@@ -49,7 +49,6 @@ module AppCLI
         else
           ensure_ruby_version!
         end
-
       end
 
       def start
@@ -133,7 +132,7 @@ module AppCLI
         escaped = command_parts.map { |p| Shellwords.escape(p) }.join(" ")
 
         if reuse_existing && runner.container_running?(env_config.app_container)
-          runner.run(%Q{docker exec -it #{env_config.app_container} bash -c #{Shellwords.escape(escaped)}})
+          runner.run(%Q(docker exec -it #{env_config.app_container} bash -c #{Shellwords.escape(escaped)}))
           return
         end
 
@@ -171,16 +170,16 @@ module AppCLI
         desired_version = env_config.ruby_version
         return if desired_version.nil?
 
-        current_version = runner.capture(%Q{docker run --rm #{env_config.app_image} ruby -e "print RUBY_VERSION"}, quiet: true)
+        current_version = runner.capture(%Q(docker run --rm #{env_config.app_image} ruby -e "print RUBY_VERSION"), quiet: true)
         current_version = current_version.to_s.strip
 
         return if current_version == desired_version
 
         message = if current_version.empty?
                     "Unable to detect Ruby version in #{env_config.app_image}; rebuilding image."
-                  else
+        else
                     "Ruby version mismatch (#{current_version} != #{desired_version}); rebuilding image."
-                  end
+        end
         shell.say(message)
         build
       end
@@ -237,7 +236,7 @@ module AppCLI
       end
 
       def network_flags
-        ["--network #{env_config.network_name}"]
+        [ "--network #{env_config.network_name}" ]
       end
 
       def traefik_flags
@@ -279,7 +278,6 @@ module AppCLI
           allow_failure: true
         )
       end
-
     end
   end
 end

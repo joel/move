@@ -102,13 +102,13 @@ module AppCLI
       end
 
       def parse_env_and_command(args)
-        return [Services.normalize_env(nil), []] if args.empty?
+        return [ Services.normalize_env(nil), [] ] if args.empty?
 
         potential_env = Services.resolve_env_argument(args.first)
         if potential_env
-          [potential_env, args[1..]]
+          [ potential_env, args[1..] ]
         else
-          [Services.normalize_env(nil), args]
+          [ Services.normalize_env(nil), args ]
         end
       end
     end

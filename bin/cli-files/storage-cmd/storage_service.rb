@@ -121,7 +121,7 @@ module AppCLI
       # blocked. Idempotent (PutBucketCors overwrites).
       def ensure_cors
         require "tempfile"
-        Tempfile.create(["cors", ".xml"]) do |f|
+        Tempfile.create([ "cors", ".xml" ]) do |f|
           f.write(cors_config)
           f.flush
           code = curl_status(

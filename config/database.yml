@@ -20,6 +20,11 @@ default: &default
   max_connections: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
 
 
+  username: <%= ENV.fetch("POSTGRES_USER") { "postgres" } %>
+  password: <%= ENV.fetch("POSTGRES_PASSWORD") { "" } %>
+  host: <%= ENV.fetch("DB_HOST") { "localhost" } %>
+  port: <%= ENV.fetch("DB_PORT") { 5432 } %>
+
 development:
   <<: *default
   database: move_development
@@ -88,8 +93,8 @@ production:
   primary: &primary_production
     <<: *default
     database: move_production
-    username: move
-    password: <%= ENV["MOVE_DATABASE_PASSWORD"] %>
+    username: <%= ENV.fetch("POSTGRES_USER") { "postgres" } %>
+    password: <%= ENV.fetch("POSTGRES_PASSWORD") { "" } %>
   cache:
     <<: *primary_production
     database: move_production_cache

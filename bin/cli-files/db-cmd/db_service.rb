@@ -134,7 +134,7 @@ module AppCLI
         raise Thor::Error, "No command provided for db exec." if command_parts.empty?
 
         escaped = command_parts.map { |p| Shellwords.escape(p) }.join(" ")
-        runner.run(%Q{docker exec -it #{env_config.db_container} bash -c #{Shellwords.escape(escaped)}})
+        runner.run(%Q(docker exec -it #{env_config.db_container} bash -c #{Shellwords.escape(escaped)}))
       end
 
       private
@@ -169,15 +169,15 @@ module AppCLI
         if env_config.postgresql?
           query = "SELECT 1 FROM pg_database WHERE datname='#{db_name}';"
           output = runner.capture(
-            %Q{docker exec #{env_config.db_container} psql -U postgres -tAc #{Shellwords.escape(query)}},
+            %Q(docker exec #{env_config.db_container} psql -U postgres -tAc #{Shellwords.escape(query)}),
             quiet: true
           )
           output&.include?("1")
         else
           db_user = mysql_user
-          query = %Q{SHOW DATABASES LIKE "#{db_name}";}
+          query = %Q(SHOW DATABASES LIKE "#{db_name}";)
           output = runner.capture(
-            %Q{docker exec #{env_config.db_container} mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u #{db_user} -N -e '#{query}'},
+            %Q(docker exec #{env_config.db_container} mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u #{db_user} -N -e '#{query}'),
             quiet: true
           )
           output&.include?(db_name)
@@ -187,9 +187,9 @@ module AppCLI
       def create_missing_databases(missing)
         if env_config.postgresql?
           missing.each do |db|
-            statement = %Q{CREATE DATABASE "#{db}";}
+            statement = %Q(CREATE DATABASE "#{db}";)
             runner.run(
-              %Q{docker exec #{env_config.db_container} psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c #{Shellwords.escape(statement)}},
+              %Q(docker exec #{env_config.db_container} psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c #{Shellwords.escape(statement)}),
               allow_failure: true
             )
           end
@@ -197,7 +197,7 @@ module AppCLI
           db_user = mysql_user
           statements = missing.map { |db| "CREATE DATABASE IF NOT EXISTS `#{db}`;" }.join(" ")
           runner.run(
-            %Q{docker exec #{env_config.db_container} mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u #{db_user} -N -e '#{statements}'},
+            %Q(docker exec #{env_config.db_container} mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u #{db_user} -N -e '#{statements}'),
             allow_failure: true
           )
         end
@@ -219,7 +219,7 @@ module AppCLI
 
         max_attempts.times do |attempt|
           ok = system(
-            %Q{docker exec #{env_config.db_container} mysqladmin ping --protocol=TCP -h 127.0.0.1 -P 3306 -u root --silent}
+            %Q(docker exec #{env_config.db_container} mysqladmin ping --protocol=TCP -h 127.0.0.1 -P 3306 -u root --silent)
           )
           if ok
             shell.say("MySQL is ready!")
@@ -239,7 +239,7 @@ module AppCLI
 
         max_attempts.times do |attempt|
           ok = system(
-            %Q{docker exec #{env_config.db_container} pg_isready -U postgres -h 127.0.0.1 -p 5432 >/dev/null 2>&1}
+            %Q(docker exec #{env_config.db_container} pg_isready -U postgres -h 127.0.0.1 -p 5432 >/dev/null 2>&1)
           )
           if ok
             shell.say("PostgreSQL is ready!")
