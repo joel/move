@@ -21,10 +21,8 @@ jobs:
         with:
           fetch-depth: '1'
       -
-        name: Install ruby 3.3.6
+        name: Install Ruby
         uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: 3.3.6
       -
         name: "Install Dependencies"
         run: bundle install --jobs 4 --retry 3
@@ -52,10 +50,9 @@ jobs:
         with:
           fetch-depth: '1'
       -
-        name: Install ruby 3.3.6
+        name: Install Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.3.6
           bundler-cache: true
       -
         name: "Lint / rubocop"
