@@ -1,0 +1,12 @@
+diff --git a/spec/requests/posts_spec.rb b/spec/requests/posts_spec.rb
+--- a/spec/requests/posts_spec.rb
++++ b/spec/requests/posts_spec.rb
+@@ -25,6 +25,8 @@ RSpec.describe "/posts" do
+     skip("Add a hash of attributes invalid for your model")
+   end
+
++  let!(:user) { create(:user) }
++
+   describe "GET /index" do
+     it "renders a successful response" do
+       Post.create! valid_attributes

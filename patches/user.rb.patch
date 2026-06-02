@@ -1,0 +1,9 @@
+diff --git a/app/models/user.rb b/app/models/user.rb
+--- a/app/models/user.rb
++++ b/app/models/user.rb
+@@ -2,4 +2,5 @@
+
+ # Source: https://github.com/rails/rails/blob/8-0-stable/activerecord/lib/rails/generators/active_record/model/templates/model.rb.tt
+ class User < ApplicationRecord
++  has_many :posts, dependent: :destroy
+ end

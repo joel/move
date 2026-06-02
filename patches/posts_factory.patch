@@ -1,0 +1,12 @@
+diff --git a/spec/factories/posts.rb b/spec/factories/posts.rb
+--- a/spec/factories/posts.rb
++++ b/spec/factories/posts.rb
+@@ -3,7 +3,7 @@ FactoryBot.define do
+   factory :post do
+     title { "MyString" }
+     body { "MyText" }
+-    user { nil }
++    user
+   end
+   # Here !!!
+ end
