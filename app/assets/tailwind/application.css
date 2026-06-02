@@ -1,1 +1,407 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 @import "tailwindcss";
+@source "../../views";
+@source "../../components";
+@source "../../../app/javascript";
+
+@layer base {
+  :root {
+    color-scheme: light;
+
+    /* ── Surface hierarchy (M3 tonal layering) ── */
+    --ha-bg: #faf8ff;
+    --ha-bg-alt: #f2f3ff;
+    --ha-surface: #faf8ff;
+    --ha-surface-muted: #f2f3ff;
+    --ha-surface-low: #f2f3ff;
+    --ha-surface-container: #eaedff;
+    --ha-surface-high: #e2e7ff;
+    --ha-surface-highest: #dae2fd;
+    --ha-surface-variant: #dae2fd;
+    --ha-surface-dim: #d2d9f4;
+    --ha-card: #ffffff;
+    --ha-card-border: transparent;
+    --ha-border: #bdc8d1;
+
+    /* ── Text ── */
+    --ha-text: #131b2e;
+    --ha-muted: #3e484f;
+    --ha-on-surface: #131b2e;
+    --ha-on-surface-variant: #3e484f;
+
+    /* ── Panel / sidebar ── */
+    --ha-panel: #0b1220;
+    --ha-panel-strong: #111827;
+    --ha-panel-text: #e2e8f0;
+    --ha-panel-muted: #94a3b8;
+
+    /* ── Primary ── */
+    --ha-primary: #00668a;
+    --ha-primary-container: #38bdf8;
+    --ha-primary-fixed: #c4e7ff;
+    --ha-primary-fixed-dim: #7bd0ff;
+    --ha-on-primary: #ffffff;
+    --ha-on-primary-container: #004965;
+
+    /* ── Secondary ── */
+    --ha-secondary: #006c4b;
+    --ha-secondary-container: #64f9bc;
+    --ha-on-secondary: #ffffff;
+    --ha-on-secondary-container: #00714e;
+
+    /* ── Tertiary ── */
+    --ha-tertiary: #855300;
+    --ha-tertiary-container: #f1a02b;
+    --ha-on-tertiary: #ffffff;
+    --ha-on-tertiary-container: #613b00;
+
+    /* ── Accent (backward compat aliases) ── */
+    --ha-accent: #38bdf8;
+    --ha-accent-strong: #0ea5e9;
+    --ha-accent-2: #34d399;
+
+    /* ── Error ── */
+    --ha-danger: #ba1a1a;
+    --ha-danger-strong: #ef4444;
+    --ha-error: #ba1a1a;
+    --ha-error-container: #ffdad6;
+
+    /* ── Outline ── */
+    --ha-outline: #6e7980;
+    --ha-outline-variant: #bdc8d1;
+
+    /* ── Inverse ── */
+    --ha-inverse-surface: #283044;
+    --ha-inverse-on-surface: #eef0ff;
+    --ha-inverse-primary: #7bd0ff;
+
+    /* ── Interactive ── */
+    --ha-ring: #00668a;
+    --ha-ring-shadow: rgba(0, 102, 138, 0.2);
+    --ha-surface-hover: #f2f3ff;
+
+    /* ── Elevation ── */
+    --ha-card-shadow: 0 20px 40px -12px rgba(19, 27, 46, 0.08);
+    --ha-card-shadow-hover: 0 24px 48px -10px rgba(19, 27, 46, 0.14);
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    /* ── Surface hierarchy (flipped luminosity) ── */
+    --ha-bg: #0b1120;
+    --ha-bg-alt: #0f172a;
+    --ha-surface: #0b1120;
+    --ha-surface-muted: #111c2e;
+    --ha-surface-low: #111c2e;
+    --ha-surface-container: #1a2236;
+    --ha-surface-high: #1e293b;
+    --ha-surface-highest: #283044;
+    --ha-surface-variant: #1e293b;
+    --ha-surface-dim: #0b1120;
+    --ha-card: #111c2e;
+    --ha-card-border: transparent;
+    --ha-border: #334155;
+
+    /* ── Text ── */
+    --ha-text: #e2e8f0;
+    --ha-muted: #94a3b8;
+    --ha-on-surface: #e2e8f0;
+    --ha-on-surface-variant: #94a3b8;
+
+    /* ── Panel / sidebar ── */
+    --ha-panel: #0b1220;
+    --ha-panel-strong: #0f172a;
+    --ha-panel-text: #e2e8f0;
+    --ha-panel-muted: #94a3b8;
+
+    /* ── Primary ── */
+    --ha-primary: #7bd0ff;
+    --ha-primary-container: #004c69;
+    --ha-primary-fixed: #c4e7ff;
+    --ha-primary-fixed-dim: #7bd0ff;
+    --ha-on-primary: #003549;
+    --ha-on-primary-container: #c4e7ff;
+
+    /* ── Secondary ── */
+    --ha-secondary: #45dfa4;
+    --ha-secondary-container: #005137;
+    --ha-on-secondary: #003826;
+    --ha-on-secondary-container: #68fcbf;
+
+    /* ── Tertiary ── */
+    --ha-tertiary: #ffb960;
+    --ha-tertiary-container: #653e00;
+    --ha-on-tertiary: #462a00;
+    --ha-on-tertiary-container: #ffddb8;
+
+    /* ── Accent (backward compat) ── */
+    --ha-accent: #7bd0ff;
+    --ha-accent-strong: #38bdf8;
+    --ha-accent-2: #45dfa4;
+
+    /* ── Error ── */
+    --ha-danger: #ffb4ab;
+    --ha-danger-strong: #f87171;
+    --ha-error: #ffb4ab;
+    --ha-error-container: #93000a;
+
+    /* ── Outline ── */
+    --ha-outline: #8b9198;
+    --ha-outline-variant: #3e484f;
+
+    /* ── Inverse ── */
+    --ha-inverse-surface: #e2e8f0;
+    --ha-inverse-on-surface: #283044;
+    --ha-inverse-primary: #00668a;
+
+    /* ── Interactive ── */
+    --ha-ring: #7bd0ff;
+    --ha-ring-shadow: rgba(123, 208, 255, 0.25);
+    --ha-surface-hover: #1e293b;
+
+    /* ── Elevation ── */
+    --ha-card-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.3);
+    --ha-card-shadow-hover: 0 24px 48px -10px rgba(0, 0, 0, 0.45);
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: "Inter", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    background-color: var(--ha-bg);
+    color: var(--ha-text);
+  }
+
+  code,
+  pre {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo,
+      Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+
+  summary {
+    list-style: none;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+}
+
+@layer components {
+  /* ── Cards: no borders, tonal layering, ambient aura shadow ── */
+  .ha-card {
+    border-radius: 2rem;
+    border: none;
+    background: var(--ha-card);
+    box-shadow: var(--ha-card-shadow);
+    transition:
+      transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @media (hover: hover) {
+    .ha-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--ha-card-shadow-hover);
+    }
+  }
+
+  .ha-overline {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--ha-muted);
+  }
+
+  .ha-card-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-top: 1rem;
+  }
+
+  /* ── Inputs: surface_highest bg, no border, ghost-border on focus ── */
+  .ha-input {
+    width: 100%;
+    border-radius: 1.5rem;
+    border: 1px solid transparent;
+    background: var(--ha-surface-highest);
+    padding: 0.85rem 1.1rem;
+    color: var(--ha-text);
+    transition:
+      background-color 200ms ease,
+      border-color 200ms ease,
+      box-shadow 200ms ease;
+  }
+
+  .ha-input::placeholder {
+    color: var(--ha-muted);
+  }
+
+  .ha-input:focus {
+    outline: none;
+    background: var(--ha-card);
+    border-color: rgba(0, 102, 138, 0.15);
+    box-shadow: 0 0 0 3px var(--ha-ring-shadow);
+  }
+
+  .dark .ha-input:focus {
+    border-color: rgba(123, 208, 255, 0.15);
+  }
+
+  /* ── Buttons ── */
+  .ha-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1),
+      background-color 200ms ease,
+      color 200ms ease;
+  }
+
+  @media (hover: hover) {
+    .ha-button:hover {
+      transform: translateY(-1px);
+    }
+  }
+
+  .ha-button:active {
+    transform: scale(0.97);
+  }
+
+  .ha-button:focus-visible {
+    outline: 2px solid var(--ha-ring);
+    outline-offset: 2px;
+  }
+
+  /* Primary: gradient from primary to primary_container */
+  .ha-button-primary {
+    background: linear-gradient(135deg, var(--ha-primary), var(--ha-primary-container));
+    color: var(--ha-on-primary);
+    box-shadow: 0 14px 30px -10px rgba(0, 102, 138, 0.35);
+  }
+
+  .ha-button-primary:hover {
+    box-shadow: 0 18px 36px -8px rgba(0, 102, 138, 0.45);
+  }
+
+  .ha-button-secondary {
+    background: var(--ha-surface-high);
+    color: var(--ha-text);
+    border: none;
+  }
+
+  .ha-button-secondary:hover {
+    background: var(--ha-surface-container);
+  }
+
+  .ha-button-danger {
+    background: var(--ha-danger);
+    color: var(--ha-on-primary);
+    box-shadow: 0 14px 30px -10px rgba(186, 26, 26, 0.35);
+  }
+
+  .ha-button-danger:hover {
+    background: var(--ha-danger-strong);
+  }
+
+  /* ── Navigation sidebar (desktop only, hidden md:flex) ── */
+  .ha-nav {
+    width: 16rem;
+  }
+
+  .ha-nav-item {
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  /* ── Glassmorphism utility ── */
+  .ha-glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .dark .ha-glass {
+    background: rgba(11, 17, 32, 0.7);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  /* ── Gradient aura for CTAs / hero sections ── */
+  .ha-gradient-aura {
+    background: linear-gradient(135deg, var(--ha-primary), var(--ha-primary-container));
+  }
+}
+
+@layer utilities {
+  .ha-fade-in {
+    animation: ha-fade 600ms ease-out both;
+  }
+
+  .ha-rise {
+    animation: ha-rise 600ms ease-out both;
+  }
+
+  /* Headline font utility */
+  .font-headline {
+    font-family: "Space Grotesk", "Segoe UI", ui-sans-serif, system-ui,
+      sans-serif;
+  }
+
+  /* Ghost border: felt, not seen */
+  .ha-ghost-border {
+    border: 1px solid rgba(189, 200, 209, 0.15);
+  }
+
+  .dark .ha-ghost-border {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ha-fade-in,
+  .ha-rise,
+  .ha-button {
+    animation: none;
+    transition: none;
+  }
+}
+
+@keyframes ha-fade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ha-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

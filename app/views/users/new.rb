@@ -10,13 +10,21 @@ module Views
       end
 
       def view_template
-        div(class: "mx-auto md:w-2/3 w-full") do
-          h1(class: "font-bold text-4xl") { "New user" }
+        div(class: "space-y-6") do
+          render Components::PageHeader.new(
+            section: "Users",
+            title: "New user",
+            subtitle: "Add someone who can own posts."
+          )
 
-          render Components::UserForm.new(user: @user)
+          div(class: "ha-card p-6") do
+            render Components::UserForm.new(user: @user)
+          end
 
-          link_to "Back to users", view_context.users_path,
-                  class: "ml-2 rounded-lg py-3 px-5 bg-gray-100 inline-block font-medium"
+          div(class: "flex flex-wrap gap-2") do
+            link_to("Back to users", view_context.users_path,
+                    class: "ha-button ha-button-secondary")
+          end
         end
       end
     end

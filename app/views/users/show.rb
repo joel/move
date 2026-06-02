@@ -11,33 +11,36 @@ module Views
       end
 
       def view_template
-        div(class: "mx-auto md:w-2/3 w-full flex") do
-          div(class: "mx-auto") do
-            render_notice
-
-            render Components::UserCard.new(user: @user)
-
-            link_to "Edit this user", view_context.edit_user_path(@user),
-                    class: "mt-2 rounded-lg py-3 px-5 bg-gray-100 inline-block font-medium"
-            div(class: "inline-block ms-2") do
-              button_to "Destroy this user", @user, method: :delete,
-                                                    class: "mt-2 rounded-lg py-3 px-5 bg-gray-100 font-medium"
-            end
-            link_to "Back to users", view_context.users_path,
-                    class: "ms-2 rounded-lg py-3 px-5 bg-gray-100 inline-block font-medium"
+        div(class: "space-y-8") do
+          render Components::PageHeader.new(
+            section: "Users",
+            title: "User details",
+            subtitle: "Review details before updating or removing."
+          ) do
+            render_actions
           end
+
+          render Components::NoticeBanner.new(message: view_context.notice) if view_context.notice.present?
+
+          render Components::UserCard.new(user: @user)
         end
       end
 
       private
 
-      def render_notice
-        return if view_context.notice.blank?
-
-        p(
-          id: "notice",
-          class: "py-2 px-3 bg-green-50 mb-5 text-green-500 font-medium rounded-lg inline-block"
-        ) { view_context.notice }
+      def render_actions
+        if view_context.allowed_to?(:edit?, @user)
+          link_to("Edit user", view_context.edit_user_path(@user),
+                  class: "ha-button ha-button-secondary")
+        end
+        if view_context.allowed_to?(:destroy?, @user)
+          button_to("Delete", view_context.user_path(@user),
+                    method: :delete,
+                    class: "ha-button ha-button-danger",
+                    form: { class: "inline-flex" })
+        end
+        link_to("Back to users", view_context.users_path,
+                class: "ha-button ha-button-secondary")
       end
     end
   end

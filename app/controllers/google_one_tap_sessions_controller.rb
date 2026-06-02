@@ -1,0 +1,108 @@
+# frozen_string_literal: true
+
+# Handles the Google "One Tap" credential posted by the
+# google-one-tap Stimulus controller. Active only when GOOGLE_CLIENT_ID
+# is configured; otherwise the One Tap prompt never renders.
+class GoogleOneTapSessionsController < ApplicationController
+  skip_forgery_protection only: :create
+
+  def create
+    payload = verify_google_token(params[:credential])
+    unless payload
+      return render json: { error: "invalid_token" },
+                    status: :unprocessable_content
+    end
+
+    google_uid = payload["sub"]
+    email = payload["email"]&.downcase
+
+    user = find_user_by_identity(google_uid) ||
+           find_and_link_user(email, google_uid)
+
+    return login_and_respond(user, payload) if user
+
+    # No matching account: send them to self-service signup.
+    render json: {
+      error: "no_account",
+      redirect: rodauth.create_account_path
+    }, status: :unprocessable_content
+  end
+
+  private
+
+  def verify_google_token(token)
+    return nil if token.blank?
+
+    uri = URI(
+      "https://oauth2.googleapis.com/tokeninfo?id_token=#{token}"
+    )
+    response = Net::HTTP.get_response(uri)
+    return nil unless response.is_a?(Net::HTTPSuccess)
+
+    data = JSON.parse(response.body)
+    return nil unless data["aud"] == ENV["GOOGLE_CLIENT_ID"]
+    return nil unless data["email_verified"] == "true"
+
+    data
+  rescue JSON::ParserError, SocketError, Timeout::Error
+    nil
+  end
+
+  def find_user_by_identity(google_uid)
+    sql = ActiveRecord::Base.sanitize_sql_array(
+      [
+        "SELECT user_id FROM user_omniauth_identities " \
+        "WHERE provider = 'google' AND uid = ?",
+        google_uid
+      ]
+    )
+    row = ActiveRecord::Base.connection.select_one(sql)
+    User.find(row["user_id"]) if row
+  end
+
+  def find_and_link_user(email, google_uid)
+    user = User.find_by(email: email)
+    return unless user
+
+    sql = ActiveRecord::Base.sanitize_sql_array(
+      [
+        "INSERT INTO user_omniauth_identities " \
+        "(id, user_id, provider, uid) VALUES (?, ?, ?, ?)",
+        SecureRandom.uuid, user.id, "google", google_uid
+      ]
+    )
+    ActiveRecord::Base.connection.execute(sql)
+    user
+  end
+
+  def login_and_respond(user, payload)
+    open_status = rodauth.account_open_status_value
+
+    if user.status != open_status
+      # Auto-verify unverified accounts (Google verified the email).
+      # Mirrors omniauth_verify_account? true in rodauth_main.rb.
+      # Unverified (1) < open (2) < closed (3) — only promote upward.
+      unless user.status < open_status
+        return render json: { error: "account_not_active" },
+                      status: :unprocessable_content
+      end
+      user.update!(status: open_status)
+    end
+
+    rodauth.account_from_id(user.id)
+    session[rodauth.session_key] = user.id
+    session[rodauth.authenticated_by_session_key] = ["google_one_tap"]
+    rodauth.remember_login
+
+    backfill_name(user, payload)
+
+    render json: { ok: true, redirect: "/" }
+  end
+
+  def backfill_name(user, payload)
+    return if user.name.present?
+
+    name = payload["name"]
+    user.update!(name: name) if name.present?
+  end
+end

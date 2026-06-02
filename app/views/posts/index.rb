@@ -10,30 +10,24 @@ module Views
       end
 
       def view_template
-        div(class: "w-full") do
-          render_notice
-
-          div(class: "flex justify-between items-center") do
-            h1(class: "font-bold text-4xl") { "Posts" }
-            link_to "New post", view_context.new_post_path,
-                    class: "rounded-lg py-3 px-5 bg-blue-600 text-white block font-medium"
+        div(class: "space-y-8") do
+          render Components::PageHeader.new(
+            section: "Content",
+            title: "Posts",
+            subtitle: "Keep updates organized and visible for the whole team."
+          ) do
+            if view_context.allowed_to?(:new?, Post)
+              link_to("New post", view_context.new_post_path,
+                      class: "ha-button ha-button-primary")
+            end
           end
 
-          div(id: "posts", class: "min-w-full") do
+          render Components::NoticeBanner.new(message: view_context.notice) if view_context.notice.present?
+
+          div(id: "posts", class: "grid gap-4") do
             @posts.each { |post| render Components::PostCard.new(post: post) }
           end
         end
-      end
-
-      private
-
-      def render_notice
-        return if view_context.notice.blank?
-
-        p(
-          id: "notice",
-          class: "py-2 px-3 bg-green-50 mb-5 text-green-500 font-medium rounded-lg inline-block"
-        ) { view_context.notice }
       end
     end
   end

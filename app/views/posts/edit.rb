@@ -10,15 +10,21 @@ module Views
       end
 
       def view_template
-        div(class: "mx-auto md:w-2/3 w-full") do
-          h1(class: "font-bold text-4xl") { "Editing post" }
+        div(class: "space-y-6") do
+          render Components::PageHeader.new(
+            section: "Posts",
+            title: "Edit post",
+            subtitle: "Refine the title or body."
+          )
 
-          render Components::PostForm.new(post: @post)
+          div(class: "ha-card p-6") do
+            render Components::PostForm.new(post: @post)
+          end
 
-          link_to "Show this post", @post,
-                  class: "ml-2 rounded-lg py-3 px-5 bg-gray-100 inline-block font-medium"
-          link_to "Back to posts", view_context.posts_path,
-                  class: "ml-2 rounded-lg py-3 px-5 bg-gray-100 inline-block font-medium"
+          div(class: "flex flex-wrap gap-2") do
+            link_to("Back to posts", view_context.posts_path,
+                    class: "ha-button ha-button-secondary")
+          end
         end
       end
     end

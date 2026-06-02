@@ -3,7 +3,9 @@
 require "rails_helper"
 
 RSpec.describe "Posts" do
-  let!(:user) { create(:user) }
+  before do
+    sign_up_and_login
+  end
 
   it "allows a user to create a new post" do
     # Visit the page where the user can create a post

@@ -24,8 +24,18 @@
 # must be quoted to be interpreted as strings. For example:
 #
 #     en:
+accounts:
+  update:
+    notice: "Account was successfully updated."
+  destroy:
+    notice: "Account was successfully deleted."
 #       "yes": yup
 #       enabled: "ON"
 
 en:
+accounts:
+  update:
+    notice: "Account was successfully updated."
+  destroy:
+    notice: "Account was successfully deleted."
   hello: "Hello world"

@@ -1,0 +1,139 @@
+# frozen_string_literal: true
+
+module Views
+  module Rodauth
+    class WebauthnRemove < Views::Base
+      include Phlex::Rails::Helpers::FormWith
+      include Phlex::Rails::Helpers::ContentTag
+      include Phlex::Rails::Helpers::LinkTo
+
+      def view_template
+        div(class: "space-y-8") do
+          render_hero
+          render Components::RodauthFlash.new
+          render_add_another_card
+          render_remove_form
+        end
+      end
+
+      private
+
+      def render_hero
+        div(class: "ha-card p-8") do
+          p(class: "ha-overline") { plain "Security" }
+          h1(class: "mt-2 text-3xl font-semibold tracking-tight sm:text-4xl") do
+            plain "Manage passkeys"
+          end
+          p(class: "mt-3 text-sm text-[var(--ha-muted)]") do
+            plain "Remove a passkey that you no longer use."
+          end
+        end
+      end
+
+      def render_add_another_card
+        div(class: "ha-card p-6") do
+          h2(class: "text-lg font-semibold") { plain "Add another passkey" }
+          p(class: "mt-2 text-sm text-[var(--ha-muted)]") do
+            plain "Register another device for faster, safer sign-ins."
+          end
+          div(class: "mt-4") do
+            link_to(
+              "Add passkey",
+              view_context.rodauth.webauthn_setup_path,
+              class: "ha-button ha-button-primary"
+            )
+          end
+        end
+      end
+
+      def render_remove_form
+        div(class: "ha-card p-6 space-y-6") do
+          form_with(
+            url: view_context.rodauth.webauthn_remove_path,
+            method: :post,
+            id: "webauthn-remove-form",
+            data: { turbo: false },
+            class: "space-y-6"
+          ) do |form|
+            raw safe(view_context.rodauth.webauthn_remove_additional_form_tags.to_s)
+
+            div(class: "flex flex-col gap-3") do
+              passkey_rows.each { |row| render_passkey_row(form, row) }
+            end
+
+            render_remove_error
+
+            form.submit(
+              view_context.rodauth.webauthn_remove_button,
+              class: "ha-button ha-button-danger w-full"
+            )
+          end
+        end
+      end
+
+      def render_passkey_row(form, row)
+        label(
+          for: "webauthn-remove-#{row[:id]}",
+          class: "flex items-center gap-3 rounded-xl border " \
+                 "border-[var(--ha-border)] bg-[var(--ha-surface-muted)] " \
+                 "px-3 py-2 text-sm text-[var(--ha-text)]"
+        ) do
+          form.radio_button(
+            view_context.rodauth.webauthn_remove_param,
+            row[:id],
+            id: "webauthn-remove-#{row[:id]}",
+            class: "h-4 w-4",
+            aria: radio_aria_attrs
+          )
+          span(class: "font-medium") { plain row[:name] }
+          span(class: "text-[var(--ha-muted)]") do
+            plain " — Last used: #{row[:last_use]}"
+          end
+        end
+      end
+
+      def render_remove_error
+        return unless remove_error
+
+        span(
+          class: "block text-xs text-red-500",
+          id: "webauthn_remove_error_message"
+        ) { remove_error }
+      end
+
+      def radio_aria_attrs
+        return {} unless remove_error
+
+        { invalid: true, describedby: "webauthn_remove_error_message" }
+      end
+
+      def remove_error
+        return @remove_error if defined?(@remove_error)
+
+        @remove_error = view_context.rodauth.field_error(
+          view_context.rodauth.webauthn_remove_param
+        )
+      end
+
+      def passkey_rows
+        rodauth = view_context.rodauth
+        fmt = rodauth.strftime_format
+        sql = ActiveRecord::Base.sanitize_sql_array(
+          [
+            "SELECT webauthn_id, last_use, name FROM user_webauthn_keys " \
+            "WHERE user_id = ? ORDER BY last_use DESC",
+            rodauth.account_id
+          ]
+        )
+        rows = ActiveRecord::Base.connection.exec_query(sql, "Passkeys")
+        rows.map do |row|
+          last_use = row["last_use"]
+          parsed = last_use.is_a?(Time) ? last_use : Time.zone.parse(last_use.to_s)
+          { id: row["webauthn_id"],
+            name: row["name"].presence || "Passkey",
+            last_use: parsed ? parsed.strftime(fmt) : "Never" }
+        end
+      end
+    end
+  end
+end

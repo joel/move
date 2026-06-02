@@ -1,7 +1,10 @@
 # frozen_string_literal: true
 
+# Source: https://github.com/rails/rails/blob/7-1-stable/railties/lib/rails/generators/rails/scaffold_controller/templates/controller.rb.tt
 class PostsController < ApplicationController
   before_action :set_post, only: %i[show edit update destroy]
+  before_action :require_authenticated_user!, only: %i[new create edit update destroy]
+  before_action :authorize_post!, only: %i[edit update destroy]
 
   # GET /posts
   def index
@@ -16,7 +19,7 @@ class PostsController < ApplicationController
 
   # GET /posts/new
   def new
-    @post = Post.new(title: "A Post", body: "...", user_id: User.first&.id)
+    @post = current_user.posts.new(title: "A Post", body: "...")
     render Views::Posts::New.new(post: @post)
   end
 
@@ -27,7 +30,7 @@ class PostsController < ApplicationController
 
   # POST /posts
   def create
-    @post = Post.new(post_params)
+    @post = current_user.posts.new(post_params)
 
     if @post.save
       redirect_to @post, notice: "Post was successfully created."
@@ -48,7 +51,7 @@ class PostsController < ApplicationController
   # DELETE /posts/1
   def destroy
     @post.destroy!
-    redirect_to posts_path, notice: "Post was successfully destroyed.", status: :see_other
+    redirect_to posts_url, notice: "Post was successfully destroyed.", status: :see_other
   end
 
   private
@@ -57,8 +60,12 @@ class PostsController < ApplicationController
     @post = Post.find(params.expect(:id))
   end
 
+  def authorize_post!
+    authorize! @post, to: :"#{action_name}?"
+  end
+
   # Only allow a list of trusted parameters through.
   def post_params
-    params.expect(post: %i[title body user_id])
+    params.expect(post: %i[title body])
   end
 end

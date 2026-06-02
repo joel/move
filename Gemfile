@@ -119,3 +119,18 @@ end
 gem "phlex-rails", "~> 2.0"
 
 gem "foreman", "~> 0.90.0"
+
+# ── Authentication (Rodauth: passkeys, email links, Google) ──
+gem "omniauth-google-oauth2"
+gem "rodauth-omniauth"
+gem "rodauth-rails"
+gem "sequel-activerecord_connection", require: false
+gem "tilt", require: false
+gem "webauthn"
+
+# Authorization
+gem "action_policy"
+
+group :test do
+  gem "phlex-testing-capybara", require: false
+end
