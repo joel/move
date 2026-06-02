@@ -1,0 +1,14 @@
+# Controls the notes produced by `gh release create --generate-notes`.
+# Dependency-bump PRs are noise in release notes — exclude them by label
+# and author so the changelog stays focused on real changes.
+changelog:
+  exclude:
+    labels:
+      - dependencies
+    authors:
+      - dependabot
+      - dependabot[bot]
+  categories:
+    - title: What's Changed
+      labels:
+        - "*"
