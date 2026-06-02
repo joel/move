@@ -1,0 +1,19 @@
+## Use whatever base image
+FROM alpine
+
+# https://github.com/ufoscout/docker-compose-wait/releases/
+ARG ARG_COMPOSE_WAIT_VER=2.12.1
+
+# Install curl
+RUN apk add --no-cache curl
+
+## Add the wait script to the image
+ADD https://github.com/ufoscout/docker-compose-wait/releases/download/${ARG_COMPOSE_WAIT_VER}/wait /wait
+
+RUN chmod +x /wait
+
+## Add your application to the docker image
+ADD bin/health_check.sh /health_check.sh
+RUN chmod +x /health_check.sh
+
+CMD ["/wait"]
