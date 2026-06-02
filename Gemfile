@@ -117,3 +117,5 @@ group :test do
 end
 
 gem "phlex-rails", "~> 2.0"
+
+gem "foreman", "~> 0.90.0"
