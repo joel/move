@@ -115,3 +115,5 @@ group :test do
   gem "rspec-rails"
   gem "selenium-webdriver"
 end
+
+gem "phlex-rails", "~> 2.0"
