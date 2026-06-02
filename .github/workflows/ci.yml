@@ -14,6 +14,26 @@ jobs:
 
     needs: lint
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      DB_HOST: localhost
+      DB_PORT: 5432
+
     steps:
       -
         name: Checkout Source Code
@@ -29,15 +49,14 @@ jobs:
       -
         name: "Prepare Tests"
         run: |
-          bin/rails db:environment:set RAILS_ENV=test
-          bin/rails db:drop db:create db:schema:load
+          bin/rails db:create db:schema:load
           bin/rails assets:precompile
       -
         name: "Test / Unit Tests (controllers, models, helpers, mailers, jobs, lib, requests)"
-        run: bin/bundle exec rspec spec --exclude-pattern "spec/system/**/*_spec.rb"
+        run: bundle exec rspec spec --exclude-pattern "spec/system/**/*_spec.rb"
       -
         name: "Test / System Tests"
-        run: TEST_BROWSER=rack_test bin/bundle exec rspec spec/system
+        run: TEST_BROWSER=rack_test bundle exec rspec spec/system
 
   lint:
 
