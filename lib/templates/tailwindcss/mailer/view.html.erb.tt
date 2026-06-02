@@ -1,0 +1,6 @@
+<%# Source: https://github.com/rails/tailwindcss-rails/blob/v2.0.32/lib/generators/tailwindcss/mailer/templates/*.erb.tt %>
+<h1><%= class_name %>#<%= @action %></h1>
+
+<p>
+  <%%= @greeting %>, find me in <%= @path %>
+</p>
