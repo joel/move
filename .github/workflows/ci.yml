@@ -1,6 +1,12 @@
 name: CI
 
-on: [ push ]
+run-name: ${{ github.actor }} - CI - ${{ github.event.pull_request.title || github.event.head_commit.message }}
+
+on:
+  push:
+    paths-ignore:
+      - '**/*.md'
+      - '.claude/**'
 
 env:
   RAILS_ENV: test
