@@ -1,0 +1,97 @@
+name: Release Bug Scan
+
+run-name: ${{ github.actor }} - Release Bug Scan - ${{ github.ref_name }}
+
+# Runs an automated Codex bug scan whenever a release tag is pushed. Adjust the
+# tag glob below to match your release-tag convention (e.g. v1.2.3). Tag pushes
+# are independent of the deploy pipeline, so this scan never interferes with a
+# deploy. Requires an OPENAI_API_KEY repository secret.
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Least privilege: the scan only reads the code and publishes a summary/artifact.
+permissions:
+  contents: read
+
+# One scan per tag; a re-pushed tag supersedes an in-flight run.
+concurrency:
+  group: release-bug-scan-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout tagged code
+        uses: actions/checkout@v6
+        with:
+          # Full history + tags so we can diff this tag against the previous one.
+          fetch-depth: 0
+
+      - name: Resolve diff range
+        id: range
+        run: |
+          current="${GITHUB_REF_NAME}"
+          # Previous release tag reachable from this tag's first parent.
+          previous="$(git describe --tags --abbrev=0 "${current}^" 2>/dev/null || true)"
+          if [ -n "${previous}" ]; then
+            range="${previous}..${current}"
+          else
+            # First release: diff the whole tree against the empty tree so the
+            # scan sees every file as an addition. A bare "${current}" would diff
+            # the tag against the (identical) checked-out working tree — i.e.
+            # nothing. git hash-object derives the empty-tree hash portably
+            # (works for SHA-256 repos too).
+            empty_tree="$(git hash-object -t tree /dev/null)"
+            range="${empty_tree}..${current}"
+          fi
+          echo "current=${current}"   >> "$GITHUB_OUTPUT"
+          echo "previous=${previous}" >> "$GITHUB_OUTPUT"
+          echo "range=${range}"       >> "$GITHUB_OUTPUT"
+          echo "Scanning range: ${range}"
+
+      - name: Build Codex prompt
+        run: |
+          {
+            echo "## Release under review"
+            echo "- Current tag: \`${CURRENT_TAG}\`"
+            echo "- Previous tag: \`${PREVIOUS_TAG:-<none — first release>}\`"
+            echo "- Diff range (git revision range): \`${DIFF_RANGE}\`"
+            echo
+            cat .github/codex/release-bug-scan-prompt.md
+          } > "${RUNNER_TEMP}/codex-prompt.md"
+        env:
+          CURRENT_TAG: ${{ steps.range.outputs.current }}
+          PREVIOUS_TAG: ${{ steps.range.outputs.previous }}
+          DIFF_RANGE: ${{ steps.range.outputs.range }}
+
+      - name: Run Codex bug scan
+        id: scan
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          # Read-only: the scan analyses code, it never edits the working tree.
+          sandbox: read-only
+          prompt-file: ${{ runner.temp }}/codex-prompt.md
+          output-file: release-bug-scan.md
+
+      - name: Publish report to job summary
+        if: always()
+        run: |
+          if [ -s release-bug-scan.md ]; then
+            cat release-bug-scan.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## 🔎 Release Bug Scan" >> "$GITHUB_STEP_SUMMARY"
+            echo "_No report was produced — check the Codex step logs above._" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bug-scan-${{ github.ref_name }}
+          path: release-bug-scan.md
+          if-no-files-found: ignore
