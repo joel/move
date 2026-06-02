@@ -36,18 +36,18 @@ module AppCLI
           [
             "docker build #{AppCLI::ROOT}",
             "--tag #{env_config.wait_image}",
-            "-f #{File.join(AppCLI::ROOT, 'dockerfiles/Dockerfile-wait')}"
+            "-f #{File.join(AppCLI::ROOT, "dockerfiles/Dockerfile-wait")}"
           ]
         )
       end
 
       def prepare
         setup
-        unless runner.image_exists?(env_config.app_image)
+        if runner.image_exists?(env_config.app_image)
+          ensure_ruby_version!
+        else
           shell.say("App image #{env_config.app_image} missing, building it first")
           build
-        else
-          ensure_ruby_version!
         end
       end
 
@@ -132,7 +132,7 @@ module AppCLI
         escaped = command_parts.map { |p| Shellwords.escape(p) }.join(" ")
 
         if reuse_existing && runner.container_running?(env_config.app_container)
-          runner.run(%Q(docker exec -it #{env_config.app_container} bash -c #{Shellwords.escape(escaped)}))
+          runner.run(%(docker exec -it #{env_config.app_container} bash -c #{Shellwords.escape(escaped)}))
           return
         end
 
@@ -170,16 +170,17 @@ module AppCLI
         desired_version = env_config.ruby_version
         return if desired_version.nil?
 
-        current_version = runner.capture(%Q(docker run --rm #{env_config.app_image} ruby -e "print RUBY_VERSION"), quiet: true)
+        current_version = runner.capture(%(docker run --rm #{env_config.app_image} ruby -e "print RUBY_VERSION"),
+                                         quiet: true)
         current_version = current_version.to_s.strip
 
         return if current_version == desired_version
 
         message = if current_version.empty?
                     "Unable to detect Ruby version in #{env_config.app_image}; rebuilding image."
-        else
+                  else
                     "Ruby version mismatch (#{current_version} != #{desired_version}); rebuilding image."
-        end
+                  end
         shell.say(message)
         build
       end
@@ -199,9 +200,7 @@ module AppCLI
           "--env RAILS_ALLOW_ALL_HOSTS=true"
         ]
 
-        if env_config.short == "dev"
-          flags << "--env BUNDLE_WITHOUT=production"
-        end
+        flags << "--env BUNDLE_WITHOUT=production" if env_config.short == "dev"
 
         if env_config.mysql? || env_config.postgresql?
           db_port = env_config.db_port
@@ -221,22 +220,18 @@ module AppCLI
         flags = []
 
         if env_config.mysql?
-          flags << "--volume #{File.join(AppCLI::ROOT, 'certs/mysql/ca.pem')}:/run/secrets/mysql-ca.pem:ro"
+          flags << "--volume #{File.join(AppCLI::ROOT, "certs/mysql/ca.pem")}:/run/secrets/mysql-ca.pem:ro"
         end
 
-        if env_config.short == "dev"
-          flags << "--volume #{AppCLI::ROOT}:/rails"
-        end
+        flags << "--volume #{AppCLI::ROOT}:/rails" if env_config.short == "dev"
 
-        if env_config.sqlite3?
-          flags << "--volume #{File.join(AppCLI::ROOT, 'db')}:/rails/db"
-        end
+        flags << "--volume #{File.join(AppCLI::ROOT, "db")}:/rails/db" if env_config.sqlite3?
 
         flags
       end
 
       def network_flags
-        [ "--network #{env_config.network_name}" ]
+        ["--network #{env_config.network_name}"]
       end
 
       def traefik_flags

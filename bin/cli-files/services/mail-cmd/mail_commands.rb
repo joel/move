@@ -10,19 +10,13 @@ module AppCLI
       include Thor::Actions
 
       desc "start", "Start the local mail service"
-      def start
-        mail_service.start
-      end
+      delegate :start, to: :mail_service
 
       desc "stop", "Stop the local mail service"
-      def stop
-        mail_service.stop
-      end
+      delegate :stop, to: :mail_service
 
       desc "logs", "View local mail service logs"
-      def logs
-        mail_service.logs
-      end
+      delegate :logs, to: :mail_service
 
       desc "status", "Check local mail service status"
       def status

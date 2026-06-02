@@ -1,7 +1,6 @@
 #!/usr/bin/env ruby
 
 require "open3"
-require "pathname"
 require "shellwords"
 require "thor"
 require "active_support/core_ext/module/delegation"
@@ -42,7 +41,10 @@ module AppCLI
       return "development" if value.empty?
 
       normalized = SUPPORTED_ENVS[value.downcase]
-      raise Thor::Error, "Unsupported environment '#{env_arg}'. Use dev|development or prod|production." unless normalized
+      unless normalized
+        raise Thor::Error,
+              "Unsupported environment '#{env_arg}'. Use dev|development or prod|production."
+      end
 
       normalized
     end
@@ -119,7 +121,7 @@ module AppCLI
       end
 
       def db_port
-        env_port = ENV["DB_PORT"]
+        env_port = ENV.fetch("DB_PORT", nil)
         return env_port.to_s.strip unless env_port.nil? || env_port.strip.empty?
 
         default = DEFAULT_DB_PORTS[db_adapter]
@@ -138,7 +140,7 @@ module AppCLI
         return nil unless File.exist?(version_file)
 
         version = File.read(version_file).strip
-        version = version.sub(/\Aruby-/, "")
+        version = version.delete_prefix("ruby-")
         version.empty? ? nil : version
       end
 
@@ -184,9 +186,9 @@ module AppCLI
         @shell = shell
       end
 
-      def say(message, *args)
+      def say(message, *)
         if shell.respond_to?(:say)
-          shell.say(message, *args)
+          shell.say(message, *)
         else
           puts(message)
         end

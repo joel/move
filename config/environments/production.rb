@@ -24,22 +24,21 @@ Rails.application.configure do
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :local
 
-# Assume all access to the app is happening through a SSL-terminating reverse proxy.
-# config.assume_ssl = true
+  # Assume all access to the app is happening through a SSL-terminating reverse proxy.
+  # config.assume_ssl = true
 
-# Enforce HTTPS semantics at the app level
-config.force_ssl  = true
+  # Enforce HTTPS semantics at the app level
+  config.force_ssl  = true
 
-# Tell Rails to treat proxied requests as HTTPS
-config.assume_ssl = true
+  # Tell Rails to treat proxied requests as HTTPS
+  config.assume_ssl = true
 
-# Don't redirect the internal healthcheck, keep Kamal happy
-config.ssl_options = {
-  redirect: {
-    exclude: ->(request) { request.path == "/up" }
+  # Don't redirect the internal healthcheck, keep Kamal happy
+  config.ssl_options = {
+    redirect: {
+      exclude: ->(request) { request.path == "/up" }
+    }
   }
-}
-
 
   # Skip http-to-https redirect for the default health check endpoint.
   # config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
@@ -68,32 +67,32 @@ config.ssl_options = {
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.
   config.action_mailer.raise_delivery_errors = true
 
-# Set host to be used by links generated in mailer templates.
-config.action_mailer.default_url_options = { host: "<%= app_name %>.workeverywhere.app", protocol: "https" }
-config.action_mailer.asset_host = "https://<%= app_name %>.workeverywhere.app"
+  # Set host to be used by links generated in mailer templates.
+  config.action_mailer.default_url_options = { host: "<%= app_name %>.workeverywhere.app", protocol: "https" }
+  config.action_mailer.asset_host = "https://<%= app_name %>.workeverywhere.app"
 
-# TODO: Find a better way to handle Docker build time vs runtime env vars
-notif_mail_username = if ENV["SECRET_KEY_BASE_DUMMY"]
-                        ENV.fetch("NOTIF_MAIL_USERNAME", nil) # For Docker build time
-else
-                        ENV.fetch("NOTIF_MAIL_USERNAME") # Enforce presence in production
-end
-notif_mail_password = if ENV["SECRET_KEY_BASE_DUMMY"]
-                        ENV.fetch("NOTIF_MAIL_PASSWORD", nil) # For Docker build time
-else
-                        ENV.fetch("NOTIF_MAIL_PASSWORD") # Enforce presence in production
-end
+  # TODO: Find a better way to handle Docker build time vs runtime env vars
+  notif_mail_username = if ENV["SECRET_KEY_BASE_DUMMY"]
+                          ENV.fetch("NOTIF_MAIL_USERNAME", nil) # For Docker build time
+                        else
+                          ENV.fetch("NOTIF_MAIL_USERNAME") # Enforce presence in production
+                        end
+  notif_mail_password = if ENV["SECRET_KEY_BASE_DUMMY"]
+                          ENV.fetch("NOTIF_MAIL_PASSWORD", nil) # For Docker build time
+                        else
+                          ENV.fetch("NOTIF_MAIL_PASSWORD") # Enforce presence in production
+                        end
 
-config.action_mailer.delivery_method = :smtp
-config.action_mailer.default_options = { from: ENV.fetch("NOTIF_MAIL_FROM", "<%= app_name %>@joelazemar.com") }
-config.action_mailer.smtp_settings = {
-  address: ENV.fetch("NOTIF_MAIL_HOST", "mail.smtp2go.com"),
-  port: ENV.fetch("NOTIF_MAIL_PORT", "587").to_i,
-  user_name: notif_mail_username,
-  password: notif_mail_password,
-  authentication: :plain,
-  enable_starttls_auto: true
-}
+  config.action_mailer.delivery_method = :smtp
+  config.action_mailer.default_options = { from: ENV.fetch("NOTIF_MAIL_FROM", "<%= app_name %>@joelazemar.com") }
+  config.action_mailer.smtp_settings = {
+    address: ENV.fetch("NOTIF_MAIL_HOST", "mail.smtp2go.com"),
+    port: ENV.fetch("NOTIF_MAIL_PORT", "587").to_i,
+    user_name: notif_mail_username,
+    password: notif_mail_password,
+    authentication: :plain,
+    enable_starttls_auto: true
+  }
 
   # config.x.notif_mail_to = ENV.fetch("NOTIF_MAIL_TO", "joel.azemar@gmail.com")
 
@@ -105,7 +104,7 @@ config.action_mailer.smtp_settings = {
   config.active_record.dump_schema_after_migration = false
 
   # Only use :id for inspections in production.
-  config.active_record.attributes_for_inspect = [ :id ]
+  config.active_record.attributes_for_inspect = [:id]
 
   # Enable DNS rebinding protection and other `Host` header attacks.
   # config.hosts = [

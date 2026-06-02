@@ -134,7 +134,7 @@ module AppCLI
         raise Thor::Error, "No command provided for db exec." if command_parts.empty?
 
         escaped = command_parts.map { |p| Shellwords.escape(p) }.join(" ")
-        runner.run(%Q(docker exec -it #{env_config.db_container} bash -c #{Shellwords.escape(escaped)}))
+        runner.run(%(docker exec -it #{env_config.db_container} bash -c #{Shellwords.escape(escaped)}))
       end
 
       private
@@ -169,15 +169,15 @@ module AppCLI
         if env_config.postgresql?
           query = "SELECT 1 FROM pg_database WHERE datname='#{db_name}';"
           output = runner.capture(
-            %Q(docker exec #{env_config.db_container} psql -U postgres -tAc #{Shellwords.escape(query)}),
+            %(docker exec #{env_config.db_container} psql -U postgres -tAc #{Shellwords.escape(query)}),
             quiet: true
           )
           output&.include?("1")
         else
           db_user = mysql_user
-          query = %Q(SHOW DATABASES LIKE "#{db_name}";)
+          query = %(SHOW DATABASES LIKE "#{db_name}";)
           output = runner.capture(
-            %Q(docker exec #{env_config.db_container} mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u #{db_user} -N -e '#{query}'),
+            %(docker exec #{env_config.db_container} mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u #{db_user} -N -e '#{query}'),
             quiet: true
           )
           output&.include?(db_name)
@@ -187,9 +187,9 @@ module AppCLI
       def create_missing_databases(missing)
         if env_config.postgresql?
           missing.each do |db|
-            statement = %Q(CREATE DATABASE "#{db}";)
+            statement = %(CREATE DATABASE "#{db}";)
             runner.run(
-              %Q(docker exec #{env_config.db_container} psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c #{Shellwords.escape(statement)}),
+              %(docker exec #{env_config.db_container} psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c #{Shellwords.escape(statement)}),
               allow_failure: true
             )
           end
@@ -197,12 +197,12 @@ module AppCLI
           db_user = mysql_user
           statements = missing.map { |db| "CREATE DATABASE IF NOT EXISTS `#{db}`;" }.join(" ")
           runner.run(
-            %Q(docker exec #{env_config.db_container} mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u #{db_user} -N -e '#{statements}'),
+            %(docker exec #{env_config.db_container} mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u #{db_user} -N -e '#{statements}'),
             allow_failure: true
           )
         end
 
-        shell.say("Ensured databases exist: #{missing.join(', ')}")
+        shell.say("Ensured databases exist: #{missing.join(", ")}")
       end
 
       def wait_for_db_ready
@@ -219,7 +219,7 @@ module AppCLI
 
         max_attempts.times do |attempt|
           ok = system(
-            %Q(docker exec #{env_config.db_container} mysqladmin ping --protocol=TCP -h 127.0.0.1 -P 3306 -u root --silent)
+            %(docker exec #{env_config.db_container} mysqladmin ping --protocol=TCP -h 127.0.0.1 -P 3306 -u root --silent)
           )
           if ok
             shell.say("MySQL is ready!")
@@ -239,7 +239,7 @@ module AppCLI
 
         max_attempts.times do |attempt|
           ok = system(
-            %Q(docker exec #{env_config.db_container} pg_isready -U postgres -h 127.0.0.1 -p 5432 >/dev/null 2>&1)
+            %(docker exec #{env_config.db_container} pg_isready -U postgres -h 127.0.0.1 -p 5432 >/dev/null 2>&1)
           )
           if ok
             shell.say("PostgreSQL is ready!")
@@ -271,11 +271,11 @@ module AppCLI
             "--env MYSQL_ALLOW_EMPTY_PASSWORD=yes",
             "--network #{env_config.network_name}",
             "--volume #{env_config.db_volume}:/var/lib/mysql",
-            "--volume #{File.join(AppCLI::ROOT, 'certs/mysql/ca.pem')}:/etc/mysql/certs/ca.pem:ro",
-            "--volume #{File.join(AppCLI::ROOT, 'certs/mysql/server-cert.pem')}:/etc/mysql/certs/server-cert.pem:ro",
-            "--volume #{File.join(AppCLI::ROOT, 'certs/mysql/server-key.pem')}:/etc/mysql/certs/server-key.pem:ro",
-            "--volume #{File.join(AppCLI::ROOT, 'config/mysql/ssl.cnf')}:/etc/mysql/conf.d/ssl.cnf:ro",
-            "--volume #{File.join(AppCLI::ROOT, 'config/mysql/init.sql')}:/docker-entrypoint-initdb.d/001-init.sql:ro",
+            "--volume #{File.join(AppCLI::ROOT, "certs/mysql/ca.pem")}:/etc/mysql/certs/ca.pem:ro",
+            "--volume #{File.join(AppCLI::ROOT, "certs/mysql/server-cert.pem")}:/etc/mysql/certs/server-cert.pem:ro",
+            "--volume #{File.join(AppCLI::ROOT, "certs/mysql/server-key.pem")}:/etc/mysql/certs/server-key.pem:ro",
+            "--volume #{File.join(AppCLI::ROOT, "config/mysql/ssl.cnf")}:/etc/mysql/conf.d/ssl.cnf:ro",
+            "--volume #{File.join(AppCLI::ROOT, "config/mysql/init.sql")}:/docker-entrypoint-initdb.d/001-init.sql:ro",
             ("--publish #{db_port}:3306" if db_port),
             env_config.db_image
           ].compact
