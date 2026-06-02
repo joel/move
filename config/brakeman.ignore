@@ -1,0 +1,106 @@
+{
+  "ignored_warnings": [
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "090289ff1ccc5c57495bcd6ed45e31887b9607acb4aeb99830f8e3926fbaa82b",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "bin/cli-files/services/helpers.rb",
+      "line": 239,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "system(\"docker network inspect #{name} >/dev/null 2>&1\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "AppCLI::Services::CommandRunner",
+        "method": "ensure_network"
+      },
+      "user_input": "name",
+      "confidence": "Medium",
+      "note": "Reviewed: dev-only bin/cli tooling. Interpolated values (container/image/network/volume names) come from project config, not user input. Not reachable from web requests."
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "24c3761262f494ff0aff7cd93d421de85e2253aa3fe414c3b0f4ba7ac2efc103",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "bin/cli-files/db-cmd/db_service.rb",
+      "line": 242,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "system(\"docker exec #{env_config.db_container} pg_isready -U postgres -h 127.0.0.1 -p 5432 >/dev/null 2>&1\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "AppCLI::Services::DbService",
+        "method": "wait_for_postgres"
+      },
+      "user_input": "env_config.db_container",
+      "confidence": "Medium",
+      "note": "Reviewed: dev-only bin/cli tooling. Interpolated values (container/image/network/volume names) come from project config, not user input. Not reachable from web requests."
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "5e1b74b53f7b31233c87568a70235bb0ab7cee21b3745903ec469c2acb2c760c",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "bin/cli-files/services/helpers.rb",
+      "line": 226,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "system(\"docker image inspect #{image} >/dev/null 2>&1\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "AppCLI::Services::CommandRunner",
+        "method": "image_exists?"
+      },
+      "user_input": "image",
+      "confidence": "Medium",
+      "note": "Reviewed: dev-only bin/cli tooling. Interpolated values (container/image/network/volume names) come from project config, not user input. Not reachable from web requests."
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "6ca5083acbb1819dacd8679ab6aa01f171c9fe696da1e0133accf4b3c4d90840",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "bin/cli-files/services/helpers.rb",
+      "line": 245,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "system(\"docker volume inspect #{name} >/dev/null 2>&1\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "AppCLI::Services::CommandRunner",
+        "method": "ensure_volume"
+      },
+      "user_input": "name",
+      "confidence": "Medium",
+      "note": "Reviewed: dev-only bin/cli tooling. Interpolated values (container/image/network/volume names) come from project config, not user input. Not reachable from web requests."
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "93170a99ccd4fa3714831218ce0017fe1bc5727c8ca16a67227742a5aec480c4",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "bin/cli-files/db-cmd/db_service.rb",
+      "line": 222,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "system(\"docker exec #{env_config.db_container} mysqladmin ping --protocol=TCP -h 127.0.0.1 -P 3306 -u root --silent\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "AppCLI::Services::DbService",
+        "method": "wait_for_mysql"
+      },
+      "user_input": "env_config.db_container",
+      "confidence": "Medium",
+      "note": "Reviewed: dev-only bin/cli tooling. Interpolated values (container/image/network/volume names) come from project config, not user input. Not reachable from web requests."
+    }
+  ],
+  "updated": "2026-06-02 18:01:51 +0000",
+  "brakeman_version": "8.0.4"
+}
