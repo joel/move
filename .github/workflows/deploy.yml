@@ -34,12 +34,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-        with:
-          # Use the docker driver (not docker-container/buildkit): the container
-          # driver's cross-repo blob mounts fail on a first push to a new Docker
-          # Hub repo ("blob unknown to registry"). The docker driver pushes every
-          # layer explicitly. Matches builder.driver in config/deploy.yml.
-          driver: docker
 
       - name: Set up SSH agent
         uses: webfactory/ssh-agent@v0.10.0
