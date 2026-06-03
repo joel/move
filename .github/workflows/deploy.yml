@@ -6,6 +6,13 @@ on:
   push:
     branches: [main]
 
+# Never run two production deploys at once. cancel-in-progress is false so an
+# in-flight kamal deploy (which holds a server-side lock and may be mid-rollout)
+# is never interrupted; a newer push queues and supersedes any other pending run.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
