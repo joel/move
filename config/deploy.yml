@@ -84,6 +84,12 @@ asset_path: /rails/public/assets
 builder:
   arch: x86_64
 
+  # Build with the plain docker driver (not the docker-container/buildkit
+  # driver). The container driver's push to Docker Hub fails with "blob unknown
+  # to registry"; building into the local daemon and pushing avoids it. Single
+  # arch (x86_64) doesn't need the container driver.
+  driver: docker
+
   # Disable buildx provenance/SBOM attestations: Docker Hub rejects the
   # attestation manifest's blobs ("blob unknown to registry") on push.
   provenance: false
