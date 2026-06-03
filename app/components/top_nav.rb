@@ -64,6 +64,7 @@ module Components
     def render_auth_actions
       if current_user
         link_to("Account", view_context.account_path, class: nav_link_class)
+        link_to(passkey_label, passkey_path, class: nav_link_class)
         button_to("Sign out", view_context.rodauth.logout_path,
                   method: :post,
                   form: { class: "inline-flex" },
@@ -72,6 +73,25 @@ module Components
         link_to("Sign in", view_context.rodauth.login_path,
                 class: "ha-button ha-button-primary !px-4 !py-2 text-sm")
       end
+    end
+
+    # Passwordless passkey (WebAuthn) management: "Add passkey" until the account
+    # has one registered, then "Manage passkeys" to review/remove existing keys.
+    def passkey_path
+      rodauth = view_context.rodauth
+      passkey_registered? ? rodauth.webauthn_remove_path : rodauth.webauthn_setup_path
+    end
+
+    def passkey_label
+      passkey_registered? ? "Manage passkeys" : "Add passkey"
+    end
+
+    # rodauth.webauthn_setup? reads the authenticated Rodauth account; guard on
+    # logged_in? so the nav never raises when current_user is present without a
+    # Rodauth session (e.g. request specs that stub current_user).
+    def passkey_registered?
+      rodauth = view_context.rodauth
+      rodauth.logged_in? && rodauth.webauthn_setup?
     end
 
     def nav_link_class
