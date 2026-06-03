@@ -1,6 +1,6 @@
 ---
 name: qa-review
-description: Use this skill after product-review completes to perform structured quality assurance on the full feature or fix — checking edge cases, boundary conditions, and regression risk that automated tests may not cover. Trigger when the user says "qa review", "qa check", "edge case review", or after any phase completes before the PR is merged. This skill is adversarial: its job is to break the feature, not validate it. Always prefer testing in the live Docker environment over reading code.
+description: Use this skill after product-review completes to perform structured quality assurance on the full feature or fix — checking edge cases, boundary conditions, and regression risk that automated tests may not cover. Trigger when the user says "qa review", "qa check", "edge case review", or after any phase completes before the PR is merged. This skill is adversarial — its job is to break the feature, not validate it. Always prefer testing in the live Docker environment over reading code.
 ---
 
 # QA Review
