@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_02_152138) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_03_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "citext"
   enable_extension "pg_catalog.plpgsql"
@@ -74,10 +74,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_02_152138) do
   end
 
   add_foreign_key "posts", "users"
-  add_foreign_key "user_email_auth_keys", "users", column: "id"
+  add_foreign_key "user_email_auth_keys", "users", column: "id", on_delete: :cascade
   add_foreign_key "user_omniauth_identities", "users", on_delete: :cascade
-  add_foreign_key "user_remember_keys", "users", column: "id"
-  add_foreign_key "user_verification_keys", "users", column: "id"
-  add_foreign_key "user_webauthn_keys", "users"
-  add_foreign_key "user_webauthn_user_ids", "users", column: "id"
+  add_foreign_key "user_remember_keys", "users", column: "id", on_delete: :cascade
+  add_foreign_key "user_verification_keys", "users", column: "id", on_delete: :cascade
+  add_foreign_key "user_webauthn_keys", "users", on_delete: :cascade
+  add_foreign_key "user_webauthn_user_ids", "users", column: "id", on_delete: :cascade
 end
