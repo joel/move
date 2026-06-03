@@ -1,0 +1,52 @@
+name: Deploy
+
+run-name: ${{ github.actor }} - DEPLOY - ${{ github.event.head_commit.message }}
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    # Allow opting out of a deploy for a given commit.
+    if: "!contains(github.event.head_commit.message, '[skip deploy]')"
+
+    env:
+      # These are synced into GitHub Actions secrets by Doppler's GitHub
+      # integration. `.kamal/secrets` reads them from the environment in CI and
+      # falls back to the Doppler CLI + config/master.key for local deploys.
+      KAMAL_REGISTRY_PASSWORD: ${{ secrets.KAMAL_REGISTRY_PASSWORD }}
+      RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      NOTIF_MAIL_USERNAME: ${{ secrets.NOTIF_MAIL_USERNAME }}
+      NOTIF_MAIL_PASSWORD: ${{ secrets.NOTIF_MAIL_PASSWORD }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add deploy host to known_hosts
+        # The runner occasionally can't resolve the host via DNS; pin it so the
+        # ssh-keyscan + deploy connect reliably. IP must match workeverywhere.app.
+        run: |
+          echo "65.20.110.89 workeverywhere.app" | sudo tee -a /etc/hosts
+          mkdir -p ~/.ssh
+          ssh-keyscan -t rsa,ecdsa,ed25519 workeverywhere.app 65.20.110.89 >> ~/.ssh/known_hosts
+
+      - name: Deploy
+        run: bin/kamal deploy
