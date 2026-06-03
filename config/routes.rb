@@ -5,6 +5,9 @@ Rails.application.routes.draw do
   resources :posts
   resources :users
   get "welcome/home"
+
+  # Test-only login shortcut used by system specs (see TestSessionsController).
+  get "test/login", to: "test_sessions#show" if Rails.env.test?
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.

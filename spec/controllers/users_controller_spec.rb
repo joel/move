@@ -41,6 +41,11 @@ RSpec.describe UsersController do
   # UsersController. Be sure to keep this updated too.
   let(:valid_session) { {} }
 
+  # UsersController requires an authenticated admin (see UserPolicy).
+  let!(:user) { create(:user, :admin) }
+
+  before { stub_current_user(user) }
+
   describe "GET #index" do
     it "returns a success response" do
       User.create! valid_attributes

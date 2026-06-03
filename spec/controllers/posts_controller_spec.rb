@@ -43,6 +43,8 @@ RSpec.describe PostsController do
   # PostsController. Be sure to keep this updated too.
   let(:valid_session) { {} }
 
+  before { stub_current_user(user) }
+
   describe "GET #index" do
     it "returns a success response" do
       Post.create! valid_attributes
