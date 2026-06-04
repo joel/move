@@ -25,12 +25,36 @@ end
 
 require "thor"
 
+namespace :project do
+  desc "Run non-system specs"
+  task tests: :environment do
+    sh %(bundle exec rspec spec --exclude-pattern "spec/system/**/*_spec.rb")
+  end
+
+  desc "Run system specs"
+  task "system-tests" => :environment do
+    sh "bundle exec rspec spec/system"
+  end
+
+  desc "Run ErbLint and RuboCop checks"
+  task lint: :environment do
+    sh "bin/erb_lint --lint-all"
+    sh "bundle exec rubocop --lint --parallel --format simple"
+  end
+
+  desc "Autocorrect ErbLint and RuboCop lint issues"
+  task "fix-lint" => :environment do
+    sh "bin/erb_lint --lint-all -a"
+    sh "bundle exec rubocop --lint --parallel -A --format simple"
+  end
+end
+
 desc "Run all checks"
-task default: %w[spec rubocop erb_lint] do
+task default: %w[project:tests project:system-tests project:lint] do
   Thor::Base.shell.new.say_status :OK, "All checks passed!"
 end
 
 desc "Apply auto-corrections"
-task fix: %w[rubocop:autocorrect_all erb_lint:autocorrect] do
+task fix: %w[project:fix-lint] do
   Thor::Base.shell.new.say_status :OK, "All fixes applied!"
 end
