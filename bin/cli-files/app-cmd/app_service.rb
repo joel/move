@@ -238,6 +238,9 @@ module AppCLI
         [
           "--label traefik.enable=true",
           "--label 'traefik.http.routers.#{env_config.traefik_router}.rule=#{env_config.traefik_rule}'",
+          # Low priority so exact-host service routers (mail/storage/bucket) win
+          # over the app's catch-all subdomain regexp.
+          "--label traefik.http.routers.#{env_config.traefik_router}.priority=1",
           "--label traefik.http.routers.#{env_config.traefik_router}.entrypoints=websecure",
           "--label traefik.http.routers.#{env_config.traefik_router}.tls=true",
           "--label traefik.http.services.#{env_config.traefik_service}.loadbalancer.server.port=9292",

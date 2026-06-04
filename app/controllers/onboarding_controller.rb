@@ -43,6 +43,6 @@ class OnboardingController < ApplicationController
   # Root URL on the new Organization's subdomain.
   def organization_root_url(organization)
     port = request.optional_port ? ":#{request.optional_port}" : ""
-    "#{request.protocol}#{organization.slug}.#{app_host}#{port}/"
+    TenantHost.org_root_url(organization.slug, protocol: request.protocol, port:)
   end
 end

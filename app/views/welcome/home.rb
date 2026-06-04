@@ -55,7 +55,7 @@ module Views
       def organization_url(organization)
         request = view_context.request
         port = request.optional_port ? ":#{request.optional_port}" : ""
-        "#{request.protocol}#{organization.slug}.#{Rails.configuration.x.app_host}#{port}/"
+        TenantHost.org_root_url(organization.slug, protocol: request.protocol, port:)
       end
 
       def render_logged_out

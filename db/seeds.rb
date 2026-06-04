@@ -5,7 +5,7 @@ user = User.find_or_create_by!(name: "John Doe", email: "john.doe@example.com")
 Post.find_or_create_by!(title: "Hello World", body: "This is a test post", user:)
 
 # Phase D1 — sample Organizations on two subdomains for tenancy verification:
-#   https://john.move.workeverywhere.docker  ·  https://acme.move.workeverywhere.docker
+#   https://john.workeverywhere.docker  ·  https://acme.workeverywhere.docker
 acme_owner = User.find_or_create_by!(email: "joel@acme.org") { |u| u.name = "Joel Azemar" }
 
 {

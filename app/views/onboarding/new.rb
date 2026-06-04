@@ -27,9 +27,11 @@ module Views
       private
 
       def render_form
+        # Turbo can't follow the cross-host redirect to the new org subdomain,
+        # so submit this form as a standard (non-Turbo) request.
         form_with(
           model: @organization, url: view_context.onboarding_path,
-          class: "flex flex-col gap-stack-gap"
+          class: "flex flex-col gap-stack-gap", data: { turbo: false }
         ) do |form|
           render_errors if @organization.errors.any?
           render Components::Ui::Field.new(
@@ -41,7 +43,7 @@ module Views
             name: "organization[slug]", label: t("onboarding.fields.slug"),
             value: @organization.slug,
             placeholder: t("onboarding.fields.slug_placeholder"),
-            hint: t("onboarding.fields.slug_hint", host: Rails.configuration.x.app_host),
+            hint: t("onboarding.fields.slug_hint", host: Rails.configuration.x.tenant_domain),
             required: true
           )
           div(class: "mt-2") do

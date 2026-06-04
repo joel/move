@@ -30,7 +30,7 @@ RSpec.describe "Onboarding" do
       expect(organization.created_by_user).to eq(user)
       membership = organization.organization_memberships.find_by(user:)
       expect(membership.account_admin).to be(true)
-      expect(response.location).to match(%r{//acme\.move\.workeverywhere\.docker/\z})
+      expect(response.location).to match(%r{//acme\.workeverywhere\.docker/\z})
     end
 
     it "re-renders with errors on invalid input" do

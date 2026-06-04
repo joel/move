@@ -15,7 +15,7 @@ RSpec.describe "Subdomain tenancy" do
   it "renders the tenant home for a member on the org subdomain" do
     create(:organization_membership, organization:, user:)
     stub_current_user(user)
-    host! "acme.move.workeverywhere.docker"
+    host! "acme.workeverywhere.docker"
 
     get "/"
 
@@ -24,14 +24,14 @@ RSpec.describe "Subdomain tenancy" do
   end
 
   it "returns a non-disclosing 404 for an unknown subdomain" do
-    host! "ghost.move.workeverywhere.docker"
+    host! "ghost.workeverywhere.docker"
     get "/"
     expect(response).to have_http_status(:not_found)
   end
 
   it "returns a non-disclosing 404 for an authenticated non-member" do
     stub_current_user(user) # not a member of `acme`
-    host! "acme.move.workeverywhere.docker"
+    host! "acme.workeverywhere.docker"
 
     get "/"
 
@@ -40,7 +40,7 @@ RSpec.describe "Subdomain tenancy" do
 
   it "redirects anonymous subdomain visitors to the apex login" do
     stub_current_user(nil)
-    host! "acme.move.workeverywhere.docker"
+    host! "acme.workeverywhere.docker"
 
     get "/"
 

@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
-# Resolves the current Organization from the request subdomain.
+# Resolves the current Organization from the request subdomain (see TenantHost).
 #
 # The apex host (`move.workeverywhere.docker`) has no Organization — it serves
-# auth + onboarding. Org subdomains (`<slug>.move.workeverywhere.docker`) resolve
+# auth + onboarding. Org subdomains (`<slug>.workeverywhere.docker`) resolve
 # `Current.organization`; an unknown subdomain is a non-disclosing 404.
 module Tenancy
   extend ActiveSupport::Concern
@@ -15,26 +15,8 @@ module Tenancy
 
   private
 
-  def app_host
-    Rails.configuration.x.app_host
-  end
-
-  # The org slug from the subdomain, or nil on the apex host.
-  def tenant_slug
-    host = request.host.to_s.downcase
-    return nil if host == app_host
-
-    suffix = ".#{app_host}"
-    return nil unless host.end_with?(suffix)
-
-    label = host.delete_suffix(suffix)
-    return nil if label.blank? || label.include?(".")
-
-    label
-  end
-
   def tenant_request?
-    tenant_slug.present?
+    TenantHost.tenant?(request.host)
   end
 
   def current_organization
@@ -45,10 +27,10 @@ module Tenancy
   # subdomain raises RecordNotFound (non-disclosing — never reveals whether an
   # org exists), rendered as a branded 404 by ApplicationController.
   def resolve_tenant
-    slug = tenant_slug
+    slug = TenantHost.slug_for(request.host)
     return if slug.nil?
 
-    organization = Organization.find_by(slug: slug)
+    organization = Organization.find_by(slug:)
     raise ActiveRecord::RecordNotFound if organization.nil?
 
     Current.organization = organization
@@ -68,6 +50,6 @@ module Tenancy
   # Build a URL on the apex host (e.g. to bounce subdomain auth to the apex).
   def apex_url(path)
     port = request.optional_port ? ":#{request.optional_port}" : ""
-    "#{request.protocol}#{app_host}#{port}#{path}"
+    "#{request.protocol}#{TenantHost.apex_host}#{port}#{path}"
   end
 end

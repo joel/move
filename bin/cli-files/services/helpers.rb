@@ -166,11 +166,19 @@ module AppCLI
         "#{APP_NAME}.#{TRAEFIK_DOMAIN}"
       end
 
+      # Base domain org subdomains hang off (apex minus its first label):
+      # move.workeverywhere.docker → workeverywhere.docker.
+      def traefik_tenant_domain
+        traefik_host.split(".", 2).last
+      end
+
       # Route the apex host plus any single-label org subdomain
-      # (<slug>.move.workeverywhere.docker) to the app, so subdomain tenancy
-      # works in local dev. Prod routing is handled separately by Kamal.
+      # (<slug>.workeverywhere.docker) to the app, so subdomain tenancy works in
+      # local dev. Use a low router priority (see traefik_flags) so the exact-host
+      # service routers (mail/storage/bucket) still win for their own subdomains.
+      # Prod routing is handled separately by Kamal.
       def traefik_rule
-        escaped = traefik_host.gsub(".") { '\.' }
+        escaped = traefik_tenant_domain.gsub(".") { '\.' }
         "Host(`#{traefik_host}`) || HostRegexp(`^[a-z0-9-]+\\.#{escaped}$`)"
       end
 

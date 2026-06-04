@@ -27,14 +27,7 @@ Rails.application.routes.draw do
 
   # Root: on an org subdomain, the tenant home; on the apex, the welcome page.
   # (PR2 replaces the tenant root with the A1 Move selector.)
-  tenant_subdomain = lambda do |request|
-    host = request.host.to_s.downcase
-    base = Rails.configuration.x.app_host
-    host != base && host.end_with?(".#{base}") &&
-      host.delete_suffix(".#{base}").exclude?(".")
-  end
-
-  constraints(tenant_subdomain) do
+  constraints(->(request) { TenantHost.tenant?(request.host) }) do
     root to: "organizations/home#show", as: :tenant_root
   end
 
