@@ -172,19 +172,16 @@ class RodauthMain < Rodauth::Rails::Auth
       logout_redirect "/"
       verify_account_redirect { login_redirect }
 
-      # Passwordless logins set a 30-day remember-me cookie, so a browser stays
-      # authenticated across requests (load_memory). Without this, a signed-in
-      # user who opens /login or /create-account for a *different* account gets
-      # stuck — the new account's verify link is rejected while they're logged in
-      # as someone else. Send authenticated users home with a clear notice so
-      # they sign out first.
-      before_login_route { already_authenticated_redirect if logged_in? }
-      before_create_account_route { already_authenticated_redirect if logged_in? }
-
-      auth_class_eval do
-        def already_authenticated_redirect
-          set_notice_flash "You are already signed in. Sign out first to use a different account."
-          redirect login_redirect
+      # A verification link proves ownership of its email address, so it must work
+      # regardless of who is currently signed in. Passwordless logins persist via
+      # a remember-me cookie (load_memory re-authenticates each request), which
+      # otherwise causes a signed-in browser to silently reject a *different*
+      # account's verify link. When a verify link is opened, drop any existing
+      # login so the key-based verification proceeds and signs in the new account.
+      before_verify_account_route do
+        if logged_in? && param_or_nil(verify_account_key_param)
+          forget_login
+          clear_session
         end
       end
     end
