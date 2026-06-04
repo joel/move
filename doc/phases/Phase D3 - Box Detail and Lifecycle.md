@@ -1,7 +1,7 @@
 # Phase D3 — Box Detail & Lifecycle
 
-**Release tag:** `ui-03`
-**Branch:** `feature/ui-03-box-detail`
+**Release tag:** `v0.8.0-box-lifecycle`
+**Branch:** `feature/box-lifecycle`
 **Design status:** ✅ Design complete
 **Depends on:** D0, D1, D2
 **Domain backing:** `prompts/Phase 03` (box lifecycle, measurements, QR token basics) + `prompts/Phase 04` (media gallery surface). Domain Spec §4.8, §5.2; Design Spec §4 B1.
@@ -48,4 +48,4 @@ Deliver the single-box hub: identity, room, dimensions/volume/weight, item inven
 The capture camera flow (D4), review queue interior (D6), label/QR generation (D9), unpacking checklist (D10), summary (D12).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `ui-03`:
+_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.8.0-box-lifecycle`:

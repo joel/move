@@ -1,7 +1,7 @@
 # Phase D8 — Hybrid Search
 
-**Release tag:** `ui-08`
-**Branch:** `feature/ui-08-search`
+**Release tag:** `v0.13.0-search`
+**Branch:** `feature/search`
 **Design status:** ✅ Design complete
 **Depends on:** D0, D1, D5 (items exist)
 **Domain backing:** `prompts/Phase 07` (hybrid search). Domain Spec §7; Technical Foundation §11; Design Spec §4 D1.
@@ -46,4 +46,4 @@ Deliver Move-scoped hybrid search (full-text + `pg_trgm` + `pgvector`) that find
 MCP `search_items` tool (D13 / `prompts/Phase 10`); recognition (D4).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `ui-08`:
+_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.13.0-search`:

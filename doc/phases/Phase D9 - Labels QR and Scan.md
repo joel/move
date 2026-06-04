@@ -1,7 +1,7 @@
 # Phase D9 — Labels, QR & Scan
 
-**Release tag:** `ui-09`
-**Branch:** `feature/ui-09-labels-qr-scan`
+**Release tag:** `v0.14.0-qr-labels-scan`
+**Branch:** `feature/qr-labels-scan`
 **Design status:** ✅ Design complete — E1 + E2 designed in Stitch (`DESIGN-DISCREPANCIES.md` §E2)
 **Depends on:** D0, D1, D2, D3
 **Domain backing:** `prompts/Phase 08` (labels, manifests, scan). Domain Spec §4.8 (qr_token), §12, §8; Design Spec §4 E1, E2.
@@ -28,7 +28,7 @@ Produce what goes on/in the box (opaque exterior label + authenticated manifest)
 - `App::Qr::Resolve` (auth-gated; returns box listing; **never** changes status; cross-org/foreign token → non-disclosing failure; archived → read-only). QR token permanent + opaque (Domain §12.1).
 
 ## 6. ✅ Design status (resolved)
-E2 is designed across four Stitch state screens (scanning, resolved, unrecognized, archived — see §3); recorded in `README.md` §2 and `DESIGN-DISCREPANCIES.md` §E2. During build, verify the Resolved State reveals only box identity (number + room, **no contents**) and shows edit/unpack actions for admin/contributor only (viewer read-only). E1 + E2 ship together under `ui-09`.
+E2 is designed across four Stitch state screens (scanning, resolved, unrecognized, archived — see §3); recorded in `README.md` §2 and `DESIGN-DISCREPANCIES.md` §E2. During build, verify the Resolved State reveals only box identity (number + room, **no contents**) and shows edit/unpack actions for admin/contributor only (viewer read-only). E1 + E2 ship together under `v0.14.0-qr-labels-scan`.
 
 ## 7. Acceptance criteria
 - [ ] E1 label preview matches Stitch; contains **only** number/room/QR; A7 print view correct.
@@ -44,4 +44,4 @@ E2 is designed across four Stitch state screens (scanning, resolved, unrecognize
 Unpacking checklist actions (D10); MCP tools (D13).
 
 ## 10. Phase audit trail
-_Fill on execution:_ Issue: · PR: · E2 Stitch screen id: · Verification: · Release `ui-09`:
+_Fill on execution:_ Issue: · PR: · E2 Stitch screen id: · Verification: · Release `v0.14.0-qr-labels-scan`:

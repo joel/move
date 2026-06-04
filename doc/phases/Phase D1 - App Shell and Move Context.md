@@ -1,7 +1,7 @@
 # Phase D1 — App Shell & Move Context
 
-**Release tag:** `ui-01`
-**Branch:** `feature/ui-01-app-shell`
+**Release tag:** `v0.6.0-tenancy-and-moves`
+**Branch:** `feature/tenancy-and-moves`
 **Design status:** ✅ Design complete — A1 delivered as 3 Stitch screens (`DESIGN-DISCREPANCIES.md` §A1)
 **Depends on:** D0
 **Domain backing:** `prompts/Phase 01` (Organizations, subdomain tenancy) + `prompts/Phase 02` (Move, MoveMembership). Domain Spec §4.1–4.4, §5.1, §9.2; Technical Foundation §4.
@@ -55,4 +55,4 @@ A1 is designed across three Stitch screens (List View, Empty State, Create Form 
 Boxes content (D2), members management UI (D11), settings (D13).
 
 ## 10. Phase audit trail
-_Fill on execution:_ Issue: · PR: · A1 Stitch screen id: · Verification: · Release `ui-01`:
+_Fill on execution:_ Issue: · PR: · A1 Stitch screen id: · Verification: · Release `v0.6.0-tenancy-and-moves`:

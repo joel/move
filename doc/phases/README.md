@@ -22,24 +22,24 @@ If a screen a phase needs does **not** exist in Stitch, the phase is marked **�
 
 ## 1. Phase list
 
-| Phase | File | Release tag | Screens delivered | Design status |
-|-------|------|-------------|-------------------|---------------|
-| D0 | `Phase D0 - Design Foundation.md` | `ui-00` | Design system, theming, nav chrome (stateless), style guide | ✅ Design complete |
-| D1 | `Phase D1 - App Shell and Move Context.md` | `ui-01` | A1 Create/Select Move, global navigation | ✅ A1 designed (3 screens) |
-| D2 | `Phase D2 - Boxes Home.md` | `ui-02` | A2 Boxes home | ✅ |
-| D3 | `Phase D3 - Box Detail and Lifecycle.md` | `ui-03` | B1 Box detail | ✅ |
-| D4 | `Phase D4 - Capture Image.md` | `ui-04` | B2 Capture image | ✅ |
-| D5 | `Phase D5 - Manual Add and Item Detail.md` | `ui-05` | B3 Manual add, C3 Item detail/edit | ✅ |
-| D6 | `Phase D6 - Review Flow.md` | `ui-06` | C1 Review queue, C2 Review item-by-item | ✅ |
-| D7 | `Phase D7 - Controlled Vocabularies.md` | `ui-07` | D2 Categories, Tags, Rooms | ✅ |
-| D8 | `Phase D8 - Hybrid Search.md` | `ui-08` | D1 Search | ✅ |
-| D9 | `Phase D9 - Labels QR and Scan.md` | `ui-09` | E1 Box label & QR, E2 Scan QR | ✅ E2 designed (4 states) |
-| D10 | `Phase D10 - Unpacking Mode.md` | `ui-10` | E3 Unpacking mode | ✅ E3 designed (2 screens) |
-| D11 | `Phase D11 - Members and Roles.md` | `ui-11` | F1 Members & roles | ✅ |
-| D12 | `Phase D12 - Volume and Weight Summary.md` | `ui-12` | F2 Summary & volume | ✅ |
-| D13 | `Phase D13 - Settings Menu and Assistant.md` | `ui-13` | F3 Settings/menu + MCP token UI | ✅ F3 designed (3 screens) |
+| Phase | File | Release tag (SemVer) | Screens delivered | Design status |
+|-------|------|----------------------|-------------------|---------------|
+| D0 | `Phase D0 - Design Foundation.md` | `v0.5.0-design-foundation` | Design system, theming, nav chrome (stateless), style guide | ✅ Design complete |
+| D1 | `Phase D1 - App Shell and Move Context.md` | `v0.6.0-tenancy-and-moves` | A1 Create/Select Move, global navigation | ✅ A1 designed (3 screens) |
+| D2 | `Phase D2 - Boxes Home.md` | `v0.7.0-boxes-home` | A2 Boxes home | ✅ |
+| D3 | `Phase D3 - Box Detail and Lifecycle.md` | `v0.8.0-box-lifecycle` | B1 Box detail | ✅ |
+| D4 | `Phase D4 - Capture Image.md` | `v0.9.0-capture-recognition` | B2 Capture image | ✅ |
+| D5 | `Phase D5 - Manual Add and Item Detail.md` | `v0.10.0-items` | B3 Manual add, C3 Item detail/edit | ✅ |
+| D6 | `Phase D6 - Review Flow.md` | `v0.11.0-review` | C1 Review queue, C2 Review item-by-item | ✅ |
+| D7 | `Phase D7 - Controlled Vocabularies.md` | `v0.12.0-vocabularies` | D2 Categories, Tags, Rooms | ✅ |
+| D8 | `Phase D8 - Hybrid Search.md` | `v0.13.0-search` | D1 Search | ✅ |
+| D9 | `Phase D9 - Labels QR and Scan.md` | `v0.14.0-qr-labels-scan` | E1 Box label & QR, E2 Scan QR | ✅ E2 designed (4 states) |
+| D10 | `Phase D10 - Unpacking Mode.md` | `v0.15.0-unpacking` | E3 Unpacking mode | ✅ E3 designed (2 screens) |
+| D11 | `Phase D11 - Members and Roles.md` | `v0.16.0-members` | F1 Members & roles | ✅ |
+| D12 | `Phase D12 - Volume and Weight Summary.md` | `v0.17.0-summary` | F2 Summary & volume | ✅ |
+| D13 | `Phase D13 - Settings Menu and Assistant.md` | `v0.18.0-assistant-mcp` | F3 Settings/menu + MCP token UI | ✅ F3 designed (3 screens) |
 
-Releases use two-digit lexical tags (`ui-00` … `ui-13`) so they sort cleanly and never collide with the domain-led `phase-00 … phase-11` tags.
+Each phase ships its own SemVer release per `AGENTS.md` Release Rules: a `vMAJOR.MINOR.PATCH-<domain-slug>` tag (e.g. `v0.7.0-boxes-home`) cut with `gh release create … --generate-notes`. The `-<domain-slug>` names the domain implemented so the tag list itself reads as a build history; the `v*` prefix keeps the Release Bug Scan (`release-bug-scan.yml`) and the SemVer release flow intact. (The earlier `ui-NN`/`phase-NN` tags were placeholders from before any domain was implemented — see `DESIGN-DISCREPANCIES.md` §RELEASE-TAGS.)
 
 ---
 

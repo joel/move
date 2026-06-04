@@ -1,7 +1,7 @@
 # Phase D5 — Manual Add & Item Detail / Edit
 
-**Release tag:** `ui-05`
-**Branch:** `feature/ui-05-items`
+**Release tag:** `v0.10.0-items`
+**Branch:** `feature/items`
 **Design status:** ✅ Design complete
 **Depends on:** D0, D1, D2, D3
 **Domain backing:** `prompts/Phase 04` (item lifecycle, movement). Domain Spec §4.12, §5.4–5.5, §8; Design Spec §4 B3, C3.
@@ -47,4 +47,4 @@ Deliver lightweight manual item creation and the full item record view/edit, inc
 Recognition-driven review actions keep/correct/false (D6); search behaviour (D8); vocabulary management screens (D7).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `ui-05`:
+_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.10.0-items`:

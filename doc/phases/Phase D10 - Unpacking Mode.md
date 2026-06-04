@@ -1,7 +1,7 @@
 # Phase D10 — Unpacking Mode
 
-**Release tag:** `ui-10`
-**Branch:** `feature/ui-10-unpacking`
+**Release tag:** `v0.15.0-unpacking`
+**Branch:** `feature/unpacking`
 **Design status:** ✅ Design complete — E3 delivered as 2 Stitch screens (`DESIGN-DISCREPANCIES.md` §E3)
 **Depends on:** D0, D1, D3, D5
 **Domain backing:** `prompts/Phase 09` (unpacking). Domain Spec §5.2, §5.5, §8; Design Spec §4 E3.
@@ -45,4 +45,4 @@ E3 is designed across two Stitch screens — Active Checklist + Box Unpacked Cel
 Volume/weight summary (D12); scan entry to unpacking (D9 provides the entry via the E2 Scan-resolved state).
 
 ## 10. Phase audit trail
-_Fill on execution:_ Issue: · PR: · E3 Stitch screen id: · Verification: · Release `ui-10`:
+_Fill on execution:_ Issue: · PR: · E3 Stitch screen id: · Verification: · Release `v0.15.0-unpacking`:

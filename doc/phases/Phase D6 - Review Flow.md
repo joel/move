@@ -1,7 +1,7 @@
 # Phase D6 — Review Flow (Queue + Item-by-Item)
 
-**Release tag:** `ui-06`
-**Branch:** `feature/ui-06-review`
+**Release tag:** `v0.11.0-review`
+**Branch:** `feature/review`
 **Design status:** ✅ Design complete
 **Depends on:** D0, D1, D3, D4, D5
 **Domain backing:** `prompts/Phase 06` (review UX, conflicts, activity). Domain Spec §4.11, §5.4, §6.4, §8, §10; Design Spec §4 C1, C2.
@@ -46,4 +46,4 @@ Deliver the review experience that resolves uncertain recognition suggestions �
 Search ranking (D8), vocabulary management (D7), unpacking (D10).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `ui-06`:
+_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.11.0-review`:

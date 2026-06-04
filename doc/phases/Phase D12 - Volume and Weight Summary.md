@@ -1,7 +1,7 @@
 # Phase D12 — Volume & Weight Summary
 
-**Release tag:** `ui-12`
-**Branch:** `feature/ui-12-summary`
+**Release tag:** `v0.17.0-summary`
+**Branch:** `feature/summary`
 **Design status:** ✅ Design complete
 **Depends on:** D0, D1, D3 (box dimensions)
 **Domain backing:** `prompts/Phase 09` (summary/measurements). Domain Spec §4.8, §8; Technical Foundation §6.2; Design Spec §4 F2.
@@ -41,4 +41,4 @@ Deliver the mover-facing picture: total volume, optional total weight, per-room 
 MCP `get_volume_summary` (D13); export/share (deferred).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `ui-12`:
+_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.17.0-summary`:

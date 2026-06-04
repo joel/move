@@ -71,6 +71,16 @@
 
 ---
 
+## ✅ §RELEASE-TAGS — Phase release tags must be domain-named SemVer (PR #20 review)
+
+- **Raised by:** Codex review on PR #20 (P2). The original plan tagged phase releases `ui-00`…`ui-13`, which conflicts with `AGENTS.md` Release Rules (SemVer `vMAJOR.MINOR.PATCH`) and with `release-bug-scan.yml` (triggers only on `v*` tags) — so a `ui-NN` release would silently skip the release bug scan and diverge from the `gh release create vX.Y.Z --generate-notes` flow.
+- **Resolution (2026-06-04):** Replace `ui-NN` with **domain-named SemVer** tags `vMAJOR.MINOR.PATCH-<domain-slug>`, one minor bump per phase starting after the current latest tag (`v0.4.1`):
+  `v0.5.0-design-foundation`, `v0.6.0-tenancy-and-moves`, `v0.7.0-boxes-home`, `v0.8.0-box-lifecycle`, `v0.9.0-capture-recognition`, `v0.10.0-items`, `v0.11.0-review`, `v0.12.0-vocabularies`, `v0.13.0-search`, `v0.14.0-qr-labels-scan`, `v0.15.0-unpacking`, `v0.16.0-members`, `v0.17.0-summary`, `v0.18.0-assistant-mcp`.
+  The `v*` prefix keeps the Release Bug Scan + SemVer flow intact; the `-<slug>` makes the tag list self-describing (navigable by domain). Phase branches renamed to `feature/<slug>` to match. The old `ui-NN`/`phase-NN` tags were placeholders from before any domain existed.
+- **Known related gap (not fixed here):** the sibling domain-led plan `doc/ai/v0.2/prompts/Phase Index.md` still recommends `phase-00…phase-11` tags, which have the *same* conflict with the SemVer/`v*` rules. Left unchanged — out of scope for this PR; worth a follow-up cleanup so both plans share the domain-named SemVer convention.
+
+---
+
 ## ⚠️ §PALETTE — Two colour systems coexist
 
 - **Observation:** `designTheme` exposes a full Material-3 token set **and** a "Refined Palette" (`page-dark #2A2822`, `card-dark #34312A`, `page-light #F2ECE1`, `card-light #FAF6EF`, `accent-sage-dark #9FB089`). Many newer screens carry a `… - Refined Palette` variant; the design-system prose references the Refined Palette values directly.
@@ -114,5 +124,6 @@
 | NAV | ⚠️ | D0 | ✅ decided | bottom tab + sidebar |
 | AUTH | ⚠️ | D0 | ✅ decided | re-skin Rodauth/welcome |
 | VARIANTS | ⚠️ | all | watch | fill light/missing variants on demand |
+| RELEASE-TAGS | ⚠️ | all | ✅ resolved | domain-named SemVer `vX.Y.Z-<slug>` (PR #20 review) |
 
 *Update this file whenever a discrepancy is found or closed. A 🚫 row must be ✅ before its phase leaves "Ready".*

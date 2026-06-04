@@ -1,7 +1,7 @@
 # Phase D11 — Members & Roles
 
-**Release tag:** `ui-11`
-**Branch:** `feature/ui-11-members`
+**Release tag:** `v0.16.0-members`
+**Branch:** `feature/members`
 **Design status:** ✅ Design complete
 **Depends on:** D0, D1
 **Domain backing:** `prompts/Phase 02` (MoveMembership) + invitations (Technical Foundation §4.5). Domain Spec §4.2/§4.4, §9, §10; Design Spec §4 F1.
@@ -42,4 +42,4 @@ Deliver admin management of who can do what on a Move: member list, role assignm
 Account-level Organization administration; settings (D13).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `ui-11`:
+_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.16.0-members`:

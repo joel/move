@@ -1,7 +1,7 @@
 # Phase D7 — Controlled Vocabularies (Categories, Tags, Rooms)
 
-**Release tag:** `ui-07`
-**Branch:** `feature/ui-07-vocabularies`
+**Release tag:** `v0.12.0-vocabularies`
+**Branch:** `feature/vocabularies`
 **Design status:** ✅ Design complete
 **Depends on:** D0, D1
 **Domain backing:** `prompts/Phase 03` (vocabularies). Domain Spec §4.5–4.7, §8, §9.1; Design Spec §4 D2.
@@ -47,4 +47,4 @@ Deliver admin management of the three managed per-Move vocabularies — categori
 The pickers themselves (already in D3/D5); search over vocab names (D8).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `ui-07`:
+_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.12.0-vocabularies`:

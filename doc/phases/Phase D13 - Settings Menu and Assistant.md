@@ -1,7 +1,7 @@
 # Phase D13 — Settings, Menu & Assistant (MCP tokens)
 
-**Release tag:** `ui-13`
-**Branch:** `feature/ui-13-settings-assistant`
+**Release tag:** `v0.18.0-assistant-mcp`
+**Branch:** `feature/assistant-mcp`
 **Design status:** ✅ Design complete — F3 delivered as Menu hub + Settings/Assistant Stitch screens (`DESIGN-DISCREPANCIES.md` §F3)
 **Depends on:** D0, D1
 **Domain backing:** `prompts/Phase 10` (MCP tokens + tools). Domain Spec §4.13, §14; Technical Foundation §14; Design Spec §4 F3.
@@ -48,4 +48,4 @@ F3 is designed as a Menu hub + a Settings/Assistant screen (mobile + desktop —
 Adaptive thresholds, messaging channels, org-wide tokens (explicitly forbidden — Workflow §14).
 
 ## 10. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Menu/Settings Stitch screen ids: · Verification: · Release `ui-13`:
+_Fill on execution:_ Issue: · PR: · Menu/Settings Stitch screen ids: · Verification: · Release `v0.18.0-assistant-mcp`:

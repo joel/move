@@ -1,7 +1,7 @@
 # Phase D4 — Capture Image & Recognition Pipeline
 
-**Release tag:** `ui-04`
-**Branch:** `feature/ui-04-capture`
+**Release tag:** `v0.9.0-capture-recognition`
+**Branch:** `feature/capture-recognition`
 **Design status:** ✅ Design complete
 **Depends on:** D0, D1, D2, D3
 **Domain backing:** `prompts/Phase 04` (media upload) + `prompts/Phase 05` (recognition pipeline). Domain Spec §4.9–4.11, §5.3, §6; Technical Foundation §10; Design Spec §4 B2.
@@ -52,4 +52,4 @@ Deliver the image-only capture surface with unmistakable capture-to-box clarity,
 The review UX itself (D6), search indexing of confirmed items (D8), MCP `add_media_to_box` (D13).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `ui-04`:
+_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.9.0-capture-recognition`:

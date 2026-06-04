@@ -1,7 +1,7 @@
 # Phase D0 — Design Foundation
 
-**Release tag:** `ui-00`
-**Branch:** `feature/ui-00-design-foundation`
+**Release tag:** `v0.5.0-design-foundation`
+**Branch:** `feature/design-foundation`
 **Design status:** ✅ Design complete (no missing screens)
 **Depends on:** nothing (first phase)
 **Blocks:** every other phase (D1–D13)
@@ -121,4 +121,4 @@ Build, with light/dark + states, matching the design-system "Components" section
 Any Move domain model, any real screen data, any feature behaviour. Those start in D1.
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `ui-00`:
+_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.5.0-design-foundation`:

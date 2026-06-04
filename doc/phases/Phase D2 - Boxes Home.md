@@ -1,7 +1,7 @@
 # Phase D2 — Boxes Home
 
-**Release tag:** `ui-02`
-**Branch:** `feature/ui-02-boxes-home`
+**Release tag:** `v0.7.0-boxes-home`
+**Branch:** `feature/boxes-home`
 **Design status:** ✅ Design complete
 **Depends on:** D0, D1
 **Domain backing:** `prompts/Phase 03` (boxes, rooms, box lifecycle, measurements). Domain Spec §4.8, §5.2; Design Spec §4 A2.
@@ -49,4 +49,4 @@ Deliver the main hub of a Move: the box list/grid with per-box status, the promi
 Box detail interior (D3), real capture pipeline (D4), search results (D8), summary page (D12).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `ui-02`:
+_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.7.0-boxes-home`:
