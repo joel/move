@@ -6,6 +6,9 @@ Rails.application.routes.draw do
   resources :users
   get "welcome/home"
 
+  # Onboarding: create the first Organization after signup (apex host).
+  resource :onboarding, only: %i[new create], controller: "onboarding"
+
   # Internal design-system reference (Phase D0). Gated to local envs / admins
   # in the controller.
   get "style_guide", to: "style_guide#show"
@@ -21,6 +24,19 @@ Rails.application.routes.draw do
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
+
+  # Root: on an org subdomain, the tenant home; on the apex, the welcome page.
+  # (PR2 replaces the tenant root with the A1 Move selector.)
+  tenant_subdomain = lambda do |request|
+    host = request.host.to_s.downcase
+    base = Rails.configuration.x.app_host
+    host != base && host.end_with?(".#{base}") &&
+      host.delete_suffix(".#{base}").exclude?(".")
+  end
+
+  constraints(tenant_subdomain) do
+    root to: "organizations/home#show", as: :tenant_root
+  end
 
   # Defines the root path route ("/")
   root "welcome#home"

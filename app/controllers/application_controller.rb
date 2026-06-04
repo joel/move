@@ -2,6 +2,7 @@
 
 class ApplicationController < ActionController::Base
   include ActionPolicy::Controller
+  include Tenancy
 
   layout -> { Views::Layouts::ApplicationLayout }
 
@@ -13,6 +14,17 @@ class ApplicationController < ActionController::Base
         render Views::Shared::Forbidden.new, status: :forbidden
       end
       format.any { head :forbidden }
+    end
+  end
+
+  # Non-disclosing 404 — covers missing records, cross-org access, and unknown
+  # subdomains alike, so none of them leak existence.
+  rescue_from ActiveRecord::RecordNotFound do
+    respond_to do |format|
+      format.html do
+        render Views::Shared::NotFound.new, status: :not_found
+      end
+      format.any { head :not_found }
     end
   end
 

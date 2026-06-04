@@ -25,6 +25,7 @@ module Views
               plain "You're signed in. This is your starting point — build from here."
             end
           end
+          render_organizations
           div(class: "flex flex-wrap justify-center gap-3") do
             link_to("Browse posts", view_context.posts_path,
                     class: "ha-button ha-button-primary")
@@ -32,6 +33,29 @@ module Views
                     class: "ha-button ha-button-secondary")
           end
         end
+      end
+
+      # Additive Organization entry (Phase D1): link to the user's orgs, or offer
+      # to create one. PR2 makes this the authoritative post-login routing.
+      def render_organizations
+        organizations = view_context.current_user.organizations
+        if organizations.any?
+          div(class: "flex flex-wrap justify-center gap-3") do
+            organizations.each do |organization|
+              link_to(organization.name, organization_url(organization),
+                      class: "ha-button ha-button-secondary")
+            end
+          end
+        else
+          link_to(t("welcome.create_organization"), view_context.new_onboarding_path,
+                  class: "ha-button ha-button-primary")
+        end
+      end
+
+      def organization_url(organization)
+        request = view_context.request
+        port = request.optional_port ? ":#{request.optional_port}" : ""
+        "#{request.protocol}#{organization.slug}.#{Rails.configuration.x.app_host}#{port}/"
       end
 
       def render_logged_out

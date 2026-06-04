@@ -1,0 +1,28 @@
+# Strings for Organizations / subdomain tenancy / onboarding (Phase D1, part 1).
+en:
+  welcome:
+    create_organization: "Create your organization"
+  onboarding:
+    eyebrow: "Get started"
+    title: "Create your organization"
+    subtitle: "Your organization gets its own space on a subdomain."
+    submit: "Create organization"
+    fields:
+      name: "Organization name"
+      name_placeholder: "e.g. Acme Relocation"
+      slug: "Subdomain"
+      slug_placeholder: "e.g. acme"
+      slug_hint: "Your space will live at <slug>.%{host}"
+    create:
+      created: "Organization created."
+  organizations:
+    home:
+      eyebrow: "Organization"
+      subtitle: "Your moving workspace."
+      empty_title: "Moves are coming next"
+      empty_description: "This is your organization's home. Creating and selecting Moves lands in the next step."
+  errors:
+    not_found:
+      title: "Not found"
+      description: "We couldn't find what you were looking for."
+      action: "Go home"
