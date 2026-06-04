@@ -136,6 +136,14 @@ GEM
       dotenv (= 3.2.0)
       railties (>= 6.1)
     drb (2.2.3)
+    dry-core (1.2.0)
+      concurrent-ruby (~> 1.0)
+      logger
+      zeitwerk (~> 2.6)
+    dry-monads (1.10.0)
+      concurrent-ruby (~> 1.0)
+      dry-core (~> 1.1)
+      zeitwerk (~> 2.6)
     ed25519 (1.4.0)
     erb (6.0.4)
     erb_lint (0.9.0)
@@ -285,7 +293,7 @@ GEM
       childprocess (>= 0.6.3, < 6)
       iniparse (~> 1.4)
       rexml (>= 3.3.9)
-    parallel (2.1.0)
+    parallel (1.28.0)
     parser (3.3.11.1)
       ast (~> 2.4.1)
       racc
@@ -315,7 +323,7 @@ GEM
     psych (5.4.0)
       date
       stringio
-    public_suffix (7.0.5)
+    public_suffix (6.0.2)
     puma (8.0.2)
       nio4r (~> 2.0)
     raabro (1.4.0)
@@ -392,6 +400,12 @@ GEM
       roda (~> 3.76)
       rodauth (~> 2.36)
       rodauth-model (~> 0.2)
+    ros-apartment (3.4.4)
+      activerecord (>= 7.0.0, < 8.2)
+      activesupport (>= 7.0.0, < 8.2)
+      parallel (< 2.0)
+      public_suffix (>= 2.0.5, < 7)
+      rack (>= 1.3.6, < 4.0)
     rspec-core (3.13.6)
       rspec-support (~> 3.13.0)
     rspec-expectations (3.13.5)
@@ -576,6 +590,7 @@ DEPENDENCIES
   capybara
   debug
   dotenv-rails
+  dry-monads (~> 1.10)
   erb_lint
   factory_bot_rails
   ffaker
@@ -596,6 +611,7 @@ DEPENDENCIES
   rails (~> 8.1.3)
   rodauth-omniauth
   rodauth-rails
+  ros-apartment (~> 3.4)
   rspec-rails
   rubocop
   rubocop-capybara

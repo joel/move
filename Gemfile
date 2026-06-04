@@ -135,6 +135,14 @@ gem "webauthn"
 # Authorization
 gem "action_policy"
 
+# Business logic lives in app/actions (not models), composed with Dry::Monads
+# result/do notation. See app/actions/AGENTS.md.
+gem "dry-monads", "~> 1.10"
+
+# Multi-tenancy via PostgreSQL schema-per-tenant (do not hand-roll tenancy).
+# https://github.com/rails-on-services/apartment
+gem "ros-apartment", "~> 3.4", require: "apartment"
+
 group :test do
   gem "phlex-testing-capybara", require: false
 end

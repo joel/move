@@ -32,6 +32,34 @@ This document provides instructions and protocols for AI Agents interacting with
 
 **Design-led phase plan:** `doc/phases/` re-organises the v0.2 work around screens so each customer-facing surface ships against a real design. `Phase D0` (design foundation) must land before any other UI phase. The domain-led companion plan is `doc/ai/v0.2/prompts/`.
 
+### Architecture & engineering conventions (MUST follow)
+
+These are non-negotiable for all domain work. Do not reinvent these wheels.
+
+1. **Multi-tenancy → use the Apartment gem.** Do **not** hand-roll subdomain
+   resolution, `Current.organization` scoping, or `organization_id` filtering.
+   Tenancy is PostgreSQL **schema-per-tenant** via
+   [`ros-apartment`](https://github.com/rails-on-services/apartment): each
+   Organization is a tenant (schema); `Apartment::Elevator::Subdomain` resolves
+   the tenant from the subdomain; shared models (Rodauth/user auth tables, the
+   Organization registry) live in the `public` schema via `excluded_models`.
+   Create/drop tenants with `Apartment::Tenant.create/drop`; scope work with
+   `Apartment::Tenant.switch(name) { … }`. Config in `config/initializers/apartment.rb`.
+
+2. **Business logic → `app/actions/` (never in models).** Models stay
+   persistence-focused (associations, validations, scopes). Controllers stay thin
+   (authorize → call action → pattern-match → render). Every domain operation is a
+   `Domain::Verb < BaseAction` using `Dry::Monads` result/do notation and emitting
+   a `domain.verb` `Rails.event`. Full reference + templates in
+   [`app/actions/AGENTS.md`](app/actions/AGENTS.md). Pattern mirrors the sibling
+   `catalyst` project and https://github.com/joel/trip/tree/main/app/actions.
+
+3. **Live-test authentication after every change.** Auth is fragile (passwordless
+   Rodauth + remember-me + the Apartment elevator). Before pushing, run the
+   **Runtime Test Workflow** (§5 / `/product-review`) and explicitly verify the
+   full auth journey — create account, sign in, sign out, sign back in — works
+   end to end in the running app. A green test suite is **not** sufficient.
+
 ---
 
 ## 2. CLI Operations (`bin/cli`)
