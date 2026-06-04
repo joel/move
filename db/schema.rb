@@ -10,10 +10,30 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_03_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_04_130001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "citext"
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "organization_memberships", id: :uuid, default: -> { "uuidv7()" }, force: :cascade do |t|
+    t.boolean "account_admin", default: false, null: false
+    t.datetime "created_at", null: false
+    t.uuid "organization_id", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["organization_id", "user_id"], name: "index_organization_memberships_on_organization_id_and_user_id", unique: true
+    t.index ["user_id", "organization_id"], name: "index_organization_memberships_on_user_id_and_organization_id"
+  end
+
+  create_table "organizations", id: :uuid, default: -> { "uuidv7()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "created_by_user_id"
+    t.string "name", null: false
+    t.jsonb "settings", default: {}, null: false
+    t.citext "slug", null: false
+    t.datetime "updated_at", null: false
+    t.index ["slug"], name: "index_organizations_on_slug", unique: true
+  end
 
   create_table "posts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.text "body"
@@ -73,6 +93,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_03_160000) do
     t.index ["email"], name: "index_users_on_email", unique: true, where: "(status = ANY (ARRAY[1, 2]))"
   end
 
+  add_foreign_key "organization_memberships", "organizations", on_delete: :cascade
+  add_foreign_key "organization_memberships", "users", on_delete: :cascade
+  add_foreign_key "organizations", "users", column: "created_by_user_id", on_delete: :nullify
   add_foreign_key "posts", "users"
   add_foreign_key "user_email_auth_keys", "users", column: "id", on_delete: :cascade
   add_foreign_key "user_omniauth_identities", "users", on_delete: :cascade

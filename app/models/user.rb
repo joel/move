@@ -5,6 +5,8 @@ class User < ApplicationRecord
   include Roleable
 
   has_many :posts, dependent: :destroy
+  has_many :organization_memberships, dependent: :destroy
+  has_many :organizations, through: :organization_memberships
 
   validates :email, presence: true, uniqueness: { case_sensitive: false }
 end
