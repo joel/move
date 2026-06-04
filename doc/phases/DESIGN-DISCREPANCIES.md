@@ -77,7 +77,7 @@
 - **Resolution (2026-06-04):** Replace `ui-NN` with **domain-named SemVer** tags `vMAJOR.MINOR.PATCH-<domain-slug>`, one minor bump per phase starting after the current latest tag (`v0.4.1`):
   `v0.5.0-design-foundation`, `v0.6.0-tenancy-and-moves`, `v0.7.0-boxes-home`, `v0.8.0-box-lifecycle`, `v0.9.0-capture-recognition`, `v0.10.0-items`, `v0.11.0-review`, `v0.12.0-vocabularies`, `v0.13.0-search`, `v0.14.0-qr-labels-scan`, `v0.15.0-unpacking`, `v0.16.0-members`, `v0.17.0-summary`, `v0.18.0-assistant-mcp`.
   The `v*` prefix keeps the Release Bug Scan + SemVer flow intact; the `-<slug>` makes the tag list self-describing (navigable by domain). Phase branches renamed to `feature/<slug>` to match. The old `ui-NN`/`phase-NN` tags were placeholders from before any domain existed.
-- **Known related gap (not fixed here):** the sibling domain-led plan `doc/ai/v0.2/prompts/Phase Index.md` still recommends `phase-00…phase-11` tags, which have the *same* conflict with the SemVer/`v*` rules. Left unchanged — out of scope for this PR; worth a follow-up cleanup so both plans share the domain-named SemVer convention.
+- **Sibling plan aligned (same PR):** the domain-led plan also recommended `phase-00…phase-11` release tags with the *same* conflict. Updated to the SemVer/`v*` convention: `doc/ai/v0.2/prompts/Phase Index.md` ("Recommended release tags") and `doc/ai/v0.2/docs/Move - Workflow Specification v0.2.md` §4 step 16 + §12 (`gh release create vX.Y.Z`). Their `feature/phase-NN-…` *branch* names are left as-is — branch names don't hit the `v*`/SemVer rules, so they're not part of this discrepancy.
 
 ---
 

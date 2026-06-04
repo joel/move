@@ -97,7 +97,7 @@ For each phase:
 13. Move issue to In Review.
 14. Respond to every review comment and resolve every thread.
 15. After human rebase-and-merge, confirm main CI/deploy state.
-16. Publish `phase-NN` release if the phase is numbered and releaseable.
+16. Publish a SemVer `vX.Y.Z` release (per `AGENTS.md` Release Rules) if the phase is releaseable.
 17. Record issue, PR, verification, and release URL in the phase file.
 18. Move issue to Done.
 
@@ -292,17 +292,20 @@ Release runs only after the PR has been rebase-and-merged to `main` by a human.
 1. Sync local main.
 2. Confirm merge commit is present.
 3. Confirm main CI/deploy is green or that deploy was intentionally skipped for docs-only changes.
-4. If this is a numbered implementation phase, create release tag:
+4. If this is a releaseable implementation phase, create a SemVer release tag
+   (`vMAJOR.MINOR.PATCH`, optionally with a `-<domain-slug>` suffix so the tag
+   names the domain — e.g. `v0.7.0-boxes-home`; the `v*` prefix keeps the
+   release bug scan running):
 
 ```bash
-unset GITHUB_TOKEN && gh release create phase-NN \
+unset GITHUB_TOKEN && gh release create vX.Y.Z \
   --repo <OWNER>/<REPO> \
   --target main \
-  --title "Phase NN - <short title>" \
+  --title "vX.Y.Z - <short title>" \
   --generate-notes
 ```
 
-5. If `phase-NN` already exists, stop. Do not overwrite.
+5. If that tag already exists, stop. Do not overwrite.
 6. Record release URL in the phase file.
 7. Move issue to Done.
 

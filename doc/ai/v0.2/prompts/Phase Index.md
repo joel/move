@@ -64,15 +64,18 @@ No offline mutation queue, no video capture, no item value fields, no bounding b
 
 ## Recommended release tags
 
-Use two-digit tags for lexical order:
+Releases follow the **`AGENTS.md` Release Rules**: SemVer `vMAJOR.MINOR.PATCH`,
+cut with `gh release create vX.Y.Z --generate-notes`. The leading `v` matters —
+`.github/workflows/release-bug-scan.yml` triggers only on `v*` tags, so the old
+`phase-NN` scheme would silently skip the release bug scan and diverge from the
+documented SemVer flow.
 
-```text
-phase-00
-phase-01
-phase-02
-...
-phase-11
-```
+To keep a tag self-describing, append a domain slug as a SemVer pre-release
+identifier — `vMAJOR.MINOR.PATCH-<domain-slug>` (still matches `v*`), e.g.
+`v0.7.0-boxes-home`. See `../../../phases/README.md` and its
+`DESIGN-DISCREPANCIES.md` §RELEASE-TAGS for a worked per-phase mapping.
+
+Do **not** use `phase-NN` release tags.
 
 ---
 
