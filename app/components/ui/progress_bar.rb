@@ -20,7 +20,7 @@ module Components
           div(
             class: "h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high",
             role: "progressbar",
-            aria_valuenow: @value.to_i,
+            aria_valuenow: clamped_value,
             aria_valuemin: 0,
             aria_valuemax: @max.to_i
           ) do
@@ -42,8 +42,14 @@ module Components
         @tone == :terracotta ? "bg-secondary" : "bg-accent-sage"
       end
 
+      # Clamp to the valid range so the visual width and the exposed
+      # aria-valuenow stay consistent even when callers pass out-of-range values.
+      def clamped_value
+        @value.clamp(0, @max).round
+      end
+
       def percent
-        ((@value / @max) * 100).clamp(0, 100).round
+        (clamped_value / @max * 100).round
       end
     end
   end

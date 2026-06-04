@@ -21,6 +21,16 @@ RSpec.describe Components::Ui::ProgressBar do
     expect(html).to include('aria-valuenow="5"')
   end
 
+  it "clamps aria-valuenow to the valid range, consistent with the fill width" do
+    over = described_class.new(value: 20, max: 10).call
+    expect(over).to include('aria-valuenow="10"')
+    expect(over).to include("width: 100%")
+
+    under = described_class.new(value: -5, max: 10).call
+    expect(under).to include('aria-valuenow="0"')
+    expect(under).to include("width: 0%")
+  end
+
   it "uses a sage fill by default and terracotta on request" do
     expect(described_class.new(value: 1, max: 2).call).to include("bg-accent-sage")
     expect(described_class.new(value: 1, max: 2, tone: :terracotta).call).to include("bg-secondary")
