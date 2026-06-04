@@ -15,6 +15,11 @@ on:
 permissions:
   contents: read
 
+# Run JS actions on Node 24. openai/codex-action@v1 pins an older actions/setup-node
+# that still targets the deprecated Node 20 runtime; this opts it into Node 24.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 # One scan per tag; a re-pushed tag supersedes an in-flight run.
 concurrency:
   group: release-bug-scan-${{ github.ref_name }}
@@ -90,7 +95,7 @@ jobs:
 
       - name: Upload report artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: release-bug-scan-${{ github.ref_name }}
           path: release-bug-scan.md
