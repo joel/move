@@ -41,6 +41,33 @@ CREATE TABLE public.ar_internal_metadata (
 
 
 --
+-- Name: organization_memberships; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_memberships (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    role character varying DEFAULT 'member'::character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: organizations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organizations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    slug public.citext NOT NULL,
+    name character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: posts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -158,6 +185,22 @@ ALTER TABLE ONLY public.ar_internal_metadata
 
 
 --
+-- Name: organization_memberships organization_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_memberships
+    ADD CONSTRAINT organization_memberships_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organizations organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organizations
+    ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: posts posts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -237,6 +280,34 @@ CREATE UNIQUE INDEX idx_omniauth_identities_uniqueness ON public.user_omniauth_i
 
 
 --
+-- Name: index_organization_memberships_on_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_organization_memberships_on_organization_id ON public.organization_memberships USING btree (organization_id);
+
+
+--
+-- Name: index_organization_memberships_on_organization_id_and_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_organization_memberships_on_organization_id_and_user_id ON public.organization_memberships USING btree (organization_id, user_id);
+
+
+--
+-- Name: index_organization_memberships_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_organization_memberships_on_user_id ON public.organization_memberships USING btree (user_id);
+
+
+--
+-- Name: index_organizations_on_slug; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_organizations_on_slug ON public.organizations USING btree (slug);
+
+
+--
 -- Name: index_posts_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -273,6 +344,14 @@ ALTER TABLE ONLY public.user_email_auth_keys
 
 
 --
+-- Name: organization_memberships fk_rails_57cf70d280; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_memberships
+    ADD CONSTRAINT fk_rails_57cf70d280 FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
 -- Name: posts fk_rails_5b5ddfd518; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -286,6 +365,14 @@ ALTER TABLE ONLY public.posts
 
 ALTER TABLE ONLY public.user_webauthn_user_ids
     ADD CONSTRAINT fk_rails_70a7526cb9 FOREIGN KEY (id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_memberships fk_rails_715ab7f4fe; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_memberships
+    ADD CONSTRAINT fk_rails_715ab7f4fe FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 
 --
@@ -327,6 +414,8 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260604200002'),
+('20260604200001'),
 ('20260603160000'),
 ('20260118160000'),
 ('20260118150143'),
