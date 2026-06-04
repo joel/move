@@ -45,7 +45,9 @@ module Move
     config.logger    = ActiveSupport::TaggedLogging.new(logger)
     config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "debug").to_sym
 
-    config.active_record.schema_format = :ruby # :sql
+    # :sql is required for Apartment schema-per-tenant: structure.sql captures
+    # the public schema, extensions and search_path that :ruby schema.rb cannot.
+    config.active_record.schema_format = :sql
 
     config.hosts.clear if ENV["RAILS_ALLOW_ALL_HOSTS"].present?
   end
