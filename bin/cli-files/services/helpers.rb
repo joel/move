@@ -20,7 +20,7 @@ module AppCLI
     WAIT_IMAGE = "workeverywhere/wait:2.12.1".freeze
     DB_IMAGES = {
       "mysql" => "mysql:latest",
-      "postgresql" => "postgres:latest"
+      "postgresql" => "postgres:18"
     }.freeze
     DEFAULT_DB_PORTS = {
       "mysql" => 3306,
