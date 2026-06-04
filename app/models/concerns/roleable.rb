@@ -28,6 +28,10 @@ module Roleable
   end
 
   def role?(role)
+    # Guard against partially-loaded records (e.g. built from a select that
+    # omitted roles_mask) so role checks never raise MissingAttributeError.
+    return false unless has_attribute?(:roles_mask)
+
     roles_mask.to_i.anybits?(role_bit(role.to_sym))
   end
 

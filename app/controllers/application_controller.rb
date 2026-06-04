@@ -40,6 +40,11 @@ class ApplicationController < ActionController::Base
   private
 
   def current_user
+    # Only an authenticated account is the current user. During auth flows
+    # (e.g. a failed create-account) Rodauth holds a partial in-memory account;
+    # returning it here would surface a half-loaded User to the views.
+    return unless rodauth.logged_in?
+
     rodauth.rails_account
   end
 
