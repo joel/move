@@ -184,6 +184,15 @@ class RodauthMain < Rodauth::Rails::Auth
           clear_session
         end
       end
+
+      # Development convenience: auto-verify and sign in new accounts on creation,
+      # so there is no email-verification step locally. The verify-by-email flow
+      # caused repeated dead-ends with sticky passwordless sessions during dev.
+      # Production keeps full email verification.
+      if Rails.env.development?
+        create_account_autologin? true
+        after_create_account { verify_account }
+      end
     end
   end
 end
