@@ -237,7 +237,7 @@ module AppCLI
       def traefik_flags
         [
           "--label traefik.enable=true",
-          "--label 'traefik.http.routers.#{env_config.traefik_router}.rule=Host(`#{env_config.traefik_host}`)'",
+          "--label 'traefik.http.routers.#{env_config.traefik_router}.rule=#{env_config.traefik_rule}'",
           "--label traefik.http.routers.#{env_config.traefik_router}.entrypoints=websecure",
           "--label traefik.http.routers.#{env_config.traefik_router}.tls=true",
           "--label traefik.http.services.#{env_config.traefik_service}.loadbalancer.server.port=9292",

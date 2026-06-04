@@ -166,6 +166,14 @@ module AppCLI
         "#{APP_NAME}.#{TRAEFIK_DOMAIN}"
       end
 
+      # Route the apex host plus any single-label org subdomain
+      # (<slug>.move.workeverywhere.docker) to the app, so subdomain tenancy
+      # works in local dev. Prod routing is handled separately by Kamal.
+      def traefik_rule
+        escaped = traefik_host.gsub(".") { '\.' }
+        "Host(`#{traefik_host}`) || HostRegexp(`^[a-z0-9-]+\\.#{escaped}$`)"
+      end
+
       def traefik_router
         TRAEFIK_ROUTER
       end
