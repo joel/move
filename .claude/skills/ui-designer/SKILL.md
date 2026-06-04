@@ -8,6 +8,8 @@ compatibility: Rails project with Phlex (Components::Base) + Tailwind CSS standa
 
 Build and modify frontend interfaces for this Rails + Phlex + Tailwind project. Every UI change should go through this skill to ensure consistency with the design system and reuse of existing library components.
 
+> **⚠️ Design source of truth for the Move app = Google Stitch, via the Stitch MCP server.** For any **customer-facing** Move screen, open the real design first and build against it — never guess. Project `Move Design` (`projects/13869765800416404511`); design tokens in `mcp__stitch__get_project … designTheme.designMd`; screens via `mcp__stitch__list_screens` / `mcp__stitch__get_screen`. The canonical screen↔phase map and the encoded tokens live in `doc/phases/` (`README.md` §2, `Phase D0 - Design Foundation.md`), and the standing protocol is in `AGENTS.md` → "Design source of truth (Google Stitch)". The Move design system (Plus Jakarta Sans; sage `#9FB089` primary; terracotta secondary; warm-charcoal `page #2A2822` / `card #34312A`; pill buttons; 20px cards; dark-first) **supersedes** the generic `--ha-*` house style below for Move work. If a needed screen is absent from Stitch, generate it (`mcp__stitch__generate_screen_from_text`) or ask the user — see `doc/phases/DESIGN-DISCREPANCIES.md`.
+
 ## Component Reference Library
 
 This skill draws from a local library of 657 Tailwind CSS component templates (path documented in the `compatibility` frontmatter). Before building any non-trivial UI element, read `references/component_library.md` — it has the full category index (364 Application UI + 114 E-commerce + 179 Marketing), the decision flow for picking a template, the Phlex translation example, and how to browse the library.

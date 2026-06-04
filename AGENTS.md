@@ -12,6 +12,26 @@ This document provides instructions and protocols for AI Agents interacting with
 
 - **URLs:** Local development (via `bin/cli`): `https://move.workeverywhere.docker` (mail at `https://mail.workeverywhere.docker`). Production: `https://move.workeverywhere.app`.
 
+### Design source of truth (Google Stitch)
+
+**The visual design lives in Google Stitch, reached through the Stitch MCP server — not in the codebase or your imagination.** Before building or changing any **customer-facing** screen, you MUST open the real design and build against it. Never guess a layout, colour, spacing, radius, or type value.
+
+- **Project:** `Move Design` → `projects/13869765800416404511` (a separate `Move Inventory Manager` project also exists — do not confuse them).
+- **Design system (tokens):** `mcp__stitch__get_project name=projects/13869765800416404511` → `designTheme.designMd`. This is the authoritative colour/typography/spacing/radius/component sheet. It is mirrored in `doc/phases/Phase D0 - Design Foundation.md`.
+- **Screens:** `mcp__stitch__list_screens projectId=13869765800416404511`, then `mcp__stitch__get_screen name=projects/13869765800416404511/screens/<id>` for the HTML + screenshot. (`list_projects`/`list_screens` outputs are large — they spill to a file you can `jq`.)
+- **Canonical screen ↔ phase ↔ Design-Spec map:** `doc/phases/README.md` §2.
+- **Palette rule:** the **"Refined Palette"** variants are canonical for surfaces/accent; the Material-3 token set is the semantic system for state colours. Prefer `… - Refined Palette` screens. See `doc/phases/DESIGN-DISCREPANCIES.md` §PALETTE.
+
+**Workflow for any UI work:**
+1. Open the canonical Stitch screen(s) for the surface and read the HTML + screenshot.
+2. Build with Phlex components + the Phase D0 design tokens — no magic values.
+3. Reproduce **every** state the Design Spec lists (empty, loading, processing, failed, error, dark).
+4. Live-verify with `/product-review` and compare screenshot-to-screenshot against Stitch.
+
+**If a screen you need does not exist in Stitch, STOP — do not invent it.** Either generate it with `mcp__stitch__generate_screen_from_text` (use `designSystem=<project system id>`, dark-first, the brand prompt in the relevant phase file) and record the new `screens/<id>` in `doc/phases/README.md`, or request it from the user/product. Log the gap and remediation in `doc/phases/DESIGN-DISCREPANCIES.md`. As of this writing **all 16 Design-Spec screens have a Stitch design** (the previously-missing A1, E2, E3, and F3 screens were created in the Stitch UI — see `DESIGN-DISCREPANCIES.md`), so no phase is design-blocked.
+
+**Design-led phase plan:** `doc/phases/` re-organises the v0.2 work around screens so each customer-facing surface ships against a real design. `Phase D0` (design foundation) must land before any other UI phase. The domain-led companion plan is `doc/ai/v0.2/prompts/`.
+
 ---
 
 ## 2. CLI Operations (`bin/cli`)
