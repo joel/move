@@ -27,7 +27,7 @@ module Components
     def render_brand
       link_to(view_context.root_path, class: "flex items-center gap-2") do
         span(class: "flex h-8 w-8 items-center justify-center rounded-xl " \
-                    "ha-gradient-aura text-sm font-bold text-white") do
+                    "ha-gradient-aura text-sm font-bold text-page") do
           plain app_name.first.upcase
         end
         span(class: "font-headline text-lg font-bold tracking-tight") do
