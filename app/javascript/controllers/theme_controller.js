@@ -6,7 +6,7 @@ export default class extends Controller {
   connect() {
     this.mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
     this.handleSystemChange = this.handleSystemChange.bind(this)
-    this.applyTheme(localStorage.getItem("theme") || "system")
+    this.applyTheme(localStorage.getItem("theme") || "dark")
     this.mediaQuery.addEventListener("change", this.handleSystemChange)
   }
 

@@ -6,6 +6,10 @@ Rails.application.routes.draw do
   resources :users
   get "welcome/home"
 
+  # Internal design-system reference (Phase D0). Gated to local envs / admins
+  # in the controller.
+  get "style_guide", to: "style_guide#show"
+
   # Test-only login shortcut used by system specs (see TestSessionsController).
   get "test/login", to: "test_sessions#show" if Rails.env.test?
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html

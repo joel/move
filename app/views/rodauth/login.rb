@@ -22,7 +22,7 @@ module Views
           div(class: "mx-auto flex h-16 w-16 items-center " \
                      "justify-center rounded-2xl " \
                      "ha-gradient-aura shadow-lg") do
-            span(class: "text-2xl font-bold text-white") { app_name.first.upcase }
+            span(class: "text-2xl font-bold text-page") { app_name.first.upcase }
           end
           h1(class: "mt-4 font-headline text-3xl font-bold " \
                     "tracking-tighter") do

@@ -1,168 +1,216 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+/*
+ * Move — Design Foundation (Phase D0)
+ * ------------------------------------------------------------------
+ * Authoritative token source: Google Stitch "Move Design"
+ * (projects/13869765800416404511 → designTheme.designMd), mirrored in
+ * `doc/phases/Phase D0 - Design Foundation.md` §4.
+ *
+ * Tailwind v4 is CSS-first: tokens live in `@theme` (which both generates
+ * utilities AND emits CSS custom properties) and reference runtime variables
+ * (`--c-*`) that swap between light (`:root`) and dark (`.dark`). Dark is the
+ * default theme. `config/tailwind.config.js` mirrors these tokens for
+ * documentation only — this file is authoritative.
+ *
+ * Brand law (never violate in later phases):
+ *   • sage           → primary actions / success / progress
+ *   • terracotta     → highlights / Fragile / soft warnings
+ *   • charcoal-brown → text + structural background
+ *   • Pure black (#000000) is prohibited; depth = tonal layering, not shadows.
+ *   • buttons/chips/progress = pill (rounded-full); cards/inputs = 20px.
+ */
+
+/* ── Self-hosted typeface (no Google CDN) ── */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("plus-jakarta-sans.woff2") format("woff2");
+}
+
 @import "tailwindcss";
+
 @source "../../views";
 @source "../../components";
 @source "../../../app/javascript";
 
+/* Class-based dark mode (toggled on <html> by the theme controller). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ──────────────────────────────────────────────────────────────────
+ * Design tokens (canonical names — §4 of the Phase D0 brief)
+ * ────────────────────────────────────────────────────────────────── */
+@theme {
+  --font-sans: "Plus Jakarta Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+
+  /* §4.4 Radii — cards/inputs use `card` (20px); buttons/chips/progress full. */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-card: 1.25rem; /* 20px */
+
+  /* §4.5 Spacing — 4px baseline + named rhythm tokens. */
+  --spacing-margin-mobile: 20px;
+  --spacing-margin-desktop: 48px;
+  --spacing-gutter: 16px;
+  --spacing-stack-gap: 12px;
+  --spacing-section-gap: 32px;
+
+  /* §4.3 Typography — Plus Jakarta Sans scale. */
+  --text-headline-xl: 40px;
+  --text-headline-xl--line-height: 48px;
+  --text-headline-xl--font-weight: 700;
+  --text-headline-xl--letter-spacing: -0.02em;
+
+  --text-headline-lg: 32px;
+  --text-headline-lg--line-height: 40px;
+  --text-headline-lg--font-weight: 700;
+  --text-headline-lg--letter-spacing: -0.01em;
+
+  --text-headline-lg-mobile: 28px;
+  --text-headline-lg-mobile--line-height: 36px;
+  --text-headline-lg-mobile--font-weight: 700;
+
+  --text-headline-md: 24px;
+  --text-headline-md--line-height: 32px;
+  --text-headline-md--font-weight: 600;
+
+  --text-body-lg: 18px;
+  --text-body-lg--line-height: 28px;
+  --text-body-lg--font-weight: 400;
+
+  --text-body-md: 16px;
+  --text-body-md--line-height: 24px;
+  --text-body-md--font-weight: 400;
+
+  --text-label-caps: 12px;
+  --text-label-caps--line-height: 16px;
+  --text-label-caps--font-weight: 700;
+  --text-label-caps--letter-spacing: 0.1em;
+
+  /* §4.1/§4.2 Colours — map canonical names to runtime (theme-swapped) vars. */
+  --color-page: var(--c-page);
+  --color-card: var(--c-card);
+  --color-card-border: var(--c-card-border);
+  --color-accent-sage: var(--c-accent-sage);
+  --color-text-warm: var(--c-text-warm);
+  --color-muted: var(--c-muted);
+
+  --color-primary: var(--c-primary);
+  --color-on-primary: var(--c-on-primary);
+  --color-primary-container: var(--c-primary-container);
+  --color-on-primary-container: var(--c-on-primary-container);
+
+  --color-secondary: var(--c-secondary);
+  --color-on-secondary: var(--c-on-secondary);
+  --color-secondary-container: var(--c-secondary-container);
+  --color-on-secondary-container: var(--c-on-secondary-container);
+
+  --color-tertiary: var(--c-tertiary);
+  --color-on-tertiary: var(--c-on-tertiary);
+  --color-tertiary-container: var(--c-tertiary-container);
+
+  --color-error: var(--c-error);
+  --color-on-error: var(--c-on-error);
+  --color-error-container: var(--c-error-container);
+  --color-on-error-container: var(--c-on-error-container);
+
+  --color-surface: var(--c-surface);
+  --color-surface-container: var(--c-surface-container);
+  --color-surface-container-high: var(--c-surface-container-high);
+  --color-surface-container-highest: var(--c-surface-container-highest);
+  --color-on-surface: var(--c-on-surface);
+  --color-on-surface-variant: var(--c-on-surface-variant);
+
+  --color-outline: var(--c-outline);
+  --color-outline-variant: var(--c-outline-variant);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Runtime palette — light (:root) and dark (.dark). Dark is default.
+ * Refined Palette (§4.1) is canonical for surfaces/accent; Material-3
+ * (§4.2) supplies the semantic state ramp.
+ * ────────────────────────────────────────────────────────────────── */
 @layer base {
-  :root {
+  :root,
+  .light {
     color-scheme: light;
 
-    /* ── Surface hierarchy (M3 tonal layering) ── */
-    --ha-bg: #faf8ff;
-    --ha-bg-alt: #f2f3ff;
-    --ha-surface: #faf8ff;
-    --ha-surface-muted: #f2f3ff;
-    --ha-surface-low: #f2f3ff;
-    --ha-surface-container: #eaedff;
-    --ha-surface-high: #e2e7ff;
-    --ha-surface-highest: #dae2fd;
-    --ha-surface-variant: #dae2fd;
-    --ha-surface-dim: #d2d9f4;
-    --ha-card: #ffffff;
-    --ha-card-border: transparent;
-    --ha-border: #bdc8d1;
+    /* Refined Palette — light */
+    --c-page: #f2ece1;
+    --c-card: #faf6ef;
+    --c-card-border: #e6ddcc;
+    --c-accent-sage: #4c6443; /* deepened sage for AA text on light */
+    --c-text-warm: #33302b;
+    --c-muted: #6b6658;
 
-    /* ── Text ── */
-    --ha-text: #131b2e;
-    --ha-muted: #3e484f;
-    --ha-on-surface: #131b2e;
-    --ha-on-surface-variant: #3e484f;
+    /* Material-3 ramp — light (derived from seed #7e9070) */
+    --c-primary: #4c6443;
+    --c-on-primary: #ffffff;
+    --c-primary-container: #cee9bb;
+    --c-on-primary-container: #0a2100;
+    --c-secondary: #8f4c34; /* terracotta */
+    --c-on-secondary: #ffffff;
+    --c-secondary-container: #ffdbcf;
+    --c-on-secondary-container: #3a0b00;
+    --c-tertiary: #735767;
+    --c-on-tertiary: #ffffff;
+    --c-tertiary-container: #ffd8ea;
+    --c-error: #ba1a1a;
+    --c-on-error: #ffffff;
+    --c-error-container: #ffdad6;
+    --c-on-error-container: #410002;
+    --c-surface: #faf6ef;
+    --c-surface-container: #efe8dc;
+    --c-surface-container-high: #e9e2d4;
+    --c-surface-container-highest: #e3dccd;
+    --c-on-surface: #1c1b16;
+    --c-on-surface-variant: #4a473e;
+    --c-outline: #7c7a6f;
+    --c-outline-variant: #cdc8ba;
 
-    /* ── Panel / sidebar ── */
-    --ha-panel: #0b1220;
-    --ha-panel-strong: #111827;
-    --ha-panel-text: #e2e8f0;
-    --ha-panel-muted: #94a3b8;
-
-    /* ── Primary ── */
-    --ha-primary: #00668a;
-    --ha-primary-container: #38bdf8;
-    --ha-primary-fixed: #c4e7ff;
-    --ha-primary-fixed-dim: #7bd0ff;
-    --ha-on-primary: #ffffff;
-    --ha-on-primary-container: #004965;
-
-    /* ── Secondary ── */
-    --ha-secondary: #006c4b;
-    --ha-secondary-container: #64f9bc;
-    --ha-on-secondary: #ffffff;
-    --ha-on-secondary-container: #00714e;
-
-    /* ── Tertiary ── */
-    --ha-tertiary: #855300;
-    --ha-tertiary-container: #f1a02b;
-    --ha-on-tertiary: #ffffff;
-    --ha-on-tertiary-container: #613b00;
-
-    /* ── Accent (backward compat aliases) ── */
-    --ha-accent: #38bdf8;
-    --ha-accent-strong: #0ea5e9;
-    --ha-accent-2: #34d399;
-
-    /* ── Error ── */
-    --ha-danger: #ba1a1a;
-    --ha-danger-strong: #ef4444;
-    --ha-error: #ba1a1a;
-    --ha-error-container: #ffdad6;
-
-    /* ── Outline ── */
-    --ha-outline: #6e7980;
-    --ha-outline-variant: #bdc8d1;
-
-    /* ── Inverse ── */
-    --ha-inverse-surface: #283044;
-    --ha-inverse-on-surface: #eef0ff;
-    --ha-inverse-primary: #7bd0ff;
-
-    /* ── Interactive ── */
-    --ha-ring: #00668a;
-    --ha-ring-shadow: rgba(0, 102, 138, 0.2);
-    --ha-surface-hover: #f2f3ff;
-
-    /* ── Elevation ── */
-    --ha-card-shadow: 0 20px 40px -12px rgba(19, 27, 46, 0.08);
-    --ha-card-shadow-hover: 0 24px 48px -10px rgba(19, 27, 46, 0.14);
+    /* Tonal hairline edge (felt, not seen). */
+    --c-hairline: rgba(0, 0, 0, 0.06);
   }
 
   .dark {
     color-scheme: dark;
 
-    /* ── Surface hierarchy (flipped luminosity) ── */
-    --ha-bg: #0b1120;
-    --ha-bg-alt: #0f172a;
-    --ha-surface: #0b1120;
-    --ha-surface-muted: #111c2e;
-    --ha-surface-low: #111c2e;
-    --ha-surface-container: #1a2236;
-    --ha-surface-high: #1e293b;
-    --ha-surface-highest: #283044;
-    --ha-surface-variant: #1e293b;
-    --ha-surface-dim: #0b1120;
-    --ha-card: #111c2e;
-    --ha-card-border: transparent;
-    --ha-border: #334155;
+    /* Refined Palette — dark (canonical) */
+    --c-page: #2a2822;
+    --c-card: #34312a;
+    --c-card-border: #45413a;
+    --c-accent-sage: #9fb089;
+    --c-text-warm: #ece7dc;
+    --c-muted: #aba496;
 
-    /* ── Text ── */
-    --ha-text: #e2e8f0;
-    --ha-muted: #94a3b8;
-    --ha-on-surface: #e2e8f0;
-    --ha-on-surface-variant: #94a3b8;
+    /* Material-3 ramp — dark (wholesale from designTheme.namedColors) */
+    --c-primary: #b9cda9;
+    --c-on-primary: #25351c;
+    --c-primary-container: #849676;
+    --c-on-primary-container: #1f2e15;
+    --c-secondary: #ffb59b; /* terracotta */
+    --c-on-secondary: #53220e;
+    --c-secondary-container: #6f3722;
+    --c-on-secondary-container: #f1a286;
+    --c-tertiary: #e5bbcf;
+    --c-on-tertiary: #442837;
+    --c-tertiary-container: #ac8698;
+    --c-error: #ffb4ab;
+    --c-on-error: #690005;
+    --c-error-container: #93000a;
+    --c-on-error-container: #ffdad6;
+    --c-surface: #15130f;
+    --c-surface-container: #221f1b;
+    --c-surface-container-high: #2c2a25;
+    --c-surface-container-highest: #37342f;
+    --c-on-surface: #e8e1da;
+    --c-on-surface-variant: #c5c8bd;
+    --c-outline: #8f9288;
+    --c-outline-variant: #444840;
 
-    /* ── Panel / sidebar ── */
-    --ha-panel: #0b1220;
-    --ha-panel-strong: #0f172a;
-    --ha-panel-text: #e2e8f0;
-    --ha-panel-muted: #94a3b8;
-
-    /* ── Primary ── */
-    --ha-primary: #7bd0ff;
-    --ha-primary-container: #004c69;
-    --ha-primary-fixed: #c4e7ff;
-    --ha-primary-fixed-dim: #7bd0ff;
-    --ha-on-primary: #003549;
-    --ha-on-primary-container: #c4e7ff;
-
-    /* ── Secondary ── */
-    --ha-secondary: #45dfa4;
-    --ha-secondary-container: #005137;
-    --ha-on-secondary: #003826;
-    --ha-on-secondary-container: #68fcbf;
-
-    /* ── Tertiary ── */
-    --ha-tertiary: #ffb960;
-    --ha-tertiary-container: #653e00;
-    --ha-on-tertiary: #462a00;
-    --ha-on-tertiary-container: #ffddb8;
-
-    /* ── Accent (backward compat) ── */
-    --ha-accent: #7bd0ff;
-    --ha-accent-strong: #38bdf8;
-    --ha-accent-2: #45dfa4;
-
-    /* ── Error ── */
-    --ha-danger: #ffb4ab;
-    --ha-danger-strong: #f87171;
-    --ha-error: #ffb4ab;
-    --ha-error-container: #93000a;
-
-    /* ── Outline ── */
-    --ha-outline: #8b9198;
-    --ha-outline-variant: #3e484f;
-
-    /* ── Inverse ── */
-    --ha-inverse-surface: #e2e8f0;
-    --ha-inverse-on-surface: #283044;
-    --ha-inverse-primary: #00668a;
-
-    /* ── Interactive ── */
-    --ha-ring: #7bd0ff;
-    --ha-ring-shadow: rgba(123, 208, 255, 0.25);
-    --ha-surface-hover: #1e293b;
-
-    /* ── Elevation ── */
-    --ha-card-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.3);
-    --ha-card-shadow-hover: 0 24px 48px -10px rgba(0, 0, 0, 0.45);
+    --c-hairline: rgba(255, 255, 255, 0.05);
   }
 
   html,
@@ -172,15 +220,15 @@
 
   body {
     margin: 0;
-    font-family: "Inter", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-    background-color: var(--ha-bg);
-    color: var(--ha-text);
+    font-family: var(--font-sans);
+    background-color: var(--c-page);
+    color: var(--c-text-warm);
+    -webkit-font-smoothing: antialiased;
   }
 
-  code,
-  pre {
-    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo,
-      Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  ::selection {
+    background-color: var(--c-accent-sage);
+    color: var(--c-page);
   }
 
   summary {
@@ -190,33 +238,123 @@
   summary::-webkit-details-marker {
     display: none;
   }
+
+  /* Clean, unobtrusive scrollbars (Boxes Home reference). */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--c-surface-container-highest);
+    border-radius: 10px;
+  }
 }
 
+/* ──────────────────────────────────────────────────────────────────
+ * Legacy `--ha-*` aliases — re-pointed to the Move palette so the
+ * pre-existing shell (welcome, posts, users, account, nav, flash, Rodauth)
+ * is re-skinned without rewriting each view. New work uses the canonical
+ * tokens above; these aliases exist only for backward compatibility.
+ * ────────────────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    --ha-bg: var(--c-page);
+    --ha-bg-alt: var(--c-surface-container);
+    --ha-surface: var(--c-page);
+    --ha-surface-muted: var(--c-surface-container);
+    --ha-surface-low: var(--c-surface-container);
+    --ha-surface-container: var(--c-surface-container);
+    --ha-surface-high: var(--c-surface-container-high);
+    --ha-surface-highest: var(--c-surface-container-highest);
+    --ha-surface-variant: var(--c-surface-container-high);
+    --ha-surface-dim: var(--c-page);
+    --ha-card: var(--c-card);
+    --ha-card-border: var(--c-card-border);
+    --ha-border: var(--c-card-border);
+
+    --ha-text: var(--c-text-warm);
+    --ha-muted: var(--c-muted);
+    --ha-on-surface: var(--c-on-surface);
+    --ha-on-surface-variant: var(--c-on-surface-variant);
+
+    --ha-panel: var(--c-page);
+    --ha-panel-strong: var(--c-surface-container);
+    --ha-panel-text: var(--c-text-warm);
+    --ha-panel-muted: var(--c-muted);
+
+    --ha-primary: var(--c-accent-sage);
+    --ha-primary-container: var(--c-primary-container);
+    --ha-primary-fixed: var(--c-primary-container);
+    --ha-primary-fixed-dim: var(--c-primary);
+    --ha-on-primary: var(--c-on-primary);
+    --ha-on-primary-container: var(--c-on-primary-container);
+
+    --ha-secondary: var(--c-secondary);
+    --ha-secondary-container: var(--c-secondary-container);
+    --ha-on-secondary: var(--c-on-secondary);
+    --ha-on-secondary-container: var(--c-on-secondary-container);
+
+    --ha-tertiary: var(--c-tertiary);
+    --ha-tertiary-container: var(--c-tertiary-container);
+    --ha-on-tertiary: var(--c-on-tertiary);
+
+    --ha-accent: var(--c-accent-sage);
+    --ha-accent-strong: var(--c-primary);
+    --ha-accent-2: var(--c-accent-sage);
+
+    --ha-danger: var(--c-error);
+    --ha-danger-strong: var(--c-error);
+    --ha-error: var(--c-error);
+    --ha-error-container: var(--c-error-container);
+
+    --ha-outline: var(--c-outline);
+    --ha-outline-variant: var(--c-outline-variant);
+
+    --ha-inverse-surface: var(--c-on-surface);
+    --ha-inverse-on-surface: var(--c-surface);
+    --ha-inverse-primary: var(--c-primary);
+
+    --ha-ring: var(--c-accent-sage);
+    --ha-ring-shadow: rgba(159, 176, 137, 0.25);
+    --ha-surface-hover: var(--c-surface-container-high);
+
+    /* Tonal layering, not shadows. */
+    --ha-card-shadow: none;
+    --ha-card-shadow-hover: none;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Re-skinned shared component classes (used by the legacy shell).
+ * ────────────────────────────────────────────────────────────────── */
 @layer components {
-  /* ── Cards: no borders, tonal layering, ambient aura shadow ── */
+  /* Cards — 20px radius, tonal lift, hairline edge (no drop shadow). */
   .ha-card {
-    border-radius: 2rem;
-    border: none;
-    background: var(--ha-card);
-    box-shadow: var(--ha-card-shadow);
+    border-radius: var(--radius-card);
+    background: var(--c-card);
+    border: 1px solid var(--c-card-border);
+    box-shadow: none;
     transition:
       transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
-      box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1);
+      background-color 200ms ease;
   }
 
   @media (hover: hover) {
     .ha-card:hover {
-      transform: translateY(-4px);
-      box-shadow: var(--ha-card-shadow-hover);
+      transform: translateY(-2px);
+      background: var(--c-surface-container-high);
     }
   }
 
   .ha-overline {
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.2em;
-    color: var(--ha-muted);
+    letter-spacing: 0.1em;
+    color: var(--c-muted);
   }
 
   .ha-card-actions {
@@ -227,36 +365,30 @@
     padding-top: 1rem;
   }
 
-  /* ── Inputs: surface_highest bg, no border, ghost-border on focus ── */
+  /* Inputs — 20px radius on card colour, sage focus ring. */
   .ha-input {
     width: 100%;
-    border-radius: 1.5rem;
-    border: 1px solid transparent;
-    background: var(--ha-surface-highest);
+    border-radius: var(--radius-card);
+    border: 1px solid var(--c-card-border);
+    background: var(--c-card);
     padding: 0.85rem 1.1rem;
-    color: var(--ha-text);
+    color: var(--c-text-warm);
     transition:
-      background-color 200ms ease,
       border-color 200ms ease,
       box-shadow 200ms ease;
   }
 
   .ha-input::placeholder {
-    color: var(--ha-muted);
+    color: var(--c-muted);
   }
 
   .ha-input:focus {
     outline: none;
-    background: var(--ha-card);
-    border-color: rgba(0, 102, 138, 0.15);
+    border-color: var(--c-accent-sage);
     box-shadow: 0 0 0 3px var(--ha-ring-shadow);
   }
 
-  .dark .ha-input:focus {
-    border-color: rgba(123, 208, 255, 0.15);
-  }
-
-  /* ── Buttons ── */
+  /* Buttons — pill, sink on press. */
   .ha-button {
     display: inline-flex;
     align-items: center;
@@ -265,91 +397,77 @@
     border-radius: 9999px;
     padding: 0.75rem 1.5rem;
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     transition:
-      transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
-      box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1),
+      transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
       background-color 200ms ease,
-      color 200ms ease;
-  }
-
-  @media (hover: hover) {
-    .ha-button:hover {
-      transform: translateY(-1px);
-    }
+      color 200ms ease,
+      opacity 200ms ease;
   }
 
   .ha-button:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
   }
 
   .ha-button:focus-visible {
-    outline: 2px solid var(--ha-ring);
+    outline: 2px solid var(--c-accent-sage);
     outline-offset: 2px;
   }
 
-  /* Primary: gradient from primary to primary_container */
   .ha-button-primary {
-    background: linear-gradient(135deg, var(--ha-primary), var(--ha-primary-container));
-    color: var(--ha-on-primary);
-    box-shadow: 0 14px 30px -10px rgba(0, 102, 138, 0.35);
+    background: var(--c-accent-sage);
+    color: var(--c-page);
   }
 
   .ha-button-primary:hover {
-    box-shadow: 0 18px 36px -8px rgba(0, 102, 138, 0.45);
+    opacity: 0.9;
   }
 
   .ha-button-secondary {
-    background: var(--ha-surface-high);
-    color: var(--ha-text);
-    border: none;
+    background: var(--c-surface-container-high);
+    color: var(--c-text-warm);
+    border: 1px solid var(--c-card-border);
   }
 
   .ha-button-secondary:hover {
-    background: var(--ha-surface-container);
+    background: var(--c-surface-container-highest);
   }
 
   .ha-button-danger {
-    background: var(--ha-danger);
-    color: var(--ha-on-primary);
-    box-shadow: 0 14px 30px -10px rgba(186, 26, 26, 0.35);
+    background: var(--c-error);
+    color: var(--c-on-error);
   }
 
   .ha-button-danger:hover {
-    background: var(--ha-danger-strong);
+    opacity: 0.9;
   }
 
-  /* ── Navigation sidebar (desktop only, hidden md:flex) ── */
   .ha-nav {
     width: 16rem;
   }
 
   .ha-nav-item {
-    transition: background-color 200ms ease, color 200ms ease;
+    transition:
+      background-color 200ms ease,
+      color 200ms ease;
   }
 
-  /* ── Glassmorphism utility ── */
   .ha-glass {
-    background: rgba(255, 255, 255, 0.7);
+    background: color-mix(in srgb, var(--c-card) 80%, transparent);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid var(--c-hairline);
   }
 
-  .dark .ha-glass {
-    background: rgba(11, 17, 32, 0.7);
-    backdrop-filter: blur(30px) saturate(180%);
-    -webkit-backdrop-filter: blur(30px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
-
-  /* ── Gradient aura for CTAs / hero sections ── */
   .ha-gradient-aura {
-    background: linear-gradient(135deg, var(--ha-primary), var(--ha-primary-container));
+    background: var(--c-accent-sage);
   }
 }
 
+/* ──────────────────────────────────────────────────────────────────
+ * Utilities — motion, hairline edge, processing glow, scrollbar hide.
+ * ────────────────────────────────────────────────────────────────── */
 @layer utilities {
   .ha-fade-in {
     animation: ha-fade 600ms ease-out both;
@@ -359,26 +477,35 @@
     animation: ha-rise 600ms ease-out both;
   }
 
-  /* Headline font utility */
   .font-headline {
-    font-family: "Space Grotesk", "Segoe UI", ui-sans-serif, system-ui,
-      sans-serif;
+    font-family: var(--font-sans);
   }
 
-  /* Ghost border: felt, not seen */
-  .ha-ghost-border {
-    border: 1px solid rgba(189, 200, 209, 0.15);
+  /* Hairline border — felt, not seen (5% white in dark, 6% black in light). */
+  .ha-ghost-border,
+  .border-hairline {
+    border: 1px solid var(--c-hairline);
   }
 
-  .dark .ha-ghost-border {
-    border: 1px solid rgba(255, 255, 255, 0.08);
+  /* Processing = soft pulsing sage glow (Recognition state). */
+  .ui-pulse-glow {
+    animation: ui-pulse-glow 2s ease-in-out infinite;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ha-fade-in,
   .ha-rise,
-  .ha-button {
+  .ha-button,
+  .ui-pulse-glow {
     animation: none;
     transition: none;
   }
@@ -403,5 +530,15 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes ui-pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(159, 176, 137, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(159, 176, 137, 0.35);
   }
 }

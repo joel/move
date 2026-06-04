@@ -49,6 +49,12 @@ Style/FrozenStringLiteralComment:
     - db/**/*
     - lib/tasks/**/*
 
+Metrics/ParameterLists:
+  # Phlex component initializers expose their public API as keyword arguments;
+  # counting each optional keyword as a parameter penalises clear, composable
+  # components. Keep the positional limit, ignore keyword args.
+  CountKeywordArgs: false
+
 Metrics/BlockLength:
   Exclude:
     - config/**/*

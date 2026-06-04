@@ -1,0 +1,37 @@
+# Shared UI strings for the Move design system (Phase D0).
+# Convention: no customer-facing copy is hard-coded in Phlex components —
+# every string renders through these `ui.*` namespaces.
+en:
+  ui:
+    buttons:
+      retry: "Retry"
+      new_box: "New Box"
+      dismiss: "Dismiss"
+    nav:
+      boxes: "Boxes"
+      search: "Search"
+      scan: "Scan"
+      summary: "Summary"
+      menu: "Menu"
+      account: "Account"
+      brand_tagline: "Mindful Moving"
+    states:
+      queued: "Queued"
+      processing: "Processing"
+      succeeded: "Recognized"
+      failed: "Recognition failed"
+      needs_correction: "Needs review"
+      auto_confirmed: "Auto-confirmed"
+      pending_review: "Pending review"
+    toast:
+      success_title: "All set"
+      error_title: "Action needed"
+      info_title: "Heads up"
+    empty:
+      title: "Nothing here yet"
+      description: "When there is something to show, it will appear here."
+    progress:
+      label: "Progress"
+    quantity:
+      decrease: "Decrease quantity"
+      increase: "Increase quantity"

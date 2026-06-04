@@ -121,4 +121,8 @@ Build, with light/dark + states, matching the design-system "Components" section
 Any Move domain model, any real screen data, any feature behaviour. Those start in D1.
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.5.0-design-foundation`:
+- **Issue:** #21
+- **PR:** #22
+- **Verification:** `/product-review` live pass (dark-default + toggle persistence, self-hosted Plus Jakarta Sans, `/style_guide` all primitives + 7 recognition states light/dark, re-skinned shell, mobile no-overflow + bottom tab bar). Unit 127/0, system 8/0, RuboCop/ErbLint/Brakeman/bundle-audit clean.
+- **Note:** repo runs Tailwind v4 (CSS-first); the `@theme` block in `app/assets/tailwind/application.css` is authoritative, `config/tailwind.config.js` mirrors it.
+- **Release `v0.5.0-design-foundation`:** _pending merge to `main` + green CI._
