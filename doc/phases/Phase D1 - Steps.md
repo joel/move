@@ -27,3 +27,33 @@ Flight-recorder for the tenancy + Moves effort. Append-only; factual.
 - **Verified:** rebuilt image → `pg_dump (PostgreSQL) 18.4`; `pg_dump -s -n public`
   against the PG 18.0 server exits 0 (previously aborted on version mismatch). App
   boots; `/up` returns 200; Rodauth Sequel connection healthy.
+- Also pinned the prod DB accessory (`config/deploy.yml`) to `postgres:18`.
+
+### Step 1 — schema_format :sql
+
+- `config/application.rb`: `schema_format = :sql`.
+- Generated `db/structure.sql` (primary) + `db/{cache,queue,cable}_structure.sql`
+  (Solid, via Rails `structure_dump` from scratch DBs); removed the `*_schema.rb`.
+- **Gotcha hit:** the dev DB carried a phantom migration `20260604130001`
+  (`create_organization_memberships`) from the *closed* PR #27 branch, which
+  contaminated `structure.sql` (Apartment's railtie re-loaded it on migrate). Fixed
+  by deleting the bad `structure.sql` and `db reset` (drop→create→migrate from repo
+  files only). Clean structure.sql now matches migrations through `20260603160000`.
+- Committed with `SKIP=RailsSchemaUpToDate` (format change only, schema unchanged).
+- **Verified:** app boots; `/`, `/login`, `/create-account` → 200.
+
+### Step 2 — Organization registry (public schema)
+
+- Migrations + `Organization` (citext slug, DNS-label validation) +
+  `OrganizationMembership` (role, unique per org/user). Factories + model specs.
+- **Verified:** model specs green (11 examples).
+
+### Step 3a — Move tenant tables + module rename
+
+- **Naming clash:** the app module `Move` collided with the `Move` model. Renamed
+  the app module to `MoveApp` (only ref outside UI strings; webauthn_rp_name default
+  is cosmetic). Model stays `Move`.
+- Migrations + `Move` (status/unit_system, `#writable?`) + `MoveMembership`. No
+  cross-schema FK to users; `move_id` FK is same-schema. Factories + specs.
+- **Verified:** model specs green; full unit suite 147 examples, 0 failures; app
+  boots after rename; `/`, `/login` → 200.
