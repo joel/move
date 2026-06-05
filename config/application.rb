@@ -49,6 +49,10 @@ module MoveApp
     # the public schema, extensions and search_path that :ruby schema.rb cannot.
     config.active_record.schema_format = :sql
 
+    # Human-facing brand name. Decoupled from the Ruby module (MoveApp) so the
+    # product is always shown as "Move".
+    config.x.brand_name = "Move"
+
     config.hosts.clear if ENV["RAILS_ALLOW_ALL_HOSTS"].present?
   end
 end
