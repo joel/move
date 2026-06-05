@@ -41,6 +41,38 @@ CREATE TABLE public.ar_internal_metadata (
 
 
 --
+-- Name: move_memberships; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.move_memberships (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    role character varying DEFAULT 'member'::character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: moves; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.moves (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying NOT NULL,
+    status character varying DEFAULT 'planned'::character varying NOT NULL,
+    planned_on date,
+    origin_address character varying,
+    destination_address character varying,
+    unit_system character varying DEFAULT 'metric'::character varying NOT NULL,
+    created_by_id uuid NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: organization_memberships; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -185,6 +217,22 @@ ALTER TABLE ONLY public.ar_internal_metadata
 
 
 --
+-- Name: move_memberships move_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.move_memberships
+    ADD CONSTRAINT move_memberships_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: moves moves_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.moves
+    ADD CONSTRAINT moves_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organization_memberships organization_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -277,6 +325,41 @@ ALTER TABLE ONLY public.users
 --
 
 CREATE UNIQUE INDEX idx_omniauth_identities_uniqueness ON public.user_omniauth_identities USING btree (provider, uid);
+
+
+--
+-- Name: index_move_memberships_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_move_memberships_on_move_id ON public.move_memberships USING btree (move_id);
+
+
+--
+-- Name: index_move_memberships_on_move_id_and_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_move_memberships_on_move_id_and_user_id ON public.move_memberships USING btree (move_id, user_id);
+
+
+--
+-- Name: index_move_memberships_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_move_memberships_on_user_id ON public.move_memberships USING btree (user_id);
+
+
+--
+-- Name: index_moves_on_created_by_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_moves_on_created_by_id ON public.moves USING btree (created_by_id);
+
+
+--
+-- Name: index_moves_on_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_moves_on_status ON public.moves USING btree (status);
 
 
 --
@@ -384,6 +467,14 @@ ALTER TABLE ONLY public.user_omniauth_identities
 
 
 --
+-- Name: move_memberships fk_rails_a80e7a5ec3; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.move_memberships
+    ADD CONSTRAINT fk_rails_a80e7a5ec3 FOREIGN KEY (move_id) REFERENCES public.moves(id);
+
+
+--
 -- Name: user_webauthn_keys fk_rails_a8aa560c7f; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -414,6 +505,8 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260604200004'),
+('20260604200003'),
 ('20260604200002'),
 ('20260604200001'),
 ('20260603160000'),
