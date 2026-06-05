@@ -59,6 +59,9 @@ These are non-negotiable for all domain work. Do not reinvent these wheels.
    **Runtime Test Workflow** (§5 / `/product-review`) and explicitly verify the
    full auth journey — create account, sign in, sign out, sign back in — works
    end to end in the running app. A green test suite is **not** sufficient.
+   Auth-layer reference + hard-won gotchas (stale-session-after-DB-reset,
+   verify-before-login, forms dropping query params, remember-me) live in
+   [`app/misc/AGENTS.md`](app/misc/AGENTS.md).
 
 ---
 
