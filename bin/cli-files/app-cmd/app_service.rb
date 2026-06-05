@@ -257,7 +257,8 @@ module AppCLI
       end
 
       def copy_schema_from_container(container_name)
-        runner.run("docker cp #{container_name}:/rails/db/schema.rb db/schema.rb")
+        # schema_format is :sql, so db:schema:dump writes db/structure.sql.
+        runner.run("docker cp #{container_name}:/rails/db/structure.sql db/structure.sql")
       end
 
       def wait_for_app
