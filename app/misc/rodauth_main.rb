@@ -156,7 +156,15 @@ class RodauthMain < Rodauth::Rails::Auth
             slug: generate_tenant_slug(user),
             owner: user
           )
-          @onboarding_slug = result.value!.slug if result.success?
+
+          if result.success?
+            @onboarding_slug = result.value!.slug
+          else
+            # Never strand a verified user without surfacing why.
+            Rails.logger.error(
+              "[onboarding] could not create org for account #{account_id}: #{result.failure.inspect}"
+            )
+          end
         end
 
         def member_of_any_organization?
@@ -186,11 +194,19 @@ class RodauthMain < Rodauth::Rails::Auth
           base = (base.presence || "org")[0, 50]
           candidate = base
           suffix = 1
-          while Organization.exists?(slug: candidate)
+          while slug_unavailable?(candidate)
             candidate = "#{base}-#{suffix}"
             suffix += 1
           end
           candidate
+        end
+
+        # A slug is unavailable if it's already taken OR a reserved subdomain;
+        # otherwise a user like admin@… would derive the reserved slug "admin",
+        # which Organizations::Create rejects, leaving them without a tenant.
+        def slug_unavailable?(slug)
+          Organizations::Create::RESERVED_SLUGS.include?(slug) ||
+            Organization.exists?(slug: slug)
         end
       end
 
