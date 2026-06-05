@@ -117,3 +117,31 @@ Flight-recorder for the tenancy + Moves effort. Append-only; factual.
 
 RuboCop, erb_lint clean; Brakeman 0 warnings; bundle-audit clean; **162 unit + 8
 system specs, 0 failures**.
+
+## Design decisions
+
+### `Move#status` / `#unit_system`: string column + `inclusion`, not Rails `enum`
+
+`Move` stores `status` (`planned/started/finished/archived`) and `unit_system`
+(`metric/imperial`) as plain `string` columns validated with
+`inclusion: { in: CONST }`, rather than a Rails `enum`. Kept deliberately:
+
+- **Transitions belong in `app/actions`.** `enum` generates bang setters
+  (`move.archived!`) that mutate + save, inviting callers to bypass the action
+  layer — directly against AGENTS.md §1.2 ("state transitions via app/actions, no
+  model mutation"). A plain attribute has no such ergonomic shortcut.
+- **Readable values everywhere.** Integer-backed `enum` stores `0/1/2/3` — opaque
+  in `psql`, logs, `structure.sql` and the per-tenant schema dumps — and reordering
+  silently remaps rows. String values are self-describing across all of that.
+- **Fits the Dry::Monads flow.** An unknown value is a normal `inclusion` failure
+  that surfaces as `Failure(ActiveModel::Errors)` through `Moves::Create`'s
+  `rescue RecordInvalid`; `enum` instead raises `ArgumentError` on assignment,
+  bypassing validation and the result flow.
+- **YAGNI.** Constants + `inclusion` cover what D1 needs (validate, drive the
+  form/`MoveCard`/I18n options, `writable?`); `enum`'s scopes/predicates aren't
+  needed yet.
+
+Accepted trade-off: we forgo free scopes (`Move.archived`) and predicates. If
+those become valuable, a **string-backed** enum (column stays `string`) is the
+upgrade path — keeping the readable-value and structure.sql benefits — with
+transitions still routed through actions.
