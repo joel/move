@@ -166,6 +166,10 @@ module AppCLI
         "#{APP_NAME}.#{TRAEFIK_DOMAIN}"
       end
 
+      def traefik_domain
+        TRAEFIK_DOMAIN
+      end
+
       def traefik_router
         TRAEFIK_ROUTER
       end
