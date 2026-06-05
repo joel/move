@@ -5,6 +5,10 @@ run-name: ${{ github.actor }} - DEPLOY - ${{ github.event.head_commit.message }}
 on:
   push:
     branches: [main]
+  # Manual lever: recover a deploy that a push skipped (e.g. a stray [skip ci]
+  # in a squash-merge message suppresses the push-triggered run). Run with
+  # `gh workflow run Deploy --ref main` or from the Actions tab.
+  workflow_dispatch:
 
 # Never run two production deploys at once. cancel-in-progress is false so an
 # in-flight kamal deploy (which holds a server-side lock and may be mid-rollout)
