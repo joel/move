@@ -31,7 +31,11 @@ class RodauthMain < Rodauth::Rails::Auth
       remember_deadline_interval({ days: 30 })
       remember_period({ days: 30 })
       extend_remember_deadline? true
-      remember_cookie_options(same_site: :lax)
+      # Share the remember cookie across org subdomains (same zone as the
+      # session cookie), so persistent login survives the apex -> subdomain hop.
+      remember_cookie_options(
+        **{ same_site: :lax, domain: Rails.application.config.x.cookie_domain }.compact
+      )
 
       # ── OmniAuth (Google social login) ────────────────────────
       # Active only when GOOGLE_CLIENT_ID is configured, so the
