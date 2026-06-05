@@ -14,15 +14,20 @@ class RodauthMain < Rodauth::Rails::Auth
 
       db Sequel.postgres(extensions: :activerecord_connection, keep_reference: false)
 
-      accounts_table :users
-      verify_account_table :user_verification_keys
-      email_auth_table :user_email_auth_keys
-      webauthn_keys_table :user_webauthn_keys
-      webauthn_user_ids_table :user_webauthn_user_ids
+      # Schema-qualify every Rodauth table to `public`. Rodauth shares the
+      # ActiveRecord connection (sequel-activerecord_connection), whose
+      # search_path Apartment switches per tenant. These key tables have no AR
+      # model, so Apartment clones them (empty) into each tenant schema;
+      # qualifying to public ensures auth always reads the real public rows.
+      accounts_table Sequel[:public][:users]
+      verify_account_table Sequel[:public][:user_verification_keys]
+      email_auth_table Sequel[:public][:user_email_auth_keys]
+      webauthn_keys_table Sequel[:public][:user_webauthn_keys]
+      webauthn_user_ids_table Sequel[:public][:user_webauthn_user_ids]
       webauthn_keys_account_id_column :user_id
 
       # ── Remember me (persistent sessions) ─────────────────────
-      remember_table :user_remember_keys
+      remember_table Sequel[:public][:user_remember_keys]
       remember_deadline_interval({ days: 30 })
       remember_period({ days: 30 })
       extend_remember_deadline? true
@@ -31,7 +36,7 @@ class RodauthMain < Rodauth::Rails::Auth
       # ── OmniAuth (Google social login) ────────────────────────
       # Active only when GOOGLE_CLIENT_ID is configured, so the
       # template runs out of the box without Google credentials.
-      omniauth_identities_table :user_omniauth_identities
+      omniauth_identities_table Sequel[:public][:user_omniauth_identities]
       omniauth_identities_account_id_column :user_id
 
       if ENV["GOOGLE_CLIENT_ID"].present?
@@ -152,7 +157,7 @@ class RodauthMain < Rodauth::Rails::Auth
       webauthn_rp_id do
         ENV.fetch("WEBAUTHN_RP_ID", webauthn_origin.sub(%r{\Ahttps?://}, "").sub(/:\d+\z/, ""))
       end
-      webauthn_rp_name { ENV.fetch("WEBAUTHN_RP_NAME", Rails.application.class.module_parent_name) }
+      webauthn_rp_name { ENV.fetch("WEBAUTHN_RP_NAME", Rails.application.config.x.brand_name) }
       webauthn_user_verification "preferred"
 
       # ── OmniAuth hooks ────────────────────────────────────────
