@@ -99,3 +99,21 @@ Flight-recorder for the tenancy + Moves effort. Append-only; factual.
   subdomain.
 - **Verified live:** signup `onboard1@example.com` → verify link → tenant schema
   `onboard1` created, owner membership set, redirected + logged in on the subdomain.
+
+### Step 8 — A1 Move screens
+
+- `resources :moves` (index/new/create); subdomain root redirects to the Move list.
+  `MovesController` requires a tenant (404 on apex), authorizes via `MovePolicy`,
+  creates via `Moves::Create`. `MoveCard` (status, name, progress hint, box/pending
+  counts — box metrics are D2), `MoveForm` (spec fields), empty state, archived
+  read-only. All copy via `moves.*` I18n. Fixed `top_nav` brand leak.
+- **Bug caught live:** Phlex views lack the `t` helper → switched to `I18n.t`.
+- **Verified live** (logged in on `acme`): list shows the move card; create form has
+  the exact spec fields; submitting creates the move (creator → admin) and returns to
+  the list; `emptyco` shows the empty state; tenant isolation holds; nav reads "Move".
+- Request specs (6) cover list/empty/form/create/validation/404.
+
+### Validation (pre-PR)
+
+RuboCop, erb_lint clean; Brakeman 0 warnings; bundle-audit clean; **162 unit + 8
+system specs, 0 failures**.
