@@ -2,6 +2,8 @@ Rails.application.routes.draw do
   # Google One Tap credential endpoint (active when GOOGLE_CLIENT_ID is set)
   post "auth/google/one_tap", to: "google_one_tap_sessions#create"
   resource :account, only: %i[show edit update destroy]
+  # A1 — Create / select Move (entry screen on an Organization subdomain).
+  resources :moves, only: %i[index new create]
   resources :posts
   resources :users
   get "welcome/home"

@@ -1,0 +1,68 @@
+require "rails_helper"
+
+RSpec.describe "Moves" do
+  let(:user) { create(:user) }
+
+  before do
+    stub_current_user(user)
+    # Pretend we are on an Organization subdomain (the elevator does this in
+    # real requests); Move data resolves against the public template here.
+    stub_current_tenant("acme")
+  end
+
+  describe "GET /moves" do
+    it "renders the list of moves" do
+      create(:move, name: "Lake House", created_by: user)
+
+      get moves_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Lake House").and include("Your moves")
+    end
+
+    it "renders the empty state when there are no moves" do
+      get moves_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(I18n.t("moves.empty.title"))
+    end
+  end
+
+  describe "GET /moves/new" do
+    it "renders the create form" do
+      get new_move_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(I18n.t("moves.form.name"))
+    end
+  end
+
+  describe "POST /moves" do
+    it "creates a move and redirects to the list" do
+      expect do
+        post moves_path, params: { move: { name: "Beach House", unit_system: "imperial" } }
+      end.to change(Move, :count).by(1)
+
+      expect(response).to redirect_to(moves_path)
+      expect(Move.find_by(name: "Beach House").move_memberships.find_by(user: user).role).to eq("admin")
+    end
+
+    it "re-renders the form with errors for an invalid move" do
+      expect do
+        post moves_path, params: { move: { name: "", unit_system: "metric" } }
+      end.not_to change(Move, :count)
+
+      expect(response).to have_http_status(:unprocessable_content)
+    end
+  end
+
+  describe "without a tenant (apex/public)" do
+    it "returns 404 (non-disclosing)" do
+      stub_current_tenant(nil)
+
+      get moves_path
+
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+end
