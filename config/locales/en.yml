@@ -33,9 +33,9 @@ accounts:
 #       enabled: "ON"
 
 en:
-accounts:
-  update:
-    notice: "Account was successfully updated."
-  destroy:
-    notice: "Account was successfully deleted."
+  accounts:
+    update:
+      notice: "Account was successfully updated."
+    destroy:
+      notice: "Account was successfully deleted."
   hello: "Hello world"
