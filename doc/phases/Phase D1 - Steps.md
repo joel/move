@@ -57,3 +57,45 @@ Flight-recorder for the tenancy + Moves effort. Append-only; factual.
   cross-schema FK to users; `move_id` FK is same-schema. Factories + specs.
 - **Verified:** model specs green; full unit suite 147 examples, 0 failures; app
   boots after rename; `/`, `/login` → 200.
+
+### Step 3b — Apartment initializer + Rodauth public-qualification
+
+- `config/initializers/apartment.rb`: excluded_models (User, Organization,
+  OrganizationMembership), persistent_schemas [public], use_sql,
+  `pg_exclude_clone_tables = true` (keep excluded tables out of tenant schemas),
+  `pg_excluded_names = [citext]` (don't rewrite `public.citext` to a non-existent
+  tenant type — caught live during tenant creation).
+- `rodauth_main.rb`: every Rodauth table schema-qualified to `public`
+  (`Sequel[:public][:…]`) — model-less key tables get cloned empty into tenants,
+  so auth must always read public.
+- Decoupled brand name (`config.x.brand_name = "Move"`) — module rename had leaked
+  "MoveApp" into the nav.
+- **Verified:** tenant create/switch — `users`/`organizations` NOT in tenant schema,
+  `moves` present, excluded User + qualified `public.users` resolve in-tenant, move
+  isolation holds. **Full auth journey live (create → verify → sign out → sign back
+  in)** with Apartment active; mini-profiler SQL confirms `public.users` /
+  `public.user_email_auth_keys`. Unit suite 147→ still 0 failures.
+
+### Step 4 — Actions
+
+- `Organizations::Create` (reserved-slug guard, owner membership, tenant provision,
+  rollback on failure) + `Moves::Create` (creator → admin). Unit specs (9) green.
+
+### Step 5–7 — Subdomain routing + shared cookie
+
+- Custom `MoveTenantElevator` (zone-based; `.docker` isn't a public suffix so
+  Apartment's Subdomain elevator can't parse it), 404 on unknown tenant.
+- Session + Rodauth remember cookie shared on `config.x.cookie_domain`
+  (`.workeverywhere.docker` dev / `.app` prod); `tenant_zone` per env.
+- Traefik low-priority `HostRegexp` router for `<slug>.<domain>` in `app_service.rb`.
+- **Verified live:** DNS `acme.…docker` → 200 with `search_path TO "acme","public"`;
+  unknown subdomain → 404; **apex login session carries to `acme` subdomain (no
+  redirect loop)**.
+
+### Onboarding
+
+- `verify_account_view` provisions a personal Organization after the verify
+  transaction; redirects to `<slug>.<zone>`. Logins route to the user's org
+  subdomain.
+- **Verified live:** signup `onboard1@example.com` → verify link → tenant schema
+  `onboard1` created, owner membership set, redirected + logged in on the subdomain.
