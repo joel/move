@@ -78,7 +78,7 @@ class RodauthMain < Rodauth::Rails::Auth
       require_password_confirmation? false
       require_bcrypt? false
 
-      auth_class_eval do
+      auth_class_eval do # rubocop:disable Metrics/BlockLength
         # No second factor is wired up; keeps the :webauthn feature from
         # treating passkeys as a 2FA step.
         def two_factor_authentication_setup?
@@ -137,7 +137,60 @@ class RodauthMain < Rodauth::Rails::Auth
 
           autologin_session("verify_account") if verify_account_autologin?
           remove_session_value(verify_account_session_key)
+          # Provision the personal tenant AFTER the verify transaction commits —
+          # tenant creation runs DDL/pg_dump and must not nest in that transaction.
+          ensure_personal_organization
           verify_account_response
+        end
+
+        # ── Tenant onboarding ─────────────────────────────────────
+        # Every verified account gets a personal Organization (an Apartment
+        # tenant) so it has somewhere to create Moves. Idempotent; sets
+        # @onboarding_slug for the post-verify redirect.
+        def ensure_personal_organization
+          return if member_of_any_organization?
+
+          user = ::User.find(account_id)
+          result = Organizations::Create.new.call(
+            name: organization_name_for(user),
+            slug: generate_tenant_slug(user),
+            owner: user
+          )
+          @onboarding_slug = result.value!.slug if result.success?
+        end
+
+        def member_of_any_organization?
+          OrganizationMembership.exists?(user_id: account_id)
+        end
+
+        def primary_organization
+          Organization
+            .joins(:organization_memberships)
+            .find_by(organization_memberships: { user_id: account_id })
+        end
+
+        def tenant_home_url(slug)
+          "https://#{slug}.#{Rails.application.config.x.tenant_zone}/"
+        end
+
+        def organization_name_for(user)
+          base = user.name.presence || user.email.to_s.split("@").first
+          "#{base}'s Move"
+        end
+
+        # Build a unique, DNS-label/schema-safe slug from the user's name/email.
+        def generate_tenant_slug(user)
+          seed = user.name.presence || user.email.to_s.split("@").first
+          base = seed.to_s.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/\A-+|-+\z/, "")
+          base = "org-#{base}" unless base.match?(/\A[a-z]/)
+          base = (base.presence || "org")[0, 50]
+          candidate = base
+          suffix = 1
+          while Organization.exists?(slug: candidate)
+            candidate = "#{base}-#{suffix}"
+            suffix += 1
+          end
+          candidate
         end
       end
 
@@ -179,7 +232,16 @@ class RodauthMain < Rodauth::Rails::Auth
       end
 
       logout_redirect "/"
-      verify_account_redirect { login_redirect }
+
+      # Route authenticated users to their Organization subdomain (the A1
+      # Move list). Apex login UI -> tenant home; the shared cookie keeps the
+      # session. Falls back to the apex when the user has no Organization yet.
+      login_redirect do
+        (org = primary_organization) ? tenant_home_url(org.slug) : "/"
+      end
+      verify_account_redirect do
+        @onboarding_slug ? tenant_home_url(@onboarding_slug) : login_redirect
+      end
     end
   end
 end
