@@ -260,7 +260,10 @@ module AppCLI
             "--name #{env_config.db_container}",
             "--env POSTGRES_HOST_AUTH_METHOD=trust",
             "--network #{env_config.network_name}",
-            "--volume #{env_config.db_volume}:/var/lib/postgresql/data",
+            # postgres:18+ stores data in a major-version subdirectory; mount the
+            # parent (/var/lib/postgresql), not /var/lib/postgresql/data. Matches
+            # the prod accessory mount in config/deploy.yml.
+            "--volume #{env_config.db_volume}:/var/lib/postgresql",
             ("--publish #{db_port}:5432" if db_port),
             env_config.db_image
           ].compact
