@@ -104,7 +104,7 @@ module Components
     end
 
     def app_name
-      Rails.application.class.module_parent_name
+      Rails.application.config.x.brand_name
     end
   end
 end

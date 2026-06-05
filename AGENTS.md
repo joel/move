@@ -153,6 +153,49 @@ When a PR receives code review comments:
 - Secrets come from **Doppler** (`move/prd`), synced into GitHub Actions secrets. `.kamal/secrets` uses the environment-provided values in CI and falls back to the Doppler CLI / `config/master.key` for local deploys.
 - Skip a deploy for a given commit with `[skip deploy]` in the commit **subject**. **Beware:** a squash-merge whose body quotes the literal `[skip deploy]` (for example, by referencing this document) will skip the deploy unintentionally.
 
+#### Database accessory (PostgreSQL 18)
+
+The database is a **Kamal accessory** defined in `config/deploy.yml` (`accessories.db`):
+`image: postgres:18`, mounted at `directories: - data:/var/lib/postgresql`.
+
+- **Pinned to `postgres:18`.** `schema_format :sql` dumps and Apartment tenant
+  cloning need a `pg_dump` matching the server, so the app image ships
+  `postgresql-client-18` and **every** Postgres image (dev `bin/cli`, CI service,
+  prod accessory) is pinned to 18. Do not float on `postgres:latest`.
+- **Mount the parent, not `/data`.** `postgres:18+` stores the cluster in a
+  major-version subdirectory (`/var/lib/postgresql/18/docker`) for `pg_upgrade
+  --link`, and refuses to start against an old-style cluster at
+  `/var/lib/postgresql/data`. The mount target must be `/var/lib/postgresql`
+  (already set for dev and prod).
+- **Accessories are not rebooted by an app deploy.** A push to `main` redeploys
+  the app but leaves `accessories.db` untouched — image/mount changes to the
+  accessory require a manual `kamal accessory` cutover.
+
+##### One-time PG 18 cutover (Kamal 2)
+
+Needed when the prod accessory still runs an old image/layout. **Destroys the
+cluster — only safe when there is no data to keep** (back up first otherwise, or
+use `pg_upgrade`). Run from a checkout with the merged `deploy.yml`:
+
+```bash
+kamal accessory remove db          # stop/remove the old container…
+# …then on the db host, ensure the accessory's bind-mounted `data` dir is empty
+# (Kamal may leave it): rm -rf the accessory data dir if so.
+kamal accessory boot db            # pull postgres:18, init the new layout fresh
+
+# verify
+docker exec <db-container> cat /var/lib/postgresql/18/docker/PG_VERSION   # => 18
+docker exec <db-container> psql -U move -d move_production -c 'select version();'
+
+# load the schema (creates move_production + cache/queue/cable, loads
+# structure.sql, migrates) — or just redeploy; the app entrypoint runs db:prepare
+kamal app exec --reuse 'bin/rails db:prepare'
+```
+
+Then smoke-test the live auth journey at `https://move.workeverywhere.app` and
+create a Move on an org subdomain. Order: merge → accessory cutover → `db:prepare`
+→ smoke test.
+
 ### Release Rules
 
 Run after a PR is merged to `main` and its `main` CI/Deploy run is green.

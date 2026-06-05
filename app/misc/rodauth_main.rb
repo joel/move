@@ -14,24 +14,33 @@ class RodauthMain < Rodauth::Rails::Auth
 
       db Sequel.postgres(extensions: :activerecord_connection, keep_reference: false)
 
-      accounts_table :users
-      verify_account_table :user_verification_keys
-      email_auth_table :user_email_auth_keys
-      webauthn_keys_table :user_webauthn_keys
-      webauthn_user_ids_table :user_webauthn_user_ids
+      # Schema-qualify every Rodauth table to `public`. Rodauth shares the
+      # ActiveRecord connection (sequel-activerecord_connection), whose
+      # search_path Apartment switches per tenant. These key tables have no AR
+      # model, so Apartment clones them (empty) into each tenant schema;
+      # qualifying to public ensures auth always reads the real public rows.
+      accounts_table Sequel[:public][:users]
+      verify_account_table Sequel[:public][:user_verification_keys]
+      email_auth_table Sequel[:public][:user_email_auth_keys]
+      webauthn_keys_table Sequel[:public][:user_webauthn_keys]
+      webauthn_user_ids_table Sequel[:public][:user_webauthn_user_ids]
       webauthn_keys_account_id_column :user_id
 
       # ── Remember me (persistent sessions) ─────────────────────
-      remember_table :user_remember_keys
+      remember_table Sequel[:public][:user_remember_keys]
       remember_deadline_interval({ days: 30 })
       remember_period({ days: 30 })
       extend_remember_deadline? true
-      remember_cookie_options(same_site: :lax)
+      # Share the remember cookie across org subdomains (same zone as the
+      # session cookie), so persistent login survives the apex -> subdomain hop.
+      remember_cookie_options(
+        **{ same_site: :lax, domain: Rails.application.config.x.cookie_domain }.compact
+      )
 
       # ── OmniAuth (Google social login) ────────────────────────
       # Active only when GOOGLE_CLIENT_ID is configured, so the
       # template runs out of the box without Google credentials.
-      omniauth_identities_table :user_omniauth_identities
+      omniauth_identities_table Sequel[:public][:user_omniauth_identities]
       omniauth_identities_account_id_column :user_id
 
       if ENV["GOOGLE_CLIENT_ID"].present?
@@ -69,7 +78,7 @@ class RodauthMain < Rodauth::Rails::Auth
       require_password_confirmation? false
       require_bcrypt? false
 
-      auth_class_eval do
+      auth_class_eval do # rubocop:disable Metrics/BlockLength
         # No second factor is wired up; keeps the :webauthn feature from
         # treating passkeys as a 2FA step.
         def two_factor_authentication_setup?
@@ -128,7 +137,76 @@ class RodauthMain < Rodauth::Rails::Auth
 
           autologin_session("verify_account") if verify_account_autologin?
           remove_session_value(verify_account_session_key)
+          # Provision the personal tenant AFTER the verify transaction commits —
+          # tenant creation runs DDL/pg_dump and must not nest in that transaction.
+          ensure_personal_organization
           verify_account_response
+        end
+
+        # ── Tenant onboarding ─────────────────────────────────────
+        # Every verified account gets a personal Organization (an Apartment
+        # tenant) so it has somewhere to create Moves. Idempotent; sets
+        # @onboarding_slug for the post-verify redirect.
+        def ensure_personal_organization
+          return if member_of_any_organization?
+
+          user = ::User.find(account_id)
+          result = Organizations::Create.new.call(
+            name: organization_name_for(user),
+            slug: generate_tenant_slug(user),
+            owner: user
+          )
+
+          if result.success?
+            @onboarding_slug = result.value!.slug
+          else
+            # Never strand a verified user without surfacing why.
+            Rails.logger.error(
+              "[onboarding] could not create org for account #{account_id}: #{result.failure.inspect}"
+            )
+          end
+        end
+
+        def member_of_any_organization?
+          OrganizationMembership.exists?(user_id: account_id)
+        end
+
+        def primary_organization
+          Organization
+            .joins(:organization_memberships)
+            .find_by(organization_memberships: { user_id: account_id })
+        end
+
+        def tenant_home_url(slug)
+          "https://#{slug}.#{Rails.application.config.x.tenant_zone}/"
+        end
+
+        def organization_name_for(user)
+          base = user.name.presence || user.email.to_s.split("@").first
+          "#{base}'s Move"
+        end
+
+        # Build a unique, DNS-label/schema-safe slug from the user's name/email.
+        def generate_tenant_slug(user)
+          seed = user.name.presence || user.email.to_s.split("@").first
+          base = seed.to_s.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/\A-+|-+\z/, "")
+          base = "org-#{base}" unless base.match?(/\A[a-z]/)
+          base = (base.presence || "org")[0, 50]
+          candidate = base
+          suffix = 1
+          while slug_unavailable?(candidate)
+            candidate = "#{base}-#{suffix}"
+            suffix += 1
+          end
+          candidate
+        end
+
+        # A slug is unavailable if it's already taken OR a reserved subdomain;
+        # otherwise a user like admin@… would derive the reserved slug "admin",
+        # which Organizations::Create rejects, leaving them without a tenant.
+        def slug_unavailable?(slug)
+          Organizations::Create::RESERVED_SLUGS.include?(slug) ||
+            Organization.exists?(slug: slug)
         end
       end
 
@@ -152,7 +230,7 @@ class RodauthMain < Rodauth::Rails::Auth
       webauthn_rp_id do
         ENV.fetch("WEBAUTHN_RP_ID", webauthn_origin.sub(%r{\Ahttps?://}, "").sub(/:\d+\z/, ""))
       end
-      webauthn_rp_name { ENV.fetch("WEBAUTHN_RP_NAME", Rails.application.class.module_parent_name) }
+      webauthn_rp_name { ENV.fetch("WEBAUTHN_RP_NAME", Rails.application.config.x.brand_name) }
       webauthn_user_verification "preferred"
 
       # ── OmniAuth hooks ────────────────────────────────────────
@@ -170,7 +248,16 @@ class RodauthMain < Rodauth::Rails::Auth
       end
 
       logout_redirect "/"
-      verify_account_redirect { login_redirect }
+
+      # Route authenticated users to their Organization subdomain (the A1
+      # Move list). Apex login UI -> tenant home; the shared cookie keeps the
+      # session. Falls back to the apex when the user has no Organization yet.
+      login_redirect do
+        (org = primary_organization) ? tenant_home_url(org.slug) : "/"
+      end
+      verify_account_redirect do
+        @onboarding_slug ? tenant_home_url(@onboarding_slug) : login_redirect
+      end
     end
   end
 end

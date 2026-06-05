@@ -235,18 +235,30 @@ module AppCLI
       end
 
       def traefik_flags
+        router = env_config.traefik_router
+        tenant_router = "#{router}-tenants"
+        escaped_domain = env_config.traefik_domain.gsub(".", "\\.")
+        # Low-priority catch-all for org subdomains (<slug>.<domain>). Priority 1
+        # keeps the exact Host() routers for the apex, mail and storage winning.
+        tenant_rule = "HostRegexp(`^[a-z0-9-]+\\.#{escaped_domain}$`)"
         [
           "--label traefik.enable=true",
-          "--label 'traefik.http.routers.#{env_config.traefik_router}.rule=Host(`#{env_config.traefik_host}`)'",
-          "--label traefik.http.routers.#{env_config.traefik_router}.entrypoints=websecure",
-          "--label traefik.http.routers.#{env_config.traefik_router}.tls=true",
+          "--label 'traefik.http.routers.#{router}.rule=Host(`#{env_config.traefik_host}`)'",
+          "--label traefik.http.routers.#{router}.entrypoints=websecure",
+          "--label traefik.http.routers.#{router}.tls=true",
+          "--label 'traefik.http.routers.#{tenant_router}.rule=#{tenant_rule}'",
+          "--label traefik.http.routers.#{tenant_router}.entrypoints=websecure",
+          "--label traefik.http.routers.#{tenant_router}.tls=true",
+          "--label traefik.http.routers.#{tenant_router}.priority=1",
+          "--label traefik.http.routers.#{tenant_router}.service=#{env_config.traefik_service}",
           "--label traefik.http.services.#{env_config.traefik_service}.loadbalancer.server.port=9292",
           "--label traefik.docker.network=#{env_config.network_name}"
         ]
       end
 
       def copy_schema_from_container(container_name)
-        runner.run("docker cp #{container_name}:/rails/db/schema.rb db/schema.rb")
+        # schema_format is :sql, so db:schema:dump writes db/structure.sql.
+        runner.run("docker cp #{container_name}:/rails/db/structure.sql db/structure.sql")
       end
 
       def wait_for_app

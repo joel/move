@@ -50,6 +50,12 @@ Rails.application.configure do
   config.action_mailer.default_url_options = { host: "move.workeverywhere.docker", protocol: "https" }
   config.action_mailer.asset_host = "https://move.workeverywhere.docker"
 
+  # Multi-tenancy: org subdomains are <slug>.workeverywhere.docker (the dev TLS
+  # cert only covers one label). The shared cookie domain lets the apex login
+  # session carry to org subdomains.
+  config.x.tenant_zone = "workeverywhere.docker"
+  config.x.cookie_domain = ".workeverywhere.docker"
+
   # Make template changes take effect immediately.
   config.action_mailer.perform_caching = false
 

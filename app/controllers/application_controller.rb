@@ -23,12 +23,18 @@ class ApplicationController < ActionController::Base
   # Changes to the importmap will invalidate the etag for HTML responses
   stale_when_importmap_changes
 
-  helper_method :current_user
+  helper_method :current_user, :current_tenant
 
   private
 
   def current_user
     rodauth.rails_account
+  end
+
+  # The active Apartment tenant (Organization slug), or nil on the public apex.
+  def current_tenant
+    tenant = Apartment::Tenant.current
+    tenant unless tenant == Apartment.default_tenant || tenant == "public"
   end
 
   def require_authenticated_user!

@@ -1,0 +1,44 @@
+# A1 — Create / select Move strings (Phase D1). No customer-facing copy is
+# hard-coded in the Phlex components; everything renders through moves.*.
+en:
+  moves:
+    index:
+      title: "Your moves"
+      subtitle: "Select a destination to continue organizing."
+      create: "Create a move"
+    empty:
+      title: "Ready to start moving?"
+      description: "You don't have any active moves in this organization yet."
+      create: "Create your first move"
+    new:
+      title: "New journey"
+      subtitle: "Set up your moving details to stay organized and mindful."
+      back: "Back to moves"
+    form:
+      name: "Move name"
+      name_placeholder: "e.g. Dream Apartment 2024"
+      planned_on: "Planned date"
+      origin: "Origin address"
+      destination: "Destination address"
+      unit_system: "Unit system"
+      optional: "Optional"
+      submit: "Create move"
+      errors:
+        one: "1 error prevented this move from being saved:"
+        other: "%{count} errors prevented this move from being saved:"
+    unit:
+      metric: "Metric"
+      imperial: "Imperial"
+    status:
+      planned: "Planned"
+      started: "Started"
+      finished: "Finished"
+      archived: "Archived"
+    packed_hint: "%{packed} of %{total} boxes packed"
+    pending_review:
+      zero: "No pending review"
+      one: "1 pending review"
+      other: "%{count} pending review"
+    read_only: "Archived — read only"
+    create:
+      created: "%{name} was created."

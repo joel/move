@@ -71,6 +71,11 @@ Rails.application.configure do
   config.action_mailer.default_url_options = { host: "move.workeverywhere.app", protocol: "https" }
   config.action_mailer.asset_host = "https://move.workeverywhere.app"
 
+  # Multi-tenancy: org subdomains are <slug>.workeverywhere.app, sharing the
+  # session cookie across the zone.
+  config.x.tenant_zone = "workeverywhere.app"
+  config.x.cookie_domain = ".workeverywhere.app"
+
   # TODO: Find a better way to handle Docker build time vs runtime env vars
   notif_mail_username = if ENV["SECRET_KEY_BASE_DUMMY"]
                           ENV.fetch("NOTIF_MAIL_USERNAME", nil) # For Docker build time

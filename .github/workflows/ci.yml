@@ -23,7 +23,9 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16
+        # Must match the dev/prod server (and the pg_dump that produced
+        # db/structure.sql): the dump uses PG 17+ GUCs like transaction_timeout.
+        image: postgres:18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
