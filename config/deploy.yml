@@ -16,18 +16,16 @@ servers:
   #     - workeverywhere.app
   #   cmd: bin/jobs
 
-# kamal-proxy serves a custom WILDCARD certificate (a Cloudflare Origin CA cert
-# covering move-easy.org + *.move-easy.org), supplied via secrets. Let's Encrypt
-# is not used: it cannot issue wildcards over HTTP-01, and tenant subdomains are
-# dynamic. With no `host:`, the proxy forwards EVERY host (apex + *.move-easy.org)
-# to the app; the MoveTenantElevator resolves the tenant from the subdomain.
-# Cloudflare must be set to SSL/TLS mode "Full (Strict)".
+# TLS terminates at Cloudflare (edge) and the Cloudflare Tunnel (cloudflared on
+# the origin) — kamal-proxy serves plain HTTP and forwards EVERY host to the app.
+# No `host:` filter, for the wildcard tenant model: the MoveTenantElevator
+# resolves the tenant from the subdomain. ssl MUST stay false here — kamal-proxy
+# cannot wildcard-match hosts and its validator demands a host whenever ssl is on,
+# so it can't terminate TLS for dynamic *.move-easy.org subdomains itself.
+# forward_headers trusts cloudflared's X-Forwarded-* (real client IP / proto);
+# the origin firewall blocks all inbound except the tunnel + SSH.
 proxy:
-  ssl:
-    certificate_pem: CERTIFICATE_PEM
-    private_key_pem: PRIVATE_KEY_PEM
-  # Behind Cloudflare: trust its X-Forwarded-* (real client IP / proto). Pair
-  # with an origin firewall locked to Cloudflare IP ranges to prevent spoofing.
+  ssl: false
   forward_headers: true
 
 # Credentials for your image host.
