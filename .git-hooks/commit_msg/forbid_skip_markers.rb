@@ -12,7 +12,13 @@ module Overcommit
       # for the merge. Docs are excluded from CI via paths-ignore in
       # .github/workflows/ci.yml — never via [skip ci].
       class ForbidSkipMarkers < Base
-        PATTERN = /\[(?:skip[ -]ci|ci[ -]skip|no[ -]ci|skip[ -]actions|actions[ -]skip|skip[ -]deploy)\]/i
+        # GitHub honors two skip syntaxes in a commit message, both of which
+        # suppress push/PR workflows: the bracketed markers (anywhere) and the
+        # `skip-checks: true` trailer (in the commit description). See GitHub's
+        # "Skipping workflow runs" docs. Reject both.
+        MARKERS = /\[(?:skip[ -]ci|ci[ -]skip|no[ -]ci|skip[ -]actions|actions[ -]skip|skip[ -]deploy)\]/i
+        TRAILER = /skip-checks:\s*true/i
+        PATTERN = Regexp.union(MARKERS, TRAILER)
 
         def run
           offending = commit_message_lines.grep(PATTERN)
