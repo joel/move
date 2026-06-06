@@ -316,6 +316,32 @@ diagrams** before the PR merges — code without docs is incomplete.
 - **Record hard-won gotchas** in the recipe's gotcha table and in agent memory.
 - Reference these docs from the PR description.
 
+## 8. Seed data after implementation (Mandatory)
+
+Every phase that adds a user-facing surface MUST extend
+[`db/seeds.rb`](db/seeds.rb) so that, after `bin/rails db:seed`, a developer can
+sign in and **immediately showcase and play with** the new feature — no manual
+record-building. The seed data is part of the deliverable, not an afterthought.
+
+- **Comprehensive states.** Seed records across the meaningful states the surface
+  can render (e.g. for Boxes: sealed/packing/in-transit, with and without
+  dimensions, multiple rooms, an empty case). Reviewers and the `/product-review`
+  pass rely on this coverage.
+- **Idempotent.** Use `find_or_create_by`/`find_or_initialize_by` keyed on a
+  natural attribute so re-running `db:seed` never duplicates.
+- **Never seed production.** Keep the `return if Rails.env.production?` guard —
+  `db:prepare` auto-runs seeds on a fresh DB and demo accounts/tenants must not
+  reach the live registry (this leaked before).
+- **Tenancy-aware.** Provision the demo tenant via `Organizations::Create`, then
+  `Apartment::Tenant.switch` to seed Move-scoped records. Guard the demo to the
+  base schema (`return unless Apartment::Tenant.current == "public"`) — Apartment
+  re-runs `db:seed` per tenant.
+- **Loginable account.** Seeded sign-in accounts need `status: 2` (verified) to
+  use the passwordless email link. Document the demo email + org subdomain in a
+  comment at the top of `db/seeds.rb`.
+- **Verify.** Run `bin/rails db:seed` twice (idempotency) and confirm the new
+  records render during `/product-review`.
+
 ## Skill Self-Evaluation
 
 After using any skill from this project, append a brief retrospective:

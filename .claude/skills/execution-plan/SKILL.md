@@ -144,6 +144,17 @@ Write code, following project conventions. If your Ruby version manager needs ac
 
 **For any UI work** (new views, components, forms, layouts, styling changes), use the `/ui-designer` skill. It provides access to the Tailwind CSS reference library and ensures consistency with the project design system (the `ha-*` CSS design-token system). Always check the library before building new components from scratch.
 
+### Step 5b: Seed data (Mandatory for any new user-facing surface)
+
+Extend `db/seeds.rb` so that after `bin/rails db:seed` a developer can sign in and **immediately showcase and play with** the surface this phase adds — no manual record-building. See the project's `AGENTS.md` §8 for the full rule. In short:
+
+- **Comprehensive states** — seed records across the meaningful states the surface renders (lifecycle states, with/without optional data, an empty case).
+- **Idempotent** — `find_or_create_by` keyed on a natural attribute; re-running never duplicates.
+- **Production-guarded** — keep `return if Rails.env.production?` (`db:prepare` auto-seeds a fresh DB).
+- **Tenancy-aware** — provision the demo tenant via the tenant-creation action, `Apartment::Tenant.switch` for tenant-scoped records, and guard the demo to the base schema (`return unless Apartment::Tenant.current == "public"`).
+- **Loginable** — seeded sign-in accounts need a verified status; note the demo email + org subdomain in a comment.
+- **Verify** — run `bin/rails db:seed` twice (idempotency) and confirm the records render during Step 8 (`/product-review`).
+
 ### Step 6: Pre-Commit Validation
 
 Run the project's lint/test/system-test tasks and ensure they all pass before committing. Many Rails projects expose these as rake tasks; run everything at once with:
@@ -361,6 +372,7 @@ unset GITHUB_TOKEN && gh release view <tag> --repo <owner>/<repo> >/dev/null 2>&
 3.  gh project item-edit                               → Move to Ready, then In Progress
 4.  git checkout -b feature/                           → Create branch
 5.  <implement changes>                                → Write code
+5b. extend db/seeds.rb (+ bundle exec rails db:seed)   → Showcase-ready demo data
 6.  bundle exec rake                                   → Lint + tests + system tests
 7.  git commit (+ append sha to audit log)             → Overcommit hooks validate
 8.  /product-review                                    → Live browser verification
