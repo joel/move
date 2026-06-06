@@ -1,0 +1,78 @@
+require "rails_helper"
+
+RSpec.describe "Captures" do
+  let(:user) { create(:user) }
+  let(:move) { create(:move, created_by: user) }
+  let(:box) { create(:box, move:, number: "1", status: "packing") }
+
+  before do
+    stub_current_user(user)
+    stub_current_tenant("acme")
+  end
+
+  def upload(name = "sample_image.png", type = "image/png")
+    Rack::Test::UploadedFile.new(Rails.root.join("spec/fixtures/files", name), type)
+  end
+
+  describe "GET capture" do
+    it "renders the capture screen with the unambiguous target box" do
+      get move_box_capture_path(move, box)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Capture for Box #001")
+      expect(response.body).to include(I18n.t("captures.shutter"))
+    end
+
+    it "redirects a sealed box to the box detail (capture blocked)" do
+      sealed = create(:box, :with_room, move:, status: "sealed")
+
+      get move_box_capture_path(move, sealed)
+
+      expect(response).to redirect_to(move_box_path(move, sealed))
+    end
+  end
+
+  describe "POST capture" do
+    it "captures an image, runs recognition inline, and lands split items" do
+      expect do
+        post move_box_capture_path(move, box), params: { file: upload }
+      end.to change(box.media, :count).by(1)
+
+      expect(response).to redirect_to(move_box_capture_path(move, box))
+      expect(box.recognition_runs.last.status).to eq("succeeded")
+      expect(box.items.where(review_state: "auto_confirmed").count).to eq(2)
+      expect(box.items.where(review_state: "pending_review").count).to eq(1)
+    end
+
+    it "fails honestly with no file (no offline queue)" do
+      post move_box_capture_path(move, box), params: {}
+
+      expect(response).to redirect_to(move_box_capture_path(move, box))
+      follow_redirect!
+      expect(response.body).to include(I18n.t("captures.errors.no_file"))
+    end
+  end
+
+  describe "GET capture/session" do
+    it "renders the session panel with recognition state" do
+      media = create(:media, move:, box:)
+      create(:recognition_run, :succeeded, move:, box:, media:)
+
+      get move_box_capture_session_path(move, box)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include('data-pending="0"')
+    end
+  end
+
+  describe "POST capture/retry" do
+    it "creates a new run for a failed media" do
+      media = create(:media, move:, box:)
+      create(:recognition_run, :failed, move:, box:, media:)
+
+      expect do
+        post move_box_capture_retry_path(move, box, media_id: media.id)
+      end.to change(box.recognition_runs, :count).by(1)
+    end
+  end
+end
