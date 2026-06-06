@@ -52,6 +52,12 @@ RSpec.describe Boxes::Create do
     expect(move.boxes.count).to eq(0)
   end
 
+  it "does not create an orphan room when the box is invalid" do
+    expect do
+      described_class.new.call(move:, params: { number: "A1", room_name: "Attic" }, creator:)
+    end.not_to change(move.rooms, :count)
+  end
+
   it "emits a box.created event" do
     allow(Rails.event).to receive(:notify)
     described_class.new.call(move:, params: {}, creator:)

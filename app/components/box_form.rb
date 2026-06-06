@@ -8,10 +8,11 @@ module Components
     include Phlex::Rails::Helpers::FormWith
     include Phlex::Rails::Helpers::Pluralize
 
-    def initialize(move:, box:, rooms:)
+    def initialize(move:, box:, rooms:, submit_label: nil)
       @move = move
       @box = box
       @rooms = rooms
+      @submit_label = submit_label || I18n.t("boxes.form.submit")
     end
 
     def view_template
@@ -24,7 +25,7 @@ module Components
         dimensions(form)
 
         div(class: "mt-2 flex flex-wrap gap-3") do
-          form.submit I18n.t("boxes.form.submit"), class: "ha-button ha-button-primary"
+          form.submit @submit_label, class: "ha-button ha-button-primary"
         end
       end
     end

@@ -63,15 +63,18 @@ Apartment::Tenant.switch(organization.slug) do
     move.rooms.find_or_create_by!(name: name)
   end
 
-  # number => attributes. Covers: sealed + full dims, packing + missing dims,
-  # partial dims (missing height), in_transit, and a roomless box.
+  # number => attributes. Covers every lifecycle state (packing/sealed/
+  # in_transit/unpacking/unpacked), boxes with full / partial / no dimensions,
+  # and a roomless box (to demo the seal-requires-room guard).
   boxes = {
     "1" => { room: "Kitchen",     status: "sealed",     dims: [40, 30, 25, 8] },
     "2" => { room: "Kitchen",     status: "packing",    dims: [] },
     "3" => { room: "Living Room", status: "sealed",     dims: [60, 40, 40, 15] },
     "4" => { room: "Bedroom",     status: "packing",    dims: [50, 40, nil, 6] },
     "5" => { room: "Garage",      status: "in_transit", dims: [80, 60, 50, 22] },
-    "6" => { room: nil,           status: "packing",    dims: [] }
+    "6" => { room: nil,           status: "packing",    dims: [] },
+    "7" => { room: "Bedroom",     status: "unpacking",  dims: [55, 45, 35, 12] },
+    "8" => { room: "Living Room", status: "unpacked",   dims: [60, 40, 40, 14] }
   }
 
   boxes.each do |number, attrs|

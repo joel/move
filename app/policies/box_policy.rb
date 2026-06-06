@@ -17,6 +17,10 @@ class BoxPolicy < ApplicationPolicy
     user.present? && record.move&.writable?
   end
 
+  alias edit? create?
+  alias update? create?
+  alias transition? create?
+
   relation_scope do |relation|
     next relation.none if user.blank?
 

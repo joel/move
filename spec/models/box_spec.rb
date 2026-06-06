@@ -41,10 +41,26 @@ RSpec.describe Box do
     end
   end
 
-  describe "#sealed?" do
-    it "is false while packing and true once moved on" do
-      expect(build(:box, status: "packing")).not_to be_sealed
-      expect(build(:box, status: "sealed")).to be_sealed
+  describe "lifecycle predicates" do
+    it "distinguishes packing, sealed and packed states precisely" do
+      expect(build(:box, status: "packing")).to be_packing.and(be_capturable).and(have_attributes(packed?: false, sealed?: false))
+      expect(build(:box, status: "sealed")).to be_sealed.and(be_packed).and(have_attributes(capturable?: false))
+      expect(build(:box, status: "in_transit")).to be_packed.and(have_attributes(sealed?: false, capturable?: false))
+    end
+
+    it "exposes the valid transitions for the current status" do
+      expect(build(:box, status: "packing").available_transitions).to eq(%w[sealed])
+      expect(build(:box, status: "sealed").available_transitions).to eq(%w[packing in_transit])
+      expect(build(:box, status: "unpacked").available_transitions).to be_empty
+      expect(build(:box, status: "packing")).to be_can_transition_to("sealed")
+      expect(build(:box, status: "packing")).not_to be_can_transition_to("in_transit")
+    end
+  end
+
+  describe "#volume_cm3" do
+    it "derives volume from dimensions, nil when incomplete" do
+      expect(build(:box, :with_dimensions).volume_cm3).to eq(40 * 30 * 25)
+      expect(build(:box, :with_dimensions, height_cm: nil).volume_cm3).to be_nil
     end
   end
 

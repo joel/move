@@ -99,6 +99,80 @@ RSpec.describe "Boxes" do
     end
   end
 
+  describe "GET /moves/:move_id/boxes/:id" do
+    it "renders the box detail with identity, dimensions and volume" do
+      box = create(:box, :with_dimensions, move:, number: "1",
+                                           room: create(:room, move:, name: "Kitchen"))
+
+      get move_box_path(move, box)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Box #001").and include("Kitchen")
+      expect(response.body).to include("40 × 30 × 25 cm").and include("0.030 m³")
+    end
+  end
+
+  describe "PATCH /moves/:move_id/boxes/:id" do
+    it "updates the box and redirects to its detail" do
+      box = create(:box, move:, number: "1")
+
+      patch move_box_path(move, box), params: { box: { weight_kg: 9, room_name: "Garage" } }
+
+      expect(response).to redirect_to(move_box_path(move, box))
+      expect(box.reload.weight_kg).to eq(9)
+      expect(box.room.name).to eq("Garage")
+    end
+
+    it "re-renders the form with errors for an invalid number" do
+      box = create(:box, move:, number: "1")
+
+      patch move_box_path(move, box), params: { box: { number: "A1" } }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(box.reload.number).to eq("1")
+    end
+  end
+
+  describe "PATCH /moves/:move_id/boxes/:id/transition" do
+    it "seals a box that has a room" do
+      box = create(:box, :with_room, move:, number: "1", status: "packing")
+
+      patch transition_move_box_path(move, box), params: { to: "sealed" }
+
+      expect(response).to redirect_to(move_box_path(move, box))
+      expect(box.reload.status).to eq("sealed")
+    end
+
+    it "refuses to seal a box without a room and keeps it packing" do
+      box = create(:box, move:, number: "1", status: "packing", room: nil)
+
+      patch transition_move_box_path(move, box), params: { to: "sealed" }
+
+      expect(response).to redirect_to(move_box_path(move, box))
+      expect(box.reload.status).to eq("packing")
+      follow_redirect!
+      expect(response.body).to include(I18n.t("boxes.transition.room_required"))
+    end
+
+    it "rejects an illegal transition" do
+      box = create(:box, :with_room, move:, number: "1", status: "packing")
+
+      patch transition_move_box_path(move, box), params: { to: "unpacked" }
+
+      expect(box.reload.status).to eq("packing")
+    end
+
+    it "is blocked on an archived move" do
+      archived = create(:move, :archived, created_by: user)
+      box = create(:box, :with_room, move: archived, number: "1", status: "packing")
+
+      patch transition_move_box_path(archived, box), params: { to: "sealed" }
+
+      expect(response).to redirect_to(move_boxes_path(archived))
+      expect(box.reload.status).to eq("packing")
+    end
+  end
+
   describe "without a tenant (apex/public)" do
     it "returns 404 (non-disclosing)" do
       stub_current_tenant(nil)

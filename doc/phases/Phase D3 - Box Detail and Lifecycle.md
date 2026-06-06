@@ -48,4 +48,20 @@ Deliver the single-box hub: identity, room, dimensions/volume/weight, item inven
 The capture camera flow (D4), review queue interior (D6), label/QR generation (D9), unpacking checklist (D10), summary (D12).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.8.0-box-lifecycle`:
+- **Issue:** #44
+- **PR:** #45 (`feature/box-lifecycle`)
+- **Verification:** `/product-review` on `acme.workeverywhere.docker` — box detail
+  (identity, room/status chips, dimensions + derived volume `0.030 m³` + weight),
+  live **Unseal** transition, live **seal-requires-room** guard (roomless box
+  stays packing with the flash), capture hidden once sealed, archived read-only
+  (system spec). Screenshot-matched to `Box Detail (Dark) - Refined Palette`.
+  Full suite + RuboCop green; no Bullet N+1.
+- **Deferred (annotated against §6):**
+  - **Items inventory** (list/pending-review/delete) → **D5** (Item model). Empty
+    placeholder for now.
+  - **Media gallery** (full-media thumbnails, never crops) + **Capture image** →
+    **D4** (Media + capture). Empty gallery; capture/add-item entries inert.
+  - **Recognition runs / failed-retry** → **D4**; `Ui::RecognitionState` is the
+    wired integration point.
+  - **Generate label/QR** → D9.
+- **Release `v0.8.0-box-lifecycle`:** _pending merge._

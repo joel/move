@@ -5,7 +5,10 @@ Rails.application.routes.draw do
   # A1 — Create / select Move (entry screen on an Organization subdomain).
   # A2 — Boxes Home: the box list/grid is the hub of a Move.
   resources :moves, only: %i[index new create] do
-    resources :boxes, only: %i[index new create]
+    # B1 — Box detail & lifecycle.
+    resources :boxes, only: %i[index new create show edit update] do
+      member { patch :transition }
+    end
   end
   resources :posts
   resources :users
