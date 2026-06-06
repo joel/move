@@ -6,6 +6,8 @@ module Boxes
   # attaching a room (resolved by name from the minimal D2 vocabulary). The
   # caller owns the tenant context and the writable-Move guard (controller).
   class Create < BaseAction
+    include Boxes::RoomResolution
+
     def call(move:, params:, creator:)
       room = yield resolve_room(move, params[:room_name])
       box = yield persist(move, params, room)
@@ -14,17 +16,6 @@ module Boxes
     end
 
     private
-
-    # Case-insensitive find-or-create so "kitchen" reuses an existing "Kitchen".
-    def resolve_room(move, name)
-      name = name.to_s.strip
-      return Success(nil) if name.blank?
-
-      room = move.rooms.where("LOWER(name) = ?", name.downcase).first
-      Success(room || move.rooms.create!(name: name))
-    rescue ActiveRecord::RecordInvalid => e
-      Failure(e.record.errors)
-    end
 
     def persist(move, params, room)
       box = move.boxes.create!(
