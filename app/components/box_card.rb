@@ -51,7 +51,7 @@ module Components
           card.span { status_label }
           card.span { I18n.t("boxes.card.no_items") }
         end
-        card.render Components::Ui::ProgressBar.new(value: box.sealed? ? 100 : 0, max: 100)
+        card.render Components::Ui::ProgressBar.new(value: box.packed? ? 100 : 0, max: 100)
         next unless box.missing_dimensions?
 
         card.div(class: "flex items-center gap-1.5 text-label-caps uppercase text-secondary") do
