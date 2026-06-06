@@ -107,6 +107,26 @@ wired to it, inert until RecognitionRun lands in **D4**. **Status: ⚠️ decide
 
 ---
 
+## ⚠️ §B1 — "Box Detail" screen — non-blocking decisions (D3)
+
+The canonical screen `Box Detail (Dark) - Refined Palette`
+(`screens/bf7c4f4817464dd09f2b6d0b859cdf1d`) was implemented in Phase D3.
+
+- **Lifecycle action buttons aren't drawn.** The screen shows the status chip and
+  Capture/Add-item buttons, but Spec §4 also requires seal/unseal/in-transit/
+  unpacking/unpacked actions. **Decision:** rendered with design tokens in the
+  actions card (the valid `Box::TRANSITIONS` for the current status); no Stitch
+  change needed.
+- **Status copy.** The design chip reads "Open"; the app uses **"Packing"** for
+  consistency with the A2 grid and the domain status name. Minor copy difference,
+  not a redesign.
+- **Items inventory + media gallery** are shown populated in the design, but Items
+  land in **D5** and Media/capture in **D4**. D3 renders empty placeholders;
+  capture/add-item entries are present but inert. The gallery will only ever show
+  **full media, never crops** (Technical Foundation §13). **Status: ⚠️ decided.**
+
+---
+
 ## ⚠️ §PALETTE — Two colour systems coexist
 
 - **Observation:** `designTheme` exposes a full Material-3 token set **and** a "Refined Palette" (`page-dark #2A2822`, `card-dark #34312A`, `page-light #F2ECE1`, `card-light #FAF6EF`, `accent-sage-dark #9FB089`). Many newer screens carry a `… - Refined Palette` variant; the design-system prose references the Refined Palette values directly.
@@ -144,6 +164,7 @@ wired to it, inert until RecognitionRun lands in **D4**. **Status: ⚠️ decide
 |----|-----------|-------|--------|--------|
 | A1 | ✅ | D1 | resolved | 3 screens created (`36ff167a…`, `fc59e54d…`, `aef244f9…`) |
 | A2 | ⚠️ | D2 | ✅ decided | box-name→room, item counts→D5, progress indicator added |
+| B1 | ⚠️ | D3 | ✅ decided | lifecycle buttons added, items→D5 / gallery→D4 placeholders |
 | E2 | ✅ | D9 | resolved | 4 state screens created (`09263080…`, `8086fa25…`, `de9f2c2a…`, `47000d2e…`) |
 | E3 | ✅ | D10 | resolved | 2 screens created (`8e990c6d…`, `2cb7c29c…`) |
 | F3 | ✅ | D13 | resolved | 3 screens created (`6f780b58…`, `11d53a11…`, `02012642…`) |
