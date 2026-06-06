@@ -6,6 +6,18 @@ local:
   service: Disk
   root: <%= Rails.root.join("storage") %>
 
+# SeaweedFS — S3-compatible object store backing Active Storage in dev and prod.
+# Path-style addressing (force_path_style) + a custom endpoint; dev SeaweedFS
+# accepts anonymous access so the keys can be placeholders there, real keys in prod.
+seaweedfs:
+  service: S3
+  endpoint: <%= ENV.fetch("STORAGE_ENDPOINT", "https://storage.workeverywhere.docker:8333") %>
+  bucket: <%= ENV.fetch("STORAGE_BUCKET", "move") %>
+  region: <%= ENV.fetch("STORAGE_REGION", "us-east-1") %>
+  access_key_id: <%= ENV.fetch("STORAGE_ACCESS_KEY_ID", "move-dev") %>
+  secret_access_key: <%= ENV.fetch("STORAGE_SECRET_ACCESS_KEY", "move-dev-secret") %>
+  force_path_style: true
+
 # Use bin/rails credentials:edit to set the AWS secrets (as aws:access_key_id|secret_access_key)
 # amazon:
 #   service: S3

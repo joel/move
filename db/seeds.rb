@@ -51,7 +51,7 @@ unless organization
 end
 
 # --- Tenant-scoped demo: a Move with rooms and boxes in varied states --------
-Apartment::Tenant.switch(organization.slug) do
+Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLength
   move = Move.find_or_create_by!(name: "Seattle Relocation") do |m|
     m.status = "started"
     m.unit_system = "metric"
@@ -90,8 +90,38 @@ Apartment::Tenant.switch(organization.slug) do
     end
   end
 
+  # A captured photo + a completed recognition run on box 1, with the auto-confirm
+  # vs pending-review item split (Coffee maker/Books auto, Mugs pending). Records
+  # are seeded directly (not via the live pipeline) so db:seed is deterministic.
+  demo_box = move.boxes.find_by(number: "1")
+  if demo_box&.media&.none?
+    media = demo_box.media.new(move: move, media_type: "image", captured_via: "web", captured_at: Time.current)
+    media.image.attach(
+      io: Rails.public_path.join("icon.png").open, filename: "capture.png", content_type: "image/png"
+    )
+    media.save!
+    run = demo_box.recognition_runs.create!(
+      move: move, media: media, provider: "fake", provider_model: "fake-1", status: "succeeded",
+      started_at: 1.minute.ago, completed_at: Time.current,
+      metadata: { "item_count" => 3, "provider" => "fake" }
+    )
+    [["Coffee maker", 0.97, true], ["Stack of books", 0.88, true], ["Set of mugs", 0.62, false]].each do |name, conf, auto|
+      suggestion = run.recognition_suggestions.create!(
+        move: move, box: demo_box, media: media, proposed_name: name, proposed_quantity: 1,
+        confidence_score: conf, state: auto ? "auto_accepted" : "pending"
+      )
+      item = demo_box.items.create!(
+        move: move, source_media: media, source_recognition_suggestion_id: suggestion.id, name: name,
+        quantity: 1, confidence_score: conf, created_via: "recognition",
+        review_state: auto ? "auto_confirmed" : "pending_review"
+      )
+      suggestion.update!(item: item)
+    end
+  end
+
   Rails.logger.info(
-    "[seeds] #{organization.slug}: #{move.boxes.count} boxes, #{move.rooms.count} rooms"
+    "[seeds] #{organization.slug}: #{move.boxes.count} boxes, #{move.rooms.count} rooms, " \
+    "#{move.items.count} items, #{move.media.count} media"
   )
 end
 

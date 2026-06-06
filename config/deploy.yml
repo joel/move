@@ -45,10 +45,17 @@ env:
     - POSTGRES_PASSWORD
     - NOTIF_MAIL_USERNAME
     - NOTIF_MAIL_PASSWORD
+    - STORAGE_ACCESS_KEY_ID
+    - STORAGE_SECRET_ACCESS_KEY
   clear:
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
     # When you start using multiple servers, you should split out job processing to a dedicated machine.
     SOLID_QUEUE_IN_PUMA: true
+
+    # Active Storage → SeaweedFS S3 accessory (container-network endpoint, path-style).
+    STORAGE_ENDPOINT: http://move-storage:8333
+    STORAGE_BUCKET: move
+    STORAGE_REGION: us-east-1
     NOTIF_MAIL_HOST: mail.smtp2go.com
     NOTIF_MAIL_PORT: 587
     NOTIF_MAIL_FROM: move@joelazemar.com
@@ -136,3 +143,14 @@ accessories:
       health-interval: 5s
       health-timeout: 3s
       health-retries: 10
+
+  # SeaweedFS — S3-compatible object store backing Active Storage (Media images).
+  # One-time cutover (like the PG18 one): `kamal accessory boot storage`, create
+  # the `move` bucket + CORS, then redeploy. The app boots without it; only
+  # uploads need it. Auth via -s3.config keys (STORAGE_ACCESS_KEY_ID/SECRET).
+  storage:
+    image: chrislusf/seaweedfs:3.97
+    host: 65.20.110.89
+    cmd: "server -s3 -s3.port=8333 -dir=/data -volume.max=0 -master.volumeSizeLimitMB=1024"
+    directories:
+      - data:/data

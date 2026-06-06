@@ -15,9 +15,11 @@ module Views
         "unpacking" => "unpacking", "unpacked" => "unpacked"
       }.freeze
 
-      def initialize(move:, box:)
+      def initialize(move:, box:, items: [], media: [])
         @move = move
         @box = box
+        @items = items
+        @media = media
         @measurements = BoxMeasurements.new(box, unit_system: move.unit_system)
       end
 
@@ -114,7 +116,7 @@ module Views
 
         render Components::Ui::Button.new(
           label: I18n.t("boxes.actions.capture"), icon: Components::Icons::Camera,
-          full_width: true, disabled: true
+          full_width: true, href: move_box_capture_path(@move, @box)
         )
       end
 
@@ -154,32 +156,90 @@ module Views
         end
       end
 
-      # Items land in D5 — empty placeholder for now.
+      # Read-only inventory (item edit → D5, review actions → D6).
       def items_section
         section(class: "flex flex-col gap-stack-gap lg:col-span-8") do
           div(class: "flex items-center justify-between px-2") do
             h3(class: "text-headline-md text-text-warm") { I18n.t("boxes.show.items") }
+            pending_badge if pending_count.positive?
           end
-          render Components::Ui::EmptyState.new(
-            title: I18n.t("boxes.show.items_empty_title"),
-            description: I18n.t("boxes.show.items_empty_description")
-          )
+          @items.any? ? items_list : items_empty
         end
       end
 
-      # Media gallery lands in D4 — empty placeholder; full media only, never crops.
+      def pending_badge
+        span(class: "rounded-full bg-tertiary/15 px-3 py-1 text-label-caps uppercase text-tertiary") do
+          I18n.t("boxes.show.pending_review", count: pending_count)
+        end
+      end
+
+      def items_list
+        div(class: "flex flex-col divide-y divide-card-border rounded-card border border-card-border bg-card") do
+          @items.each { |item| item_row(item) }
+        end
+      end
+
+      def item_row(item)
+        div(class: "flex items-center justify-between gap-3 p-4") do
+          div(class: "flex flex-col gap-1") do
+            span(class: "text-body-lg text-text-warm") { item_label(item) }
+            span(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.item.fragile") } if item.fragile?
+          end
+          render Components::Ui::Chip.new(label: I18n.t("boxes.item_state.#{item.review_state}"), kind: item_chip_kind(item))
+        end
+      end
+
+      def item_label(item)
+        item.quantity > 1 ? "#{item.name} ×#{item.quantity}" : item.name
+      end
+
+      def item_chip_kind(item)
+        item.review_state == "pending_review" ? :tag : :room
+      end
+
+      def items_empty
+        render Components::Ui::EmptyState.new(
+          title: I18n.t("boxes.show.items_empty_title"),
+          description: I18n.t("boxes.show.items_empty_description")
+        )
+      end
+
+      # Full-media gallery — never crops/bounding boxes (Domain §4.9, TF §13).
       def gallery_section
         aside(class: "flex flex-col gap-stack-gap lg:col-span-4") do
           div(class: "flex items-center justify-between px-2") do
             h3(class: "text-headline-md text-text-warm") { I18n.t("boxes.show.gallery") }
-            span(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.show.photos", count: 0) }
+            span(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.show.photos", count: @media.size) }
           end
-          render Components::Ui::EmptyState.new(
-            icon: Components::Icons::Camera,
-            title: I18n.t("boxes.show.gallery_empty_title"),
-            description: I18n.t("boxes.show.gallery_empty_description")
+          @media.any? ? gallery_grid : gallery_empty
+        end
+      end
+
+      def gallery_grid
+        div(class: "grid grid-cols-2 gap-3") do
+          @media.each { |media| gallery_thumb(media) }
+        end
+      end
+
+      def gallery_thumb(media)
+        div(class: "aspect-square overflow-hidden rounded-xl bg-surface-container-high") do
+          img(
+            src: view_context.rails_storage_proxy_path(media.image),
+            class: "h-full w-full object-cover", alt: "", loading: "lazy"
           )
         end
+      end
+
+      def gallery_empty
+        render Components::Ui::EmptyState.new(
+          icon: Components::Icons::Camera,
+          title: I18n.t("boxes.show.gallery_empty_title"),
+          description: I18n.t("boxes.show.gallery_empty_description")
+        )
+      end
+
+      def pending_count
+        @items.count { |item| item.review_state == "pending_review" }
       end
 
       def box_title

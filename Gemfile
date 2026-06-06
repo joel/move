@@ -57,6 +57,10 @@ gem "image_processing", "~> 2.0"
 # are actually processed. require: false — image_processing loads it on demand.
 gem "ruby-vips", require: false
 
+# S3-compatible Active Storage backend (SeaweedFS in dev/prod). require: false —
+# Active Storage loads it on demand for the S3 service.
+gem "aws-sdk-s3", require: false
+
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[mri windows], require: "debug/prelude"

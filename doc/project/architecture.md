@@ -115,6 +115,9 @@ subdomain (no redirect loop). The login UI is apex-only; subdomains are post-aut
 | Subdomain elevator | `config/initializers/apartment_elevator.rb` | zone-based (`.docker`/`.app` aren't always public suffixes), 404 on unknown |
 | Auth | `app/misc/rodauth_main.rb` | passwordless; **all tables `Sequel[:public][:…]`**; onboarding creates tenant post-verify |
 | Page layouts | `app/views/layouts/*` | `ApplicationLayout` (TopNav, auth/marketing) vs `AppShellLayout` (D0 sidebar + bottom tab bar, in-app surfaces); shared `<head>` in `ChromeHead`. Controllers opt in via `layout -> { … }` (e.g. `BoxesController`) |
+| File storage | `config/storage.yml`, `config/deploy.yml` | Active Storage; dev/test = Disk, prod = **SeaweedFS S3** (`seaweedfs` service, `force_path_style`) via a Kamal accessory. Images served through **proxy URLs** (internal endpoint never exposed). Media tables are per-tenant (not Apartment-excluded) |
+| Background jobs | `config/queue.yml`, `app/jobs/*` | Solid Queue: async (dev), `:inline` (test), in-Puma (prod, `SOLID_QUEUE_IN_PUMA`). Jobs restore the Apartment tenant from args (`Current` is never carried across the enqueue boundary) |
+| Recognition | `app/services/recognition_providers/*` | Provider-agnostic adapter interface (`fake`/`openai`/`anthropic` via `RECOGNITION_PROVIDER`); normalized `label/confidence/count` only — no raw vendor data or bounding boxes |
 | Deterministic dump | `config/initializers/structure_sql.rb` | exclude tenant schemas + normalize search_path |
 | Per-env tenancy | `config/environments/*.rb` | `tenant_zone`, `cookie_domain`, `config.hosts` |
 | Deploy | `config/deploy.yml` | `proxy.ssl: false`, no host, forward_headers; db accessory `postgres:18` at `/var/lib/postgresql` |

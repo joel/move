@@ -1,0 +1,24 @@
+# B2 — Capture image strings (Phase D4). No customer-facing copy is hard-coded
+# in the Phlex components; everything renders through captures.*.
+en:
+  captures:
+    title: "Capture for Box #%{number} — %{room}"
+    online: "Online"
+    shutter: "Capture image"
+    finish: "Finish box"
+    add_item: "Add item manually"
+    sealed: "This box is sealed — unseal it before capturing."
+    session:
+      title: "Session"
+      count:
+        zero: "No captures"
+        one: "1 capture"
+        other: "%{count} captures"
+      empty: "Captured images for this box will appear here."
+    create:
+      captured: "Image captured — recognizing items…"
+    retry:
+      retried: "Recognition retried."
+    errors:
+      no_file: "Choose an image to capture (you appear to be offline or no file was selected)."
+      failed: "That capture could not be saved. Check your connection and try again."

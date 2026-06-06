@@ -235,6 +235,42 @@ still works.
 
 ---
 
+## 6b. Active Storage, object storage & background jobs
+
+For features that upload files + process them in the background (e.g. image
+capture → recognition):
+
+1. **Active Storage:** `bin/rails active_storage:install` (UUID PKs land in the
+   tenant template). Media tables are **per-tenant — do NOT add
+   `ActiveStorage::Blob/Attachment` to Apartment `excluded_models`**.
+2. **Object storage (SeaweedFS S3):** add `aws-sdk-s3` and a `seaweedfs` service
+   in `config/storage.yml` (env-driven `endpoint`/`bucket`/keys,
+   `force_path_style: true`). dev/test = Disk; prod = `:seaweedfs`. Serve images
+   via **proxy URLs** (`rails_storage_proxy_path`) so the internal S3 endpoint is
+   never exposed to the browser. Prod is a Kamal accessory:
+   ```yaml
+   accessories:
+     storage:
+       image: chrislusf/seaweedfs:3.97
+       host: <ORIGIN_IP>
+       cmd: "server -s3 -s3.port=8333 -dir=/data ..."
+       directories: [ data:/data ]
+   env: { clear: { STORAGE_ENDPOINT: http://<app>-storage:8333, STORAGE_BUCKET: <app> },
+          secret: [ STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY ] }
+   ```
+   One-time cutover (like PG18): `kamal accessory boot storage`, create the
+   bucket + CORS, then redeploy. The app boots without it; only uploads need it.
+3. **Background jobs (Solid Queue):** async in dev, `:inline` in **test** (so an
+   upload→process flow completes within an example), and **in-Puma in prod**
+   (`SOLID_QUEUE_IN_PUMA: true` in `deploy.yml` env) — no separate jobs role.
+   Jobs never inherit request context: **restore the Apartment tenant from job
+   args** (`Apartment::Tenant.switch(tenant) { … }`), don't rely on `Current`.
+4. **Reserved names:** never name a controller action `session` (shadows
+   `ActionController#session` → `DoubleRenderError` when the layout renders CSRF)
+   or a Ruby keyword (`retry`). CSRF is off in test, so this only bites in dev.
+
+---
+
 ## 7. Cutover order (zero-confusion sequence)
 
 1. Buy domain → add Cloudflare zone → registrar nameservers → wait active.

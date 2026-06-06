@@ -23,6 +23,9 @@ class Box < ApplicationRecord
 
   belongs_to :move
   belongs_to :room, optional: true
+  has_many :media, dependent: :destroy
+  has_many :recognition_runs, dependent: :destroy
+  has_many :items, dependent: :destroy
 
   # Virtual: the new-box form lets you type a room by name; Boxes::Create
   # resolves it against the per-Move vocabulary (find-or-create).
@@ -71,6 +74,19 @@ class Box < ApplicationRecord
 
   def missing_dimensions?
     DIMENSIONS.any? { |dim| self[dim].blank? }
+  end
+
+  def item_count
+    items.in_box.count
+  end
+
+  def pending_review_count
+    items.pending_review.count
+  end
+
+  # Latest run status drives the recognition badge on the card / detail.
+  def recognition_state
+    recognition_runs.order(created_at: :desc).first&.status
   end
 
   # Derived, never stored as source-of-truth (Technical Foundation §6.2).
