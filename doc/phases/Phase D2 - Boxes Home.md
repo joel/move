@@ -49,4 +49,20 @@ Deliver the main hub of a Move: the box list/grid with per-box status, the promi
 Box detail interior (D3), real capture pipeline (D4), search results (D8), summary page (D12).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.7.0-boxes-home`:
+- **Issue:** #42
+- **PR:** #43 (`feature/boxes-home`)
+- **Verification:** `/product-review` on `joel.workeverywhere.docker` — empty state,
+  add-box journey (auto number + room find-or-create), per-box status + missing-
+  dimensions warning, compact progress indicator (packed/pending/missing), room
+  filter, archived read-only (new redirects), dark default, mobile (393×852, no
+  overflow, bottom tab bar). Screenshot-matched to `Boxes Home (Dark) - Refined
+  Palette`. Full suite + RuboCop green.
+- **Notes / deferred (annotated against §6):**
+  - Item count + pending-review render as placeholders ("No items yet" / 0) — the
+    Items table lands in **D5**; the controller aggregate is ready to wire then.
+  - Recognition processing/failed states: `BoxCard` exposes a `recognition_state`
+    integration point (nil for now); driven once RecognitionRun lands in **D4**.
+  - Capture/Scan + Search nav entries are present but stubbed (their phases: D4/D8).
+  - Box has no `name` in the domain; cards title by **room** (badge carries the
+    number) — see `DESIGN-DISCREPANCIES.md` §A2.
+- **Release `v0.7.0-boxes-home`:** _pending merge._
