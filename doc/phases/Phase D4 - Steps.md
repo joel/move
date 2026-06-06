@@ -32,10 +32,13 @@ ever stored — only `label/confidence/count` and operational metadata.
 
 ## Storage & jobs
 - **Active Storage**: tables are in the tenant template (Media is tenant-scoped —
-  NOT in Apartment `excluded_models`). dev/test = Disk; **prod = SeaweedFS S3**
-  (`seaweedfs` service, `force_path_style`) via a new Kamal accessory. Images are
-  served through **proxy URLs** (`rails_storage_proxy_path`) so the internal S3
-  endpoint is never exposed to the browser.
+  NOT in Apartment `excluded_models`). dev/test = Disk; **prod = the shared
+  host-wide SeaweedFS S3** gateway (already serving the sibling apps) via move's
+  own `move` bucket (`STORAGE_ENDPOINT=http://seaweedfs:8333`, `force_path_style`).
+  Images are served through **proxy URLs** (`rails_storage_proxy_path`) so the
+  internal S3 endpoint is never exposed. **No per-app accessory** — that would add
+  a second redundant SeaweedFS to the box (corrected post-merge after spotting the
+  shared instance; bucket created with `weed shell s3.bucket.create -name move`).
 - **Solid Queue**: async in dev (in-process), `:inline` in test (capture →
   recognition completes in the example), in-Puma in prod (`SOLID_QUEUE_IN_PUMA`).
   Jobs never inherit request context — `ProcessJob` restores the Apartment tenant
