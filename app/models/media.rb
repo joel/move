@@ -17,6 +17,14 @@ class Media < ApplicationRecord
   validates :captured_via, inclusion: { in: CAPTURED_VIA }
   validates :captured_at, presence: true
   validates :image, presence: true
+  validate :image_must_be_an_image
+
+  def image_must_be_an_image
+    return unless image.attached?
+    return if image.content_type.to_s.start_with?("image/")
+
+    errors.add(:image, :not_an_image)
+  end
 
   scope :recent_first, -> { order(captured_at: :desc) }
 

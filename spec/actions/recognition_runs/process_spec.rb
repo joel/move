@@ -1,0 +1,50 @@
+require "rails_helper"
+
+RSpec.describe RecognitionRuns::Process do
+  let(:move) { create(:move, auto_confirm_threshold: 0.8) }
+  let(:box) { create(:box, move:) }
+  let(:media) { create(:media, move:, box:) }
+  let(:run) { create(:recognition_run, move:, box:, media:, status: "queued") }
+
+  it "splits detections into auto_confirmed and pending_review items by threshold" do
+    result = described_class.new.call(run:)
+
+    expect(result).to be_success
+    run.reload
+    expect(run.status).to eq("succeeded")
+    expect(run.completed_at).to be_present
+
+    # Fake provider: 0.97 + 0.88 ≥ 0.8 (auto), 0.62 < 0.8 (pending).
+    expect(box.items.where(review_state: "auto_confirmed").count).to eq(2)
+    expect(box.items.where(review_state: "pending_review").count).to eq(1)
+    expect(run.recognition_suggestions.count).to eq(3)
+  end
+
+  it "cross-links each item and suggestion and stores no bounding boxes" do
+    described_class.new.call(run:)
+
+    suggestion = run.recognition_suggestions.find_by(proposed_name: "Coffee maker")
+    expect(suggestion.item).to be_present
+    expect(suggestion.item.source_recognition_suggestion_id).to eq(suggestion.id)
+    expect(suggestion.attributes.keys).not_to include("bounding_box", "crop")
+  end
+
+  it "ends failed (not stuck) when the provider raises, and stores a sanitized error" do
+    provider = instance_double(RecognitionProviders::Fake)
+    allow(provider).to receive(:identify).and_raise(StandardError, "boom")
+
+    result = described_class.new.call(run:, provider:)
+
+    expect(result).to be_failure
+    run.reload
+    expect(run.status).to eq("failed")
+    expect(run.error_code).to eq("StandardError")
+    expect(run.completed_at).to be_present
+    expect(box.items.count).to eq(0)
+  end
+
+  it "stores only provider-independent metadata, never raw responses" do
+    described_class.new.call(run:)
+    expect(run.reload.metadata.keys).to contain_exactly("item_count", "provider")
+  end
+end
