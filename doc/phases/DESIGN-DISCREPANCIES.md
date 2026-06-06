@@ -127,6 +127,29 @@ The canonical screen `Box Detail (Dark) - Refined Palette`
 
 ---
 
+## ⚠️ §B2 — "Capture image" screen — non-blocking decisions (D4)
+
+The canonical screen `Capture Image (Dark) - Responsive`
+(`screens/99b7a1dce2924e21982207cc8812318f`) was implemented in Phase D4.
+
+- **Upload, not a live camera.** The mockup shows a viewfinder with crosshairs/
+  flip-camera. The app uses a **file upload** (`accept=image/*` + `capture=
+  environment`, so mobile opens the native camera) → Active Storage, matching
+  "online upload via Active Storage". A live getUserMedia stream was rejected as
+  heavy/brittle for an upload pipeline. The viewfinder is rendered as the
+  upload/preview area.
+- **"Online & Syncing" pill is static.** Phase 1 is online-only with an honest
+  failure on no-file/upload error (no offline queue). The pill shows "Online"; a
+  live connectivity indicator is not built.
+- **Session = recent box captures.** The right panel lists this box's recent
+  media with live recognition state (polled), per the design.
+- **Retry role-gating** is writable-Move-only until viewer/contributor roles land
+  in D11 (the design/spec want admin/contributor). **Status: ⚠️ decided.**
+
+(Light-desktop variant gap is tracked separately under §CAPTURE-LIGHT.)
+
+---
+
 ## ⚠️ §PALETTE — Two colour systems coexist
 
 - **Observation:** `designTheme` exposes a full Material-3 token set **and** a "Refined Palette" (`page-dark #2A2822`, `card-dark #34312A`, `page-light #F2ECE1`, `card-light #FAF6EF`, `accent-sage-dark #9FB089`). Many newer screens carry a `… - Refined Palette` variant; the design-system prose references the Refined Palette values directly.
@@ -165,6 +188,7 @@ The canonical screen `Box Detail (Dark) - Refined Palette`
 | A1 | ✅ | D1 | resolved | 3 screens created (`36ff167a…`, `fc59e54d…`, `aef244f9…`) |
 | A2 | ⚠️ | D2 | ✅ decided | box-name→room, item counts→D5, progress indicator added |
 | B1 | ⚠️ | D3 | ✅ decided | lifecycle buttons added, items→D5 / gallery→D4 placeholders |
+| B2 | ⚠️ | D4 | ✅ decided | file-upload (not live camera), static online pill, retry writable-only |
 | E2 | ✅ | D9 | resolved | 4 state screens created (`09263080…`, `8086fa25…`, `de9f2c2a…`, `47000d2e…`) |
 | E3 | ✅ | D10 | resolved | 2 screens created (`8e990c6d…`, `2cb7c29c…`) |
 | F3 | ✅ | D13 | resolved | 3 screens created (`6f780b58…`, `11d53a11…`, `02012642…`) |

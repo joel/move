@@ -52,4 +52,20 @@ Deliver the image-only capture surface with unmistakable capture-to-box clarity,
 The review UX itself (D6), search indexing of confirmed items (D8), MCP `add_media_to_box` (D13).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.9.0-capture-recognition`:
+- **Issue:** #46
+- **PR:** #47 (`feature/capture-recognition`)
+- **Verification:** `/product-review` on `acme.workeverywhere.docker` with the fake
+  provider — captured an image into box 2: media created, recognition ran async
+  (in-Puma/async Solid Queue), session went **Processing → ✓ Recognized**, and
+  **3 items landed split 2 auto-confirmed / 1 pending-review**. Box detail shows
+  the full-media gallery + read-only items + pending badge; boxes home shows real
+  item / pending-review counts. Sealed-box capture blocked. No Bullet N+1.
+  Two issues surfaced live and were fixed (see Steps).
+- **Decisions:** file-upload capture (not live getUserMedia); Fake + interface +
+  thin OpenAI/Anthropic adapters (default fake); prod storage = SeaweedFS S3
+  accessory (dev/test Disk); Solid Queue async (dev) / inline (test) / in-Puma
+  (prod); categories/tags → D7; `moves.auto_confirm_threshold` (default 0.8).
+- **Deferred:** review UX (D6), item edit/detail (D5), search indexing (D8), MCP
+  add_media (D13). Role-gated retry is writable-only until viewer/contributor
+  roles land in **D11**.
+- **Release `v0.9.0-capture-recognition`:** _pending merge._
