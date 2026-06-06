@@ -44,11 +44,16 @@ module Views
       end
 
       def thumb(media)
-        div(class: "h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-container-high") do
-          img(
-            src: view_context.rails_storage_proxy_path(media.image),
-            class: "h-full w-full object-cover", alt: "", loading: "lazy"
-          )
+        div(class: "flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden " \
+                   "rounded-lg bg-surface-container-high text-muted") do
+          if media.image.attached?
+            img(
+              src: view_context.rails_storage_proxy_path(media.image),
+              class: "h-full w-full object-cover", alt: "", loading: "lazy"
+            )
+          else
+            render Components::Icons::Camera.new(css: "h-6 w-6")
+          end
         end
       end
 

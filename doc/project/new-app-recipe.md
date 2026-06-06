@@ -284,6 +284,19 @@ capture → recognition):
 4. **Reserved names:** never name a controller action `session` (shadows
    `ActionController#session` → `DoubleRenderError` when the layout renders CSRF)
    or a Ruby keyword (`retry`). CSRF is off in test, so this only bites in dev.
+5. **Apartment ⇄ Rails 8.1 connections (important).** Rails 8.1 leases a
+   connection *per operation*; ros-apartment switches the schema on the
+   elevator's connection only, and initializes other pool connections to
+   `public`. Two consequences + fixes:
+   - **`config.active_record.permanent_connection_checkout = true`** (in
+     `application.rb`) — pins the elevator's connection for the request so tenant
+     reads/writes don't silently hit `public` (symptom: "Add box" 500s/no-ops via
+     a FK violation against the empty `public.moves`).
+   - **Exclude Active Storage models** (`ActiveStorage::Blob/Attachment/
+     VariantRecord` in `excluded_models`) — its controllers (proxy) lease a fresh
+     connection Apartment defaults to `public`, so per-tenant blobs 404. Sharing
+     them in `public` resolves it; the per-tenant Media row references them by id.
+   - Always **guard views with `image.attached?`** before building a storage URL.
 
 ---
 

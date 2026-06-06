@@ -222,11 +222,16 @@ module Views
       end
 
       def gallery_thumb(media)
-        div(class: "aspect-square overflow-hidden rounded-xl bg-surface-container-high") do
-          img(
-            src: view_context.rails_storage_proxy_path(media.image),
-            class: "h-full w-full object-cover", alt: "", loading: "lazy"
-          )
+        div(class: "flex aspect-square items-center justify-center overflow-hidden " \
+                   "rounded-xl bg-surface-container-high text-muted") do
+          if media.image.attached?
+            img(
+              src: view_context.rails_storage_proxy_path(media.image),
+              class: "h-full w-full object-cover", alt: "", loading: "lazy"
+            )
+          else
+            render Components::Icons::Camera.new(css: "h-7 w-7")
+          end
         end
       end
 
