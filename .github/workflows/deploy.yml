@@ -33,6 +33,9 @@ jobs:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       NOTIF_MAIL_USERNAME: ${{ secrets.NOTIF_MAIL_USERNAME }}
       NOTIF_MAIL_PASSWORD: ${{ secrets.NOTIF_MAIL_PASSWORD }}
+      # move-app S3 identity for the shared SeaweedFS (Active Storage).
+      STORAGE_ACCESS_KEY_ID: ${{ secrets.STORAGE_ACCESS_KEY_ID }}
+      STORAGE_SECRET_ACCESS_KEY: ${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
 
     steps:
       - name: Checkout code
