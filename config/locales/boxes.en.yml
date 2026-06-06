@@ -50,4 +50,42 @@ en:
       filtered_description: "Try another room, or clear the filter to see every box."
     create:
       created: "Box %{number} was added."
+    update:
+      updated: "Box %{number} was updated."
+    show:
+      title: "Box #%{number}"
+      back: "Back to boxes"
+      edit: "Edit box"
+      dimensions: "Dimensions"
+      volume: "Vol: %{value}"
+      weight: "Weight Est."
+      read_only: "This move is archived — boxes are read-only."
+      items: "Items"
+      items_empty_title: "No items yet"
+      items_empty_description: "Capture a photo or add items manually to fill this box."
+      gallery: "Gallery"
+      photos:
+        zero: "No photos"
+        one: "1 photo"
+        other: "%{count} photos"
+      gallery_empty_title: "No photos yet"
+      gallery_empty_description: "Photos you capture for this box will appear here."
+    edit:
+      title: "Edit box"
+      subtitle: "Update the room, dimensions and weight."
+      back: "Back to box"
+      submit: "Save changes"
+    actions:
+      capture: "Capture image"
+      add_item: "Add item manually"
+      seal: "Seal"
+      unseal: "Unseal"
+      in_transit: "Mark in transit"
+      unpacking: "Mark unpacking"
+      unpacked: "Mark unpacked"
+    transition:
+      transitioned: "Box marked %{status}."
+      room_required: "Assign a room before sealing this box."
+      invalid: "That status change isn't allowed."
+      failed: "Could not update the box status."
     archived: "This move is archived and is read-only."

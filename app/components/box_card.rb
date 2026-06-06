@@ -12,9 +12,11 @@ module Components
     end
 
     def view_template
-      render Components::Ui::Card.new(micro_bar: micro_bar) do
-        header_row
-        title_block
+      a(href: move_box_path(@box.move_id, @box), class: "block") do
+        render Components::Ui::Card.new(interactive: true, micro_bar: micro_bar) do
+          header_row
+          title_block
+        end
       end
     end
 
