@@ -33,9 +33,6 @@ jobs:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       NOTIF_MAIL_USERNAME: ${{ secrets.NOTIF_MAIL_USERNAME }}
       NOTIF_MAIL_PASSWORD: ${{ secrets.NOTIF_MAIL_PASSWORD }}
-      # Cloudflare Origin CA wildcard cert served by kamal-proxy.
-      CERTIFICATE_PEM: ${{ secrets.CERTIFICATE_PEM }}
-      PRIVATE_KEY_PEM: ${{ secrets.PRIVATE_KEY_PEM }}
 
     steps:
       - name: Checkout code
