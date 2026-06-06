@@ -3,7 +3,10 @@ Rails.application.routes.draw do
   post "auth/google/one_tap", to: "google_one_tap_sessions#create"
   resource :account, only: %i[show edit update destroy]
   # A1 — Create / select Move (entry screen on an Organization subdomain).
-  resources :moves, only: %i[index new create]
+  # A2 — Boxes Home: the box list/grid is the hub of a Move.
+  resources :moves, only: %i[index new create] do
+    resources :boxes, only: %i[index new create]
+  end
   resources :posts
   resources :users
   get "welcome/home"

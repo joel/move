@@ -17,7 +17,7 @@ module Components
     end
 
     def view_template
-      div(class: card_classes) do
+      a(href: move_boxes_path(@move), class: card_classes) do
         div(class: "flex items-start justify-between gap-3") do
           div do
             span(class: status_classes) { status_label }
@@ -34,7 +34,8 @@ module Components
     private
 
     def card_classes
-      base = "flex flex-col gap-4 rounded-card border border-card-border bg-card p-5"
+      base = "flex flex-col gap-4 rounded-card border border-card-border bg-card p-5 " \
+             "transition hover:-translate-y-0.5 hover:bg-surface-container-high"
       @move.archived? ? "#{base} opacity-60" : base
     end
 

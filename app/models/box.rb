@@ -15,6 +15,10 @@ class Box < ApplicationRecord
   belongs_to :move
   belongs_to :room, optional: true
 
+  # Virtual: the new-box form lets you type a room by name; Boxes::Create
+  # resolves it against the per-Move vocabulary (find-or-create).
+  attr_accessor :room_name
+
   validates :number, presence: true, uniqueness: { scope: :move_id }
   # Numeric labels in D2 (keeps natural ordering and the next-number generator
   # simple); free-form box labels can come later.
