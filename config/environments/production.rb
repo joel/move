@@ -68,13 +68,14 @@ Rails.application.configure do
   config.action_mailer.raise_delivery_errors = true
 
   # Set host to be used by links generated in mailer templates.
-  config.action_mailer.default_url_options = { host: "move.workeverywhere.app", protocol: "https" }
-  config.action_mailer.asset_host = "https://move.workeverywhere.app"
+  config.action_mailer.default_url_options = { host: "move-easy.org", protocol: "https" }
+  config.action_mailer.asset_host = "https://move-easy.org"
 
-  # Multi-tenancy: org subdomains are <slug>.workeverywhere.app, sharing the
-  # session cookie across the zone.
-  config.x.tenant_zone = "workeverywhere.app"
-  config.x.cookie_domain = ".workeverywhere.app"
+  # Multi-tenancy: the apex move-easy.org is the marketing/login host; org
+  # subdomains are <slug>.move-easy.org. The shared cookie domain lets the apex
+  # login session carry to every org subdomain.
+  config.x.tenant_zone = "move-easy.org"
+  config.x.cookie_domain = ".move-easy.org"
 
   # TODO: Find a better way to handle Docker build time vs runtime env vars
   notif_mail_username = if ENV["SECRET_KEY_BASE_DUMMY"]
