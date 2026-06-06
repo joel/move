@@ -167,11 +167,14 @@ ssh-keygen -lf ~/.ssh/<your_key>      # fingerprints must match
   rejects them locally. Docs are excluded from CI via `paths-ignore`, never a marker.
 - **Set the repo to use the PR title+body for squash commits** (one-time, admin):
   ```bash
-  gh api -X PATCH repos/<owner>/<repo> \
+  unset GITHUB_TOKEN && gh api -X PATCH repos/<owner>/<repo> \
     -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY
   ```
+  (`unset GITHUB_TOKEN` first — a stale env token returns `HTTP 401: Bad
+  credentials`; `gh` then falls back to its own auth store. Applies to every
+  `gh` command in this repo.)
 - The Deploy workflow has `workflow_dispatch:` — recover a skipped deploy with
-  `gh workflow run Deploy --ref main`.
+  `unset GITHUB_TOKEN && gh workflow run Deploy --ref main`.
 
 ---
 

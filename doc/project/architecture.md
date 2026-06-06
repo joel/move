@@ -22,7 +22,7 @@ origin** — the tunnel dials out.
 flowchart LR
   U["Browser<br/>example.org<br/>*.example.org"] -->|HTTPS| CF["Cloudflare edge<br/>(TLS + wildcard cert + WAF)"]
   CF -->|"encrypted tunnel<br/>(outbound from origin)"| CFD["cloudflared<br/>(systemd, on origin)"]
-  subgraph ORIGIN["Vultr origin — inbound 80/443 CLOSED; only :22 + outbound"]
+  subgraph ORIGIN["Vultr origin — inbound 80/443 CLOSED, only :22 + outbound"]
     CFD -->|"http://ORIGIN_IP:80"| KP["kamal-proxy<br/>(ssl:false, forward ALL hosts)"]
     KP -->|HTTP| APP["Rails app (Puma)<br/>MoveTenantElevator sets the tenant"]
     APP --> PG[("PostgreSQL 18<br/>Kamal accessory")]
@@ -93,7 +93,7 @@ sequenceDiagram
   alt tenant exists
     E->>A: Apartment::Tenant.switch("acme")
     A->>A: SET search_path = "acme","public"
-    E->>R: app.call (Move queries hit acme; users/Rodauth hit public)
+    E->>R: app.call (Move queries hit acme, users/Rodauth hit public)
     R-->>B: 200 (A1 move list)
   else unknown tenant
     A-->>E: Apartment::TenantNotFound
