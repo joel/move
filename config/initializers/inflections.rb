@@ -14,3 +14,10 @@
 # ActiveSupport::Inflector.inflections(:en) do |inflect|
 #   inflect.acronym "RESTful"
 # end
+
+# "media" is the model/table name for captured images (Domain §4.9). Keep it
+# uncountable so the Media model maps to the `media` table and `has_many :media`
+# reads naturally (Rails would otherwise singularize it to "medium").
+ActiveSupport::Inflector.inflections(:en) do |inflect|
+  inflect.uncountable %w[media]
+end

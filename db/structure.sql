@@ -103,6 +103,44 @@ CREATE TABLE public.boxes (
 
 
 --
+-- Name: items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.items (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    box_id uuid NOT NULL,
+    source_media_id uuid,
+    source_recognition_suggestion_id uuid,
+    name character varying,
+    quantity integer DEFAULT 1 NOT NULL,
+    fragile boolean DEFAULT false NOT NULL,
+    confidence_score numeric(4,3),
+    created_via character varying DEFAULT 'recognition'::character varying NOT NULL,
+    review_state character varying DEFAULT 'pending_review'::character varying NOT NULL,
+    presence_state character varying DEFAULT 'in_box'::character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: media; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.media (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    box_id uuid NOT NULL,
+    media_type character varying DEFAULT 'image'::character varying NOT NULL,
+    captured_at timestamp(6) without time zone NOT NULL,
+    captured_via character varying DEFAULT 'web'::character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: move_memberships; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -130,7 +168,8 @@ CREATE TABLE public.moves (
     unit_system character varying DEFAULT 'metric'::character varying NOT NULL,
     created_by_id uuid NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    auto_confirm_threshold numeric(3,2) DEFAULT 0.8 NOT NULL
 );
 
 
@@ -170,6 +209,49 @@ CREATE TABLE public.posts (
     title character varying,
     body text,
     user_id uuid NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: recognition_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.recognition_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    box_id uuid NOT NULL,
+    media_id uuid NOT NULL,
+    provider character varying NOT NULL,
+    provider_model character varying,
+    status character varying DEFAULT 'queued'::character varying NOT NULL,
+    error_code character varying,
+    error_message character varying,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    started_at timestamp(6) without time zone,
+    completed_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: recognition_suggestions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.recognition_suggestions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    box_id uuid NOT NULL,
+    media_id uuid NOT NULL,
+    recognition_run_id uuid NOT NULL,
+    item_id uuid,
+    proposed_name character varying NOT NULL,
+    proposed_quantity integer DEFAULT 1 NOT NULL,
+    proposed_fragile boolean,
+    confidence_score numeric(4,3),
+    state character varying DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
@@ -324,6 +406,22 @@ ALTER TABLE ONLY public.boxes
 
 
 --
+-- Name: items items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.items
+    ADD CONSTRAINT items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: media media_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.media
+    ADD CONSTRAINT media_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: move_memberships move_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -361,6 +459,22 @@ ALTER TABLE ONLY public.organizations
 
 ALTER TABLE ONLY public.posts
     ADD CONSTRAINT posts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: recognition_runs recognition_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recognition_runs
+    ADD CONSTRAINT recognition_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: recognition_suggestions recognition_suggestions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recognition_suggestions
+    ADD CONSTRAINT recognition_suggestions_pkey PRIMARY KEY (id);
 
 
 --
@@ -506,6 +620,48 @@ CREATE INDEX index_boxes_on_status ON public.boxes USING btree (status);
 
 
 --
+-- Name: index_items_on_box_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_items_on_box_id ON public.items USING btree (box_id);
+
+
+--
+-- Name: index_items_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_items_on_move_id ON public.items USING btree (move_id);
+
+
+--
+-- Name: index_items_on_review_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_items_on_review_state ON public.items USING btree (review_state);
+
+
+--
+-- Name: index_items_on_source_media_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_items_on_source_media_id ON public.items USING btree (source_media_id);
+
+
+--
+-- Name: index_media_on_box_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_media_on_box_id ON public.media USING btree (box_id);
+
+
+--
+-- Name: index_media_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_media_on_move_id ON public.media USING btree (move_id);
+
+
+--
 -- Name: index_move_memberships_on_move_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -576,6 +732,69 @@ CREATE INDEX index_posts_on_user_id ON public.posts USING btree (user_id);
 
 
 --
+-- Name: index_recognition_runs_on_box_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_recognition_runs_on_box_id ON public.recognition_runs USING btree (box_id);
+
+
+--
+-- Name: index_recognition_runs_on_media_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_recognition_runs_on_media_id ON public.recognition_runs USING btree (media_id);
+
+
+--
+-- Name: index_recognition_runs_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_recognition_runs_on_move_id ON public.recognition_runs USING btree (move_id);
+
+
+--
+-- Name: index_recognition_runs_on_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_recognition_runs_on_status ON public.recognition_runs USING btree (status);
+
+
+--
+-- Name: index_recognition_suggestions_on_box_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_recognition_suggestions_on_box_id ON public.recognition_suggestions USING btree (box_id);
+
+
+--
+-- Name: index_recognition_suggestions_on_item_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_recognition_suggestions_on_item_id ON public.recognition_suggestions USING btree (item_id);
+
+
+--
+-- Name: index_recognition_suggestions_on_media_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_recognition_suggestions_on_media_id ON public.recognition_suggestions USING btree (media_id);
+
+
+--
+-- Name: index_recognition_suggestions_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_recognition_suggestions_on_move_id ON public.recognition_suggestions USING btree (move_id);
+
+
+--
+-- Name: index_recognition_suggestions_on_recognition_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_recognition_suggestions_on_recognition_run_id ON public.recognition_suggestions USING btree (recognition_run_id);
+
+
+--
 -- Name: index_rooms_on_move_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -611,11 +830,91 @@ CREATE UNIQUE INDEX index_users_on_email ON public.users USING btree (email) WHE
 
 
 --
+-- Name: recognition_suggestions fk_rails_0883acd32d; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recognition_suggestions
+    ADD CONSTRAINT fk_rails_0883acd32d FOREIGN KEY (recognition_run_id) REFERENCES public.recognition_runs(id);
+
+
+--
+-- Name: recognition_suggestions fk_rails_0a1702672a; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recognition_suggestions
+    ADD CONSTRAINT fk_rails_0a1702672a FOREIGN KEY (box_id) REFERENCES public.boxes(id);
+
+
+--
+-- Name: recognition_runs fk_rails_12e3ae5fdd; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recognition_runs
+    ADD CONSTRAINT fk_rails_12e3ae5fdd FOREIGN KEY (media_id) REFERENCES public.media(id);
+
+
+--
 -- Name: user_email_auth_keys fk_rails_1a2acb61d1; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.user_email_auth_keys
     ADD CONSTRAINT fk_rails_1a2acb61d1 FOREIGN KEY (id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: recognition_suggestions fk_rails_1a790bf4bd; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recognition_suggestions
+    ADD CONSTRAINT fk_rails_1a790bf4bd FOREIGN KEY (item_id) REFERENCES public.items(id);
+
+
+--
+-- Name: items fk_rails_26cde3138d; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.items
+    ADD CONSTRAINT fk_rails_26cde3138d FOREIGN KEY (box_id) REFERENCES public.boxes(id);
+
+
+--
+-- Name: recognition_suggestions fk_rails_320e554aa8; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recognition_suggestions
+    ADD CONSTRAINT fk_rails_320e554aa8 FOREIGN KEY (move_id) REFERENCES public.moves(id);
+
+
+--
+-- Name: recognition_runs fk_rails_38114b708d; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recognition_runs
+    ADD CONSTRAINT fk_rails_38114b708d FOREIGN KEY (box_id) REFERENCES public.boxes(id);
+
+
+--
+-- Name: items fk_rails_3bf62e79fb; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.items
+    ADD CONSTRAINT fk_rails_3bf62e79fb FOREIGN KEY (move_id) REFERENCES public.moves(id);
+
+
+--
+-- Name: media fk_rails_4e64a33103; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.media
+    ADD CONSTRAINT fk_rails_4e64a33103 FOREIGN KEY (move_id) REFERENCES public.moves(id);
+
+
+--
+-- Name: recognition_suggestions fk_rails_56e971506f; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recognition_suggestions
+    ADD CONSTRAINT fk_rails_56e971506f FOREIGN KEY (media_id) REFERENCES public.media(id);
 
 
 --
@@ -632,6 +931,14 @@ ALTER TABLE ONLY public.organization_memberships
 
 ALTER TABLE ONLY public.posts
     ADD CONSTRAINT fk_rails_5b5ddfd518 FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: media fk_rails_6dfa82d09b; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.media
+    ADD CONSTRAINT fk_rails_6dfa82d09b FOREIGN KEY (box_id) REFERENCES public.boxes(id);
 
 
 --
@@ -715,6 +1022,22 @@ ALTER TABLE ONLY public.active_storage_attachments
 
 
 --
+-- Name: items fk_rails_c7c0e718a0; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.items
+    ADD CONSTRAINT fk_rails_c7c0e718a0 FOREIGN KEY (source_media_id) REFERENCES public.media(id);
+
+
+--
+-- Name: recognition_runs fk_rails_c912f85210; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recognition_runs
+    ADD CONSTRAINT fk_rails_c912f85210 FOREIGN KEY (move_id) REFERENCES public.moves(id);
+
+
+--
 -- Name: boxes fk_rails_d7ba44d4a0; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -737,6 +1060,11 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260606170315'),
+('20260606170314'),
+('20260606170313'),
+('20260606170312'),
+('20260606170311'),
 ('20260606170310'),
 ('20260606120002'),
 ('20260606120001'),

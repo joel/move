@@ -15,6 +15,10 @@ class Move < ApplicationRecord
   has_many :users, through: :move_memberships
   has_many :rooms, dependent: :destroy
   has_many :boxes, dependent: :destroy
+  has_many :media, dependent: :destroy
+  has_many :recognition_runs, dependent: :destroy
+  has_many :recognition_suggestions, dependent: :destroy
+  has_many :items, dependent: :destroy
 
   validates :name, presence: true
   validates :status, inclusion: { in: STATUSES }
