@@ -81,6 +81,32 @@
 
 ---
 
+## ⚠️ §A2 — "Boxes Home" screen — non-blocking decisions (D2)
+
+The canonical screen `Boxes Home (Dark) - Refined Palette`
+(`screens/bda13a39e9cb48b99d72ea5af19041d7`) was implemented in Phase D2. Three
+design ⇄ domain gaps were resolved with documented decisions rather than redesign:
+
+- **Box has no name.** The Stitch cards show descriptive titles ("Everyday
+  Dishes", "Library Heavy"), but Domain Spec §4.8 gives a Box only a number, room,
+  dimensions, status and QR token — no name. **Decision:** cards title by **room**
+  (the box number sits on the badge); "No room yet" when unassigned. Named boxes
+  would be a domain change, not a D2 fix.
+- **Item counts on cards.** The design shows real item ratios ("12/12 Items").
+  Items land in **D5**, so D2 renders "No items yet" and a status-driven packed
+  bar (sealed → full, packing → empty). The controller already computes the
+  aggregate shape for D5 to populate.
+- **Compact progress indicator.** Spec §4 requires a packed / pending-review /
+  missing-dimensions indicator that is **not drawn on the canonical screen**.
+  **Decision:** added subtly with design tokens (a summary card above the grid);
+  no Stitch change needed.
+
+Recognition processing/failed states (Design Spec §4 A2) use the existing
+`Ui::RecognitionState` component; `BoxCard` exposes a `recognition_state` slot
+wired to it, inert until RecognitionRun lands in **D4**. **Status: ⚠️ decided.**
+
+---
+
 ## ⚠️ §PALETTE — Two colour systems coexist
 
 - **Observation:** `designTheme` exposes a full Material-3 token set **and** a "Refined Palette" (`page-dark #2A2822`, `card-dark #34312A`, `page-light #F2ECE1`, `card-light #FAF6EF`, `accent-sage-dark #9FB089`). Many newer screens carry a `… - Refined Palette` variant; the design-system prose references the Refined Palette values directly.
@@ -117,6 +143,7 @@
 | ID | Blocking? | Phase | Status | Action |
 |----|-----------|-------|--------|--------|
 | A1 | ✅ | D1 | resolved | 3 screens created (`36ff167a…`, `fc59e54d…`, `aef244f9…`) |
+| A2 | ⚠️ | D2 | ✅ decided | box-name→room, item counts→D5, progress indicator added |
 | E2 | ✅ | D9 | resolved | 4 state screens created (`09263080…`, `8086fa25…`, `de9f2c2a…`, `47000d2e…`) |
 | E3 | ✅ | D10 | resolved | 2 screens created (`8e990c6d…`, `2cb7c29c…`) |
 | F3 | ✅ | D13 | resolved | 3 screens created (`6f780b58…`, `11d53a11…`, `02012642…`) |

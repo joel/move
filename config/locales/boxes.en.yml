@@ -1,0 +1,53 @@
+# A2 — Boxes Home strings (Phase D2). No customer-facing copy is hard-coded in
+# the Phlex components; everything renders through boxes.*.
+en:
+  boxes:
+    index:
+      title: "My Boxes"
+      add: "Add box"
+      start_new: "Start New Box"
+      start_new_hint: "Tap to add a box"
+    summary:
+      packed: "Packed"
+      pending_review: "Pending review"
+      missing_dimensions: "Missing dimensions"
+    filters:
+      all: "All boxes"
+      clear: "Clear filter"
+    card:
+      badge: "Box %{number}"
+      no_room: "No room yet"
+      no_items: "No items yet"
+      missing_dimensions: "Add dimensions"
+    status:
+      packing: "Packing"
+      sealed: "Sealed"
+      in_transit: "In transit"
+      unpacking: "Unpacking"
+      unpacked: "Unpacked"
+    new:
+      title: "Add a box"
+      subtitle: "Numbered automatically — add a room and dimensions when you know them."
+      back: "Back to boxes"
+    form:
+      number: "Box number"
+      number_placeholder: "Auto"
+      room: "Room"
+      room_placeholder: "e.g. Kitchen"
+      length_cm: "Length (cm)"
+      width_cm: "Width (cm)"
+      height_cm: "Height (cm)"
+      weight_kg: "Weight (kg)"
+      optional: "Optional"
+      submit: "Add box"
+      errors:
+        one: "1 error prevented this box from being saved:"
+        other: "%{count} errors prevented this box from being saved:"
+    empty:
+      title: "No boxes yet"
+      description: "Add your first box to start packing this move."
+      filtered_title: "No boxes in this room"
+      filtered_description: "Try another room, or clear the filter to see every box."
+    create:
+      created: "Box %{number} was added."
+    archived: "This move is archived and is read-only."
