@@ -13,7 +13,15 @@ Apartment.configure do |config|
   # and (2) pins the AR model to the public connection regardless of the active
   # tenant. User is Rodauth's accounts table; Organization(+Membership) is the
   # tenant registry.
-  config.excluded_models = %w[User Organization OrganizationMembership]
+  # Active Storage tables are shared in `public` (not per-tenant). Rails 8.1's
+  # Active Storage controllers (e.g. the proxy) lease a fresh pool connection that
+  # Apartment initializes to `public`, so per-tenant blobs 404'd. Keeping blobs/
+  # attachments/variants in `public` makes them resolve regardless of the active
+  # schema; the domain Media row stays per-tenant and references them by id.
+  config.excluded_models = %w[
+    User Organization OrganizationMembership
+    ActiveStorage::Blob ActiveStorage::Attachment ActiveStorage::VariantRecord
+  ]
 
   # Always keep `public` on the search path so shared tables, the citext
   # extension, and the schema-qualified Rodauth key tables resolve from inside

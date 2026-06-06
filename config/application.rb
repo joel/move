@@ -23,6 +23,16 @@ module MoveApp
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.1
 
+    # ros-apartment switches the tenant by SET search_path on
+    # ActiveRecord::Base.connection (the subdomain elevator). Rails 8.1's default
+    # *temporary* connection checkout means a later per-query lease (e.g. Active
+    # Storage's proxy controller, or a write) can grab a different pool connection
+    # that Apartment defaults to the `public` schema — so tenant rows 404 / writes
+    # miss the tenant. Pin the connection per thread so the elevator's search_path
+    # persists across the whole request. (Until ros-apartment supports 8.1's
+    # connection model natively.)
+    config.active_record.permanent_connection_checkout = true
+
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
