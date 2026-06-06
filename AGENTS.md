@@ -292,6 +292,30 @@ This repository ships agent skills under `.claude/skills/`. Prefer them for the 
 - **`/qa-review`**, **`/security-review`**, **`/ux-review`**, **`/ui-polish`** — review passes before a PR is merged.
 - **`/ui-designer`** — build Tailwind + Phlex UI from the component library.
 
+## 7. Documentation after implementation (Mandatory)
+
+Every change that touches **architecture, infrastructure, deployment, tenancy,
+auth, or any cross-cutting flow** MUST update the project documentation **and its
+diagrams** before the PR merges — code without docs is incomplete.
+
+- **Where:** operational/architectural docs live in [`doc/project/`](doc/project)
+  ([`README.md`](doc/project/README.md) index, [`architecture.md`](doc/project/architecture.md),
+  [`new-app-recipe.md`](doc/project/new-app-recipe.md)). Product/phase docs stay in
+  `doc/phases/`. Per-effort step logs (the flight recorder) stay in
+  `doc/phases/<Phase> - Steps.md`.
+- **Always include visual schemas**, not just prose:
+  - **Mermaid** diagrams embedded in the markdown (render inline on GitHub) for
+    request flows, schema/tenancy models, and sequence/lifecycle.
+  - An **editable Excalidraw scene** in [`doc/project/diagrams/`](doc/project/diagrams)
+    (`*.excalidraw`, openable at <https://excalidraw.com/>) for the headline
+    architecture diagram. If an **Excalidraw MCP server** is connected, use it to
+    author/regenerate the scene; otherwise hand-author the `.excalidraw` JSON.
+- **Keep the recipe reproducible:** when you add/alter a setup step (a gem, a
+  Kamal/Cloudflare/Doppler/CI setting, an install command), update
+  `new-app-recipe.md` with the exact command/config so the next app is a copy-paste.
+- **Record hard-won gotchas** in the recipe's gotcha table and in agent memory.
+- Reference these docs from the PR description.
+
 ## Skill Self-Evaluation
 
 After using any skill from this project, append a brief retrospective:

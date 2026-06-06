@@ -1,0 +1,30 @@
+# Project documentation (`doc/project/`)
+
+Operational + architectural docs for Move and the **reusable recipe** for standing
+up another multi-tenant app on the same stack. (Product/phase/design docs live in
+[`doc/phases/`](../phases) and [`doc/ai/`](../ai); this folder is the
+infrastructure / "how it actually runs and ships" reference.)
+
+## Contents
+
+| Doc | What it covers |
+|---|---|
+| [`architecture.md`](architecture.md) | Runtime request flow, schema-per-tenant model, per-request tenant resolution, component map — with diagrams. |
+| [`new-app-recipe.md`](new-app-recipe.md) | Step-by-step reproducible recipe (commands + config) to build/deploy a new multi-tenant app on this stack. |
+| [`diagrams/`](diagrams) | Editable Excalidraw scenes (open at [excalidraw.com](https://excalidraw.com/)). |
+
+## TL;DR of the production architecture
+
+`browser → Cloudflare edge (TLS, wildcard) → Cloudflare Tunnel → cloudflared →
+kamal-proxy (HTTP, forward-all) → Rails (Apartment elevator sets the tenant) →
+PostgreSQL 18`. The origin has **no inbound ports open** — the tunnel dials out.
+Each Organization is a PostgreSQL **schema**; auth + the org registry live in
+`public`. See [`architecture.md`](architecture.md).
+
+## Documentation rule
+
+Per root [`AGENTS.md`](../../AGENTS.md) §7, **every implementation that changes
+architecture, infrastructure, deploy, or a cross-cutting flow must update these
+docs and their diagrams** before the PR merges.
+
+_Last updated: 2026-06-06 (move-easy.org production cutover)._
