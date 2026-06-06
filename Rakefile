@@ -33,19 +33,23 @@ namespace :project do
 
   desc "Run system specs"
   task "system-tests" => :environment do
-    sh "bundle exec rspec spec/system"
+    # Reason: CI runs system specs with the rack_test driver (browser-independent);
+    # mirror it so `rake` matches CI instead of defaulting to selenium_chrome.
+    sh({ "TEST_BROWSER" => "rack_test" }, "bundle exec rspec spec/system")
   end
 
   desc "Run ErbLint and RuboCop checks"
   task lint: :environment do
     sh "bin/erb_lint --lint-all"
-    sh "bundle exec rubocop --lint --parallel --format simple"
+    # Reason: CI runs the full RuboCop suite, not just lint cops.
+    sh "bundle exec rubocop --parallel --format simple"
   end
 
-  desc "Autocorrect ErbLint and RuboCop lint issues"
+  desc "Autocorrect ErbLint and RuboCop issues"
   task "fix-lint" => :environment do
     sh "bin/erb_lint --lint-all -a"
-    sh "bundle exec rubocop --lint --parallel -A --format simple"
+    # Reason: autocorrect the same full suite that `lint` checks.
+    sh "bundle exec rubocop --parallel -A --format simple"
   end
 end
 
