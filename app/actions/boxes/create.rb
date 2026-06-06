@@ -9,21 +9,26 @@ module Boxes
     include Boxes::RoomResolution
 
     def call(move:, params:, creator:)
-      room = yield resolve_room(move, params[:room_name])
-      box = yield persist(move, params, room)
+      box = yield persist(move, params)
       yield emit_event(box, creator)
       Success(box)
     end
 
     private
 
-    def persist(move, params, room)
-      box = move.boxes.create!(
-        number: params[:number].presence || next_number(move),
-        qr_token: SecureRandom.urlsafe_base64(16),
-        room: room,
-        **dimensions(params)
-      )
+    # Room resolution and box creation share one transaction, so an invalid box
+    # rolls back any room the name created (no orphan rooms on a failed create).
+    def persist(move, params)
+      box = nil
+      ActiveRecord::Base.transaction do
+        room = find_or_create_room(move, params[:room_name])
+        box = move.boxes.create!(
+          number: params[:number].presence || next_number(move),
+          qr_token: SecureRandom.urlsafe_base64(16),
+          room: room,
+          **dimensions(params)
+        )
+      end
       Success(box)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)

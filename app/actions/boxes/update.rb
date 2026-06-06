@@ -11,18 +11,21 @@ module Boxes
     ATTRS = %i[number length_cm width_cm height_cm weight_kg].freeze
 
     def call(box:, params:, editor:)
-      room = yield resolve_room(box.move, params[:room_name])
-      yield persist(box, params, room)
+      yield persist(box, params)
       yield emit_event(box, editor)
       Success(box)
     end
 
     private
 
-    def persist(box, params, room)
-      attrs = params.slice(*ATTRS)
-      attrs[:room] = room if params[:room_name].present?
-      box.update!(attrs)
+    # Room resolution and the box update share one transaction, so an invalid
+    # box rolls back any room the name created (no orphan rooms on a failed edit).
+    def persist(box, params)
+      ActiveRecord::Base.transaction do
+        attrs = params.slice(*ATTRS)
+        attrs[:room] = find_or_create_room(box.move, params[:room_name]) if params[:room_name].present?
+        box.update!(attrs)
+      end
       Success(box)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)

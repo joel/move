@@ -41,6 +41,12 @@ RSpec.describe Boxes::Update do
     expect(box.reload.number).to eq("1")
   end
 
+  it "does not create an orphan room when the update fails" do
+    expect do
+      described_class.new.call(box:, params: { number: "A1", room_name: "Attic" }, editor:)
+    end.not_to change(move.rooms, :count)
+  end
+
   it "emits a box.updated event" do
     allow(Rails.event).to receive(:notify)
     described_class.new.call(box:, params: { weight_kg: 3 }, editor:)
