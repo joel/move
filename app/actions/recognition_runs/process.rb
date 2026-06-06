@@ -10,7 +10,9 @@ module RecognitionRuns
     def call(run:, provider: RecognitionProviders.resolve)
       mark_processing(run)
       result = provider.identify(image: run.media.image, context: context(run))
-      materialize(run, result)
+      # Materialize atomically: if any detection fails to persist, roll back all
+      # of them so a failed run never leaves partial inventory behind.
+      ActiveRecord::Base.transaction { materialize(run, result) }
       finish(run, result)
       Success(run)
     rescue StandardError => e

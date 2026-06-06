@@ -47,4 +47,24 @@ RSpec.describe RecognitionRuns::Process do
     described_class.new.call(run:)
     expect(run.reload.metadata.keys).to contain_exactly("item_count", "provider")
   end
+
+  it "rolls back all items when a later detection fails to persist" do
+    # Second detection's confidence overflows decimal(4,3) → create! raises
+    # midway. The transaction must roll back the first item too.
+    objects = [
+      RecognitionProviders::DetectedObject.new(label: "Lamp", confidence: 0.97, count: 1),
+      RecognitionProviders::DetectedObject.new(label: "Rug", confidence: 99.0, count: 1)
+    ]
+    provider = instance_double(RecognitionProviders::Fake)
+    allow(provider).to receive(:identify).and_return(
+      RecognitionProviders::Result.new(provider: "fake", provider_model: "x", objects:)
+    )
+
+    result = described_class.new.call(run:, provider:)
+
+    expect(result).to be_failure
+    expect(run.reload.status).to eq("failed")
+    expect(box.items.count).to eq(0)
+    expect(run.recognition_suggestions.count).to eq(0)
+  end
 end

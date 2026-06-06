@@ -40,8 +40,11 @@ class CapturesController < ApplicationController
   # POST /moves/:move_id/boxes/:box_id/capture/retry — new run for a failed media.
   def retry_recognition
     media = @box.media.find(params.expect(:media_id))
-    RecognitionRuns::Retry.new.call(run: media.recognition_runs.order(created_at: :desc).first)
-    redirect_to move_box_capture_path(@move, @box), notice: t(".retried")
+    result = RecognitionRuns::Retry.new.call(run: media.recognition_runs.order(created_at: :desc).first)
+    # Only the latest *failed* run is retryable; a no-op (e.g. replayed POST)
+    # redirects quietly without queuing a duplicate run.
+    notice = (t(".retried") if result.success?)
+    redirect_to move_box_capture_path(@move, @box), notice: notice
   rescue ActiveRecord::RecordNotFound
     head :not_found
   end
