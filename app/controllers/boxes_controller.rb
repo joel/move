@@ -36,7 +36,8 @@ class BoxesController < ApplicationController
     render Views::Boxes::Show.new(
       move: @move, box: @box,
       items: authorized_scope(@box.items).in_box.ordered,
-      media: @box.media.with_attached_image.recent_first
+      # Preload the blob only (proxy URLs use the original; no variants/preview).
+      media: @box.media.includes(image_attachment: :blob).recent_first
     )
   end
 
