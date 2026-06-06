@@ -6,8 +6,9 @@ module Components
   # recognition runs arrive in later phases (D5/D4); `recognition_state` is the
   # integration point — passed nil until D4 supplies runs.
   class BoxCard < Components::Base
-    def initialize(box:, recognition_state: nil)
+    def initialize(box:, item_count: 0, recognition_state: nil)
       @box = box
+      @item_count = item_count
       @recognition_state = recognition_state
     end
 
@@ -40,8 +41,12 @@ module Components
     def title_block
       div do
         h3(class: "mb-1 text-headline-md text-text-warm") { title }
-        p(class: "text-body-md text-muted") { I18n.t("boxes.card.no_items") }
+        p(class: "text-body-md text-muted") { items_label }
       end
+    end
+
+    def items_label
+      @item_count.zero? ? I18n.t("boxes.card.no_items") : I18n.t("boxes.card.items", count: @item_count)
     end
 
     # Bottom strip: status + items placeholder, the packed progress bar, and a
@@ -51,7 +56,7 @@ module Components
       lambda do |card|
         card.div(class: "flex justify-between text-label-caps uppercase text-muted") do
           card.span { status_label }
-          card.span { I18n.t("boxes.card.no_items") }
+          card.span { items_label }
         end
         card.render Components::Ui::ProgressBar.new(value: box.packed? ? 100 : 0, max: 100)
         next unless box.missing_dimensions?

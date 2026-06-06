@@ -26,13 +26,18 @@ class BoxesController < ApplicationController
       boxes: scope.ordered,
       rooms: @move.rooms.order(:name),
       summary: move_summary,
-      selected_room_id: selected_room&.id
+      selected_room_id: selected_room&.id,
+      item_counts: @move.items.in_box.group(:box_id).count
     )
   end
 
   # GET /moves/:move_id/boxes/:id
   def show
-    render Views::Boxes::Show.new(move: @move, box: @box)
+    render Views::Boxes::Show.new(
+      move: @move, box: @box,
+      items: authorized_scope(@box.items).in_box.ordered,
+      media: @box.media.with_attached_image.recent_first
+    )
   end
 
   # GET /moves/:move_id/boxes/new
@@ -143,7 +148,7 @@ class BoxesController < ApplicationController
       missing_dimensions: boxes.where(
         "length_cm IS NULL OR width_cm IS NULL OR height_cm IS NULL"
       ).count,
-      pending_review: 0
+      pending_review: @move.items.pending_review.count
     }
   end
 

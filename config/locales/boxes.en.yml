@@ -18,7 +18,17 @@ en:
       badge: "Box %{number}"
       no_room: "No room yet"
       no_items: "No items yet"
+      items:
+        one: "1 item"
+        other: "%{count} items"
       missing_dimensions: "Add dimensions"
+    item:
+      fragile: "Fragile"
+    item_state:
+      pending_review: "Pending review"
+      auto_confirmed: "Auto-confirmed"
+      confirmed: "Confirmed"
+      needs_correction: "Needs review"
     status:
       packing: "Packing"
       sealed: "Sealed"
@@ -61,6 +71,9 @@ en:
       weight: "Weight Est."
       read_only: "This move is archived — boxes are read-only."
       items: "Items"
+      pending_review:
+        one: "1 pending review"
+        other: "%{count} pending review"
       items_empty_title: "No items yet"
       items_empty_description: "Capture a photo or add items manually to fill this box."
       gallery: "Gallery"
