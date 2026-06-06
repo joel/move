@@ -32,12 +32,13 @@ class CapturesController < ApplicationController
   end
 
   # GET /moves/:move_id/boxes/:box_id/capture/session — polled fragment.
-  def session
+  # NB: not named `session` — that collides with ActionController#session.
+  def session_panel
     render Views::Captures::SessionPanel.new(box: @box, media: session_media), layout: false
   end
 
   # POST /moves/:move_id/boxes/:box_id/capture/retry — new run for a failed media.
-  def retry
+  def retry_recognition
     media = @box.media.find(params.expect(:media_id))
     RecognitionRuns::Retry.new.call(run: media.recognition_runs.order(created_at: :desc).first)
     redirect_to move_box_capture_path(@move, @box), notice: t(".retried")
@@ -77,7 +78,7 @@ class CapturesController < ApplicationController
   end
 
   def session_media
-    @box.media.includes(:recognition_runs).recent_first.limit(20)
+    @box.media.includes(:recognition_runs, image_attachment: :blob).recent_first.limit(20)
   end
 
   def capture_error(reason)

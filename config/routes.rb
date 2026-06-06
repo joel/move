@@ -11,8 +11,8 @@ Rails.application.routes.draw do
       # B2 — Capture image & recognition. `session` is the polled session panel.
       get "capture", to: "captures#show", as: :capture
       post "capture", to: "captures#create"
-      get "capture/session", to: "captures#session", as: :capture_session
-      post "capture/retry", to: "captures#retry", as: :capture_retry
+      get "capture/session", to: "captures#session_panel", as: :capture_session
+      post "capture/retry", to: "captures#retry_recognition", as: :capture_retry
     end
   end
   resources :posts
