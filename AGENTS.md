@@ -10,7 +10,7 @@ This document provides instructions and protocols for AI Agents interacting with
 
 - **Ruby version manager:** This project uses **mise**. Prefix Ruby/Rails commands with `mise x --` (e.g. `mise x -- bundle exec rspec`) so the project's Ruby (`.ruby-version`) is used.
 
-- **URLs:** Local development (via `bin/cli`): `https://move.workeverywhere.docker` (mail at `https://mail.workeverywhere.docker`). Production: `https://move.workeverywhere.app`.
+- **URLs:** Local development (via `bin/cli`): `https://move.workeverywhere.docker` (mail at `https://mail.workeverywhere.docker`). Production: `https://move-easy.org` (apex/login; org subdomains `<slug>.move-easy.org`), behind Cloudflare (Full Strict, Origin CA wildcard cert served by kamal-proxy).
 
 ### Design source of truth (Google Stitch)
 

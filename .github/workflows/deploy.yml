@@ -33,6 +33,9 @@ jobs:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       NOTIF_MAIL_USERNAME: ${{ secrets.NOTIF_MAIL_USERNAME }}
       NOTIF_MAIL_PASSWORD: ${{ secrets.NOTIF_MAIL_PASSWORD }}
+      # Cloudflare Origin CA wildcard cert served by kamal-proxy.
+      CERTIFICATE_PEM: ${{ secrets.CERTIFICATE_PEM }}
+      PRIVATE_KEY_PEM: ${{ secrets.PRIVATE_KEY_PEM }}
 
     steps:
       - name: Checkout code
@@ -52,12 +55,11 @@ jobs:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Add deploy host to known_hosts
-        # The runner occasionally can't resolve the host via DNS; pin it so the
-        # ssh-keyscan + deploy connect reliably. IP must match workeverywhere.app.
+        # Kamal SSHes to the raw origin IP (servers.web in deploy.yml). Never scan
+        # move-easy.org — it is Cloudflare-proxied and does not answer SSH.
         run: |
-          echo "65.20.110.89 workeverywhere.app" | sudo tee -a /etc/hosts
           mkdir -p ~/.ssh
-          ssh-keyscan -t rsa,ecdsa,ed25519 workeverywhere.app 65.20.110.89 >> ~/.ssh/known_hosts
+          ssh-keyscan -t rsa,ecdsa,ed25519 65.20.110.89 >> ~/.ssh/known_hosts
 
       - name: Deploy
         run: bin/kamal deploy

@@ -68,13 +68,14 @@ Rails.application.configure do
   config.action_mailer.raise_delivery_errors = true
 
   # Set host to be used by links generated in mailer templates.
-  config.action_mailer.default_url_options = { host: "move.workeverywhere.app", protocol: "https" }
-  config.action_mailer.asset_host = "https://move.workeverywhere.app"
+  config.action_mailer.default_url_options = { host: "move-easy.org", protocol: "https" }
+  config.action_mailer.asset_host = "https://move-easy.org"
 
-  # Multi-tenancy: org subdomains are <slug>.workeverywhere.app, sharing the
-  # session cookie across the zone.
-  config.x.tenant_zone = "workeverywhere.app"
-  config.x.cookie_domain = ".workeverywhere.app"
+  # Multi-tenancy: the apex move-easy.org is the marketing/login host; org
+  # subdomains are <slug>.move-easy.org. The shared cookie domain lets the apex
+  # login session carry to every org subdomain.
+  config.x.tenant_zone = "move-easy.org"
+  config.x.cookie_domain = ".move-easy.org"
 
   # TODO: Find a better way to handle Docker build time vs runtime env vars
   notif_mail_username = if ENV["SECRET_KEY_BASE_DUMMY"]
@@ -111,12 +112,14 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [:id]
 
-  # Enable DNS rebinding protection and other `Host` header attacks.
-  # config.hosts = [
-  #   "example.com",     # Allow requests from example.com
-  #   /.*\.example\.com/ # Allow requests from subdomains like `www.example.com`
-  # ]
-  #
-  # Skip DNS rebinding protection for the default health check endpoint.
-  # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+  # Host-header allowlist. kamal-proxy forwards every host to the app (no
+  # `host:` filter, for the wildcard tenant model), so reject unexpected Host
+  # headers here — direct-to-origin-IP requests or other domains pointed at the
+  # box. The LEADING DOT matters: a dotted String permits the apex AND every
+  # `<slug>.move-easy.org` tenant (ActionDispatch::HostAuthorization); without
+  # it, only the bare apex would match and all tenant subdomains would 403.
+  config.hosts << ".move-easy.org"
+  # The health-check endpoint must answer regardless of Host (kamal-proxy's probe
+  # may not carry the public host), so skip host authorization for it.
+  config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 end

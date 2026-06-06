@@ -5,21 +5,30 @@ service: move
 image: joelazemar/move
 
 # Deploy to these servers.
+# SSH target = the raw origin IP, not a Cloudflare-proxied hostname (proxied
+# records resolve to Cloudflare IPs, which do not accept SSH). Confirm this is
+# the server's real IP with port 22 reachable.
 servers:
   web:
-    - workeverywhere.app
+    - 65.20.110.89
   # job:
   #   hosts:
   #     - workeverywhere.app
   #   cmd: bin/jobs
 
-# Enable SSL auto certification via Let's Encrypt and allow for multiple apps on a single web server.
-# Remove this section when using multiple web servers and ensure you terminate SSL at your load balancer.
-#
-# Note: If using Cloudflare, set encryption mode in SSL/TLS setting to "Full" to enable CF-to-app encryption.
+# kamal-proxy serves a custom WILDCARD certificate (a Cloudflare Origin CA cert
+# covering move-easy.org + *.move-easy.org), supplied via secrets. Let's Encrypt
+# is not used: it cannot issue wildcards over HTTP-01, and tenant subdomains are
+# dynamic. With no `host:`, the proxy forwards EVERY host (apex + *.move-easy.org)
+# to the app; the MoveTenantElevator resolves the tenant from the subdomain.
+# Cloudflare must be set to SSL/TLS mode "Full (Strict)".
 proxy:
-  ssl: true
-  host: move.workeverywhere.app
+  ssl:
+    certificate_pem: CERTIFICATE_PEM
+    private_key_pem: PRIVATE_KEY_PEM
+  # Behind Cloudflare: trust its X-Forwarded-* (real client IP / proto). Pair
+  # with an origin firewall locked to Cloudflare IP ranges to prevent spoofing.
+  forward_headers: true
 
 # Credentials for your image host.
 registry:
@@ -58,6 +67,10 @@ env:
     DB_HOST: move-db
     DB_PORT: 5432
     POSTGRES_USER: move
+
+    # WebAuthn passkeys must bind to the registrable parent domain, not the
+    # specific subdomain, so a passkey works on the apex and every org subdomain.
+    WEBAUTHN_RP_ID: move-easy.org
 
     # Log everything from Rails
     # RAILS_LOG_LEVEL: debug
@@ -106,7 +119,8 @@ ssh:
 accessories:
   db:
     image: postgres:18
-    host: workeverywhere.app
+    # SSH target = raw origin IP (see servers.web note).
+    host: 65.20.110.89
     env:
       clear:
         POSTGRES_DB: move_production
