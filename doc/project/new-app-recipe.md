@@ -255,14 +255,24 @@ capture → recognition):
      instance on the box). Point the app at it:
      ```yaml
      env: { clear: { STORAGE_ENDPOINT: http://seaweedfs:8333, STORAGE_BUCKET: <app>,
-                     STORAGE_REGION: us-east-1 } }
+                     STORAGE_REGION: us-east-1 },
+            secret: [ STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY ] }
      ```
-     Anonymous gateway → the access keys are harmless placeholders (storage.yml
-     defaults); no `env.secret` / Doppler entries needed.
-   - **Create the app's bucket once** (it is not auto-created):
-     `docker exec -i seaweedfs sh -c 'echo "s3.bucket.create -name <app>" | weed shell'`.
-     No CORS needed (server-side upload + proxy serving — the browser never talks
-     to S3 directly). The app boots without the bucket; only uploads need it.
+   - **The gateway enforces bucket-scoped S3 identities** (it is NOT anonymous —
+     `aws-sdk` signs every request, so an unknown key gets `InvalidAccessKeyId`).
+     Create the app's bucket and a scoped identity once, then store the keys in the
+     app's Doppler (`<app>/prd`):
+     ```bash
+     docker exec -i seaweedfs sh -c 'echo "s3.bucket.create -name <app>" | weed shell'
+     ACCESS=$(openssl rand -hex 10); SECRET=$(openssl rand -base64 32 | tr -dc A-Za-z0-9 | head -c 40)
+     docker exec -i seaweedfs sh -c "echo \"s3.configure -user <app>-app \
+       -access_key $ACCESS -secret_key $SECRET \
+       -actions Read:<app>,Write:<app>,List:<app>,Tagging:<app>,Admin:<app> -apply\" | weed shell"
+     doppler secrets set STORAGE_ACCESS_KEY_ID=$ACCESS STORAGE_SECRET_ACCESS_KEY=$SECRET --project <app> --config prd
+     ```
+     `s3.configure -apply` merges (other apps' identities are preserved — verify
+     with a no-arg `s3.configure`). No CORS needed (server-side upload + proxy
+     serving). The app boots without the bucket; only uploads need it.
    - Caveat: a shared anonymous gateway isn't auth-isolated between buckets — it's
      the existing house setup; a per-app accessory is the alternative if you need
      hard isolation.
