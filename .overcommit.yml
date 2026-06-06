@@ -34,6 +34,12 @@ PreCommit:
     exclude:
       - "**/db/structure.sql"
 
+CommitMsg:
+  ForbidSkipMarkers:
+    enabled: true
+    description: "Check for CI/deploy skip markers"
+    requires_files: false
+
 PostCheckout:
   ALL:
     quiet: false

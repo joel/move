@@ -152,6 +152,25 @@ When a PR receives code review comments:
 - `.github/workflows/deploy.yml` deploys to production (`move.workeverywhere.app`) via **Kamal** on **every push to `main`** (i.e. every merge).
 - Secrets come from **Doppler** (`move/prd`), synced into GitHub Actions secrets. `.kamal/secrets` uses the environment-provided values in CI and falls back to the Doppler CLI / `config/master.key` for local deploys.
 - Skip a deploy for a given commit with `[skip deploy]` in the commit **subject**. **Beware:** a squash-merge whose body quotes the literal `[skip deploy]` (for example, by referencing this document) will skip the deploy unintentionally.
+- **Never use `[skip ci]` / `[ci skip]` / `[no ci]` / `[skip actions]` in commit messages.** GitHub treats them anywhere in the message as a platform-level skip that suppresses **all** workflow runs for the push — including the deploy — and it **cannot** be overridden in workflow YAML. Docs are excluded from CI via `paths-ignore` in `ci.yml`, never via a marker. A `commit-msg` overcommit hook (`ForbidSkipMarkers`) rejects these locally.
+- **Recover a skipped deploy** by re-running it manually: `unset GITHUB_TOKEN && gh workflow run Deploy --ref main` (the deploy workflow has `workflow_dispatch`), or from the Actions tab.
+
+#### Squash-and-merge hygiene
+
+Squash merges aggregate the branch's commit messages into the merge commit body
+**by default**, which is how stray `[skip ci]` markers reach `main` and skip the
+deploy. To prevent it, set the repo to use the PR title + description for squash
+commits (one-time, requires admin):
+
+```bash
+unset GITHUB_TOKEN && gh api -X PATCH repos/joel/move \
+  -f squash_merge_commit_title=PR_TITLE \
+  -f squash_merge_commit_message=PR_BODY
+```
+
+Then **write a real PR description** — it becomes the squash commit body, so keep
+it marker-free and meaningful. At merge time, double-check the squash message
+contains no `[skip ci]` / `[skip deploy]`.
 
 #### Database accessory (PostgreSQL 18)
 
