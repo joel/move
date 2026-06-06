@@ -62,9 +62,11 @@ The review UX itself (D6), search indexing of confirmed items (D8), MCP `add_med
   item / pending-review counts. Sealed-box capture blocked. No Bullet N+1.
   Two issues surfaced live and were fixed (see Steps).
 - **Decisions:** file-upload capture (not live getUserMedia); Fake + interface +
-  thin OpenAI/Anthropic adapters (default fake); prod storage = SeaweedFS S3
-  accessory (dev/test Disk); Solid Queue async (dev) / inline (test) / in-Puma
-  (prod); categories/tags → D7; `moves.auto_confirm_threshold` (default 0.8).
+  thin OpenAI/Anthropic adapters (default fake); prod storage = the **shared
+  host-wide SeaweedFS** via move's own `move` bucket (dev/test Disk) — a per-app
+  accessory was added then **corrected post-merge** to reuse the existing shared
+  instance (see Steps); Solid Queue async (dev) / inline (test) / in-Puma (prod);
+  categories/tags → D7; `moves.auto_confirm_threshold` (default 0.8).
 - **Deferred:** review UX (D6), item edit/detail (D5), search indexing (D8), MCP
   add_media (D13). Role-gated retry is writable-only until viewer/contributor
   roles land in **D11**.

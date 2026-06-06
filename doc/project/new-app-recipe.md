@@ -247,19 +247,25 @@ capture → recognition):
    in `config/storage.yml` (env-driven `endpoint`/`bucket`/keys,
    `force_path_style: true`). dev/test = Disk; prod = `:seaweedfs`. Serve images
    via **proxy URLs** (`rails_storage_proxy_path`) so the internal S3 endpoint is
-   never exposed to the browser. Prod is a Kamal accessory:
-   ```yaml
-   accessories:
-     storage:
-       image: chrislusf/seaweedfs:3.97
-       host: <ORIGIN_IP>
-       cmd: "server -s3 -s3.port=8333 -dir=/data ..."
-       directories: [ data:/data ]
-   env: { clear: { STORAGE_ENDPOINT: http://<app>-storage:8333, STORAGE_BUCKET: <app> },
-          secret: [ STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY ] }
-   ```
-   One-time cutover (like PG18): `kamal accessory boot storage`, create the
-   bucket + CORS, then redeploy. The app boots without it; only uploads need it.
+   never exposed to the browser.
+   - **Check first:** these boxes already run **one shared, host-wide `seaweedfs`
+     container** (anonymous S3, on the `kamal` network) that every app uses via
+     its **own bucket** (catalyst→`catalyst`, move→`move`). **Reuse it** — do NOT
+     add a per-app SeaweedFS accessory (that would put a second redundant
+     instance on the box). Point the app at it:
+     ```yaml
+     env: { clear: { STORAGE_ENDPOINT: http://seaweedfs:8333, STORAGE_BUCKET: <app>,
+                     STORAGE_REGION: us-east-1 } }
+     ```
+     Anonymous gateway → the access keys are harmless placeholders (storage.yml
+     defaults); no `env.secret` / Doppler entries needed.
+   - **Create the app's bucket once** (it is not auto-created):
+     `docker exec -i seaweedfs sh -c 'echo "s3.bucket.create -name <app>" | weed shell'`.
+     No CORS needed (server-side upload + proxy serving — the browser never talks
+     to S3 directly). The app boots without the bucket; only uploads need it.
+   - Caveat: a shared anonymous gateway isn't auth-isolated between buckets — it's
+     the existing house setup; a per-app accessory is the alternative if you need
+     hard isolation.
 3. **Background jobs (Solid Queue):** async in dev, `:inline` in **test** (so an
    upload→process flow completes within an example), and **in-Puma in prod**
    (`SOLID_QUEUE_IN_PUMA: true` in `deploy.yml` env) — no separate jobs role.
