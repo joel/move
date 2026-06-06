@@ -112,12 +112,14 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [:id]
 
-  # Enable DNS rebinding protection and other `Host` header attacks.
-  # config.hosts = [
-  #   "example.com",     # Allow requests from example.com
-  #   /.*\.example\.com/ # Allow requests from subdomains like `www.example.com`
-  # ]
-  #
-  # Skip DNS rebinding protection for the default health check endpoint.
-  # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+  # Host-header allowlist. kamal-proxy forwards every host to the app (no
+  # `host:` filter, for the wildcard tenant model), so reject unexpected Host
+  # headers here — direct-to-origin-IP requests or other domains pointed at the
+  # box. The LEADING DOT matters: a dotted String permits the apex AND every
+  # `<slug>.move-easy.org` tenant (ActionDispatch::HostAuthorization); without
+  # it, only the bare apex would match and all tenant subdomains would 403.
+  config.hosts << ".move-easy.org"
+  # The health-check endpoint must answer regardless of Host (kamal-proxy's probe
+  # may not carry the public host), so skip host authorization for it.
+  config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 end
