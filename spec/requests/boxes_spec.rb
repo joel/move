@@ -42,6 +42,15 @@ RSpec.describe "Boxes" do
       expect(response.body).to include("Kitchen")
       expect(response.body).not_to include("Box 02")
     end
+
+    it "treats a malformed room_id as a cleared filter (no error)" do
+      create(:box, move:, number: "1")
+
+      get move_boxes_path(move, room_id: "not-a-uuid")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Box 01")
+    end
   end
 
   describe "GET /moves/:move_id/boxes/new" do

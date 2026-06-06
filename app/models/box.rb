@@ -19,10 +19,16 @@ class Box < ApplicationRecord
   # resolves it against the per-Move vocabulary (find-or-create).
   attr_accessor :room_name
 
+  # Largest PostgreSQL bigint — the `ordered` scope casts number to bigint, so an
+  # override must stay in range or every index query would raise RangeError.
+  MAX_NUMBER = 9_223_372_036_854_775_807
+
   validates :number, presence: true, uniqueness: { scope: :move_id }
   # Numeric labels in D2 (keeps natural ordering and the next-number generator
-  # simple); free-form box labels can come later.
-  validates :number, format: { with: /\A\d+\z/ }, allow_blank: true
+  # simple), bounded to bigint so the ordering cast can't overflow.
+  validates :number,
+            numericality: { only_integer: true, greater_than: 0, less_than_or_equal_to: MAX_NUMBER },
+            allow_blank: true
   validates :qr_token, presence: true, uniqueness: true
   validates :status, inclusion: { in: STATUSES }
 

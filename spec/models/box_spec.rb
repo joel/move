@@ -20,6 +20,10 @@ RSpec.describe Box do
       expect(build(:box, number: "A1")).not_to be_valid
     end
 
+    it "rejects a number beyond the bigint range (keeps the ordering cast safe)" do
+      expect(build(:box, number: "9" * 25)).not_to be_valid
+    end
+
     it "enforces number uniqueness within a Move" do
       move = create(:move)
       create(:box, move:, number: "1")

@@ -13,15 +13,18 @@ class BoxesController < ApplicationController
 
   # GET /moves/:move_id/boxes
   def index
+    # Resolve the filter through the Move's own rooms so an unknown or malformed
+    # room_id is treated as a cleared filter, never a stray query.
+    selected_room = @move.rooms.find_by(id: selected_room_id) if selected_room_id
     scope = authorized_scope(@move.boxes).includes(:room)
-    scope = scope.where(room_id: selected_room_id) if selected_room_id
+    scope = scope.where(room: selected_room) if selected_room
 
     render Views::Boxes::Index.new(
       move: @move,
       boxes: scope.ordered,
       rooms: @move.rooms.order(:name),
       summary: move_summary,
-      selected_room_id: selected_room_id
+      selected_room_id: selected_room&.id
     )
   end
 
