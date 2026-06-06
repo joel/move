@@ -13,6 +13,8 @@ class Move < ApplicationRecord
   belongs_to :created_by, class_name: "User"
   has_many :move_memberships, dependent: :destroy
   has_many :users, through: :move_memberships
+  has_many :rooms, dependent: :destroy
+  has_many :boxes, dependent: :destroy
 
   validates :name, presence: true
   validates :status, inclusion: { in: STATUSES }

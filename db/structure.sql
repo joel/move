@@ -41,6 +41,26 @@ CREATE TABLE public.ar_internal_metadata (
 
 
 --
+-- Name: boxes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.boxes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    room_id uuid,
+    number character varying NOT NULL,
+    qr_token character varying NOT NULL,
+    length_cm numeric(8,2),
+    width_cm numeric(8,2),
+    height_cm numeric(8,2),
+    weight_kg numeric(8,2),
+    status character varying DEFAULT 'packing'::character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: move_memberships; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -108,6 +128,19 @@ CREATE TABLE public.posts (
     title character varying,
     body text,
     user_id uuid NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: rooms; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.rooms (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    name character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
@@ -217,6 +250,14 @@ ALTER TABLE ONLY public.ar_internal_metadata
 
 
 --
+-- Name: boxes boxes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.boxes
+    ADD CONSTRAINT boxes_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: move_memberships move_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -254,6 +295,14 @@ ALTER TABLE ONLY public.organizations
 
 ALTER TABLE ONLY public.posts
     ADD CONSTRAINT posts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: rooms rooms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rooms
+    ADD CONSTRAINT rooms_pkey PRIMARY KEY (id);
 
 
 --
@@ -328,6 +377,41 @@ CREATE UNIQUE INDEX idx_omniauth_identities_uniqueness ON public.user_omniauth_i
 
 
 --
+-- Name: index_boxes_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_boxes_on_move_id ON public.boxes USING btree (move_id);
+
+
+--
+-- Name: index_boxes_on_move_id_and_number; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_boxes_on_move_id_and_number ON public.boxes USING btree (move_id, number);
+
+
+--
+-- Name: index_boxes_on_qr_token; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_boxes_on_qr_token ON public.boxes USING btree (qr_token);
+
+
+--
+-- Name: index_boxes_on_room_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_boxes_on_room_id ON public.boxes USING btree (room_id);
+
+
+--
+-- Name: index_boxes_on_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_boxes_on_status ON public.boxes USING btree (status);
+
+
+--
 -- Name: index_move_memberships_on_move_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -398,6 +482,20 @@ CREATE INDEX index_posts_on_user_id ON public.posts USING btree (user_id);
 
 
 --
+-- Name: index_rooms_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_rooms_on_move_id ON public.rooms USING btree (move_id);
+
+
+--
+-- Name: index_rooms_on_move_id_and_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_rooms_on_move_id_and_name ON public.rooms USING btree (move_id, name);
+
+
+--
 -- Name: index_user_omniauth_identities_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -459,6 +557,22 @@ ALTER TABLE ONLY public.organization_memberships
 
 
 --
+-- Name: rooms fk_rails_717ed49701; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rooms
+    ADD CONSTRAINT fk_rails_717ed49701 FOREIGN KEY (move_id) REFERENCES public.moves(id);
+
+
+--
+-- Name: boxes fk_rails_809086bda1; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.boxes
+    ADD CONSTRAINT fk_rails_809086bda1 FOREIGN KEY (move_id) REFERENCES public.moves(id);
+
+
+--
 -- Name: user_omniauth_identities fk_rails_8643d06e22; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -491,6 +605,14 @@ ALTER TABLE ONLY public.user_verification_keys
 
 
 --
+-- Name: boxes fk_rails_d7ba44d4a0; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.boxes
+    ADD CONSTRAINT fk_rails_d7ba44d4a0 FOREIGN KEY (room_id) REFERENCES public.rooms(id);
+
+
+--
 -- Name: user_remember_keys fk_rails_ee6b3c037b; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -505,6 +627,8 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260606120002'),
+('20260606120001'),
 ('20260604200004'),
 ('20260604200003'),
 ('20260604200002'),
