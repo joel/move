@@ -196,6 +196,23 @@ bin/cli mail start
 
 Then use `agent-browser` to verify all pages render without errors. Fix any issues found, commit the fix, and re-run the test suite.
 
+### Step 8b: Update documentation + diagrams (Mandatory for cross-cutting work)
+
+If the change touches **architecture, infrastructure, deployment, tenancy, auth, or
+any cross-cutting flow**, update the project docs **and their visual schemas**
+before pushing (see the project's `AGENTS.md` §7):
+
+- Update `doc/project/` — `architecture.md`, `new-app-recipe.md` (keep setup
+  commands/config copy-paste reproducible), and the gotcha table. Append to the
+  per-effort `doc/phases/<Phase> - Steps.md` flight recorder.
+- Include **visual schemas**, not just prose: **Mermaid** diagrams inline in the
+  markdown (request flows, schema/tenancy, sequence/lifecycle), and an **editable
+  Excalidraw scene** in `doc/project/diagrams/*.excalidraw` for the headline
+  architecture. If an **Excalidraw MCP server** is connected, use it to
+  author/regenerate the scene; otherwise hand-author the `.excalidraw` JSON.
+- Commit docs atomically (markdown-only commits are path-ignored by CI). Record
+  hard-won gotchas in agent memory too.
+
 ### Step 9: Push and Create PR
 
 ```bash
