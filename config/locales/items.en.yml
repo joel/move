@@ -1,0 +1,57 @@
+# D5 — Manual add (B3) and item detail / edit (C3) strings. No customer-facing
+# copy is hard-coded in the Phlex views/components; everything renders through
+# items.*.
+en:
+  items:
+    box: "Box #%{number}"
+    archived: "This move is archived and is read-only."
+    state:
+      pending_review: "Pending review"
+      auto_confirmed: "Auto-confirmed"
+      confirmed: "Confirmed"
+      needs_correction: "Needs review"
+    presence:
+      in_box: "In box"
+      removed: "Removed"
+    new:
+      title: "Add Item Manually"
+      subtitle: "A quick entry — name it, categorise it, and drop it in the box."
+      back: "Back to box"
+      submit: "Add to Box"
+    show:
+      title: "Item Details"
+      back: "Back to box"
+      save: "Save Changes"
+      move: "Move"
+      remove: "Remove"
+      restore: "Restore to box"
+      remove_confirm: "Mark this item as removed from its box?"
+    form:
+      name: "Item name"
+      name_placeholder: "e.g. Espresso Machine"
+      category: "Category"
+      category_blank: "Select a category"
+      quantity: "Quantity"
+      fragile: "Mark as Fragile"
+      tags: "Tags"
+      tags_empty: "No tags yet — tag vocabulary is managed in a later phase."
+      cancel: "Cancel"
+      invalid_category: "Pick a category from the list."
+      invalid_tag: "Pick tags from the list."
+      failed: "Could not save this item."
+      errors:
+        one: "1 error prevented this item from being saved:"
+        other: "%{count} errors prevented this item from being saved:"
+    create:
+      created: "%{name} was added."
+    update:
+      updated: "%{name} was updated."
+    move:
+      moved: "Item moved to box %{number}."
+      same_box: "The item is already in that box."
+      invalid: "That box isn't part of this move."
+      failed: "Could not move the item."
+    mark_removed:
+      removed: "Item marked as removed."
+    restore:
+      restored: "Item restored to its box."
