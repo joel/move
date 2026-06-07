@@ -15,9 +15,14 @@ module RecognitionSuggestions
     private
 
     def persist(suggestion)
+      # For a conflict the linked item is a pre-existing CONFIRMED inventory item
+      # (Process links it instead of duplicating). Ignoring the duplicate detection
+      # must only resolve the suggestion — never remove the real item. Capture this
+      # before the state update flips `conflict?` to false.
+      remove_item = !suggestion.conflict?
       ActiveRecord::Base.transaction do
         suggestion.update!(state: "false_positive")
-        suggestion.item&.update!(presence_state: "removed")
+        suggestion.item&.update!(presence_state: "removed") if remove_item
       end
       Success(suggestion)
     rescue ActiveRecord::RecordInvalid => e
