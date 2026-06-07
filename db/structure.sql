@@ -315,7 +315,8 @@ CREATE TABLE public.tags (
     move_id uuid NOT NULL,
     name character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    applies_to character varying DEFAULT 'item'::character varying NOT NULL
 );
 
 
@@ -691,10 +692,10 @@ CREATE INDEX index_categories_on_move_id ON public.categories USING btree (move_
 
 
 --
--- Name: index_categories_on_move_id_and_name; Type: INDEX; Schema: public; Owner: -
+-- Name: index_categories_on_move_id_and_lower_name; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX index_categories_on_move_id_and_name ON public.categories USING btree (move_id, name);
+CREATE UNIQUE INDEX index_categories_on_move_id_and_lower_name ON public.categories USING btree (move_id, lower((name)::text));
 
 
 --
@@ -908,10 +909,10 @@ CREATE INDEX index_rooms_on_move_id ON public.rooms USING btree (move_id);
 
 
 --
--- Name: index_rooms_on_move_id_and_name; Type: INDEX; Schema: public; Owner: -
+-- Name: index_rooms_on_move_id_and_lower_name; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX index_rooms_on_move_id_and_name ON public.rooms USING btree (move_id, name);
+CREATE UNIQUE INDEX index_rooms_on_move_id_and_lower_name ON public.rooms USING btree (move_id, lower((name)::text));
 
 
 --
@@ -922,10 +923,10 @@ CREATE INDEX index_tags_on_move_id ON public.tags USING btree (move_id);
 
 
 --
--- Name: index_tags_on_move_id_and_name; Type: INDEX; Schema: public; Owner: -
+-- Name: index_tags_on_move_id_and_lower_name; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX index_tags_on_move_id_and_name ON public.tags USING btree (move_id, name);
+CREATE UNIQUE INDEX index_tags_on_move_id_and_lower_name ON public.tags USING btree (move_id, lower((name)::text));
 
 
 --
@@ -1220,6 +1221,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260607130001'),
 ('20260607120004'),
 ('20260607120003'),
 ('20260607120002'),

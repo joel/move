@@ -17,6 +17,19 @@ RSpec.describe Tag do
       create(:tag, move:, name: "Heavy")
       expect(build(:tag, move:, name: "heavy")).not_to be_valid
     end
+
+    it "defaults applies_to to item and rejects unknown values" do
+      expect(create(:tag).applies_to).to eq("item")
+      expect(build(:tag, applies_to: "bogus")).not_to be_valid
+      expect(build(:tag, :both)).to be_valid
+    end
+
+    it "enforces case-insensitive uniqueness at the DB level (bypassing validation)" do
+      move = create(:move)
+      create(:tag, move:, name: "Heavy")
+      dup = build(:tag, move:, name: "heavy")
+      expect { dup.save!(validate: false) }.to raise_error(ActiveRecord::RecordNotUnique)
+    end
   end
 
   it "joins items through item_tags" do

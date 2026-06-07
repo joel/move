@@ -25,4 +25,19 @@ RSpec.describe Move do
       expect(build(:move, :archived)).not_to be_writable
     end
   end
+
+  describe "#admin?" do
+    it "is true only for an admin member" do
+      move = create(:move)
+      admin = create(:user)
+      member = create(:user)
+      create(:move_membership, :admin, move:, user: admin)
+      create(:move_membership, move:, user: member)
+
+      expect(move.admin?(admin)).to be(true)
+      expect(move.admin?(member)).to be(false)
+      expect(move.admin?(create(:user))).to be(false)
+      expect(move.admin?(nil)).to be(false)
+    end
+  end
 end
