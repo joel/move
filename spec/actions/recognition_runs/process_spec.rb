@@ -48,6 +48,19 @@ RSpec.describe RecognitionRuns::Process do
     expect(run.reload.metadata.keys).to contain_exactly("item_count", "provider")
   end
 
+  it "records a conflict (no overwrite, no duplicate) when a confirmed item of the same name exists" do
+    existing = create(:item, :confirmed, move:, box:, name: "Coffee maker", quantity: 5)
+
+    described_class.new.call(run:)
+
+    conflict = run.recognition_suggestions.find_by(proposed_name: "Coffee maker")
+    expect(conflict.state).to eq("conflict")
+    expect(conflict.item).to eq(existing)
+    # The confirmed item is untouched and not duplicated.
+    expect(existing.reload).to have_attributes(quantity: 5, review_state: "confirmed")
+    expect(box.items.where("LOWER(name) = ?", "coffee maker").count).to eq(1)
+  end
+
   it "rolls back all items when a later detection fails to persist" do
     # Second detection's confidence overflows decimal(4,3) → create! raises
     # midway. The transaction must roll back the first item too.
