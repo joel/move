@@ -76,6 +76,17 @@ RSpec.describe "Vocabularies" do
       expect(category.reload.name).to eq("Books")
       expect(response).to redirect_to(move_vocabularies_path(move, "categories"))
     end
+
+    it "re-opens the inline edit form with the error on a failed rename" do
+      category = create(:category, move:, name: "Books")
+
+      patch move_vocabulary_path(move, "categories", category), params: { vocabulary: { name: "" } }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      # The edited row reopens its form showing why the save failed.
+      expect(response.body).to include("can&#39;t be blank").or include("can't be blank")
+      expect(category.reload.name).to eq("Books")
+    end
   end
 
   describe "DELETE /moves/:move_id/vocabularies/:kind/:id" do

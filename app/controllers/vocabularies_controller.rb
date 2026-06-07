@@ -52,8 +52,10 @@ class VocabulariesController < ApplicationController
     case result
     in Dry::Monads::Success(record)
       redirect_to move_vocabularies_path(@move, @vocabulary.kind), notice: t(".updated", name: record.name)
-    in Dry::Monads::Failure(errors)
-      @record.errors.merge!(errors) if errors.respond_to?(:each)
+    in Dry::Monads::Failure
+      # @record already carries the submitted (invalid) attributes + errors from
+      # the failed save; render_index swaps it into the list so the inline edit
+      # form reopens with the error shown.
       @editing = @record.id
       render_index(status: :unprocessable_content)
     end
@@ -81,7 +83,7 @@ class VocabulariesController < ApplicationController
       Views::Vocabularies::Index.new(
         move: @move,
         vocabulary: @vocabulary,
-        records: @vocabulary.records(@move).order(:name),
+        records: records_for_index,
         usage_counts: @vocabulary.usage_counts(@move),
         can_edit: allowed_to?(:create?, @move, with: VocabularyPolicy),
         editing: @editing || params[:edit].presence,
@@ -89,6 +91,16 @@ class VocabulariesController < ApplicationController
       ),
       status: status
     )
+  end
+
+  # The Move's values for this kind. On a failed inline rename, swap the
+  # freshly-loaded copy of the edited record for the in-memory @record so the
+  # row reopens with the submitted value + validation error.
+  def records_for_index
+    records = @vocabulary.records(@move).order(:name).to_a
+    return records unless @record&.errors&.any?
+
+    records.map { |r| r.id == @record.id ? @record : r }
   end
 
   def set_move

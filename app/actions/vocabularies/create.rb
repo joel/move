@@ -15,11 +15,17 @@ module Vocabularies
     private
 
     def persist(move, vocabulary, params)
-      attrs = params.slice(*vocabulary.permitted_params)
-      record = vocabulary.records(move).create!(attrs)
+      record = vocabulary.records(move).new(params.slice(*vocabulary.permitted_params))
+      record.save!
       Success(record)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
+    rescue ActiveRecord::RecordNotUnique
+      # Two admins adding the same name can both pass the model uniqueness check;
+      # the DB lower(name) index catches the loser — surface it as a taken name,
+      # not a 500.
+      record.errors.add(:name, :taken)
+      Failure(record.errors)
     end
 
     def emit_event(record, vocabulary, actor)

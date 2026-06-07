@@ -141,7 +141,11 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     "Heavy" => "both", "Everyday Use" => "item", "Liquid" => "item",
     "Important" => "both", "Fragile" => "box", "Seasonal" => "item"
   }.each do |name, applies_to|
-    move.tags.find_or_create_by!(name: name) { |t| t.applies_to = applies_to }
+    # find_or_initialize + save (not a create-only block) so an existing tag
+    # seeded before D7 also gets its intended facet on re-seed.
+    tag = move.tags.find_or_initialize_by(name: name)
+    tag.applies_to = applies_to
+    tag.save!
   end
   tags = move.tags.index_by(&:name)
   # Rooms already seeded above; add one unused room for the remove demo.

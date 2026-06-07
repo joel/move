@@ -29,6 +29,11 @@ module Vocabularies
       Success(detached)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
+    rescue ActiveRecord::RecordNotUnique
+      # Mirror Create: a concurrent rename to the same name trips the DB
+      # lower(name) index — report a taken name instead of a 500.
+      record.errors.add(:name, :taken)
+      Failure(record.errors)
     end
 
     # Drop a now-box-only tag's item associations (the items survive). Returns the

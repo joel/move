@@ -53,6 +53,21 @@ RSpec.describe Vocabularies::Create do
     expect(result).to be_failure
   end
 
+  it "surfaces a unique-index race as a taken name, not a 500" do
+    vocabulary = Vocabulary.find("categories")
+    relation = move.categories
+    record = build(:category, move:, name: "Books")
+    allow(record).to receive(:save!).and_raise(ActiveRecord::RecordNotUnique)
+    allow(vocabulary).to receive(:records).with(move).and_return(relation)
+    allow(relation).to receive(:new).and_return(record)
+
+    result = described_class.new.call(move:, vocabulary:, params: { name: "Books" }, actor:)
+
+    expect(result).to be_failure
+    expect(result.failure).to be_a(ActiveModel::Errors)
+    expect(result.failure[:name]).to be_present
+  end
+
   it "emits a vocabulary.created event" do
     allow(Rails.event).to receive(:notify)
     vocabulary = Vocabulary.find("rooms")
