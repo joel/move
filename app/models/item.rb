@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
 # An inventory item in exactly one Box (Domain §4.12). Created by recognition
-# (auto_confirmed/pending_review) or manually (D5). Category/tags are deferred to
-# D7. No value, bounding box, or crop fields. Edit/review UIs land in D5/D6.
+# (auto_confirmed/pending_review) or manually (D5). Category + tags are managed,
+# selection-only Move vocabularies (D5); their management UI lands in D7. No
+# value, bounding box, or crop fields. Edit/review UIs land in D5/D6.
 class Item < ApplicationRecord
   CREATED_VIA = %w[recognition manual mcp].freeze
   REVIEW_STATES = %w[pending_review auto_confirmed confirmed needs_correction].freeze
@@ -11,6 +12,11 @@ class Item < ApplicationRecord
   belongs_to :move
   belongs_to :box
   belongs_to :source_media, class_name: "Media", optional: true
+  # Managed Move vocabularies (D5, selection-only; management in D7). Category is
+  # optional; tags are a many-to-many through the item_tags join.
+  belongs_to :category, optional: true
+  has_many :item_tags, dependent: :destroy
+  has_many :tags, through: :item_tags
   # Raw uuid back-reference (no FK; set when materialized from a suggestion).
   # No belongs_to to avoid a circular dependency with RecognitionSuggestion.
 
@@ -23,4 +29,8 @@ class Item < ApplicationRecord
   scope :in_box, -> { where(presence_state: "in_box") }
   scope :pending_review, -> { where(review_state: "pending_review") }
   scope :ordered, -> { order(created_at: :asc) }
+
+  def removed?
+    presence_state == "removed"
+  end
 end

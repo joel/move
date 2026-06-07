@@ -123,7 +123,7 @@ module Views
       def add_item_action
         render Components::Ui::Button.new(
           label: I18n.t("boxes.actions.add_item"), variant: :secondary,
-          full_width: true, disabled: true
+          full_width: true, href: new_move_box_item_path(@move, @box)
         )
       end
 
@@ -180,7 +180,10 @@ module Views
       end
 
       def item_row(item)
-        div(class: "flex items-center justify-between gap-3 p-4") do
+        a(
+          href: move_item_path(@move, item),
+          class: "flex items-center justify-between gap-3 p-4 transition hover:bg-surface-container-high"
+        ) do
           div(class: "flex flex-col gap-1") do
             span(class: "text-body-lg text-text-warm") { item_label(item) }
             span(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.item.fragile") } if item.fragile?

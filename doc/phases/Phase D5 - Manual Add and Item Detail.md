@@ -47,4 +47,6 @@ Deliver lightweight manual item creation and the full item record view/edit, inc
 Recognition-driven review actions keep/correct/false (D6); search behaviour (D8); vocabulary management screens (D7).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.10.0-items`:
+Issue: #56 · Branch: `feature/items` · PR: _pending_ · Verification: `/product-review` (manual add → edit → move → remove → restore; selection-only category/tags; review vs presence axes; viewer/archived cannot mutate) · Release: `v0.10.0-items` _pending_.
+
+Scope note: category + tags built now as minimal Move-scoped, selection-only vocabularies (`Category`/`Tag`/`item_tags`); management UI stays in D7. Activity/history entry point deferred (no audit-feed surface yet). See `Phase D5 - Steps.md`.
