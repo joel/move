@@ -4,12 +4,7 @@
 # (show/update + move/mark_removed/restore, scoped to the Move so the record
 # survives a box-to-box move). Runs inside an Organization tenant schema. Thin:
 # authorize, call the action, pattern-match, render.
-class ItemsController < ApplicationController
-  layout -> { Views::Layouts::AppShellLayout }
-
-  before_action :require_authenticated_user!
-  before_action :require_tenant!
-  before_action :set_move
+class ItemsController < MoveScopedController
   before_action :set_box, only: %i[new create]
   before_action :set_item, only: %i[show update move mark_removed restore]
   before_action :require_writable_move!, only: %i[new create update move mark_removed restore]
@@ -118,12 +113,6 @@ class ItemsController < ApplicationController
     id && @move.recognition_suggestions.find_by(id:)
   end
 
-  def set_move
-    @move = authorized_scope(Move.all).find(params.expect(:move_id))
-  rescue ActiveRecord::RecordNotFound
-    head :not_found
-  end
-
   def set_box
     @box = authorized_scope(@move.boxes).find(params.expect(:box_id))
   rescue ActiveRecord::RecordNotFound
@@ -141,10 +130,6 @@ class ItemsController < ApplicationController
   def vocabulary
     # Box-only tags are excluded from the item picker (applies-to facet).
     { categories: @move.categories.ordered, tags: @move.tags.for_items.ordered }
-  end
-
-  def require_tenant!
-    head :not_found unless current_tenant
   end
 
   def require_writable_move!

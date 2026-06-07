@@ -2,10 +2,9 @@
 
 # A1 — Create / select Move. Runs inside an Organization tenant schema (the
 # subdomain elevator switches Apartment before this controller is reached).
-class MovesController < ApplicationController
-  before_action :require_authenticated_user!
-  before_action :require_tenant!
-
+# Tenant-scoped but not Move-scoped (the collection has no :move_id), so it
+# extends TenantController, not MoveScopedController (keeps the default layout).
+class MovesController < TenantController
   # GET /moves
   def index
     @moves = authorized_scope(Move.all).order(created_at: :desc)
@@ -33,11 +32,6 @@ class MovesController < ApplicationController
   end
 
   private
-
-  # Tenancy is non-disclosing: a Move surface only exists on an org subdomain.
-  def require_tenant!
-    head :not_found unless current_tenant
-  end
 
   def move_params
     params.expect(

@@ -4,12 +4,7 @@
 # the per-suggestion resolution actions (keep / correct / mark_false_positive).
 # Runs inside an Organization tenant schema. Thin: authorize, call the action,
 # advance through the queue.
-class RecognitionSuggestionsController < ApplicationController
-  layout -> { Views::Layouts::AppShellLayout }
-
-  before_action :require_authenticated_user!
-  before_action :require_tenant!
-  before_action :set_move
+class RecognitionSuggestionsController < MoveScopedController
   before_action :set_box
   before_action :set_suggestion, only: %i[show keep correct mark_false_positive]
   before_action :require_writable_move!, only: %i[keep correct mark_false_positive]
@@ -96,12 +91,6 @@ class RecognitionSuggestionsController < ApplicationController
     }
   end
 
-  def set_move
-    @move = authorized_scope(Move.all).find(params.expect(:move_id))
-  rescue ActiveRecord::RecordNotFound
-    head :not_found
-  end
-
   def set_box
     @box = authorized_scope(@move.boxes).find(params.expect(:box_id))
   rescue ActiveRecord::RecordNotFound
@@ -112,10 +101,6 @@ class RecognitionSuggestionsController < ApplicationController
     @suggestion = authorized_scope(@box.recognition_suggestions).find(params.expect(:id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
-  end
-
-  def require_tenant!
-    head :not_found unless current_tenant
   end
 
   def require_writable_move!
