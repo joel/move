@@ -189,6 +189,7 @@ The canonical screen `Capture Image (Dark) - Responsive`
 | A2 | ⚠️ | D2 | ✅ decided | box-name→room, item counts→D5, progress indicator added |
 | B1 | ⚠️ | D3 | ✅ decided | lifecycle buttons added, items→D5 / gallery→D4 placeholders |
 | B2 | ⚠️ | D4 | ✅ decided | file-upload (not live camera), static online pill, retry writable-only |
+| C2 | ⚠️ | D6 | ✅ decided | quantity read-only on review (Keep = accept as-is); tweaks via Correct → C3 edit |
 | E2 | ✅ | D9 | resolved | 4 state screens created (`09263080…`, `8086fa25…`, `de9f2c2a…`, `47000d2e…`) |
 | E3 | ✅ | D10 | resolved | 2 screens created (`8e990c6d…`, `2cb7c29c…`) |
 | F3 | ✅ | D13 | resolved | 3 screens created (`6f780b58…`, `11d53a11…`, `02012642…`) |
