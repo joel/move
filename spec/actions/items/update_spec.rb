@@ -46,4 +46,11 @@ RSpec.describe Items::Update do
   it "returns validation errors for a blank name" do
     expect(call(name: "").failure[:name]).to be_present
   end
+
+  it "rejects a non-integer quantity instead of truncating it" do
+    result = call(name: "X", quantity: "2abc")
+    expect(result).to be_failure
+    expect(result.failure[:quantity]).to be_present
+    expect(item.reload.name).to eq("Old")
+  end
 end

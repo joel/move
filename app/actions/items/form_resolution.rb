@@ -26,10 +26,12 @@ module Items
       tags.size == ids.size ? Success(tags.to_a) : Failure(:invalid_tag)
     end
 
-    # Blank quantity falls back to 1; a present value is cast so the model's
-    # integer/greater-than-0 validation can reject "0" or non-numeric input.
+    # Blank quantity falls back to 1; a present value is passed through UNCAST so
+    # the model's numericality validation (only_integer, greater_than: 0) sees the
+    # raw input and rejects "0", "1.5" or "2abc" instead of silently truncating
+    # it (to_i would turn "1.5" into a persisted 1).
     def coerce_quantity(value)
-      value.blank? ? 1 : value.to_i
+      value.presence || 1
     end
 
     def coerce_fragile(value)

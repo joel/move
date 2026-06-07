@@ -62,6 +62,13 @@ RSpec.describe Items::CreateManual do
     expect(result.failure[:name]).to be_present
   end
 
+  it "rejects a non-integer quantity instead of silently truncating it" do
+    result = call(name: "Glass", quantity: "1.5")
+    expect(result).to be_failure
+    expect(result.failure[:quantity]).to be_present
+    expect(Item.where(name: "Glass")).to be_empty
+  end
+
   it "emits an item.created event" do
     allow(Rails.event).to receive(:notify)
 
