@@ -241,8 +241,13 @@ For features that upload files + process them in the background (e.g. image
 capture → recognition):
 
 1. **Active Storage:** `bin/rails active_storage:install` (UUID PKs land in the
-   tenant template). Media tables are **per-tenant — do NOT add
-   `ActiveStorage::Blob/Attachment` to Apartment `excluded_models`**.
+   tenant template). The `ActiveStorage::Blob/Attachment/VariantRecord` tables are
+   **shared in `public`** — add all three to Apartment `excluded_models` (see the
+   why in step 2). Only the domain **`Media`** table is **per-tenant**; it
+   references the shared blobs/attachments by id. If an app previously wrote
+   Active Storage rows **per-tenant** (models not yet excluded), backfill those
+   rows into `public` before excluding the models, or existing attachments will
+   appear detached (`image.attached? == false`).
 2. **Object storage (SeaweedFS S3):** add `aws-sdk-s3` and a `seaweedfs` service
    in `config/storage.yml` (env-driven `endpoint`/`bucket`/keys,
    `force_path_style: true`). dev/test = Disk; prod = `:seaweedfs`. Serve images
