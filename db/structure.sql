@@ -103,6 +103,32 @@ CREATE TABLE public.boxes (
 
 
 --
+-- Name: categories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.categories (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    name character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: item_tags; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.item_tags (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    item_id uuid NOT NULL,
+    tag_id uuid NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: items; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -120,7 +146,8 @@ CREATE TABLE public.items (
     review_state character varying DEFAULT 'pending_review'::character varying NOT NULL,
     presence_state character varying DEFAULT 'in_box'::character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    category_id uuid
 );
 
 
@@ -280,6 +307,19 @@ CREATE TABLE public.schema_migrations (
 
 
 --
+-- Name: tags; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tags (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    name character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: user_email_auth_keys; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -406,6 +446,22 @@ ALTER TABLE ONLY public.boxes
 
 
 --
+-- Name: categories categories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.categories
+    ADD CONSTRAINT categories_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: item_tags item_tags_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_tags
+    ADD CONSTRAINT item_tags_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: items items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -491,6 +547,14 @@ ALTER TABLE ONLY public.rooms
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: tags tags_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tags
+    ADD CONSTRAINT tags_pkey PRIMARY KEY (id);
 
 
 --
@@ -620,10 +684,52 @@ CREATE INDEX index_boxes_on_status ON public.boxes USING btree (status);
 
 
 --
+-- Name: index_categories_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_categories_on_move_id ON public.categories USING btree (move_id);
+
+
+--
+-- Name: index_categories_on_move_id_and_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_categories_on_move_id_and_name ON public.categories USING btree (move_id, name);
+
+
+--
+-- Name: index_item_tags_on_item_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_item_tags_on_item_id ON public.item_tags USING btree (item_id);
+
+
+--
+-- Name: index_item_tags_on_item_id_and_tag_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_item_tags_on_item_id_and_tag_id ON public.item_tags USING btree (item_id, tag_id);
+
+
+--
+-- Name: index_item_tags_on_tag_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_item_tags_on_tag_id ON public.item_tags USING btree (tag_id);
+
+
+--
 -- Name: index_items_on_box_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_items_on_box_id ON public.items USING btree (box_id);
+
+
+--
+-- Name: index_items_on_category_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_items_on_category_id ON public.items USING btree (category_id);
 
 
 --
@@ -809,6 +915,20 @@ CREATE UNIQUE INDEX index_rooms_on_move_id_and_name ON public.rooms USING btree 
 
 
 --
+-- Name: index_tags_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tags_on_move_id ON public.tags USING btree (move_id);
+
+
+--
+-- Name: index_tags_on_move_id_and_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_tags_on_move_id_and_name ON public.tags USING btree (move_id, name);
+
+
+--
 -- Name: index_user_omniauth_identities_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -827,6 +947,14 @@ CREATE INDEX index_user_webauthn_keys_on_user_id ON public.user_webauthn_keys US
 --
 
 CREATE UNIQUE INDEX index_users_on_email ON public.users USING btree (email) WHERE (status = ANY (ARRAY[1, 2]));
+
+
+--
+-- Name: categories fk_rails_01f841557e; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.categories
+    ADD CONSTRAINT fk_rails_01f841557e FOREIGN KEY (move_id) REFERENCES public.moves(id);
 
 
 --
@@ -875,6 +1003,14 @@ ALTER TABLE ONLY public.recognition_suggestions
 
 ALTER TABLE ONLY public.items
     ADD CONSTRAINT fk_rails_26cde3138d FOREIGN KEY (box_id) REFERENCES public.boxes(id);
+
+
+--
+-- Name: item_tags fk_rails_2774a12fa0; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_tags
+    ADD CONSTRAINT fk_rails_2774a12fa0 FOREIGN KEY (item_id) REFERENCES public.items(id);
 
 
 --
@@ -934,6 +1070,14 @@ ALTER TABLE ONLY public.posts
 
 
 --
+-- Name: tags fk_rails_62c57c7a1f; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tags
+    ADD CONSTRAINT fk_rails_62c57c7a1f FOREIGN KEY (move_id) REFERENCES public.moves(id);
+
+
+--
 -- Name: media fk_rails_6dfa82d09b; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -979,6 +1123,14 @@ ALTER TABLE ONLY public.boxes
 
 ALTER TABLE ONLY public.user_omniauth_identities
     ADD CONSTRAINT fk_rails_8643d06e22 FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: items fk_rails_89fb86dc8b; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.items
+    ADD CONSTRAINT fk_rails_89fb86dc8b FOREIGN KEY (category_id) REFERENCES public.categories(id);
 
 
 --
@@ -1046,6 +1198,14 @@ ALTER TABLE ONLY public.boxes
 
 
 --
+-- Name: item_tags fk_rails_edc62a420c; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_tags
+    ADD CONSTRAINT fk_rails_edc62a420c FOREIGN KEY (tag_id) REFERENCES public.tags(id);
+
+
+--
 -- Name: user_remember_keys fk_rails_ee6b3c037b; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1060,6 +1220,10 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260607120004'),
+('20260607120003'),
+('20260607120002'),
+('20260607120001'),
 ('20260606170315'),
 ('20260606170314'),
 ('20260606170313'),
