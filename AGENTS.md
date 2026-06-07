@@ -130,13 +130,23 @@ The project uses `overcommit`. Commits will fail if the following hooks are not 
 5. Run the **Pre-Commit Validation** (lint + tests) and make atomic commits.
 6. Perform live verification (see **Runtime Test Workflow** / `/product-review`).
 7. Push the branch and open a PR with a summary and test plan (`Closes #<issue>`). Wait for the required `lint` and `test` checks.
-8. Respond to **every** review comment and resolve each conversation (see below).
+8. **Wait for and check the Codex automated review** (see below) — proactively, before declaring the work done. Then respond to **every** review comment (human **and** Codex) and resolve each conversation.
 9. After the PR is merged to `main` (squash), the **production deploy runs automatically** (see **Deployment**).
 10. Tag a release when the change warrants one (see **Release Rules**).
 
 ### PR Review Response Rules
 
-When a PR receives code review comments:
+> **Codex reviews every PR automatically.** `chatgpt-codex-connector[bot]` posts a
+> review **a few minutes after the PR is opened** (and re-runs on new pushes or a
+> `@codex review` comment). **Always proactively wait for and check the Codex
+> review before declaring the work done or handing back — without being asked.**
+> Opening the PR is not the end of the loop; the Codex pass is part of it. Check
+> with `gh api repos/joel/move/pulls/<PR>/reviews` and `.../comments` filtered to
+> `chatgpt-codex-connector[bot]`. If it left inline comments, triage each one
+> below; if it only reacted 👍, note that and proceed. After pushing fixes, Codex
+> re-reviews — re-check before finishing.
+
+When a PR receives code review comments (human **or** Codex):
 
 1. **Read all comments** using `gh api repos/joel/move/pulls/<PR>/comments`.
 2. **Evaluate each comment** — decide whether to act on it, explain why not, or defer to a follow-up issue.

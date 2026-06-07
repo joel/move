@@ -34,6 +34,14 @@ Rails.application.routes.draw do
         patch :restore
       end
     end
+    # D2 — Controlled vocabularies (categories / tags / rooms). One controller
+    # serves all three siblings; the `:kind` segment is constrained to the
+    # registry so an unknown kind 404s at the routing layer.
+    kind = { kind: /categories|tags|rooms/ }
+    get "vocabularies/:kind", to: "vocabularies#index", as: :vocabularies, constraints: kind
+    post "vocabularies/:kind", to: "vocabularies#create", constraints: kind
+    patch "vocabularies/:kind/:id", to: "vocabularies#update", as: :vocabulary, constraints: kind
+    delete "vocabularies/:kind/:id", to: "vocabularies#destroy", constraints: kind
   end
   resources :posts
   resources :users

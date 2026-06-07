@@ -264,9 +264,32 @@ unset GITHUB_TOKEN && gh project item-edit \
   --single-select-option-id <in-review-option-id>
 ```
 
+### Step 10b: Wait for and check the Codex automated review (DO NOT SKIP)
+
+This repo has **Codex** (`chatgpt-codex-connector[bot]`) configured to review every
+PR automatically — it posts a review **a few minutes after the PR is opened** (or
+is re-triggered by pushing new commits / commenting `@codex review`).
+
+**Proactively wait for and check the Codex review before declaring the work done
+or handing back to the user — without being asked.** Opening the PR is not the end
+of the loop; the Codex pass is part of it. The user should never have to say
+"check Codex's comment".
+
+```bash
+# Poll until Codex has reviewed (its review or a 👍 reaction lands ~1–5 min after open).
+unset GITHUB_TOKEN && gh api repos/<owner>/<repo>/pulls/<PR>/reviews \
+  --jq '.[] | select(.user.login=="chatgpt-codex-connector[bot]") | {state, submitted_at}'
+unset GITHUB_TOKEN && gh api repos/<owner>/<repo>/pulls/<PR>/comments \
+  --jq '.[] | select(.user.login=="chatgpt-codex-connector[bot]") | {id, path, line, body}'
+```
+
+If Codex left inline comments, triage every one via Step 11 (fix / explain / defer),
+then reply and resolve. If Codex only reacted 👍 (no comments), note that and proceed.
+After pushing fixes, Codex re-reviews the new commit — re-check before finishing.
+
 ### Step 11: Respond to PR Review Comments
 
-After the PR receives review comments, you **must** respond to every comment and resolve each conversation. Never leave comments unanswered.
+After the PR receives review comments (human **or** Codex), you **must** respond to every comment and resolve each conversation. Never leave comments unanswered.
 
 #### 11a: Read all review comments
 
@@ -378,7 +401,8 @@ unset GITHUB_TOKEN && gh release view <tag> --repo <owner>/<repo> >/dev/null 2>&
 8.  /product-review                                    → Live browser verification
 9.  git push + gh pr create                            → Push and open PR (Closes #N)
 10. gh project item-edit                               → Move to In Review
-11. gh api .../comments (+ log replies in audit log)   → Reply + resolve threads
+10b. wait for + check Codex review (proactively!)      → chatgpt-codex-connector[bot]
+11. gh api .../comments (+ log replies in audit log)   → Reply + resolve threads (human + Codex)
 12. <human rebase-and-merges the PR to main>           → Merge
 13. gh release create (OPTIONAL)                       → Tag main + publish release
 14. gh project item-edit + final summary in audit log  → Move to Done

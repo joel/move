@@ -1,0 +1,72 @@
+# D2 — Controlled vocabularies (Phase D7). Categories, tags and rooms management.
+# No customer-facing copy is hard-coded in the Phlex views — everything renders
+# through vocabularies.*.
+en:
+  vocabularies:
+    tabs_label: "Vocabularies"
+    categories:
+      title: "Manage Categories"
+      subtitle: "Define how items are classified across your move."
+      tab: "Categories"
+      add: "Add category"
+      usage:
+        zero: "No items"
+        one: "1 item"
+        other: "%{count} items"
+      remove_confirm:
+        one: "Remove this category? It is on 1 item, which will be uncategorised."
+        other: "Remove this category? It is on %{count} items, which will be uncategorised."
+      empty_title: "No categories yet"
+      empty_description: "Add a category so items can be classified consistently."
+    tags:
+      title: "Manage Tags"
+      subtitle: "Create labels for items and boxes to keep your inventory organised."
+      tab: "Tags"
+      add: "Add tag"
+      usage:
+        zero: "No items"
+        one: "1 item"
+        other: "%{count} items"
+      remove_confirm:
+        one: "Remove this tag? It is on 1 item, which will keep the item but drop the tag."
+        other: "Remove this tag? It is on %{count} items, which will keep the items but drop the tag."
+      empty_title: "No tags yet"
+      empty_description: "Add a tag to start labelling items and boxes."
+    rooms:
+      title: "Manage Rooms"
+      subtitle: "Name the rooms boxes belong to across your move."
+      tab: "Rooms"
+      add: "Add room"
+      usage:
+        zero: "No boxes"
+        one: "1 box"
+        other: "%{count} boxes"
+      remove_confirm:
+        one: "Remove this room? 1 box is in it, which will lose its room."
+        other: "Remove this room? %{count} boxes are in it, which will lose their room."
+      empty_title: "No rooms yet"
+      empty_description: "Add a room so boxes can be grouped by where they belong."
+    applies_to:
+      item: "Items"
+      box: "Boxes"
+      both: "Both"
+    form:
+      name: "Name"
+      name_placeholder: "e.g. Kitchenware"
+      applies_to: "Applies to"
+      add_submit: "Add"
+      save: "Save"
+      cancel: "Cancel"
+    actions:
+      rename: "Rename %{name}"
+      remove: "Remove %{name}"
+    create:
+      created: "Added “%{name}”."
+    update:
+      updated: "Renamed to “%{name}”."
+    destroy:
+      removed:
+        zero: "Removed “%{name}”."
+        one: "Removed “%{name}” and detached it from 1 record."
+        other: "Removed “%{name}” and detached it from %{count} records."
+      remove_failed: "Could not remove that value. Please try again."

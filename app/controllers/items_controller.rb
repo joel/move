@@ -139,7 +139,8 @@ class ItemsController < ApplicationController
   # The category/tag pickers offer only the Move's managed vocabularies (D5
   # selection-only; management is D7).
   def vocabulary
-    { categories: @move.categories.ordered, tags: @move.tags.ordered }
+    # Box-only tags are excluded from the item picker (applies-to facet).
+    { categories: @move.categories.ordered, tags: @move.tags.for_items.ordered }
   end
 
   def require_tenant!

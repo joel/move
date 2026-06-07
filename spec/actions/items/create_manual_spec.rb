@@ -56,6 +56,14 @@ RSpec.describe Items::CreateManual do
     expect(result.failure).to eq(:invalid_tag)
   end
 
+  it "rejects a box-only tag on an item (applies-to facet)" do
+    box_tag = create(:tag, :box, move:, name: "Sealed")
+    result = call(name: "Glass", tag_ids: [box_tag.id])
+
+    expect(result).to be_failure
+    expect(result.failure).to eq(:invalid_tag)
+  end
+
   it "returns validation errors for a blank name" do
     result = call(name: "")
     expect(result).to be_failure

@@ -22,7 +22,9 @@ module Items
       ids = Array(tag_ids).compact_blank.uniq
       return Success([]) if ids.empty?
 
-      tags = move.tags.where(id: ids)
+      # Box-only tags are not assignable to items (applies-to facet), so a
+      # box-only id is rejected just like an out-of-Move id.
+      tags = move.tags.for_items.where(id: ids)
       tags.size == ids.size ? Success(tags.to_a) : Failure(:invalid_tag)
     end
 

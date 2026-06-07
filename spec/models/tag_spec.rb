@@ -17,6 +17,31 @@ RSpec.describe Tag do
       create(:tag, move:, name: "Heavy")
       expect(build(:tag, move:, name: "heavy")).not_to be_valid
     end
+
+    it "defaults applies_to to item and rejects unknown values" do
+      expect(create(:tag).applies_to).to eq("item")
+      expect(build(:tag, applies_to: "bogus")).not_to be_valid
+      expect(build(:tag, :both)).to be_valid
+    end
+
+    it "enforces case-insensitive uniqueness at the DB level (bypassing validation)" do
+      move = create(:move)
+      create(:tag, move:, name: "Heavy")
+      dup = build(:tag, move:, name: "heavy")
+      expect { dup.save!(validate: false) }.to raise_error(ActiveRecord::RecordNotUnique)
+    end
+  end
+
+  describe ".for_items" do
+    it "includes item and both tags but excludes box-only tags" do
+      move = create(:move)
+      item_tag = create(:tag, move:, name: "Heavy")
+      both_tag = create(:tag, :both, move:, name: "Important")
+      box_tag = create(:tag, :box, move:, name: "Sealed")
+
+      expect(move.tags.for_items).to contain_exactly(item_tag, both_tag)
+      expect(move.tags.for_items).not_to include(box_tag)
+    end
   end
 
   it "joins items through item_tags" do
