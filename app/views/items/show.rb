@@ -101,6 +101,10 @@ module Views
       end
 
       def move_control
+        # A removed item must be restored before it can be moved — hide Move while
+        # removed (the footer shows Restore instead).
+        return if @item.removed?
+
         targets = @boxes.reject { |b| b.id == @item.box_id }
         return if targets.empty?
 

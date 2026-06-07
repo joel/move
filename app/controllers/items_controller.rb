@@ -128,6 +128,7 @@ class ItemsController < ApplicationController
 
   def move_error(reason)
     case reason
+    when :removed then t("items.move.removed_item")
     when :same_box then t("items.move.same_box")
     when :cross_move, :box_missing then t("items.move.invalid")
     else t("items.move.failed")
