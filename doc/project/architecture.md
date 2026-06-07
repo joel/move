@@ -78,6 +78,34 @@ flowchart TB
   because Rodauth shares the AR connection whose search_path Apartment switches,
   and its model-less key tables get cloned (empty) into tenants.
 
+### Migrating tenant schemas on deploy
+
+A new migration must reach **every** existing tenant schema, not just `public` —
+otherwise a tenant frozen at an older schema misses the new table and unqualified
+writes fall through `search_path` to `public`, hitting FK constraints against the
+empty `public` copy (this caused a production `boxes` FK violation — see
+`new-app-recipe.md` §8). ros-apartment migrates tenants by **enhancing the
+`db:migrate` Rake task** (`apartment:migrate` runs after it). `db:prepare` calls
+the migrator *programmatically* and never invokes that Rake task, so the deploy
+entrypoint must run **both**:
+
+```mermaid
+sequenceDiagram
+  participant K as Kamal deploy (bin/docker-entrypoint)
+  participant P as db:prepare
+  participant M as db:migrate (Rake task)
+  participant AP as apartment:migrate (enhancement)
+  K->>P: ./bin/rails db:prepare
+  P->>P: create DB if absent; migrate **public** (programmatic)
+  K->>M: ./bin/rails db:migrate
+  M->>M: migrate public (no-op if current)
+  M->>AP: after-hook (Apartment.db_migrate_tenants)
+  AP->>AP: each tenant → run pending migrations in its schema
+```
+
+New tenants created later via `Apartment::Tenant.create` clone the current full
+`public`, so they start correct; this path keeps **pre-existing** tenants current.
+
 ---
 
 ## 3. Per-request tenant resolution
@@ -121,6 +149,7 @@ subdomain (no redirect loop). The login UI is apex-only; subdomains are post-aut
 | Deterministic dump | `config/initializers/structure_sql.rb` | exclude tenant schemas + normalize search_path |
 | Per-env tenancy | `config/environments/*.rb` | `tenant_zone`, `cookie_domain`, `config.hosts` |
 | Deploy | `config/deploy.yml` | `proxy.ssl: false`, no host, forward_headers; db accessory `postgres:18` at `/var/lib/postgresql` |
+| Boot migration | `bin/docker-entrypoint` | on server start runs `db:prepare && db:migrate`; the `db:migrate` Rake task fires Apartment's `apartment:migrate` so every tenant schema is migrated (§2) |
 | Secrets | `.kamal/secrets` + Doppler `<app>/prd` | synced to GitHub Actions |
 | CI | `.github/workflows/ci.yml` | lint + test; `paths-ignore` for docs (not `[skip ci]`) |
 | Deploy CI | `.github/workflows/deploy.yml` | Kamal on push to `main`; `workflow_dispatch` recovery lever |

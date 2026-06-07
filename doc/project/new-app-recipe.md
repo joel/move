@@ -327,7 +327,8 @@ capture → recognition):
 | Deploy didn't run after merge | `[skip ci]`/marker in squash message | repo squash setting + commit-msg hook (§5) |
 | `pg_dump: server version mismatch` | client 17 vs server 18 | `postgresql-client-18` (§2) |
 | dev seed user in prod | `db:seed` ran on fresh prod DB | guard `db/seeds.rb` against `Rails.env.production?` |
+| `PG::ForeignKeyViolation` writing a tenant table whose FK points at empty `public.X` | deploy ran only `db:prepare`; it migrates `public` programmatically and never fires Apartment's `db:migrate` Rake-task enhancement, so existing tenant schemas stay frozen and unqualified writes fall through `search_path` to `public` | entrypoint runs `db:prepare && db:migrate` (the Rake task → `apartment:migrate`); repair existing prod with `kamal app exec --reuse "bin/rails apartment:migrate"` |
 
 ---
 
-_Last updated: 2026-06-06, after the move-easy.org production cutover._
+_Last updated: 2026-06-07, after fixing per-tenant migration on deploy (issue #52)._
