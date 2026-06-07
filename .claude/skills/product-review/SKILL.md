@@ -63,6 +63,31 @@ agent-browser wait --load networkidle
 
 ## Workflow
 
+### Step 0: Offer a seed reset (ask first — don't auto-run)
+
+When this review is the **hand-off of a finished PR for runtime testing**, ASK
+the user whether to reset the dev seed before verifying (use AskUserQuestion;
+default to *not* resetting). A reset gives a clean, known demo state but wipes
+any data they've been poking at.
+
+Postgres won't `DROP DATABASE` while the app holds open connections, so a reset
+must stop the app (and bounce the DB) first. Canonical command:
+
+```bash
+bin/cli app stop && \
+bin/cli db stop && \
+bin/cli db start && \
+bin/cli app exec bin/rails db:drop db:create db:migrate db:seed db:schema:dump && \
+bin/cli app start
+```
+
+`bin/cli db reset` alone fails here precisely because the running app keeps
+connections open. Leaner variants to consider (verify before relying on them):
+`db:schema:load` instead of `db:migrate` (faster with `schema_format :sql`, and
+then the trailing `db:schema:dump` is unnecessary); or, since Postgres is 18+,
+`DROP DATABASE … WITH (FORCE)` could terminate connections and skip the app
+stop/start. Only run the reset if the user says yes.
+
 ### Step 1: Rebuild and Restart
 
 ```bash
