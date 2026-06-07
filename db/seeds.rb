@@ -119,8 +119,47 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     end
   end
 
+  # --- D5: managed vocabularies + manual / lifecycle items -------------------
+  # Selection-only category + tag vocabulary for this Move (management is D7).
+  categories = %w[Kitchenware Books Electronics Clothing].index_with do |name|
+    move.categories.find_or_create_by!(name: name)
+  end
+  tags = ["Heavy", "Everyday Use", "Liquid", "Important"].index_with do |name|
+    move.tags.find_or_create_by!(name: name)
+  end
+
+  # Manual items spanning the review axis (confirmed / needs_correction) and the
+  # presence axis (in_box / removed), some categorised and tagged. Keyed on name
+  # within a box so re-running never duplicates.
+  manual_items = [
+    { box: "2", name: "Espresso Machine", qty: 1, fragile: true,
+      category: "Electronics", tags: ["Heavy"], review: "confirmed", presence: "in_box" },
+    { box: "2", name: "Dinner Plates", qty: 8, fragile: true,
+      category: "Kitchenware", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
+    { box: "4", name: "Paperback Novels", qty: 12, fragile: false,
+      category: "Books", tags: ["Heavy"], review: "needs_correction", presence: "in_box" },
+    { box: "4", name: "Winter Coat", qty: 1, fragile: false,
+      category: "Clothing", tags: [], review: "confirmed", presence: "removed" }
+  ]
+  manual_items.each do |attrs|
+    box = move.boxes.find_by(number: attrs[:box])
+    next unless box
+
+    item = box.items.find_or_initialize_by(name: attrs[:name])
+    next unless item.new_record?
+
+    item.assign_attributes(
+      move: move, quantity: attrs[:qty], fragile: attrs[:fragile],
+      category: categories[attrs[:category]], created_via: "manual",
+      review_state: attrs[:review], presence_state: attrs[:presence],
+      tags: attrs[:tags].map { |name| tags[name] }
+    )
+    item.save!
+  end
+
   Rails.logger.info(
     "[seeds] #{organization.slug}: #{move.boxes.count} boxes, #{move.rooms.count} rooms, " \
+    "#{move.categories.count} categories, #{move.tags.count} tags, " \
     "#{move.items.count} items, #{move.media.count} media"
   )
 end
