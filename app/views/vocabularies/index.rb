@@ -139,7 +139,9 @@ module Views
       end
 
       # Removing an in-use value warns first (Turbo confirm); an unused value
-      # deletes straight away. Detachment itself happens server-side.
+      # deletes straight away. Detachment itself happens server-side. The confirm
+      # goes on the generated <form> (via `form:`), the canonical place Turbo
+      # gates submission regardless of version.
       def remove_button(record)
         count = @usage_counts[record.id].to_i
         opts = {
@@ -147,7 +149,7 @@ module Views
           class: "#{icon_button_class} hover:text-error",
           aria: { label: I18n.t("vocabularies.actions.remove", name: record.name) }
         }
-        opts[:data] = { turbo_confirm: I18n.t("vocabularies.#{kind}.remove_confirm", count: count) } if count.positive?
+        opts[:form] = { data: { turbo_confirm: I18n.t("vocabularies.#{kind}.remove_confirm", count: count) } } if count.positive?
         button_to(move_vocabulary_path(@move, kind, record), **opts) do
           render Components::Icons::Trash.new(css: "h-5 w-5")
         end

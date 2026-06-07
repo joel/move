@@ -137,6 +137,26 @@ RSpec.describe "Vocabularies" do
     end
   end
 
+  describe "in-use remove confirmation" do
+    it "gates the remove form with a Turbo confirm only when the value is in use" do
+      in_use = create(:category, move:, name: "Books")
+      create(:item, move:, category: in_use)
+
+      get move_vocabularies_path(move, "categories")
+
+      expect(response.body).to include("data-turbo-confirm")
+      expect(response.body).to include("uncategorised") # the in-use confirm copy
+    end
+
+    it "omits the Turbo confirm when nothing is in use" do
+      create(:category, move:, name: "Tools") # no items
+
+      get move_vocabularies_path(move, "categories")
+
+      expect(response.body).not_to include("data-turbo-confirm")
+    end
+  end
+
   describe "membership enforcement on view" do
     it "forbids a signed-in non-member from viewing the surface" do
       stranger = create(:user) # no move_membership for this Move
