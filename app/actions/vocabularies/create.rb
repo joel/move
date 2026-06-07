@@ -1,0 +1,33 @@
+# frozen_string_literal: true
+
+module Vocabularies
+  # Adds a value to one of a Move's managed vocabularies (category / tag / room).
+  # The kind is described by a Vocabulary registry object so one action serves
+  # all three. The caller owns the tenant context and the admin / writable-Move
+  # guard (controller + VocabularyPolicy).
+  class Create < BaseAction
+    def call(move:, vocabulary:, params:, actor:)
+      record = yield persist(move, vocabulary, params)
+      yield emit_event(record, vocabulary, actor)
+      Success(record)
+    end
+
+    private
+
+    def persist(move, vocabulary, params)
+      attrs = params.slice(*vocabulary.permitted_params)
+      record = vocabulary.records(move).create!(attrs)
+      Success(record)
+    rescue ActiveRecord::RecordInvalid => e
+      Failure(e.record.errors)
+    end
+
+    def emit_event(record, vocabulary, actor)
+      Rails.event.notify(
+        "vocabulary.created",
+        kind: vocabulary.kind, record_id: record.id, move_id: record.move_id, actor_id: actor&.id
+      )
+      Success()
+    end
+  end
+end
