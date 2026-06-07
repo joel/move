@@ -34,13 +34,18 @@ RSpec.describe "Recognition review flow" do
     expect(suggestion.item.presence_state).to eq("removed")
   end
 
-  it "routes Correct to the item edit screen" do
+  it "routes Correct to the item edit, then resumes the review on save" do
     suggestion = create(:recognition_suggestion, :with_item, move:, box:, proposed_name: "Kettle")
 
     visit move_box_review_path(move, box, suggestion)
     click_button I18n.t("reviews.actions.correct")
-
     expect(page).to have_text(I18n.t("items.show.title"))
+
+    fill_in "item[name]", with: "Electric Kettle"
+    click_button I18n.t("items.show.save")
+
+    # Back in the review flow (queue empty now), not stranded on the item.
+    expect(page).to have_text(I18n.t("reviews.queue.title"))
     expect(suggestion.reload.state).to eq("corrected")
   end
 end

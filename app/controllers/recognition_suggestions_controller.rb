@@ -44,7 +44,8 @@ class RecognitionSuggestionsController < ApplicationController
 
     case result
     in Dry::Monads::Success(suggestion)
-      redirect_to move_item_path(@move, suggestion.item), notice: t("reviews.flash.correcting")
+      redirect_to move_item_path(@move, suggestion.item, review_box_id: @box.id),
+                  notice: t("reviews.flash.correcting")
     in Dry::Monads::Failure(_)
       advance(alert: t("reviews.flash.cannot_correct"))
     end

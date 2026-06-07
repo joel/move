@@ -53,7 +53,7 @@ RSpec.describe "Recognition review" do
       patch correct_move_box_review_path(move, box, suggestion)
 
       expect(suggestion.reload.state).to eq("corrected")
-      expect(response).to redirect_to(move_item_path(move, suggestion.item))
+      expect(response).to redirect_to(move_item_path(move, suggestion.item, review_box_id: box.id))
     end
   end
 
