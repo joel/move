@@ -25,6 +25,32 @@ RSpec.describe Vocabularies::Update do
     expect(tag.reload.applies_to).to eq("box")
   end
 
+  it "detaches item associations when a tag is narrowed to box-only" do
+    tag = create(:tag, move:, applies_to: "both")
+    item = create(:item, move:)
+    create(:item_tag, item:, tag:)
+    vocabulary = Vocabulary.find("tags")
+
+    result = described_class.new.call(
+      record: tag, vocabulary:, params: { name: tag.name, applies_to: "box" }, actor:
+    )
+
+    expect(result).to be_success
+    expect(item.reload.tags).to be_empty
+    expect(Item.exists?(item.id)).to be(true)
+  end
+
+  it "keeps item associations when a tag stays item-assignable" do
+    tag = create(:tag, move:, applies_to: "item")
+    item = create(:item, move:)
+    create(:item_tag, item:, tag:)
+    vocabulary = Vocabulary.find("tags")
+
+    described_class.new.call(record: tag, vocabulary:, params: { name: "Renamed", applies_to: "both" }, actor:)
+
+    expect(item.reload.tags).to contain_exactly(tag)
+  end
+
   it "returns validation errors for a blank name" do
     room = create(:room, move:)
     vocabulary = Vocabulary.find("rooms")
