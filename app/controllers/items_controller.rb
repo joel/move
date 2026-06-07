@@ -101,9 +101,21 @@ class ItemsController < ApplicationController
     box = review_box
     return redirect_to(move_item_path(@move, item), notice: t(".updated", name: item.name)) unless box
 
+    # Saving the edit is what resolves the suggestion (Correct only navigates here)
+    # — so an abandoned correction leaves it pending in the queue.
+    resolve_corrected_suggestion(item)
     nxt = box.recognition_suggestions.unresolved.by_confidence.first
     target = nxt ? move_box_review_path(@move, box, nxt) : move_box_review_index_path(@move, box)
     redirect_to target, notice: t(".updated", name: item.name)
+  end
+
+  # Mark the item's originating suggestion `corrected` (and the item confirmed),
+  # but only if it is still awaiting review.
+  def resolve_corrected_suggestion(item)
+    suggestion = RecognitionSuggestion.find_by(id: item.source_recognition_suggestion_id)
+    return unless suggestion&.unresolved?
+
+    RecognitionSuggestions::Correct.new.call(suggestion:, actor: current_user)
   end
 
   def review_box

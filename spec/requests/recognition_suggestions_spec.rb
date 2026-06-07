@@ -47,13 +47,35 @@ RSpec.describe "Recognition review" do
   end
 
   describe "PATCH correct" do
-    it "marks corrected and redirects to the item edit" do
+    it "opens the item edit without resolving the suggestion yet" do
       suggestion = create(:recognition_suggestion, :with_item, move:, box:)
 
       patch correct_move_box_review_path(move, box, suggestion)
 
-      expect(suggestion.reload.state).to eq("corrected")
+      # Resolution is deferred to the edit save (#63) — still pending here.
+      expect(suggestion.reload.state).to eq("pending")
       expect(response).to redirect_to(move_item_path(move, suggestion.item, review_box_id: box.id))
+    end
+  end
+
+  describe "guarding already-resolved / auto-accepted suggestions" do
+    it "does not re-resolve an accepted suggestion via keep" do
+      suggestion = create(:recognition_suggestion, :with_item, move:, box:, state: "accepted")
+
+      patch keep_move_box_review_path(move, box, suggestion)
+
+      expect(suggestion.reload.state).to eq("accepted")
+      expect(response).to redirect_to(move_box_review_index_path(move, box))
+    end
+
+    it "does not remove an auto-accepted item via ignore" do
+      suggestion = create(:recognition_suggestion, :with_item, move:, box:, state: "auto_accepted")
+      item = suggestion.item
+
+      patch mark_false_positive_move_box_review_path(move, box, suggestion)
+
+      expect(suggestion.reload.state).to eq("auto_accepted")
+      expect(item.reload.presence_state).to eq("in_box")
     end
   end
 

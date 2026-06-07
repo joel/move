@@ -40,3 +40,4 @@ en:
       cannot_correct: "That suggestion can't be corrected directly."
       ignored: "%{name} marked as a false detection."
       complete: "Review complete — every suggestion has been resolved."
+      already_resolved: "That suggestion has already been reviewed."
