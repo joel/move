@@ -25,6 +25,7 @@ class Box < ApplicationRecord
   belongs_to :room, optional: true
   has_many :media, dependent: :destroy
   has_many :recognition_runs, dependent: :destroy
+  has_many :recognition_suggestions, dependent: :destroy
   has_many :items, dependent: :destroy
 
   # Virtual: the new-box form lets you type a room by name; Boxes::Create

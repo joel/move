@@ -73,6 +73,27 @@ RSpec.describe "Items" do
       expect(item.reload).to have_attributes(name: "New", quantity: 4)
       expect(response).to redirect_to(move_item_path(move, item))
     end
+
+    context "when editing was reached via review Correct (review_box_id)" do
+      it "resumes the review at the next unresolved suggestion" do
+        editing = create(:recognition_suggestion, :with_item, move:, box:, state: "corrected")
+        nxt = create(:recognition_suggestion, :with_item, move:, box:, confidence_score: 0.3)
+
+        patch move_item_path(move, editing.item),
+              params: { item: { name: "Fixed" }, review_box_id: box.id }
+
+        expect(response).to redirect_to(move_box_review_path(move, box, nxt))
+      end
+
+      it "returns to the queue when no suggestions remain" do
+        editing = create(:recognition_suggestion, :with_item, move:, box:, state: "corrected")
+
+        patch move_item_path(move, editing.item),
+              params: { item: { name: "Fixed" }, review_box_id: box.id }
+
+        expect(response).to redirect_to(move_box_review_index_path(move, box))
+      end
+    end
   end
 
   describe "PATCH /moves/:move_id/items/:id/move" do

@@ -15,4 +15,26 @@ class RecognitionSuggestion < ApplicationRecord
   validates :proposed_name, presence: true
   validates :proposed_quantity, numericality: { only_integer: true, greater_than: 0 }
   validates :state, inclusion: { in: STATES }
+
+  # Still needs a human decision in the review queue (D6): a fresh low-confidence
+  # suggestion, or one that conflicts with an already-confirmed item.
+  UNRESOLVED = %w[pending conflict].freeze
+
+  scope :unresolved, -> { where(state: UNRESOLVED) }
+  # Review item-by-item walks lowest-confidence first; NULLs (no score) last.
+  scope :by_confidence, -> { order(Arel.sql("confidence_score ASC NULLS LAST")) }
+
+  def unresolved?
+    UNRESOLVED.include?(state)
+  end
+
+  def conflict?
+    state == "conflict"
+  end
+
+  def confidence_percent
+    return nil if confidence_score.nil?
+
+    (confidence_score * 100).round
+  end
 end

@@ -17,7 +17,8 @@ class ItemsController < ApplicationController
   # GET /moves/:move_id/items/:id
   def show
     render Views::Items::Show.new(
-      move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered, **vocabulary
+      move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
+      review_box_id: review_box&.id, **vocabulary
     )
   end
 
@@ -52,14 +53,15 @@ class ItemsController < ApplicationController
 
     case result
     in Dry::Monads::Success(item)
-      redirect_to move_item_path(@move, item), notice: t(".updated", name: item.name)
+      redirect_after_update(item)
     in Dry::Monads::Failure(Symbol => reason)
       redirect_to move_item_path(@move, @item), alert: vocabulary_error(reason)
     in Dry::Monads::Failure(errors)
       @item.assign_attributes(item_attributes)
       @item.errors.merge!(errors) if errors.respond_to?(:each)
       render Views::Items::Show.new(
-        move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered, **vocabulary
+        move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
+        review_box_id: review_box&.id, **vocabulary
       ), status: :unprocessable_content
     end
   end
@@ -91,6 +93,23 @@ class ItemsController < ApplicationController
   end
 
   private
+
+  # An edit reached via review "Correct" carries review_box_id; saving resumes the
+  # review at the next unresolved suggestion (or the queue when none remain),
+  # instead of dead-ending on the item detail.
+  def redirect_after_update(item)
+    box = review_box
+    return redirect_to(move_item_path(@move, item), notice: t(".updated", name: item.name)) unless box
+
+    nxt = box.recognition_suggestions.unresolved.by_confidence.first
+    target = nxt ? move_box_review_path(@move, box, nxt) : move_box_review_index_path(@move, box)
+    redirect_to target, notice: t(".updated", name: item.name)
+  end
+
+  def review_box
+    id = params[:review_box_id].presence
+    id && @move.boxes.find_by(id:)
+  end
 
   def set_move
     @move = authorized_scope(Move.all).find(params.expect(:move_id))

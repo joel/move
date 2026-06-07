@@ -46,4 +46,6 @@ Deliver the review experience that resolves uncertain recognition suggestions �
 Search ranking (D8), vocabulary management (D7), unpacking (D10).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.11.0-review`:
+Issue: #61 · Branch: `feature/review` · PR: _pending_ · Verification: `/product-review` (walk a box queue → keep / correct / ignore; conflict surfaced + no overwrite; false leaves inventory) · Release: `v0.11.0-review` _pending_.
+
+Scope notes: activity feed = `Rails.event` only, persistent feed deferred (not in D6 acceptance/screens); C2 quantity read-only (tweaks via Correct → C3) — see `DESIGN-DISCREPANCIES.md` and `Phase D6 - Steps.md`.

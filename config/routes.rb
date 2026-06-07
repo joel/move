@@ -10,6 +10,15 @@ Rails.application.routes.draw do
       member { patch :transition }
       # B3 — Manual add item (scoped to the box it lands in).
       resources :items, only: %i[new create]
+      # C1/C2 — Review flow: queue (index) + item-by-item (show) + per-suggestion
+      # actions, scoped to the box being finalized.
+      resources :recognition_suggestions, only: %i[index show], path: "review", as: :review do
+        member do
+          patch :keep
+          patch :correct
+          patch :mark_false_positive
+        end
+      end
       # B2 — Capture image & recognition. `session` is the polled session panel.
       get "capture", to: "captures#show", as: :capture
       post "capture", to: "captures#create"

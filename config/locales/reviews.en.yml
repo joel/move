@@ -1,0 +1,42 @@
+# D6 — Review flow (C1 queue + C2 item-by-item). No customer-facing copy is
+# hard-coded in the Phlex views; everything renders through reviews.*.
+en:
+  reviews:
+    queue:
+      back: "Back to Box #%{number}"
+      title: "Review Suggestions"
+      subtitle: "We've identified items from your scan. Review and confirm to finalize Box #%{number}."
+      start: "Start Review"
+      heading: "Queue"
+      showing:
+        one: "Showing 1 item"
+        other: "Showing %{count} items"
+      items:
+        one: "1 item"
+        other: "%{count} items"
+      stats:
+        pending: "Pending review"
+        needs_correction: "Needs correction"
+        auto_confirmed: "Auto-confirmed"
+      empty_title: "Nothing to review"
+      empty_description: "Every suggestion in this box has been resolved."
+    item:
+      progress: "Item %{position} of %{total}"
+      confidence: "%{percent}% confidence"
+      fragile: "Fragile"
+      quantity: "Quantity"
+      ignore_confirm: "Mark this detection as a false positive? It will leave the box inventory."
+    actions:
+      keep: "Keep"
+      correct: "Correct"
+      ignore: "Ignore"
+    confidence:
+      high: "High confidence"
+      low: "Low confidence"
+      unknown: "Unrated"
+    flash:
+      kept: "Kept %{name}."
+      correcting: "Edit the item, then save your changes."
+      cannot_correct: "That suggestion can't be corrected directly."
+      ignored: "%{name} marked as a false detection."
+      complete: "Review complete — every suggestion has been resolved."

@@ -157,10 +157,69 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     item.save!
   end
 
+  # --- D6: a review-ready box — pending suggestions across confidence bands and
+  # a conflict (confirmed item + a late detection of the same name) so the review
+  # queue (C1) and item-by-item (C2) are showcase-ready. Idempotent by name.
+  review_box = move.boxes.find_by(number: "1")
+  run = review_box&.recognition_runs&.first
+  review_media = review_box&.media&.first
+  if run && review_media
+    [
+      ["Table lamp", 0.55],
+      ["Picture frame", 0.41],
+      ["Throw blanket", 0.68],
+      ["Cast-iron skillet", 0.91],
+      ["Decorative vase", 0.47],
+      ["Wall Art", 0.53],
+      ["Floor Lamp", 0.62],
+      ["Area Rug", 0.58],
+      ["Decorative Pillow", 0.49],
+      ["Bookshelf", 0.44],
+      ["Coffee Table", 0.52],
+      ["Curtains", 0.39],
+      ["Decorative Bowl", 0.46],
+      ["Table Runner", 0.43],
+      ["Wall Mirror", 0.57],
+      ["Decorative Tray", 0.48],
+      ["Floor Vase", 0.51],
+      ["Throw Pillow", 0.45],
+      ["Decorative Lantern", 0.42],
+      ["Wall Clock", 0.54]
+    ].each do |name, conf|
+      next if review_box.recognition_suggestions.exists?(proposed_name: name)
+
+      suggestion = run.recognition_suggestions.create!(
+        move: move, box: review_box, media: review_media, proposed_name: name,
+        proposed_quantity: 1, confidence_score: conf, state: "pending"
+      )
+      item = review_box.items.create!(
+        move: move, source_media: review_media, source_recognition_suggestion_id: suggestion.id,
+        name: name, quantity: 1, confidence_score: conf, created_via: "recognition",
+        review_state: "pending_review"
+      )
+      suggestion.update!(item: item)
+    end
+
+    unless review_box.recognition_suggestions.exists?(state: "conflict")
+      confirmed = review_box.items.find_or_create_by!(name: "Cast-iron skillet") do |record|
+        record.move = move
+        record.quantity = 1
+        record.created_via = "manual"
+        record.review_state = "confirmed"
+      end
+      run.recognition_suggestions.create!(
+        move: move, box: review_box, media: review_media, item: confirmed,
+        proposed_name: "Cast-iron skillet", proposed_quantity: 1,
+        confidence_score: 0.91, state: "conflict"
+      )
+    end
+  end
+
   Rails.logger.info(
     "[seeds] #{organization.slug}: #{move.boxes.count} boxes, #{move.rooms.count} rooms, " \
     "#{move.categories.count} categories, #{move.tags.count} tags, " \
-    "#{move.items.count} items, #{move.media.count} media"
+    "#{move.items.count} items, #{move.media.count} media, " \
+    "#{move.recognition_suggestions.unresolved.count} to review"
   )
 end
 

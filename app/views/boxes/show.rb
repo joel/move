@@ -167,8 +167,11 @@ module Views
         end
       end
 
+      # Links into the D6 review queue (C1) for this box.
       def pending_badge
-        span(class: "rounded-full bg-tertiary/15 px-3 py-1 text-label-caps uppercase text-tertiary") do
+        a(href: move_box_review_index_path(@move, @box),
+          class: "rounded-full bg-tertiary/15 px-3 py-1 text-label-caps uppercase " \
+                 "text-tertiary transition hover:bg-tertiary/25") do
           I18n.t("boxes.show.pending_review", count: pending_count)
         end
       end
