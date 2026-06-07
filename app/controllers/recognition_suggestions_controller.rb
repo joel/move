@@ -40,12 +40,12 @@ class RecognitionSuggestionsController < ApplicationController
   end
 
   # PATCH .../review/:id/correct — open the C3 item edit prefilled. The suggestion
-  # stays unresolved until the edit is *saved* (ItemsController#update resolves it
-  # via the review_box_id context), so abandoning the edit leaves it in the queue.
+  # stays unresolved until the edit is *saved* (ItemsController#update resolves the
+  # carried review_suggestion_id), so abandoning the edit leaves it in the queue.
   def correct
     return advance(alert: t("reviews.flash.cannot_correct")) if @suggestion.item.nil?
 
-    redirect_to move_item_path(@move, @suggestion.item, review_box_id: @box.id),
+    redirect_to move_item_path(@move, @suggestion.item, review_suggestion_id: @suggestion.id),
                 notice: t("reviews.flash.correcting")
   end
 

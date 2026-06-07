@@ -9,15 +9,15 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::FormWith
 
-      def initialize(move:, item:, boxes:, categories:, tags:, review_box_id: nil)
+      def initialize(move:, item:, boxes:, categories:, tags:, review_suggestion: nil)
         @move = move
         @item = item
         @boxes = boxes
         @categories = categories
         @tags = tags
-        # When the edit was reached via review "Correct", saving returns to the
-        # queue for this box rather than the item detail.
-        @review_box_id = review_box_id
+        # When the edit was reached via review "Correct", saving resolves this
+        # suggestion and resumes the review rather than dead-ending on the item.
+        @review_suggestion = review_suggestion
       end
 
       def view_template
@@ -32,8 +32,8 @@ module Views
       private
 
       def back_link
-        href = @review_box_id ? move_box_review_index_path(@move, @review_box_id) : move_box_path(@move, @item.box)
-        label = @review_box_id ? I18n.t("items.show.back_to_review") : I18n.t("items.show.back")
+        href = @review_suggestion ? move_box_review_index_path(@move, @review_suggestion.box) : move_box_path(@move, @item.box)
+        label = @review_suggestion ? I18n.t("items.show.back_to_review") : I18n.t("items.show.back")
         a(
           href: href,
           class: "inline-flex items-center gap-2 text-label-caps uppercase text-muted hover:text-text-warm"
@@ -95,7 +95,7 @@ module Views
             render Components::ItemForm.new(
               models: [@move, @item], item: @item,
               categories: @categories, tags: @tags,
-              submit_label: I18n.t("items.show.save"), review_box_id: @review_box_id
+              submit_label: I18n.t("items.show.save"), review_suggestion_id: @review_suggestion&.id
             )
             div(class: "mt-2 flex flex-wrap items-center gap-3 border-t border-card-border pt-5") do
               move_control

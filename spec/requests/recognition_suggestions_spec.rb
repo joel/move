@@ -54,7 +54,7 @@ RSpec.describe "Recognition review" do
 
       # Resolution is deferred to the edit save (#63) — still pending here.
       expect(suggestion.reload.state).to eq("pending")
-      expect(response).to redirect_to(move_item_path(move, suggestion.item, review_box_id: box.id))
+      expect(response).to redirect_to(move_item_path(move, suggestion.item, review_suggestion_id: suggestion.id))
     end
   end
 

@@ -18,7 +18,7 @@ class ItemsController < ApplicationController
   def show
     render Views::Items::Show.new(
       move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-      review_box_id: review_box&.id, **vocabulary
+      review_suggestion: review_suggestion, **vocabulary
     )
   end
 
@@ -61,7 +61,7 @@ class ItemsController < ApplicationController
       @item.errors.merge!(errors) if errors.respond_to?(:each)
       render Views::Items::Show.new(
         move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-        review_box_id: review_box&.id, **vocabulary
+        review_suggestion: review_suggestion, **vocabulary
       ), status: :unprocessable_content
     end
   end
@@ -94,33 +94,28 @@ class ItemsController < ApplicationController
 
   private
 
-  # An edit reached via review "Correct" carries review_box_id; saving resumes the
-  # review at the next unresolved suggestion (or the queue when none remain),
-  # instead of dead-ending on the item detail.
+  # An edit reached via review "Correct" carries review_suggestion_id; saving
+  # resolves *that* suggestion (works for conflicts too, whose linked item points
+  # at a different originating suggestion) and resumes the review at the next
+  # unresolved suggestion in its box (or the queue when none remain).
   def redirect_after_update(item)
-    box = review_box
-    return redirect_to(move_item_path(@move, item), notice: t(".updated", name: item.name)) unless box
+    suggestion = review_suggestion
+    return redirect_to(move_item_path(@move, item), notice: t(".updated", name: item.name)) unless suggestion
 
     # Saving the edit is what resolves the suggestion (Correct only navigates here)
     # — so an abandoned correction leaves it pending in the queue.
-    resolve_corrected_suggestion(item)
+    RecognitionSuggestions::Correct.new.call(suggestion:, actor: current_user) if suggestion.unresolved?
+    box = suggestion.box
     nxt = box.recognition_suggestions.unresolved.by_confidence.first
     target = nxt ? move_box_review_path(@move, box, nxt) : move_box_review_index_path(@move, box)
     redirect_to target, notice: t(".updated", name: item.name)
   end
 
-  # Mark the item's originating suggestion `corrected` (and the item confirmed),
-  # but only if it is still awaiting review.
-  def resolve_corrected_suggestion(item)
-    suggestion = RecognitionSuggestion.find_by(id: item.source_recognition_suggestion_id)
-    return unless suggestion&.unresolved?
-
-    RecognitionSuggestions::Correct.new.call(suggestion:, actor: current_user)
-  end
-
-  def review_box
-    id = params[:review_box_id].presence
-    id && @move.boxes.find_by(id:)
+  # The specific suggestion being reviewed (carried through the edit), scoped to
+  # the tenant's Move. nil for an ordinary item edit (no review context).
+  def review_suggestion
+    id = params[:review_suggestion_id].presence
+    id && @move.recognition_suggestions.find_by(id:)
   end
 
   def set_move
