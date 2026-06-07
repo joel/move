@@ -164,7 +164,28 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   run = review_box&.recognition_runs&.first
   review_media = review_box&.media&.first
   if run && review_media
-    [["Table lamp", 0.55], ["Picture frame", 0.41], ["Throw blanket", 0.68]].each do |name, conf|
+    [
+      ["Table lamp", 0.55],
+      ["Picture frame", 0.41],
+      ["Throw blanket", 0.68],
+      ["Cast-iron skillet", 0.91],
+      ["Decorative vase", 0.47],
+      ["Wall Art", 0.53],
+      ["Floor Lamp", 0.62],
+      ["Area Rug", 0.58],
+      ["Decorative Pillow", 0.49],
+      ["Bookshelf", 0.44],
+      ["Coffee Table", 0.52],
+      ["Curtains", 0.39],
+      ["Decorative Bowl", 0.46],
+      ["Table Runner", 0.43],
+      ["Wall Mirror", 0.57],
+      ["Decorative Tray", 0.48],
+      ["Floor Vase", 0.51],
+      ["Throw Pillow", 0.45],
+      ["Decorative Lantern", 0.42],
+      ["Wall Clock", 0.54]
+    ].each do |name, conf|
       next if review_box.recognition_suggestions.exists?(proposed_name: name)
 
       suggestion = run.recognition_suggestions.create!(
