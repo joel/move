@@ -61,4 +61,11 @@ existing `capture` routes) nests correctly under `/moves/:move_id/`.
 - System suite (`rack_test`): `27 examples, 0 failures` (+ vocab management spec).
 - Lint (RuboCop) + Brakeman (`0 warnings`) green.
 - Seeds run twice — idempotent (5 rooms, 5 categories, 6 tags).
-- Live `/product-review`: _to fill_.
+- Live `/product-review` (admin demo@example.com on `acme`): all three surfaces
+  render to the Stitch design (sidebar, header, kind-tinted sibling tabs, add
+  form, medallion rows with usage meta); tags show applies-to chips + select;
+  add / inline-rename / remove all work with flashes; unused remove deletes with
+  no confirm, in-use remove shows the pluralized Turbo confirm and detaches the
+  boxes (Bedroom → 2 boxes nullified). Member (member@example.com) sees the list
+  read-only — no add form, 0 edit/remove affordances. Mobile 393×852: no
+  overflow, bottom tab bar. No Bullet N+1, no runtime errors.
