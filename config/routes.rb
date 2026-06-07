@@ -8,11 +8,22 @@ Rails.application.routes.draw do
     # B1 — Box detail & lifecycle.
     resources :boxes, only: %i[index new create show edit update] do
       member { patch :transition }
+      # B3 — Manual add item (scoped to the box it lands in).
+      resources :items, only: %i[new create]
       # B2 — Capture image & recognition. `session` is the polled session panel.
       get "capture", to: "captures#show", as: :capture
       post "capture", to: "captures#create"
       get "capture/session", to: "captures#session_panel", as: :capture_session
       post "capture/retry", to: "captures#retry_recognition", as: :capture_retry
+    end
+    # C3 — Item detail / edit. Scoped to the Move (not the box) so the record
+    # survives a box-to-box move; presence/box changes via member actions.
+    resources :items, only: %i[show update] do
+      member do
+        patch :move
+        patch :mark_removed
+        patch :restore
+      end
     end
   end
   resources :posts
