@@ -17,4 +17,8 @@ class Tag < ApplicationRecord
   validates :applies_to, inclusion: { in: APPLIES_TO }
 
   scope :ordered, -> { order(:name) }
+  # Tags assignable to items. Box-only tags are excluded — the applies-to facet
+  # governs which records can carry a tag, and box tagging is not built yet
+  # (D7). Item pickers and item tag resolution scope through this.
+  scope :for_items, -> { where(applies_to: %w[item both]) }
 end

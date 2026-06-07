@@ -32,6 +32,18 @@ RSpec.describe Tag do
     end
   end
 
+  describe ".for_items" do
+    it "includes item and both tags but excludes box-only tags" do
+      move = create(:move)
+      item_tag = create(:tag, move:, name: "Heavy")
+      both_tag = create(:tag, :both, move:, name: "Important")
+      box_tag = create(:tag, :box, move:, name: "Sealed")
+
+      expect(move.tags.for_items).to contain_exactly(item_tag, both_tag)
+      expect(move.tags.for_items).not_to include(box_tag)
+    end
+  end
+
   it "joins items through item_tags" do
     tag = create(:tag)
     item = create(:item, move: tag.move)
