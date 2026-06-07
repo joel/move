@@ -2,7 +2,13 @@
 
 # If running the rails server then create or migrate existing database
 if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
-  ./bin/rails db:prepare
+  # db:prepare creates the DB and migrates the `public` schema, but it calls the
+  # migrator programmatically and so does NOT invoke the `db:migrate` Rake task.
+  # ros-apartment only migrates tenant schemas by enhancing that Rake task, so
+  # db:prepare alone leaves existing tenants frozen at their creation-time schema.
+  # Running `db:migrate` afterwards fires Apartment's enhancement (apartment:migrate),
+  # bringing every tenant schema up to date on each deploy. See issue #52.
+  ./bin/rails db:prepare && ./bin/rails db:migrate
 fi
 
 exec "${@}"
