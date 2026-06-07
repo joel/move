@@ -12,10 +12,19 @@ class VocabularyPolicy < ApplicationPolicy
   end
 
   def manage?
-    user.present? && record.admin?(user) && record.writable?
+    user.present? && admin_member? && record.writable?
   end
 
   alias create? manage?
   alias update? manage?
   alias destroy? manage?
+
+  private
+
+  # Vocabulary management is admin-only. The role rule lives in the policy
+  # (authorization layer), not on the Move model, per AGENTS.md §2 — the
+  # contributor/viewer split (D11) refines it here. Roles are admin/member today.
+  def admin_member?
+    record.move_memberships.exists?(user_id: user.id, role: "admin")
+  end
 end

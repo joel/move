@@ -33,12 +33,4 @@ class Move < ApplicationRecord
   def writable?
     !archived?
   end
-
-  # Whether the user is an admin member of this Move (D7 vocabulary management is
-  # admin-only). Roles are admin/member today; contributor/viewer arrive in D11.
-  def admin?(user)
-    return false if user.nil?
-
-    move_memberships.exists?(user_id: user.id, role: "admin")
-  end
 end
