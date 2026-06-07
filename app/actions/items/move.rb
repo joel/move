@@ -16,6 +16,10 @@ module Items
     private
 
     def validate(item, target_box)
+      # A removed item isn't in any box — restore it before moving (presence and
+      # box are independent axes; "moving" a removed item would silently leave it
+      # removed and absent from every inventory).
+      return Failure(:removed) if item.removed?
       return Failure(:box_missing) if target_box.nil?
       return Failure(:same_box) if target_box.id == item.box_id
       return Failure(:cross_move) if target_box.move_id != item.move_id

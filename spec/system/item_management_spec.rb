@@ -52,6 +52,17 @@ RSpec.describe "Manual add & item detail" do
     expect(item.presence_state).to eq("in_box")
   end
 
+  it "hides the Move control once an item is removed" do
+    create(:box, move:, number: "2", room: kitchen)
+    item = create(:item, :manual, move:, box: source)
+
+    visit move_item_path(move, item)
+    expect(page).to have_button(I18n.t("items.show.move"))
+
+    click_button I18n.t("items.show.remove")
+    expect(page).to have_no_button(I18n.t("items.show.move"))
+  end
+
   it "removes then restores an item (presence axis)" do
     item = create(:item, :manual, move:, box: source)
 

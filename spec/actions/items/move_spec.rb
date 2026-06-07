@@ -31,4 +31,14 @@ RSpec.describe Items::Move do
   it "rejects a nil target box" do
     expect(described_class.new.call(item:, target_box: nil, mover:).failure).to eq(:box_missing)
   end
+
+  it "refuses to move a removed item (restore first)" do
+    item.update!(presence_state: "removed")
+
+    result = described_class.new.call(item:, target_box: target, mover:)
+
+    expect(result.failure).to eq(:removed)
+    expect(item.reload.box).to eq(source)
+    expect(item.presence_state).to eq("removed")
+  end
 end
