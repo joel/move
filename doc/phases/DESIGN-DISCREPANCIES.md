@@ -150,6 +150,32 @@ The canonical screen `Capture Image (Dark) - Responsive`
 
 ---
 
+## ⚠️ §D2 — "Manage categories / tags / rooms" screens — non-blocking decisions (D7)
+
+The canonical screens `Manage Categories/Tags/Rooms (Dark) - Responsive`
+(`screens/925ac259…`, `5ba9c352…`, `fab5b7b3…`) were implemented in Phase D7 as
+three sibling surfaces from **one** controller + view (kind registry).
+
+- **Dark-only in Stitch.** Rendered light from the Refined-Palette tokens, per
+  §CAPTURE-LIGHT / §PALETTE.
+- **Per-row Material Symbol icons → one medallion per kind.** The mockups give
+  each value a bespoke glyph (kitchen/devices/bed…); our data model has no
+  per-value icon, so each kind uses a single medallion (category grid / tag /
+  boxes) tinted via `Ui::Chip` kinds (sage rooms · terracotta tags · neutral
+  categories), satisfying "chips distinguish kinds".
+- **Search / filter controls omitted.** The mockups show a search box and an
+  applies-to filter tab row; search over vocab names is **D8** (phase §8 out of
+  scope). The applies-to facet is still shown on each tag row. Sibling tabs
+  (Categories | Tags | Rooms) replace the filter row for navigation.
+- **No JS for add/rename.** Add is an always-visible form card; rename is an
+  inline form via `?edit=<id>` (server-rendered, no Stimulus). Remove uses a
+  Turbo `data-turbo-confirm` only when the value is in use.
+- **Entry point deferred to D13.** The shared sidebar/bottom-nav "Settings/Menu"
+  destination is still a stub (§NAV; routes land in D13). For D7 the surfaces are
+  reached by URL and cross-link via the sibling tabs. **Status: ⚠️ decided.**
+
+---
+
 ## ⚠️ §PALETTE — Two colour systems coexist
 
 - **Observation:** `designTheme` exposes a full Material-3 token set **and** a "Refined Palette" (`page-dark #2A2822`, `card-dark #34312A`, `page-light #F2ECE1`, `card-light #FAF6EF`, `accent-sage-dark #9FB089`). Many newer screens carry a `… - Refined Palette` variant; the design-system prose references the Refined Palette values directly.
@@ -190,6 +216,7 @@ The canonical screen `Capture Image (Dark) - Responsive`
 | B1 | ⚠️ | D3 | ✅ decided | lifecycle buttons added, items→D5 / gallery→D4 placeholders |
 | B2 | ⚠️ | D4 | ✅ decided | file-upload (not live camera), static online pill, retry writable-only |
 | C2 | ⚠️ | D6 | ✅ decided | quantity read-only on review (Keep = accept as-is); tweaks via Correct → C3 edit |
+| D2 | ⚠️ | D7 | ✅ decided | one medallion/kind, search→D8, no-JS add/rename, entry point→D13 |
 | E2 | ✅ | D9 | resolved | 4 state screens created (`09263080…`, `8086fa25…`, `de9f2c2a…`, `47000d2e…`) |
 | E3 | ✅ | D10 | resolved | 2 screens created (`8e990c6d…`, `2cb7c29c…`) |
 | F3 | ✅ | D13 | resolved | 3 screens created (`6f780b58…`, `11d53a11…`, `02012642…`) |
