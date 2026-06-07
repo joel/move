@@ -13,6 +13,7 @@ class RecognitionSuggestionsController < ApplicationController
   before_action :set_box
   before_action :set_suggestion, only: %i[show keep correct mark_false_positive]
   before_action :require_writable_move!, only: %i[keep correct mark_false_positive]
+  before_action :require_unresolved!, only: %i[keep correct mark_false_positive]
 
   # GET /moves/:move_id/boxes/:box_id/review
   def index
@@ -38,17 +39,14 @@ class RecognitionSuggestionsController < ApplicationController
     advance(notice: t("reviews.flash.kept", name: @suggestion.proposed_name))
   end
 
-  # PATCH .../review/:id/correct — confirm, then open the C3 item edit prefilled.
+  # PATCH .../review/:id/correct — open the C3 item edit prefilled. The suggestion
+  # stays unresolved until the edit is *saved* (ItemsController#update resolves the
+  # carried review_suggestion_id), so abandoning the edit leaves it in the queue.
   def correct
-    result = RecognitionSuggestions::Correct.new.call(suggestion: @suggestion, actor: current_user)
+    return advance(alert: t("reviews.flash.cannot_correct")) if @suggestion.item.nil?
 
-    case result
-    in Dry::Monads::Success(suggestion)
-      redirect_to move_item_path(@move, suggestion.item, review_box_id: @box.id),
-                  notice: t("reviews.flash.correcting")
-    in Dry::Monads::Failure(_)
-      advance(alert: t("reviews.flash.cannot_correct"))
-    end
+    redirect_to move_item_path(@move, @suggestion.item, review_suggestion_id: @suggestion.id),
+                notice: t("reviews.flash.correcting")
   end
 
   # PATCH .../review/:id/mark_false_positive
@@ -87,8 +85,10 @@ class RecognitionSuggestionsController < ApplicationController
     @reviewable_total ||= @box.recognition_suggestions.where.not(state: "auto_accepted").count
   end
 
+  # Only items still in the box count toward review summaries — a false-positive
+  # that was removed must not linger as "pending".
   def review_counts
-    items = @box.items
+    items = @box.items.in_box
     {
       pending: items.where(review_state: "pending_review").count,
       needs_correction: items.where(review_state: "needs_correction").count,
@@ -122,5 +122,15 @@ class RecognitionSuggestionsController < ApplicationController
     return if @move.writable?
 
     redirect_to move_box_review_index_path(@move, @box), alert: t("items.archived")
+  end
+
+  # Resolution actions only apply to unresolved (pending/conflict) suggestions —
+  # a stale page, back-button resubmit, or crafted URL must not reclassify an
+  # already-resolved or auto-accepted suggestion (e.g. remove an auto-confirmed
+  # item via the ignore endpoint).
+  def require_unresolved!
+    return if @suggestion.unresolved?
+
+    redirect_to move_box_review_index_path(@move, @box), notice: t("reviews.flash.already_resolved")
   end
 end

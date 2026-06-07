@@ -26,5 +26,13 @@ RSpec.describe Item do
       expect(box.item_count).to eq(2)
       expect(box.pending_review_count).to eq(1)
     end
+
+    it "excludes removed items from pending_review (e.g. ignored false-positives)" do
+      box = create(:box)
+      kept = create(:item, move: box.move, box:, review_state: "pending_review")
+      create(:item, move: box.move, box:, review_state: "pending_review", presence_state: "removed")
+
+      expect(box.items.pending_review).to contain_exactly(kept)
+    end
   end
 end

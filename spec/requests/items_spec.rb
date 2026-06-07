@@ -74,23 +74,37 @@ RSpec.describe "Items" do
       expect(response).to redirect_to(move_item_path(move, item))
     end
 
-    context "when editing was reached via review Correct (review_box_id)" do
-      it "resumes the review at the next unresolved suggestion" do
-        editing = create(:recognition_suggestion, :with_item, move:, box:, state: "corrected")
+    context "when editing was reached via review Correct (review_suggestion_id)" do
+      it "resolves the edited suggestion on save and resumes at the next one" do
+        editing = create(:recognition_suggestion, :with_item, move:, box:, state: "pending", confidence_score: 0.5)
         nxt = create(:recognition_suggestion, :with_item, move:, box:, confidence_score: 0.3)
 
         patch move_item_path(move, editing.item),
-              params: { item: { name: "Fixed" }, review_box_id: box.id }
+              params: { item: { name: "Fixed" }, review_suggestion_id: editing.id }
 
+        expect(editing.reload.state).to eq("corrected")
+        expect(editing.item.review_state).to eq("confirmed")
         expect(response).to redirect_to(move_box_review_path(move, box, nxt))
       end
 
       it "returns to the queue when no suggestions remain" do
-        editing = create(:recognition_suggestion, :with_item, move:, box:, state: "corrected")
+        editing = create(:recognition_suggestion, :with_item, move:, box:, state: "pending")
 
         patch move_item_path(move, editing.item),
-              params: { item: { name: "Fixed" }, review_box_id: box.id }
+              params: { item: { name: "Fixed" }, review_suggestion_id: editing.id }
 
+        expect(editing.reload.state).to eq("corrected")
+        expect(response).to redirect_to(move_box_review_index_path(move, box))
+      end
+
+      it "resolves a conflict on save even though its item points at a different suggestion" do
+        confirmed = create(:item, :confirmed, move:, box:, name: "Skillet")
+        conflict = create(:recognition_suggestion, :conflict, move:, box:, item: confirmed)
+
+        patch move_item_path(move, confirmed),
+              params: { item: { name: "Cast Skillet" }, review_suggestion_id: conflict.id }
+
+        expect(conflict.reload.state).to eq("corrected")
         expect(response).to redirect_to(move_box_review_index_path(move, box))
       end
     end
