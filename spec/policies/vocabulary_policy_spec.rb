@@ -14,9 +14,13 @@ RSpec.describe VocabularyPolicy do
   end
 
   describe "index? (view)" do
-    it "permits any signed-in user" do
+    it "permits any member (admin or member)" do
       expect(described_class.new(move, user: member).apply(:index?)).to be(true)
       expect(described_class.new(move, user: admin).apply(:index?)).to be(true)
+    end
+
+    it "denies a signed-in non-member (another Move's user in the tenant)" do
+      expect(described_class.new(move, user: stranger).apply(:index?)).to be(false)
     end
 
     it "denies an anonymous user" do

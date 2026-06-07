@@ -6,13 +6,15 @@
 # value is admin-only and only on a writable (non-archived) Move. Roles are
 # admin/member today; contributor/viewer arrive in D11.
 class VocabularyPolicy < ApplicationPolicy
-  # record is the Move whose vocabularies are managed.
+  # record is the Move whose vocabularies are managed. Viewing requires
+  # membership — a signed-in user from another Move in the same tenant must not
+  # see this Move's category/tag/room names.
   def index?
-    user.present?
+    member?
   end
 
   def manage?
-    user.present? && admin_member? && record.writable?
+    member?(role: "admin") && record.writable?
   end
 
   alias create? manage?
@@ -21,10 +23,14 @@ class VocabularyPolicy < ApplicationPolicy
 
   private
 
-  # Vocabulary management is admin-only. The role rule lives in the policy
-  # (authorization layer), not on the Move model, per AGENTS.md §2 — the
+  # Whether the user belongs to this Move (optionally with a specific role).
+  # Authorization stays in the policy (not the Move model) per AGENTS.md §2 — the
   # contributor/viewer split (D11) refines it here. Roles are admin/member today.
-  def admin_member?
-    record.move_memberships.exists?(user_id: user.id, role: "admin")
+  def member?(role: nil)
+    return false if user.nil?
+
+    scope = record.move_memberships.where(user_id: user.id)
+    scope = scope.where(role: role) if role
+    scope.exists?
   end
 end

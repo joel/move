@@ -136,4 +136,16 @@ RSpec.describe "Vocabularies" do
       expect(Category.exists?(category.id)).to be(true)
     end
   end
+
+  describe "membership enforcement on view" do
+    it "forbids a signed-in non-member from viewing the surface" do
+      stranger = create(:user) # no move_membership for this Move
+      stub_current_user(stranger)
+      create(:category, move:, name: "Kitchenware")
+
+      get move_vocabularies_path(move, "categories")
+
+      expect(response).to have_http_status(:forbidden)
+    end
+  end
 end
