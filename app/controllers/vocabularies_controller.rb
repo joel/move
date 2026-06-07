@@ -8,12 +8,7 @@
 #
 # Viewing is open to any member; adding / renaming / removing is admin-only and
 # only on a writable Move (VocabularyPolicy, record = Move).
-class VocabulariesController < ApplicationController
-  layout -> { Views::Layouts::AppShellLayout }
-
-  before_action :require_authenticated_user!
-  before_action :require_tenant!
-  before_action :set_move
+class VocabulariesController < MoveScopedController
   before_action :set_vocabulary
   before_action :set_record, only: %i[update destroy]
 
@@ -103,12 +98,6 @@ class VocabulariesController < ApplicationController
     records.map { |r| r.id == @record.id ? @record : r }
   end
 
-  def set_move
-    @move = authorized_scope(Move.all).find(params.expect(:move_id))
-  rescue ActiveRecord::RecordNotFound
-    head :not_found
-  end
-
   def set_vocabulary
     @vocabulary = Vocabulary.find(params.expect(:kind))
     head :not_found unless @vocabulary
@@ -118,11 +107,6 @@ class VocabulariesController < ApplicationController
     @record = @vocabulary.records(@move).find(params.expect(:id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
-  end
-
-  # Tenancy is non-disclosing: a Move surface only exists on an org subdomain.
-  def require_tenant!
-    head :not_found unless current_tenant
   end
 
   def vocab_params

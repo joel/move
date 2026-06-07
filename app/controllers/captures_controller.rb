@@ -3,12 +3,7 @@
 # B2 — Capture image. Per-box capture surface: upload an image (online-only),
 # which queues a recognition run; the session panel polls for live state. Capture
 # into a sealed box is blocked (Domain §5.2). Thin: guard, call the action, render.
-class CapturesController < ApplicationController
-  layout -> { Views::Layouts::AppShellLayout }
-
-  before_action :require_authenticated_user!
-  before_action :require_tenant!
-  before_action :set_move
+class CapturesController < MoveScopedController
   before_action :set_box
   before_action :require_writable_move!
   # Capture is blocked on a sealed box, but a pre-seal run can still be retried.
@@ -51,20 +46,10 @@ class CapturesController < ApplicationController
 
   private
 
-  def set_move
-    @move = authorized_scope(Move.all).find(params.expect(:move_id))
-  rescue ActiveRecord::RecordNotFound
-    head :not_found
-  end
-
   def set_box
     @box = authorized_scope(@move.boxes).find(params.expect(:box_id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
-  end
-
-  def require_tenant!
-    head :not_found unless current_tenant
   end
 
   def require_writable_move!

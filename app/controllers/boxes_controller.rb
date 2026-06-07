@@ -4,12 +4,7 @@
 # (show/edit/update/transition). Runs inside an Organization tenant schema (the
 # subdomain elevator switches Apartment first) and is scoped to one Move. Thin:
 # authorize, call the action, pattern-match, render.
-class BoxesController < ApplicationController
-  layout -> { Views::Layouts::AppShellLayout }
-
-  before_action :require_authenticated_user!
-  before_action :require_tenant!
-  before_action :set_move
+class BoxesController < MoveScopedController
   before_action :set_box, only: %i[show edit update transition]
   before_action :require_writable_move!, only: %i[new create edit update transition]
 
@@ -102,12 +97,6 @@ class BoxesController < ApplicationController
 
   private
 
-  def set_move
-    @move = authorized_scope(Move.all).find(params.expect(:move_id))
-  rescue ActiveRecord::RecordNotFound
-    head :not_found
-  end
-
   def set_box
     @box = authorized_scope(@move.boxes).find(params.expect(:id))
   rescue ActiveRecord::RecordNotFound
@@ -120,11 +109,6 @@ class BoxesController < ApplicationController
     when :invalid_transition then t("boxes.transition.invalid")
     else t("boxes.transition.failed")
     end
-  end
-
-  # Tenancy is non-disclosing: a Move surface only exists on an org subdomain.
-  def require_tenant!
-    head :not_found unless current_tenant
   end
 
   # Archived Moves are read-only — no creating, editing or transitioning boxes.
