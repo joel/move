@@ -25,12 +25,16 @@ return unless Apartment::Tenant.current == "public"
 
 require "securerandom"
 
-# --- Demo account + organization (tenant) -----------------------------------
-# Sign in (passwordless) with this email on the org subdomain
-# `<slug>.<tenant_zone>` (dev: acme.workeverywhere.docker).
+# --- Demo accounts + organization (tenant) ----------------------------------
+# Sign in (passwordless) with these emails on the org subdomain
+# `<slug>.<tenant_zone>` (dev: acme.workeverywhere.docker):
+#   demo@example.com    — admin   (full vocabulary management — D7)
+#   member@example.com  — member  (read-only vocabularies: no edit affordance)
 DEMO = {
   owner_email: "demo@example.com",
   owner_name: "Demo Mover",
+  member_email: "member@example.com",
+  member_name: "Demo Member",
   org_name: "Acme Relocation",
   org_slug: "acme"
 }.freeze
@@ -38,6 +42,11 @@ DEMO = {
 owner = User.find_or_create_by!(email: DEMO[:owner_email]) do |u|
   u.name = DEMO[:owner_name]
   u.status = 2 # verified — required to sign in via the passwordless email link
+end
+
+member = User.find_or_create_by!(email: DEMO[:member_email]) do |u|
+  u.name = DEMO[:member_name]
+  u.status = 2 # verified
 end
 
 organization = Organization.find_by(slug: DEMO[:org_slug])
@@ -58,6 +67,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     m.created_by = owner
   end
   move.move_memberships.find_or_create_by!(user: owner) { |mm| mm.role = "admin" }
+  move.move_memberships.find_or_create_by!(user: member) { |mm| mm.role = "member" }
 
   rooms = ["Kitchen", "Living Room", "Bedroom", "Garage"].index_with do |name|
     move.rooms.find_or_create_by!(name: name)
@@ -119,14 +129,23 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     end
   end
 
-  # --- D5: managed vocabularies + manual / lifecycle items -------------------
-  # Selection-only category + tag vocabulary for this Move (management is D7).
-  categories = %w[Kitchenware Books Electronics Clothing].index_with do |name|
+  # --- D5/D7: managed vocabularies (categories, tags, rooms) ------------------
+  # Selection-only elsewhere; managed on the D7 surfaces. Each vocabulary keeps
+  # one *unused* value (Tools / Seasonal / Attic) so the non-in-use remove path
+  # is showcase-ready, plus in-use values to demo the remove-with-confirm path.
+  categories = %w[Kitchenware Books Electronics Clothing Tools].index_with do |name|
     move.categories.find_or_create_by!(name: name)
   end
-  tags = ["Heavy", "Everyday Use", "Liquid", "Important"].index_with do |name|
-    move.tags.find_or_create_by!(name: name)
+  # name => applies_to (item / box / both) — covers every facet the tag rows show.
+  {
+    "Heavy" => "both", "Everyday Use" => "item", "Liquid" => "item",
+    "Important" => "both", "Fragile" => "box", "Seasonal" => "item"
+  }.each do |name, applies_to|
+    move.tags.find_or_create_by!(name: name) { |t| t.applies_to = applies_to }
   end
+  tags = move.tags.index_by(&:name)
+  # Rooms already seeded above; add one unused room for the remove demo.
+  move.rooms.find_or_create_by!(name: "Attic")
 
   # Manual items spanning the review axis (confirmed / needs_correction) and the
   # presence axis (in_box / removed), some categorised and tagged. Keyed on name
