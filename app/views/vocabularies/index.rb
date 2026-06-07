@@ -145,7 +145,7 @@ module Views
         opts = {
           method: :delete,
           class: "#{icon_button_class} hover:text-error",
-          aria_label: I18n.t("vocabularies.actions.remove", name: record.name)
+          aria: { label: I18n.t("vocabularies.actions.remove", name: record.name) }
         }
         opts[:data] = { turbo_confirm: I18n.t("vocabularies.#{kind}.remove_confirm", count: count) } if count.positive?
         button_to(move_vocabulary_path(@move, kind, record), **opts) do
