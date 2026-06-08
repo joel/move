@@ -168,4 +168,34 @@ subdomain (no redirect loop). The login UI is apex-only; subdomains are post-aut
   exposed and makes you manage the wildcard cert. The **Tunnel** wins: no exposed
   origin, no origin cert, wildcard handled at the edge.
 
-_Last updated: 2026-06-06._
+## 6. Hybrid search (D8)
+
+Move-scoped item search over an `item_search_documents` projection (one row per
+item, in the tenant schema): denormalized `search_text` → generated
+`search_tsvector` (full-text, GIN), a trigram GIN index (fuzzy), and a nullable
+`embedding vector(1536)` (pgvector, HNSW cosine). `Search::Items` ranks a
+weighted blend of `ts_rank_cd` + `similarity()` + cosine with an exact-match
+boost, excluding needs_correction/removed; it degrades to lexical/trigram when no
+query embedding is available.
+
+```mermaid
+flowchart LR
+  W[Item / Box / Vocab change] --> J[RefreshDocumentJob]
+  J --> RD[Search::RefreshDocument]
+  RD --> TS[(search_text + tsvector)]
+  RD --> EP[EmbeddingProviders fake/openai] --> EMB[(embedding 1536)]
+  Q[query] --> SI[Search::Items] --> RES[ts_rank + trigram + cosine + exact boost]
+```
+
+Embeddings come from **textual metadata only** (never images) and are
+(re)generated async; lexical/trigram is always correct. Providers mirror
+`RecognitionProviders` (env `EMBEDDING_PROVIDER`: fake default, openai
+`text-embedding-3-small`).
+
+**Infra:** Postgres image is `pgvector/pgvector:pg18` (stock 18 lacks pgvector;
+pg_trgm is contrib). The `vector` type + `*_ops` opclasses live in `public` and
+are added to Apartment's `pg_excluded_names` so tenant clones don't rewrite them
+to `<tenant>.X`. See `new-app-recipe.md` for the image swap + accessory cutover +
+glibc-collation gotcha.
+
+_Last updated: 2026-06-08._

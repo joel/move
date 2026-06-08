@@ -18,7 +18,7 @@ origin (Vultr) and Cloudflare-managed DNS.
 | Auth | Rodauth (passwordless: passkeys, email link, Google) via `rodauth-rails` |
 | Multi-tenancy | `ros-apartment` — **PostgreSQL schema-per-tenant** |
 | Business logic | `app/actions/` (Dry::Monads), never in models/controllers |
-| DB | PostgreSQL **18** (dev `bin/cli`, CI service, prod accessory — all pinned) |
+| DB | **`pgvector/pgvector:pg18`** (postgres 18 + pgvector; dev `bin/cli`, CI service, prod accessory — all pinned). pg_trgm is contrib. |
 | Schema dump | `schema_format = :sql` → `db/structure.sql` |
 | Deploy | **Kamal 2** + kamal-proxy, image on Docker Hub |
 | Secrets | **Doppler** (`<app>/prd`) → synced to GitHub Actions + read by `.kamal/secrets` |
@@ -333,6 +333,9 @@ capture → recognition):
 | `pg_dump: server version mismatch` | client 17 vs server 18 | `postgresql-client-18` (§2) |
 | dev seed user in prod | `db:seed` ran on fresh prod DB | guard `db/seeds.rb` against `Rails.env.production?` |
 | `PG::ForeignKeyViolation` writing a tenant table whose FK points at empty `public.X` | deploy ran only `db:prepare`; it migrates `public` programmatically and never fires Apartment's `db:migrate` Rake-task enhancement, so existing tenant schemas stay frozen and unqualified writes fall through `search_path` to `public` | entrypoint runs `db:prepare && db:migrate` (the Rake task → `apartment:migrate`); repair existing prod with `kamal app exec --reuse "bin/rails apartment:migrate"` |
+| `type "<tenant>.vector" does not exist` creating/cloning a tenant | the `vector` extension (+ `*_ops` opclasses) live in `public`; Apartment rewrites `public.X`→`<tenant>.X` on clone | add `vector vector_cosine_ops gin_trgm_ops` to `config.pg_excluded_names` (like `citext`) |
+| `template database … has a collation version mismatch` after swapping to `pgvector/pgvector:pg18` | the pgvector image ships an older glibc (2.36) than stock `postgres:18` (2.41); a volume created by stock 18 mismatches | dev: reinit the data volume fresh. prod cutover: `ALTER DATABASE <db> REFRESH COLLATION VERSION;` (+ `REINDEX DATABASE`) **or** dump/restore into a fresh cluster — do this during the `kamal accessory` cutover |
+| pgvector search returns nothing in prod after deploy | accessory still on plain `postgres:18` (app deploy doesn't reboot accessories) | manual `kamal accessory` cutover to `pgvector/pgvector:pg18`, then `bin/rails db:migrate` |
 
 ---
 
