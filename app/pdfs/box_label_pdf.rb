@@ -24,6 +24,7 @@ class BoxLabelPdf
     header(doc)
     number(doc)
     qr(doc)
+    code(doc)
     room(doc)
 
     doc.render
@@ -42,10 +43,20 @@ class BoxLabelPdf
   end
 
   def qr(doc)
-    png = RQRCode::QRCode.new(@scan_url).as_png(size: 360, border_modules: 1)
+    # border_modules: 4 keeps the standard QR quiet zone so scanners lock on
+    # reliably; anything smaller risks unreadable labels on real paper.
+    png = RQRCode::QRCode.new(@scan_url).as_png(size: 360, border_modules: 4)
     side = 150
     doc.image StringIO.new(png.to_blob), width: side, height: side, position: :center
     doc.move_down 6
+  end
+
+  # Human-readable token under the QR so the scanner's camera-unavailable
+  # fallback ("enter the code printed under the QR") is actually usable.
+  def code(doc)
+    doc.text @box.qr_token, size: 7, style: :bold, color: "8A8A8A",
+                            align: :center, character_spacing: 0.5
+    doc.move_down 8
   end
 
   def room(doc)

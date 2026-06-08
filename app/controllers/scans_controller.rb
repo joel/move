@@ -18,7 +18,7 @@ class ScansController < MoveScopedController
   def resolve
     authorize! @move, to: :show?, with: MovePolicy
 
-    case Qr::Resolve.new.call(token: params[:token], actor: current_user)
+    case Qr::Resolve.new.call(move: @move, token: params[:token], actor: current_user)
     in Dry::Monads::Success(box) if box.move.writable?
       render Views::Scans::Resolved.new(move: @move, box: box)
     in Dry::Monads::Success(box)

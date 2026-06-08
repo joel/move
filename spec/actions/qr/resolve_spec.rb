@@ -6,11 +6,11 @@ RSpec.describe Qr::Resolve do
   let(:user) { create(:user) }
   let(:move) { create(:move, created_by: user) }
 
-  it "resolves a known token to its box and emits qr.resolved" do
+  it "resolves a token belonging to the given Move and emits qr.resolved" do
     allow(Rails.event).to receive(:notify)
     box = create(:box, move:, qr_token: "tok-known")
 
-    result = described_class.new.call(token: "tok-known", actor: user)
+    result = described_class.new.call(move:, token: "tok-known", actor: user)
 
     expect(result).to be_success
     expect(result.value!).to eq(box)
@@ -20,21 +20,31 @@ RSpec.describe Qr::Resolve do
   end
 
   it "fails non-disclosingly for an unknown token" do
-    result = described_class.new.call(token: "does-not-exist", actor: user)
+    result = described_class.new.call(move:, token: "does-not-exist", actor: user)
 
     expect(result).to be_failure
     expect(result.failure).to eq(:unrecognized)
   end
 
   it "fails non-disclosingly for a blank token" do
-    expect(described_class.new.call(token: "", actor: user).failure).to eq(:unrecognized)
+    expect(described_class.new.call(move:, token: "", actor: user).failure).to eq(:unrecognized)
   end
 
-  it "resolves a box on an archived Move (read-only is the caller's concern) without mutating status" do
+  it "does not resolve a token from a different Move (no cross-move disclosure)" do
+    other_move = create(:move, created_by: user)
+    create(:box, move: other_move, qr_token: "tok-other")
+
+    result = described_class.new.call(move:, token: "tok-other", actor: user)
+
+    expect(result).to be_failure
+    expect(result.failure).to eq(:unrecognized)
+  end
+
+  it "resolves a box on an archived Move read-only, without mutating status" do
     archived = create(:move, :archived, created_by: user)
     box = create(:box, move: archived, qr_token: "tok-archived", status: "sealed")
 
-    result = described_class.new.call(token: "tok-archived", actor: user)
+    result = described_class.new.call(move: archived, token: "tok-archived", actor: user)
 
     expect(result).to be_success
     expect(result.value!).to eq(box)

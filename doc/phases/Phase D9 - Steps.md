@@ -37,7 +37,7 @@ sequenceDiagram
     participant DB as Box (tenant schema)
     U->>SC: GET /moves/:id/scan/:token
     SC->>QR: call(token:, actor:)
-    QR->>DB: find_by(qr_token:) within tenant
+    QR->>DB: move.boxes.find_by(qr_token:) (scoped to the route's Move)
     alt token present
         DB-->>QR: box
         QR-->>SC: Success(box) + emit qr.resolved

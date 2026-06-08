@@ -1,18 +1,19 @@
 # frozen_string_literal: true
 
 module Qr
-  # Resolves a scanned QR token to its Box within the current tenant (E2).
+  # Resolves a scanned QR token to its Box within a specific Move (E2).
   #
-  # The lookup is intentionally tenant-local: the Apartment subdomain elevator has
-  # already selected the org's schema, so a token belonging to another org (or a
-  # garbage code) is simply absent here and yields the same non-disclosing
-  # Failure(:unrecognized) — the scanner UI must never hint that a token exists
-  # elsewhere. Resolution is read-only: it NEVER changes the box's status. The
-  # archived (read-only) case is a successful resolve; the caller decides how to
-  # render it from box.move.writable?.
+  # The lookup is scoped to the route's Move, not the whole tenant: a label's QR
+  # encodes its own Move-scoped resolve URL, so a token that belongs to a
+  # *different* Move (cross-org, or another Move in the same tenant) is simply
+  # absent here and yields the same non-disclosing Failure(:unrecognized) — the
+  # scanner copy is "this code isn't from your move", and we must not leak another
+  # Move's box number/room/count. Resolution is read-only: it NEVER changes the
+  # box's status. The archived (read-only) case is a successful resolve; the
+  # caller decides how to render it from box.move.writable?.
   class Resolve < BaseAction
-    def call(token:, actor: nil)
-      box = find(token)
+    def call(move:, token:, actor: nil)
+      box = find(move, token)
       return Failure(:unrecognized) if box.nil?
 
       yield emit_event(box, actor)
@@ -21,8 +22,8 @@ module Qr
 
     private
 
-    def find(token)
-      Box.includes(:room, :move).find_by(qr_token: token.to_s.presence)
+    def find(move, token)
+      move.boxes.includes(:room, :move).find_by(qr_token: token.to_s.presence)
     end
 
     def emit_event(box, actor)
