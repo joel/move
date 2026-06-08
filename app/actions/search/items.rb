@@ -22,12 +22,21 @@ module Search
       q = query.to_s.strip
       return Success([]) if q.blank?
 
-      vector = embedder.embed(q).vector
+      vector = safe_query_vector(embedder, q)
       rows = run(move, q, vector, include_hidden)
       Success(rows.map { |r| to_result(r) })
     end
 
     private
+
+    # A query-embedding failure must not 500 the search — drop the semantic leg
+    # and serve lexical/trigram results (Domain §7.3 graceful fallback).
+    def safe_query_vector(embedder, query)
+      embedder.embed(query).vector
+    rescue StandardError => e
+      Rails.logger.warn("[search] query embedding failed: #{e.class}: #{e.message}")
+      nil
+    end
 
     def run(move, query, vector, include_hidden)
       scope = include_hidden ? move.items : move.items.searchable

@@ -25,11 +25,19 @@ module Search
       Failure(e.record.errors)
     end
 
+    # A provider failure (missing key, timeout, API error) must NOT lose the
+    # lexical projection — leave the embedding nil and persist search_text, so the
+    # item stays searchable lexically/trigram (graceful degradation, Domain §7.3).
     def apply_embedding(doc, embedder)
-      vector = embedder.embed(doc.search_text).then { |r| [r.vector, r.model] }
-      doc.embedding, model = vector
-      doc.embedding_model = doc.embedding ? model : nil
-      doc.embedded_at = doc.embedding ? Time.current : nil
+      result = embedder.embed(doc.search_text)
+      doc.embedding = result.vector
+      doc.embedding_model = result.vector ? result.model : nil
+      doc.embedded_at = result.vector ? Time.current : nil
+    rescue StandardError => e
+      Rails.logger.warn("[search] embedding failed for item=#{doc.item_id}: #{e.class}: #{e.message}")
+      doc.embedding = nil
+      doc.embedding_model = nil
+      doc.embedded_at = nil
     end
 
     # Textual metadata only: name + category + tags + box number + room.

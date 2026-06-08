@@ -5,6 +5,7 @@ class CreateItemSearchDocuments < ActiveRecord::Migration[8.1]
   # the tenant schema like every Move-owned record, so it is scoped by move_id
   # (org == schema under Apartment).
   def up
+    ensure_pgvector_available!
     enable_extension "pg_trgm" unless extension_enabled?("pg_trgm")
     enable_extension "vector" unless extension_enabled?("vector")
 
@@ -33,5 +34,29 @@ class CreateItemSearchDocuments < ActiveRecord::Migration[8.1]
 
   def down
     drop_table :item_search_documents
+  end
+
+  private
+
+  # D8 is a coordinated infra change: the DB accessory must be cut over to
+  # `pgvector/pgvector:pg18` BEFORE this migration runs (a normal app deploy runs
+  # db:migrate but does NOT reboot the accessory). If pgvector isn't installed,
+  # fail fast with the runbook instead of a cryptic `CREATE EXTENSION` error —
+  # the operator cuts the accessory over (new-app-recipe.md §cutover) then redeploys.
+  def ensure_pgvector_available!
+    return if extension_available?("vector")
+
+    raise <<~MSG.squish
+      pgvector is not installed on this PostgreSQL server. D8 requires the
+      `pgvector/pgvector:pg18` image — cut the DB accessory over FIRST
+      (`kamal accessory ...`, see doc/project/new-app-recipe.md §cutover),
+      then redeploy. This migration was aborted before any schema change.
+    MSG
+  end
+
+  def extension_available?(name)
+    select_value(
+      ActiveRecord::Base.sanitize_sql_array(["SELECT 1 FROM pg_available_extensions WHERE name = ?", name])
+    ).present?
   end
 end

@@ -70,6 +70,19 @@ RSpec.describe Search::Items do
     end
   end
 
+  describe "resilience" do
+    it "serves lexical/trigram results when the query embedder raises (no 500)" do
+      hit = index(confirmed("Garden hose"))
+      boom = instance_double(EmbeddingProviders::Fake)
+      allow(boom).to receive(:embed).and_raise(StandardError, "API down")
+
+      result = described_class.new.call(move:, query: "garden hose", embedder: boom)
+
+      expect(result).to be_success
+      expect(result.value!.map(&:item)).to include(hit)
+    end
+  end
+
   describe "exclusions (Domain §7.4)" do
     it "hides needs_correction + removed by default, includes them on request" do
       needs   = index(create(:item, move:, box:, name: "Lamp", review_state: "needs_correction"))
