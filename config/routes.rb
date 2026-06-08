@@ -24,7 +24,12 @@ Rails.application.routes.draw do
       post "capture", to: "captures#create"
       get "capture/session", to: "captures#session_panel", as: :capture_session
       post "capture/retry", to: "captures#retry_recognition", as: :capture_retry
+      # E1 — Box label (A7, opaque) and authenticated manifest (A4) as inline PDFs.
+      get "label", to: "labels#show", as: :label
+      get "manifest", to: "manifests#show", as: :manifest
     end
+    # E2 — QR scanner (live camera + manual entry), in the Move app shell.
+    get "scan", to: "scans#show", as: :scan
     # C3 — Item detail / edit. Scoped to the Move (not the box) so the record
     # survives a box-to-box move; presence/box changes via member actions.
     resources :items, only: %i[show update] do
@@ -45,6 +50,12 @@ Rails.application.routes.draw do
     # D1 — Hybrid search over the Move's items (full-text + trigram + pgvector).
     get "search", to: "searches#index", as: :search
   end
+  # E2 — resolve a scanned QR token. Move-agnostic (a printed label is opaque and
+  # carries no Move id), tenant-scoped via the subdomain elevator: a token from
+  # another org's schema simply isn't found → non-disclosing "unrecognized".
+  get "scan/:token", to: "scans#resolve", as: :scan_resolve,
+                     constraints: { token: /[A-Za-z0-9_-]+/ }
+
   resources :posts
   resources :users
   get "welcome/home"
