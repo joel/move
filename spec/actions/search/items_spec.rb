@@ -86,6 +86,17 @@ RSpec.describe Search::Items do
   end
 
   describe "denormalized propagation (Domain §7.3)" do
+    it "reindexes an item when a tag link changes (tag name becomes searchable)" do
+      item = index(confirmed("Plain widget"))
+      expect(described_class.new.call(move:, query: "fragile").value!).to be_empty
+
+      tag = create(:tag, move:, name: "Fragile")
+      create(:item_tag, item:, tag:) # ItemTag#after_commit reindexes the item
+
+      results = described_class.new.call(move:, query: "fragile").value!.map(&:item)
+      expect(results).to include(item)
+    end
+
     it "reindexes items when their room is renamed, so the new name matches" do
       item = index(confirmed("Kettle"))
       expect(described_class.new.call(move:, query: "powder room").value!).to be_empty
