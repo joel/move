@@ -25,7 +25,8 @@ jobs:
       postgres:
         # Must match the dev/prod server (and the pg_dump that produced
         # db/structure.sql): the dump uses PG 17+ GUCs like transaction_timeout.
-        image: postgres:18
+        # pgvector/pgvector:pg18 = postgres:18 + the `vector` extension (D8).
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
