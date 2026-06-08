@@ -64,6 +64,28 @@ RSpec.describe "Unpacking" do
       expect(response).to redirect_to(move_box_unpacking_path(move, box))
       expect(item.reload.presence_state).to eq("in_box")
     end
+
+    it "refuses to restore on an already-unpacked box (no active checklist)" do
+      box = create(:box, :with_room, move:, status: "unpacked")
+      item = create(:item, move:, box:, presence_state: "removed")
+
+      patch move_box_unpacking_restore_path(move, box, item)
+
+      expect(response).to redirect_to(move_box_unpacking_path(move, box))
+      expect(item.reload.presence_state).to eq("removed")
+    end
+  end
+
+  describe "PATCH .../unpacking/items/:item_id/remove on a non-unpacking box" do
+    it "refuses to remove when the checklist isn't active" do
+      box = create(:box, :with_room, move:, status: "in_transit")
+      item = create(:item, move:, box:, presence_state: "in_box")
+
+      patch move_box_unpacking_remove_path(move, box, item)
+
+      expect(response).to redirect_to(move_box_unpacking_path(move, box))
+      expect(item.reload.presence_state).to eq("in_box")
+    end
   end
 
   describe "PATCH .../unpacking/complete" do

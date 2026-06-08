@@ -11,6 +11,7 @@ class UnpackingController < MoveScopedController
   before_action :ensure_unpacking_surface, only: :show
   before_action :set_item, only: %i[remove restore]
   before_action :require_writable_move!, only: %i[remove restore complete reopen]
+  before_action :require_active_checklist, only: %i[remove restore]
 
   # GET /moves/:move_id/boxes/:box_id/unpacking
   def show
@@ -71,11 +72,22 @@ class UnpackingController < MoveScopedController
   end
 
   # The unpacking surface only exists once a box reaches `unpacking`; earlier
-  # lifecycle states have no checklist. Bounce back to the box detail otherwise.
+  # lifecycle states have no checklist. The celebration is shown once `unpacked`.
+  # Bounce back to the box detail for any other state.
   def ensure_unpacking_surface
     return if @box.unpacking? || @box.unpacked?
 
     redirect_to move_box_path(@move, @box), alert: t("unpacking.not_available")
+  end
+
+  # Per-item remove/restore only make sense while the checklist is active
+  # (status `unpacking`). On an `unpacked` box the celebration is showing, so
+  # toggling an item back in_box would leave an inconsistent "done" box; on
+  # earlier states there is no checklist at all. Reopen first to edit items.
+  def require_active_checklist
+    return if @box.unpacking?
+
+    redirect_to move_box_unpacking_path(@move, @box), alert: t("unpacking.not_available")
   end
 
   # Archived Moves are read-only — no toggling items or completing/reopening.

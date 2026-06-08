@@ -55,7 +55,12 @@ alone doesn't recompile CSS — see agent memory `product-review-asset-staleness
 Prod precompiles at image build, so unaffected.
 
 ## 11. PR review
-- **PR:** [#90](https://github.com/joel/move/pull/90) — opened, awaiting Codex.
+- **PR:** [#90](https://github.com/joel/move/pull/90).
+- **Round 1 (Codex):**
+
+| Finding | Severity | Resolution |
+|---------|----------|------------|
+| `remove`/`restore` toggles weren't guarded to `unpacking` boxes — an item could be marked removed/restored outside the E3 lifecycle (e.g. restore on an `unpacked` box leaves the celebration over an in_box item) | P2 | Fixed — added `require_active_checklist` (status == `unpacking`) to both toggles + request specs. `complete`/`reopen` already constrained by `TransitionStatus` validation. Thread resolved; Codex re-review came back clean ("no major issues"). |
 
 ## Final summary
 _filled at close_
