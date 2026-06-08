@@ -66,9 +66,25 @@ export default class extends Controller {
 
   #onDecode(data) {
     this.#stopCamera()
-    // The label encodes a full resolve URL; a bare token is appended instead.
-    if (/^https?:\/\//i.test(data)) this.#visit(data)
-    else this.#visit(`${this.resolveUrlValue}/${encodeURIComponent(data)}`)
+    if (/^https?:\/\//i.test(data)) {
+      // A label encodes a full resolve URL. Only ever navigate to a same-origin
+      // path — never follow an arbitrary external URL a hostile QR might carry
+      // (open-redirect / phishing). A foreign URL just returns to the scanner.
+      this.#visit(this.#sameOriginPath(data) || this.resolveUrlValue)
+    } else {
+      // A bare token (manual entry or a token-only QR) → the resolve route.
+      this.#visit(`${this.resolveUrlValue}/${encodeURIComponent(data)}`)
+    }
+  }
+
+  #sameOriginPath(data) {
+    try {
+      const url = new URL(data)
+      if (url.origin === window.location.origin) return url.pathname + url.search
+    } catch (_error) {
+      // Not a parseable URL — fall through.
+    }
+    return null
   }
 
   #revealFallback() {
