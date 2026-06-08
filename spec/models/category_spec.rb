@@ -22,6 +22,13 @@ RSpec.describe Category do
       create(:category, move: create(:move), name: "Kitchenware")
       expect(build(:category, move: create(:move), name: "Kitchenware")).to be_valid
     end
+
+    it "enforces case-insensitive uniqueness at the DB level (bypassing validation)" do
+      move = create(:move)
+      create(:category, move:, name: "Kitchenware")
+      dup = build(:category, move:, name: "kitchenware")
+      expect { dup.save!(validate: false) }.to raise_error(ActiveRecord::RecordNotUnique)
+    end
   end
 
   it "nullifies the category on its items when destroyed" do
