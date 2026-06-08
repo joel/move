@@ -96,6 +96,8 @@ en:
       in_transit: "Mark in transit"
       unpacking: "Mark unpacking"
       unpacked: "Mark unpacked"
+      print_label: "Print label (A7)"
+      print_manifest: "Print manifest (A4)"
     transition:
       transitioned: "Box marked %{status}."
       room_required: "Assign a room before sealing this box."

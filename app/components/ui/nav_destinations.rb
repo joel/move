@@ -21,7 +21,8 @@ module Components
                           move ? h.move_boxes_path(move) : STUB_HREF, false),
           Destination.new(:search, "ui.nav.search", Components::Icons::Search,
                           move ? h.move_search_path(move) : STUB_HREF, false),
-          Destination.new(:scan, "ui.nav.scan", Components::Icons::Camera, STUB_HREF, true),
+          Destination.new(:scan, "ui.nav.scan", Components::Icons::Camera,
+                          move ? h.move_scan_path(move) : STUB_HREF, true),
           Destination.new(:summary, "ui.nav.summary", Components::Icons::Chart, STUB_HREF, false),
           Destination.new(:menu, "ui.nav.menu", Components::Icons::Menu, STUB_HREF, false)
         ]

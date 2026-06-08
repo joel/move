@@ -149,6 +149,14 @@ gem "dry-monads", "~> 1.10"
 # https://github.com/rails-on-services/apartment
 gem "ros-apartment", "~> 3.4", require: "apartment"
 
+# D9 — Labels, QR & Scan. Pure-Ruby PDF generation for the A7 exterior label and
+# A4 manifest (no system binary, so deploys stay infra-free). QR codes are
+# rendered to PNG via rqrcode (+ chunky_png) and embedded in the PDFs.
+gem "chunky_png", "~> 1.4"
+gem "prawn", "~> 2.5"
+gem "prawn-table", "~> 0.2"
+gem "rqrcode", "~> 3.0"
+
 group :test do
   gem "phlex-testing-capybara", require: false
 end

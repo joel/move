@@ -1,0 +1,21 @@
+en:
+  scans:
+    show:
+      aim: "Point at a box label"
+      hint: "Hold your device steady — the scanner detects the QR automatically."
+      manual_placeholder: "Enter box code"
+      manual_submit: "Open"
+      camera_unavailable: "Camera unavailable. Enter the code printed under the QR instead."
+    resolved:
+      success: "Scanned successfully"
+      items: "Items inside"
+      status: "Current status"
+      open: "Open box"
+    unrecognized:
+      title: "Unrecognized code"
+      body: "This code isn't from your move. Make sure you're scanning a Move label."
+      retry: "Try again"
+    archived:
+      eyebrow: "Archived · read only"
+      contains: "Contains %{count} items"
+      view: "View box"

@@ -13,6 +13,12 @@ class BoxPolicy < ApplicationPolicy
     user.present?
   end
 
+  # E1 — printing the opaque exterior label and the (sensitive) manifest is
+  # available to anyone who can view the box. Read access matches show? for now;
+  # the member/role refinement arrives with D11 (see MovePolicy).
+  alias label? show?
+  alias manifest? show?
+
   def create?
     user.present? && record.move&.writable?
   end

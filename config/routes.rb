@@ -24,7 +24,17 @@ Rails.application.routes.draw do
       post "capture", to: "captures#create"
       get "capture/session", to: "captures#session_panel", as: :capture_session
       post "capture/retry", to: "captures#retry_recognition", as: :capture_retry
+      # E1 — Box label (A7, opaque) and authenticated manifest (A4) as inline PDFs.
+      get "label", to: "labels#show", as: :label
+      get "manifest", to: "manifests#show", as: :manifest
     end
+    # E2 — QR scanner (live camera + manual entry) and token resolution, both in
+    # the Move app shell. Resolution looks the box up by qr_token across the
+    # tenant, so a token from another org's schema is simply absent → a
+    # non-disclosing "unrecognized" state.
+    get "scan", to: "scans#show", as: :scan
+    get "scan/:token", to: "scans#resolve", as: :scan_resolve,
+                       constraints: { token: /[A-Za-z0-9_-]+/ }
     # C3 — Item detail / edit. Scoped to the Move (not the box) so the record
     # survives a box-to-box move; presence/box changes via member actions.
     resources :items, only: %i[show update] do
