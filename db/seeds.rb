@@ -166,7 +166,20 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     # D8 search demo: a confirmed "Hair dryer" so a semantic/fuzzy query like
     # "blow dryer" recovers it (shared "dryer" + embedding proximity).
     { box: "5", name: "Hair dryer", qty: 1, fragile: false,
-      category: "Electronics", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" }
+      category: "Electronics", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
+    # D10 unpacking demo: box #7 is `unpacking`, seeded with a mix of remaining
+    # (in_box) and already-unpacked (removed) items so the E3 checklist shows both
+    # the "Remaining Items" tap-targets and the dimmed "Unpacked" section.
+    { box: "7", name: "Bedside Lamp", qty: 1, fragile: true,
+      category: "Electronics", tags: ["Important"], review: "confirmed", presence: "in_box" },
+    { box: "7", name: "Folded Bedsheets", qty: 4, fragile: false,
+      category: "Clothing", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
+    { box: "7", name: "Alarm Clock", qty: 1, fragile: false,
+      category: "Electronics", tags: [], review: "confirmed", presence: "in_box" },
+    { box: "7", name: "Throw Pillows", qty: 2, fragile: false,
+      category: "Clothing", tags: [], review: "confirmed", presence: "removed" },
+    { box: "7", name: "Reading Glasses", qty: 1, fragile: true,
+      category: nil, tags: ["Important"], review: "confirmed", presence: "removed" }
   ]
   manual_items.each do |attrs|
     box = move.boxes.find_by(number: attrs[:box])
