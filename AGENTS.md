@@ -268,6 +268,14 @@ Run after a PR is merged to `main` and its `main` CI/Deploy run is green.
 
 - **A `[skip ci]` marker in a commit is forbidden here** (it skips the deploy via squash-merge). The `/execution-plan` skill's Step 7 still suggests `[skip ci]` for docs — **ignore that**; CI already path-ignores `**/*.md` and `.claude/**` via `paths-ignore`, so docs commits need no marker. (See §4 Deployment.)
 
+- **A docs-only commit at the PR tip leaves the PR `BLOCKED`** (recurring — D10 #90). Branch protection requires the `lint` + `test` contexts **on the HEAD sha**, but `ci.yml` path-ignores `**/*.md`, `doc/**`, `.claude/**`, so a docs-only HEAD never produces those contexts → `mergeStateStatus: BLOCKED` forever (no admin override needed to *avoid*, just don't end on docs). **Keep a code-touching commit at HEAD**: commit code last, or fold the trailing docs into the code commit (`git reset --soft <code-sha>` → `git add <docs>` → `git commit --amend`, then `git push --force-with-lease`; verify the net tree is unchanged with `git diff <backup> HEAD`). Same root cause as a *fully* docs-only PR (admin-merge those — see agent memory `docs-pr-required-checks-blocked`), but here only the tip is docs.
+
+- **A `#<issue>`-prefixed commit subject with NO body is treated as empty by git** and fails the `EmptyMessage` commit-msg hook. Git's default `commentChar` is `#`, so a message that is a single `#…` line gets stripped to nothing. Multi-line messages (subject + body) are fine — it only bites subject-only commits like `#91 Link PR`. Fix: add a body, or commit with `git -c core.commentChar=";" commit -m "#91 …"`.
+
+- **New Tailwind utilities are stale in dev until the CSS is rebuilt** (D10 — `text-left`, arbitrary values like `blur-2xl`/`border-4`). The CSS analogue of the importmap gotcha above: `bin/cli app rebuild` does **not** recompile Tailwind, so a class only used in a new view is absent and the element silently keeps the inherited style. Fix: `docker exec move-app-dev bin/rails tailwindcss:build` (regenerates `app/assets/builds/tailwind.css`); if you also ran `assets:precompile`, `rm -rf public/assets` afterward so dev serves the fresh build (precompiled `public/assets/.manifest.json` masks it), then `bin/cli app restart`. **Not a code bug** — prod precompiles at image build. Verify a class compiled: check `getComputedStyle(el)` in the browser, not `document.styleSheets` (cross-origin `cssRules` access throws and reads as "absent").
+
+- **Provisioning live prod demo data:** `db/seeds.rb` is guarded off in production (`return if Rails.env.production?`). To stand up a demo org/account on prod, mirror the seed body in a one-off, idempotent `runner` script and pipe it in: `mise x -- kamal app exec -i --reuse 'bin/rails runner -' < /tmp/script.rb`. Scope it to a single new org slug + a verified (`status: 2`) account so passwordless login works; never touch the real org. (D10 set up `jlstaar@gmail.com` → `demo.move-easy.org` — agent memory `prod-demo-account`.)
+
 ---
 
 ## 5. Runtime Test Workflow (Mandatory)
@@ -289,6 +297,15 @@ After all code changes are committed and tests pass, perform a live runtime veri
    - Flash messages (toasts) appear and dismiss.
    - Sidebar navigation links and active states are correct.
 6. **Fix any runtime errors** found during live testing, commit the fix, and re-run the full test suite before pushing.
+
+> **`agent-browser` + `data-turbo-confirm`:** a `button_to` carrying
+> `data: { turbo_confirm: "…" }` fires a native `confirm()` dialog that
+> `agent-browser` does **not** auto-accept, so the click looks like it did
+> nothing (the form never submits — e.g. D10 "Mark box unpacked"). Patch it
+> before clicking: `agent-browser eval "window.confirm = () => true"`, then click.
+> (rack_test system specs ignore `turbo_confirm` and submit directly, so this only
+> bites live browser verification.) Set a mobile viewport with
+> `agent-browser set viewport 393 852` (not `resize`).
 
 ### Runtime Verification Scripts
 
