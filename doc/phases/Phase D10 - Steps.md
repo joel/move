@@ -36,7 +36,23 @@ Design adaptations vs the Stitch E3 screens (deliberate, recorded here):
   items are restored individually on the checklist (user-confirmed).
 
 ## 8. Runtime verification
-_filled after /product-review_
+`/product-review` against the dev app (reset + reseeded; box #7 = 3 in_box +
+2 removed). All green:
+- Box detail → "Open unpacking" entry → checklist (sticky "3 of 5 remaining",
+  left-aligned tap-targets, dimmed Unpacked section).
+- Remove an item → settles into Unpacked, count drops to 2/5; restore → back to
+  3/5. Mark box unpacked → cascade verified in DB (in_box 0, removed 5) →
+  celebration matches the Stitch screen. Undo → box reopened to `unpacking`,
+  items stay removed (all-clear empty state renders).
+- Archived Move → READ ONLY chip, static rows, no toggle/CTA.
+- Mobile 393×852: no horizontal overflow, full-width tap-targets, bottom tab bar
+  clear of the in-flow CTA. Light + dark tokens both adapt. No Bullet N+1 alerts.
+
+**Asset note (not a code bug):** new Tailwind utilities (`text-left`, the
+celebration's `blur-2xl`/`border-4`, etc.) were absent in dev until
+`bin/rails tailwindcss:build` + `assets:precompile` + app restart (`app rebuild`
+alone doesn't recompile CSS — see agent memory `product-review-asset-staleness`).
+Prod precompiles at image build, so unaffected.
 
 ## 11. PR review
 _filled after PR opens_
