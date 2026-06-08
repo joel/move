@@ -242,6 +242,31 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     end
   end
 
+  # --- D9: an archived Move with a sealed box so the E2 *archived* scan state is
+  # showcase-ready (read-only resolve). Scan demo: open /moves/<this move>/scan and
+  # enter the box code "demo-archived-box", or scan box #1 of the active Move's
+  # printed label. The exterior label (A7) and manifest (A4) print from any box
+  # detail via the Print buttons.
+  archived_move = Move.find_or_create_by!(name: "Portland Archive") do |m|
+    m.status = "archived"
+    m.unit_system = "metric"
+    m.created_by = owner
+  end
+  archived_move.move_memberships.find_or_create_by!(user: owner) { |mm| mm.role = "admin" }
+  archived_room = archived_move.rooms.find_or_create_by!(name: "Storage")
+  archived_box = archived_move.boxes.find_or_create_by!(number: "1") do |b|
+    b.qr_token = "demo-archived-box"
+    b.room = archived_room
+    b.status = "sealed"
+  end
+  ["Winter Gear", "Holiday Decor"].each do |name|
+    next if archived_box.items.exists?(name: name)
+
+    archived_box.items.create!(
+      move: archived_move, name: name, quantity: 1, created_via: "manual", review_state: "confirmed"
+    )
+  end
+
   # D8: build the hybrid-search projection for every seeded item synchronously
   # (background workers don't run during db:seed). Fake embedder → deterministic,
   # no network. After this, search works immediately in /product-review.
