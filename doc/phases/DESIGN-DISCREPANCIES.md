@@ -197,6 +197,29 @@ The canonical screen `Search (Dark) - Refined Palette`
 
 ---
 
+## ⚠️ §E1/E2-IMPL — "Labels & Scan" build adaptations (D9)
+
+E1 (`ea5a8a69…` + mobile) and the four E2 state screens were implemented in D9.
+
+- **Label/manifest = Prawn PDFs from the box-detail Print buttons; no separate
+  print-settings page.** The E1 Stitch screen shows a desktop "Print Label" page
+  with a printer-destination dropdown and a copies stepper. Those are **browser-
+  native** (the OS print dialog), and a live HTML preview of a PDF is redundant,
+  so D9 ships the A7 label and A4 manifest as inline PDFs opened from "Print label
+  (A7)" / "Print manifest (A4)" on the box detail. The A4 manifest itself carries
+  the sensitive-content warning the design places on the print page.
+- **Resolved state shows item count + status, not contents.** Matches the design
+  (number, room chip, "N items inside", status, "Open box"); the contents live
+  behind "Open box" (box detail), preserving "never leak contents on scan".
+- **Archived state omits item thumbnails.** The Stitch archived sheet previews
+  item thumbnails; D9 renders "ARCHIVED · READ ONLY" + identity + count + a
+  read-only "View box" link. Thumbnails are a non-blocking enhancement.
+- **Resolve is Move-scoped** (`/moves/:id/scan/:token`), not a bare `/scan/:token`
+  — keeps the app-shell + nav context; still tenant-isolated by `qr_token`.
+- **Status: ⚠️ decided** (user-approved plan).
+
+---
+
 ## ⚠️ §PALETTE — Two colour systems coexist
 
 - **Observation:** `designTheme` exposes a full Material-3 token set **and** a "Refined Palette" (`page-dark #2A2822`, `card-dark #34312A`, `page-light #F2ECE1`, `card-light #FAF6EF`, `accent-sage-dark #9FB089`). Many newer screens carry a `… - Refined Palette` variant; the design-system prose references the Refined Palette values directly.

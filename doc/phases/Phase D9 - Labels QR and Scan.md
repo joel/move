@@ -44,4 +44,14 @@ E2 is designed across four Stitch state screens (scanning, resolved, unrecognize
 Unpacking checklist actions (D10); MCP tools (D13).
 
 ## 10. Phase audit trail
-_Fill on execution:_ Issue: · PR: · E2 Stitch screen id: · Verification: · Release `v0.14.0-qr-labels-scan`:
+- **Issue:** #81 · **PR:** _fill_ · **Steps:** `Phase D9 - Steps.md`
+- **E2 Stitch screens:** scanning `09263080…`, resolved `8086fa25…`, unrecognized
+  `de9f2c2a…`, archived `47000d2e…`; E1 label `ea5a8a69…` (+ mobile `65a64f8d…`).
+- **Verification:** live `/product-review` — all four E2 states + label/manifest
+  PDFs + `manifest.viewed` audit confirmed (see Steps.md).
+- **Adaptations (logged in DESIGN-DISCREPANCIES §E1/E2):** label/manifest ship as
+  Prawn PDFs reached from the box-detail Print buttons (no separate print-settings
+  page — printer/copies are browser-native); resolved shows item **count** +
+  status (never contents); archived state omits item thumbnails; resolve is
+  Move-scoped.
+- **Release:** `v0.14.0-qr-labels-scan` _fill_
