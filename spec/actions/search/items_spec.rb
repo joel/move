@@ -85,6 +85,21 @@ RSpec.describe Search::Items do
     end
   end
 
+  describe "denormalized propagation (Domain §7.3)" do
+    it "reindexes items when their room is renamed, so the new name matches" do
+      item = index(confirmed("Kettle"))
+      expect(described_class.new.call(move:, query: "powder room").value!).to be_empty
+
+      Vocabularies::Update.new.call(
+        record: room, vocabulary: Vocabulary.find("rooms"),
+        params: { name: "Powder room" }, actor: create(:user)
+      )
+
+      results = described_class.new.call(move:, query: "powder room").value!.map(&:item)
+      expect(results).to include(item)
+    end
+  end
+
   it "is scoped to the Move" do
     other_box = create(:box, move: create(:move))
     index(create(:item, :confirmed, move: other_box.move, box: other_box, name: "Skillet"))

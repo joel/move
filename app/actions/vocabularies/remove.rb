@@ -9,8 +9,12 @@ module Vocabularies
   # the caller's responsibility (UI turbo-confirm); this action assumes it has
   # already been granted.
   class Remove < BaseAction
+    include Search::Reindexing
+
     def call(record:, vocabulary:, actor:)
+      affected = affected_item_ids(record) # before detach/destroy
       detached = yield destroy(record)
+      reindex_items(affected) # rebuild search_text without the removed value
       yield emit_event(record, vocabulary, actor, detached)
       Success(detached)
     end
