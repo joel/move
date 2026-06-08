@@ -246,6 +246,10 @@ Run after a PR is merged to `main` and its `main` CI/Deploy run is green.
 
 - **Never disable overcommit entirely** (`OVERCOMMIT_DISABLE=1`). When a hook indicates a false positive, skip **only** the specific hook: `SKIP=<HookName> git commit ...` (e.g. `SKIP=RailsSchemaUpToDate`). Add a footnote in the commit body explaining which hook was skipped and why.
 
+- **`RailsSchemaUpToDate` false-positive when editing an already-applied migration** (recurring — D7 & D8): adding a *data-only* preflight/backfill step to a migration that already ran (so its version is in `schema_migrations`) leaves `db/structure.sql` unchanged, but the hook still flags it. Confirm with `bin/rails db:schema:dump` (no `structure.sql` diff), then commit with `SKIP=RailsSchemaUpToDate` and a footnote saying the dump is clean.
+
+- **Migrations that need a new DB capability (extension / accessory image) require a manual accessory cutover BEFORE merge.** A normal deploy runs `db:migrate` but does **not** reboot Kamal accessories, so e.g. a `CREATE EXTENSION vector` migration aborts the prod deploy unless the `db` accessory was first cut over (`kamal accessory reboot db` on the new image; `ALTER DATABASE … REFRESH COLLATION VERSION` if the image's glibc differs). Order: cut over → merge → deploy migrates cleanly. Full runbook + gotchas in `doc/project/new-app-recipe.md`.
+
 - **Do not use `[skip ci]` markers.** CI decides whether to run via `paths-ignore` in `.github/workflows/ci.yml` (`**/*.md`, `.claude/**` are ignored automatically). If a new path should be exempt from CI, add it to `paths-ignore` instead of relying on commit-message markers.
 
 - **Test full user journeys, not just page rendering.** Runtime tests must verify multi-step flows end-to-end (e.g. sign up → verify email → sign in → perform an action → see the result). A page rendering correctly does not guarantee the logic behind it works. If a feature involves events, subscribers, or background jobs, verify the downstream effects actually happen (check emails in the local mail service, check database records).
