@@ -98,6 +98,7 @@ module Views
       def actions_card
         render Components::Ui::Card.new(padding: "p-6") do
           div(class: "flex flex-col gap-3") do
+            unpacking_action
             if @move.writable?
               capture_action
               add_item_action
@@ -108,6 +109,18 @@ module Views
             print_actions
           end
         end
+      end
+
+      # E3 — enter the destination-side unpacking checklist (or its celebration).
+      # Shown once a box reaches `unpacking`; available even on an archived Move
+      # (read-only), so it sits outside the writable branch.
+      def unpacking_action
+        return unless @box.unpacking? || @box.unpacked?
+
+        render Components::Ui::Button.new(
+          label: I18n.t("boxes.actions.unpack"), icon: Components::Icons::Boxes,
+          full_width: true, href: move_box_unpacking_path(@move, @box)
+        )
       end
 
       # E1 — print the opaque exterior label (A7) and the sensitive manifest (A4).
