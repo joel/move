@@ -16,7 +16,15 @@ module Search
     private
 
     def persist(item, embedder)
-      doc = item.search_document || item.build_search_document(move: item.move)
+      write(item.search_document || item.build_search_document(move: item.move), item, embedder)
+    rescue ActiveRecord::RecordNotUnique
+      # A concurrent refresh inserted the row first (one doc per item) — reload
+      # the winner's row and update it so duplicate jobs converge instead of one
+      # being dropped.
+      write(ItemSearchDocument.find_by!(item_id: item.id), item, embedder)
+    end
+
+    def write(doc, item, embedder)
       doc.search_text = compose_text(item)
       apply_embedding(doc, embedder)
       doc.save!
