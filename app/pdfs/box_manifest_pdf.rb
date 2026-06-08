@@ -9,6 +9,8 @@ require "prawn/table"
 # caller is responsible for authorizing the read and emitting the audit event
 # (see Manifests::Generate); this object only renders.
 class BoxManifestPdf
+  include PdfFonts
+
   WARNING = "Confidential — this manifest lists the box contents. " \
             "Keep it with the move; do not share publicly or attach it to the exterior label."
 
@@ -19,6 +21,7 @@ class BoxManifestPdf
 
   def render
     doc = Prawn::Document.new(page_size: "A4", margin: 40)
+    register_unicode_font(doc)
     title(doc)
     meta(doc)
     warning(doc)
