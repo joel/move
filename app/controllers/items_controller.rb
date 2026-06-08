@@ -90,12 +90,18 @@ class ItemsController < MoveScopedController
   private
 
   # An edit reached via review "Correct" carries review_suggestion_id; saving
-  # resolves *that* suggestion (works for conflicts too, whose linked item points
-  # at a different originating suggestion) and resumes the review at the next
-  # unresolved suggestion in its box (or the queue when none remain).
+  # resolves *that* suggestion (works for conflicts too, whose linked item is the
+  # one being edited) and resumes the review at the next unresolved suggestion in
+  # its box (or the queue when none remain).
+  #
+  # Guard: only honour the review context when the carried suggestion actually
+  # belongs to the saved item. "Correct" only ever navigates to suggestion.item
+  # (see RecognitionSuggestionsController#correct), so a mismatch means a stale or
+  # crafted form trying to resolve an unrelated suggestion — fall back to a plain
+  # item-edit redirect and resolve nothing.
   def redirect_after_update(item)
     suggestion = review_suggestion
-    return redirect_to(move_item_path(@move, item), notice: t(".updated", name: item.name)) unless suggestion
+    return redirect_to(move_item_path(@move, item), notice: t(".updated", name: item.name)) unless suggestion && suggestion.item_id == item.id
 
     # Saving the edit is what resolves the suggestion (Correct only navigates here)
     # — so an abandoned correction leaves it pending in the queue.

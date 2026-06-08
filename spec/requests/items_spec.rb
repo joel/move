@@ -107,6 +107,21 @@ RSpec.describe "Items" do
         expect(conflict.reload.state).to eq("corrected")
         expect(response).to redirect_to(move_box_review_index_path(move, box))
       end
+
+      it "ignores a carried suggestion that belongs to a different item (stale/crafted form)" do
+        edited = create(:item, :manual, move:, box:, name: "Lamp")
+        unrelated = create(:recognition_suggestion, :with_item, move:, box:, state: "pending")
+
+        patch move_item_path(move, edited),
+              params: { item: { name: "Desk Lamp" }, review_suggestion_id: unrelated.id }
+
+        # The unrelated suggestion (and its linked item) is left untouched…
+        expect(unrelated.reload.state).to eq("pending")
+        expect(unrelated.item.review_state).not_to eq("confirmed")
+        # …and we fall back to a plain item-edit redirect rather than the review flow.
+        expect(edited.reload.name).to eq("Desk Lamp")
+        expect(response).to redirect_to(move_item_path(move, edited))
+      end
     end
   end
 
