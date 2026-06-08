@@ -203,7 +203,20 @@ EOF
 
 Never use `OVERCOMMIT_DISABLE=1`.
 
-**`[skip ci]` flag:** Add `[skip ci]` to commit messages when the change does not need CI. This includes documentation-only commits (`.md` files, skill files, workflow docs), comment-only code changes, and non-runtime config changes. Place it at the end of the subject line or in the commit body.
+> **A subject-only commit starting with `#<issue>` can fail the `EmptyMessage`
+> hook.** Git's default `commentChar` is `#`, so a message that is a single
+> `#…` line with no body gets stripped to nothing and the hook rejects it
+> (`Commit message should not be empty`). The multi-line `-m "$(cat <<'EOF' … EOF)"`
+> commits in this skill are unaffected (they have a body); it only bites a quick
+> `git commit -m "#91 Link PR"`. Fix: add a body, or use
+> `git -c core.commentChar=";" commit -m "#91 …"`.
+
+**`[skip ci]` flag (⚠ project override):** the generic advice is to add `[skip ci]`
+to docs-only/comment-only commits. **In the `move` repo, do NOT** — a squash-merge
+folds commit bodies into the merge commit, and any `[skip ci]`/`[skip deploy]`
+marker there silently skips the **production deploy**. CI already path-ignores
+`**/*.md`, `doc/**`, `.claude/**` via `paths-ignore`, so docs commits need no
+marker. (See `AGENTS.md` §4 Deployment.)
 
 ### Step 8: Runtime Test Workflow
 
@@ -233,6 +246,16 @@ before pushing (see the project's `AGENTS.md` §7):
   author/regenerate the scene; otherwise hand-author the `.excalidraw` JSON.
 - Commit docs atomically (markdown-only commits are path-ignored by CI). Record
   hard-won gotchas in agent memory too.
+
+> **Don't leave a docs-only commit as the PR tip.** Branch protection requires the
+> `lint`/`test` checks **on the HEAD sha**, but CI path-ignores `**/*.md`/`doc/**`/
+> `.claude/**` — so a docs-only HEAD never runs CI and the PR stays
+> `mergeStateStatus: BLOCKED`. Order commits so **code lands last**, or fold a
+> trailing docs commit into the preceding code commit before pushing
+> (`git reset --soft <code-sha>` → re-stage docs → `git commit --amend` →
+> `git push --force-with-lease`; confirm the net tree is unchanged with
+> `git diff <backup-branch> HEAD`). A *fully* docs-only PR is the same problem —
+> those get admin-merged.
 
 ### Step 9: Push and Create PR
 
