@@ -9,6 +9,8 @@ require "chunky_png"
 # scan URL is injected by the caller (built from the current request host) so the
 # builder stays pure and host-agnostic.
 class BoxLabelPdf
+  include PdfFonts
+
   BRAND = "MOVE"
 
   def initialize(box:, scan_url:)
@@ -19,7 +21,7 @@ class BoxLabelPdf
   # Returns the rendered PDF as a binary string.
   def render
     doc = Prawn::Document.new(page_size: "A7", margin: 18)
-    doc.font_families.update("Helvetica" => { normal: "Helvetica", bold: "Helvetica-Bold" })
+    register_unicode_font(doc)
 
     header(doc)
     number(doc)
