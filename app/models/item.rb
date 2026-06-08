@@ -18,7 +18,7 @@ class Item < ApplicationRecord
   has_many :item_tags, dependent: :destroy
   has_many :tags, through: :item_tags
   # D8 hybrid-search projection (one row per item; lexical + optional embedding).
-  has_one :search_document, dependent: :destroy
+  has_one :search_document, class_name: "ItemSearchDocument", dependent: :destroy
   # Raw uuid back-reference (no FK; set when materialized from a suggestion).
   # No belongs_to to avoid a circular dependency with RecognitionSuggestion.
 
@@ -33,8 +33,22 @@ class Item < ApplicationRecord
   # false-positive) must not linger in pending counts.
   scope :pending_review, -> { in_box.where(review_state: "pending_review") }
   scope :ordered, -> { order(created_at: :asc) }
+  # Confirmed/auto-confirmed items still in their box — the default searchable set
+  # (excludes needs_correction and removed; Domain §7.4).
+  scope :searchable, -> { in_box.where(review_state: %w[confirmed auto_confirmed]) }
 
   def removed?
     presence_state == "removed"
+  end
+
+  # Keep the D8 search projection fresh on any create/update. Async (embedding
+  # generation) and tenant-restoring. Dormant under transactional test fixtures
+  # (no real commit) — search specs index explicitly; dev/prod commit for real.
+  after_commit :enqueue_search_refresh, on: %i[create update]
+
+  private
+
+  def enqueue_search_refresh
+    Search::RefreshDocumentJob.perform_later(id, tenant: Apartment::Tenant.current)
   end
 end
