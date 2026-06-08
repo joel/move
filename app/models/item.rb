@@ -17,6 +17,8 @@ class Item < ApplicationRecord
   belongs_to :category, optional: true
   has_many :item_tags, dependent: :destroy
   has_many :tags, through: :item_tags
+  # D8 hybrid-search projection (one row per item; lexical + optional embedding).
+  has_one :search_document, dependent: :destroy
   # Raw uuid back-reference (no FK; set when materialized from a suggestion).
   # No belongs_to to avoid a circular dependency with RecognitionSuggestion.
 
