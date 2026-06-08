@@ -40,15 +40,4 @@ class Item < ApplicationRecord
   def removed?
     presence_state == "removed"
   end
-
-  # Keep the D8 search projection fresh on any create/update. Async (embedding
-  # generation) and tenant-restoring. Dormant under transactional test fixtures
-  # (no real commit) — search specs index explicitly; dev/prod commit for real.
-  after_commit :enqueue_search_refresh, on: %i[create update]
-
-  private
-
-  def enqueue_search_refresh
-    Search::RefreshDocumentJob.perform_later(id, tenant: Apartment::Tenant.current)
-  end
 end

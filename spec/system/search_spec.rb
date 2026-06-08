@@ -14,7 +14,9 @@ RSpec.describe "Hybrid search" do
   it "shows the hero + example hints, then finds an item with its box/room context" do
     room = create(:room, move:, name: "Kitchen")
     box = create(:box, move:, number: "1", room:)
-    create(:item, :confirmed, move:, box:, name: "Cast iron skillet")
+    item = create(:item, :confirmed, move:, box:, name: "Cast iron skillet")
+    # Indexing is event-driven off item actions; index the factory item directly.
+    Search::RefreshDocument.new.call(item: item)
 
     visit move_search_path(move)
     expect(page).to have_text(I18n.t("searches.hint"))

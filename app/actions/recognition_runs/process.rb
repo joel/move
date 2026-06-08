@@ -58,6 +58,10 @@ module RecognitionRuns
         created_via: "recognition", review_state: auto ? "auto_confirmed" : "pending_review"
       )
       suggestion.update!(item: item)
+      # Drives the D8 search projection (Search::IndexSubscriber).
+      Rails.event.notify(
+        "item.created", item_id: item.id, box_id: run.box_id, move_id: run.move_id, created_via: "recognition"
+      )
     end
 
     # A user-confirmed item with the same name already lives in this box.

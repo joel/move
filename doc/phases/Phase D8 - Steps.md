@@ -13,7 +13,8 @@ Append-only log of how the work unfolded. Companion to
 ```mermaid
 flowchart LR
   subgraph write[Write path]
-    I[Item create/update/move] -- after_commit --> J[Search::RefreshDocumentJob]
+    I[Item actions create/update/move] -- "item.* Rails.event" --> SUB[Search::IndexSubscriber]
+    SUB --> J[Search::RefreshDocumentJob]
     B[Box # / room change] -- action --> J
     V[Vocab rename/remove] -- action --> J
     J --> RD[Search::RefreshDocument]
@@ -37,10 +38,12 @@ flowchart LR
   with an exact-match boost; `WHERE` requires at least one signal; excludes
   needs_correction/removed (the `searchable` scope) unless `include_hidden`.
   Drops the semantic leg when the query yields no embedding (graceful fallback).
-- **Freshness:** `Item#after_commit` covers item writes (dormant under
-  transactional test fixtures — search specs index explicitly). Denormalized
-  sources (box number/room, vocab rename/remove) reindex affected items from
-  their actions via `Search::Reindexing`.
+- **Freshness (event-driven, not model callbacks — AGENTS.md §2):** item actions
+  (manual, update, move) + recognition materialization emit `item.*` Rails.events;
+  `Search::IndexSubscriber` enqueues the refresh job. Denormalized sources (box
+  number/room, vocab rename/remove) reindex affected items from their actions via
+  `Search::Reindexing`. (An earlier draft used `Item#after_commit`; moved to the
+  event path on review so indexing stays out of models.)
 
 ## Infra gotchas (hard-won)
 
