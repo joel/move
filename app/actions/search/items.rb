@@ -16,7 +16,7 @@ module Search
     LIMIT = 50
     TRGM_THRESHOLD = 0.2          # min trigram similarity to qualify as a match
     SEMANTIC_MAX_DISTANCE = 0.55  # max cosine distance to qualify semantically
-    WEIGHTS = { lexical: 1.0, trigram: 0.6, semantic: 0.8, exact: 2.0 }.freeze
+    WEIGHTS = { lexical: 1.0, trigram: 0.6, name: 1.0, semantic: 0.8, exact: 2.0 }.freeze
 
     def call(move:, query:, include_hidden: false, embedder: EmbeddingProviders.resolve)
       q = query.to_s.strip
@@ -50,6 +50,9 @@ module Search
     def select_sql(vector)
       lexical = "ts_rank_cd(item_search_documents.search_tsvector, plainto_tsquery('english', :q))"
       trigram = "similarity(item_search_documents.search_text, :q)"
+      # Name trigram (focused, undiluted by box/room/category context) — drives
+      # fuzzy recall on the most important field, e.g. "blow dryer" ~ "Hair dryer".
+      name = "similarity(items.name, :q)"
       semantic = vector ? semantic_score_sql : "0.0"
       exact = "(CASE WHEN item_search_documents.search_text ILIKE :exact OR items.name ILIKE :exact " \
               "THEN 1 ELSE 0 END)"
@@ -58,11 +61,12 @@ module Search
         boxes.number AS result_box_number,
         rooms.name AS result_room_name,
         #{lexical} AS lexical_score,
-        #{trigram} AS trigram_score,
+        GREATEST(#{trigram}, #{name}) AS trigram_score,
         #{semantic} AS semantic_score,
         #{exact} AS exact_hit,
         (#{lexical} * #{WEIGHTS[:lexical]} + #{trigram} * #{WEIGHTS[:trigram]}
-         + #{semantic} * #{WEIGHTS[:semantic]} + #{exact} * #{WEIGHTS[:exact]}) AS score
+         + #{name} * #{WEIGHTS[:name]} + #{semantic} * #{WEIGHTS[:semantic]}
+         + #{exact} * #{WEIGHTS[:exact]}) AS score
       SQL
     end
 
@@ -70,6 +74,7 @@ module Search
       conditions = [
         "item_search_documents.search_tsvector @@ plainto_tsquery('english', :q)",
         "similarity(item_search_documents.search_text, :q) >= #{TRGM_THRESHOLD}",
+        "similarity(items.name, :q) >= #{TRGM_THRESHOLD}",
         "item_search_documents.search_text ILIKE :exact"
       ]
       conditions << semantic_match_sql if vector
