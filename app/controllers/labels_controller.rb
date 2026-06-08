@@ -9,7 +9,7 @@ class LabelsController < MoveScopedController
   # GET /moves/:move_id/boxes/:box_id/label
   def show
     authorize! @box, to: :label?, with: BoxPolicy
-    pdf = BoxLabelPdf.new(box: @box, scan_url: scan_resolve_url(@box.qr_token))
+    pdf = BoxLabelPdf.new(box: @box, scan_url: move_scan_resolve_url(@move, @box.qr_token))
     send_data pdf.render, filename: filename, type: "application/pdf", disposition: "inline"
   end
 
