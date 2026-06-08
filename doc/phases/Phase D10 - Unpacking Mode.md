@@ -45,4 +45,14 @@ E3 is designed across two Stitch screens — Active Checklist + Box Unpacked Cel
 Volume/weight summary (D12); scan entry to unpacking (D9 provides the entry via the E2 Scan-resolved state).
 
 ## 10. Phase audit trail
-_Fill on execution:_ Issue: · PR: · E3 Stitch screen id: · Verification: · Release `v0.15.0-unpacking`:
+- **Issue:** [#89](https://github.com/joel/move/issues/89) (`enhancement`).
+- **PR:** [#90](https://github.com/joel/move/pull/90).
+- **E3 Stitch screens:** `screens/8e990c6d258d473cad16101819689246` (Active
+  Checklist) · `screens/2cb7c29c027247f8955004bda7b8740b` (Box Unpacked
+  Celebration).
+- **Step log:** `doc/phases/Phase D10 - Steps.md`.
+- **Key decision:** celebration *Undo* = reopen box only (unpacked → unpacking);
+  `Box::TRANSITIONS` gains that reverse edge. The `→ unpacked` cascade marks all
+  in-box items removed in one transaction.
+- **Verification:** _filled after /product-review._
+- **Release `v0.15.0-unpacking`:** _filled after merge._

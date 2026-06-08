@@ -7,16 +7,18 @@
 # later phases (D5/D4) — this model intentionally has neither yet.
 class Box < ApplicationRecord
   # Lifecycle per Domain Spec §5.2: packing -> sealed -> in_transit ->
-  # unpacking -> unpacked. A sealed box can be unsealed. Transitions are applied
-  # by app/actions/boxes/transition_status.rb, which also enforces the
-  # seal-requires-room guard.
+  # unpacking -> unpacked. A sealed box can be unsealed; an unpacked box can be
+  # re-opened back to unpacking (D10 celebration "Undo" / reopen — items are
+  # restored individually, the reopen never auto-restores). Transitions are
+  # applied by app/actions/boxes/transition_status.rb, which also enforces the
+  # seal-requires-room guard and the unpacked cascade (in-box items -> removed).
   STATUSES = %w[packing sealed in_transit unpacking unpacked].freeze
   TRANSITIONS = {
     "packing" => %w[sealed],
     "sealed" => %w[packing in_transit],
     "in_transit" => %w[unpacking],
     "unpacking" => %w[unpacked],
-    "unpacked" => []
+    "unpacked" => %w[unpacking]
   }.freeze
   # Linear dimensions used for the "missing dimensions" flag (weight is separate).
   DIMENSIONS = %i[length_cm width_cm height_cm].freeze
@@ -63,6 +65,16 @@ class Box < ApplicationRecord
   # Capture into a sealed (closed) box is blocked until it is unsealed (§5.2).
   def capturable?
     packing?
+  end
+
+  # Destination-side working state — the unpacking checklist (D10/E3) is active.
+  def unpacking?
+    status == "unpacking"
+  end
+
+  # Terminal "everything removed" state — renders the D10 celebration.
+  def unpacked?
+    status == "unpacked"
   end
 
   def available_transitions

@@ -27,6 +27,14 @@ Rails.application.routes.draw do
       # E1 — Box label (A7, opaque) and authenticated manifest (A4) as inline PDFs.
       get "label", to: "labels#show", as: :label
       get "manifest", to: "manifests#show", as: :manifest
+      # E3 — Unpacking mode: destination-side checklist (box in `unpacking`) and
+      # the "box unpacked" celebration (box in `unpacked`). Per-item remove/restore
+      # toggles, `complete` (cascade to unpacked), `reopen` (Undo back to unpacking).
+      get "unpacking", to: "unpacking#show", as: :unpacking
+      patch "unpacking/complete", to: "unpacking#complete", as: :unpacking_complete
+      patch "unpacking/reopen", to: "unpacking#reopen", as: :unpacking_reopen
+      patch "unpacking/items/:item_id/remove", to: "unpacking#remove", as: :unpacking_remove
+      patch "unpacking/items/:item_id/restore", to: "unpacking#restore", as: :unpacking_restore
     end
     # E2 — QR scanner (live camera + manual entry) and token resolution, both in
     # the Move app shell. Resolution looks the box up by qr_token across the

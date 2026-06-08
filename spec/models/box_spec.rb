@@ -46,12 +46,15 @@ RSpec.describe Box do
       expect(build(:box, status: "packing")).to be_packing.and(be_capturable).and(have_attributes(packed?: false, sealed?: false))
       expect(build(:box, status: "sealed")).to be_sealed.and(be_packed).and(have_attributes(capturable?: false))
       expect(build(:box, status: "in_transit")).to be_packed.and(have_attributes(sealed?: false, capturable?: false))
+      expect(build(:box, status: "unpacking")).to be_unpacking.and(have_attributes(unpacked?: false))
+      expect(build(:box, status: "unpacked")).to be_unpacked.and(have_attributes(unpacking?: false))
     end
 
     it "exposes the valid transitions for the current status" do
       expect(build(:box, status: "packing").available_transitions).to eq(%w[sealed])
       expect(build(:box, status: "sealed").available_transitions).to eq(%w[packing in_transit])
-      expect(build(:box, status: "unpacked").available_transitions).to be_empty
+      # An unpacked box can be re-opened back to unpacking (D10 "Undo" / reopen).
+      expect(build(:box, status: "unpacked").available_transitions).to eq(%w[unpacking])
       expect(build(:box, status: "packing")).to be_can_transition_to("sealed")
       expect(build(:box, status: "packing")).not_to be_can_transition_to("in_transit")
     end

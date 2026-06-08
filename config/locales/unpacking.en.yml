@@ -1,0 +1,24 @@
+---
+en:
+  unpacking:
+    back: "Back to box"
+    box_title: "Box #%{number}"
+    read_only: "Read only"
+    progress: "Unpacking Progress"
+    remaining_count: "%{count} of %{total} remaining"
+    remaining_title: "Remaining Items"
+    unpacked_title: "Unpacked"
+    restore: "Restore %{name}"
+    complete: "Mark box unpacked"
+    complete_confirm: "Mark this box unpacked? Every remaining item will be moved to unpacked."
+    all_clear_title: "Nothing left to unpack"
+    all_clear_description: "Every item in this box has been unpacked."
+    done_title: "Box unpacked"
+    done_body: "Everything is where it needs to be. Take a breath."
+    back_to_boxes: "Back to boxes"
+    undo: "Undo"
+    not_available: "This box isn't being unpacked yet."
+    archived: "This move is archived and is read-only."
+    flash:
+      completed: "Box marked unpacked."
+      failed: "Could not mark the box unpacked."

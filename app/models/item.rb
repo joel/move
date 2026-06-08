@@ -29,6 +29,8 @@ class Item < ApplicationRecord
   validates :presence_state, inclusion: { in: PRESENCE_STATES }
 
   scope :in_box, -> { where(presence_state: "in_box") }
+  # Items unpacked / removed from their box (D10 unpacking "Unpacked" section).
+  scope :removed, -> { where(presence_state: "removed") }
   # "Pending review" implies the item is still in the box — a removed item (e.g. a
   # false-positive) must not linger in pending counts.
   scope :pending_review, -> { in_box.where(review_state: "pending_review") }
