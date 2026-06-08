@@ -42,6 +42,8 @@ Rails.application.routes.draw do
     post "vocabularies/:kind", to: "vocabularies#create", constraints: kind
     patch "vocabularies/:kind/:id", to: "vocabularies#update", as: :vocabulary, constraints: kind
     delete "vocabularies/:kind/:id", to: "vocabularies#destroy", constraints: kind
+    # D1 — Hybrid search over the Move's items (full-text + trigram + pgvector).
+    get "search", to: "searches#index", as: :search
   end
   resources :posts
   resources :users

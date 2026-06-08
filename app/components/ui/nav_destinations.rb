@@ -11,14 +11,25 @@ module Components
 
       STUB_HREF = "#"
 
-      def self.default
+      # Move-aware destinations: Boxes (D2) and Search (D8) link to the active
+      # Move when one is in context (Current.move); Scan/Summary/Menu stay stubs
+      # until their phases (D9/D12/D13). With no Move, all are stubs (D0).
+      def self.for_move(move = Current.move)
+        h = Rails.application.routes.url_helpers
         [
-          Destination.new(:boxes, "ui.nav.boxes", Components::Icons::Boxes, STUB_HREF, false),
-          Destination.new(:search, "ui.nav.search", Components::Icons::Search, STUB_HREF, false),
+          Destination.new(:boxes, "ui.nav.boxes", Components::Icons::Boxes,
+                          move ? h.move_boxes_path(move) : STUB_HREF, false),
+          Destination.new(:search, "ui.nav.search", Components::Icons::Search,
+                          move ? h.move_search_path(move) : STUB_HREF, false),
           Destination.new(:scan, "ui.nav.scan", Components::Icons::Camera, STUB_HREF, true),
           Destination.new(:summary, "ui.nav.summary", Components::Icons::Chart, STUB_HREF, false),
           Destination.new(:menu, "ui.nav.menu", Components::Icons::Menu, STUB_HREF, false)
         ]
+      end
+
+      # Backwards-compatible stateless default (no Move context).
+      def self.default
+        for_move(nil)
       end
     end
   end
