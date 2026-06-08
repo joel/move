@@ -285,7 +285,22 @@ unset GITHUB_TOKEN && gh api repos/<owner>/<repo>/pulls/<PR>/comments \
 
 If Codex left inline comments, triage every one via Step 11 (fix / explain / defer),
 then reply and resolve. If Codex only reacted 👍 (no comments), note that and proceed.
-After pushing fixes, Codex re-reviews the new commit — re-check before finishing.
+
+**The review is ITERATIVE — expect several rounds, not one.** Each round commonly
+surfaces fresh P1/P2s as earlier ones are fixed (substantial PRs here have taken
+**5–6 rounds / ~9 findings**). After every fix push: re-trigger `@codex review`,
+wait, re-check, address. **Loop until a round comes back clean** (or remaining
+items are explicitly deferred to tracked issues and their threads resolved) — only
+then is the PR review-complete.
+
+Practical notes:
+- **Codex drops rapid-fire triggers** — firing `@codex review` repeatedly in quick
+  succession gets some coalesced/ignored. Space them out, poll patiently (~45s),
+  and confirm via a review on the current HEAD sha / the trigger's reaction, not
+  just elapsed time.
+- A finding can be valid but **already mitigated** (e.g. a release-scan flags a
+  deploy risk you handled via a runbook step) — reply with the evidence and
+  resolve; don't re-fix.
 
 ### Step 11: Respond to PR Review Comments
 
