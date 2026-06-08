@@ -262,6 +262,12 @@ Run after a PR is merged to `main` and its `main` CI/Deploy run is green.
 
 - **Pre-fill forms from context, not just params.** When a URL carries context (tokens, IDs) that determines valid input, pre-fill and lock the relevant fields. Never rely on the user to type something the system already knows — mismatches cause silent rejections that look like bugs.
 
+- **A new vendored importmap asset is invisible in dev until `assets:precompile` + app restart** (D9 `vendor/javascript/jsqr.js`). The page's `<script type=importmap>` omits the pin and `asset_path("x.js")` raises `Propshaft::MissingAssetError` even though `Rails.application.assets.load_path.find("x.js")` succeeds — the running Puma memoised Propshaft's manifest at boot. Fix: `docker exec move-app-dev bin/rails assets:precompile` **then** `bin/cli app restart` (both needed). A bare `import x from "pkg"` that 404s silently kills the whole Stimulus controller. **Not a code bug** — prod precompiles at image build. Verify: `document.querySelector('script[type=importmap]').textContent.includes('pkg')`. Full detail in agent memory `product-review-asset-staleness`.
+
+- **Prawn PDFs must embed a Unicode TTF — never render user text with the built-in (AFM) fonts.** Helvetica & co. only encode Windows-1252, so a user-supplied name with accents/CJK/emoji/smart-punctuation raises `Prawn::Errors::IncompatibleStringEncoding` → a 500 (D9 #85). Register a TTF (vendored `app/assets/fonts/NotoSans-*.ttf` via the `PdfFonts` mixin) and `doc.font(...)` before rendering any user text; glyphs the TTF lacks degrade to blank `.notdef` boxes (no crash). Add a spec that renders Unicode + emoji content asserting `not_to raise_error`.
+
+- **A `[skip ci]` marker in a commit is forbidden here** (it skips the deploy via squash-merge). The `/execution-plan` skill's Step 7 still suggests `[skip ci]` for docs — **ignore that**; CI already path-ignores `**/*.md` and `.claude/**` via `paths-ignore`, so docs commits need no marker. (See §4 Deployment.)
+
 ---
 
 ## 5. Runtime Test Workflow (Mandatory)

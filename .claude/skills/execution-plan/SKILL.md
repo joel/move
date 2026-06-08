@@ -178,6 +178,16 @@ When implementing a multi-part feature, commit after each logical unit is comple
 
 Stage specific files (not `git add .`) and use a descriptive commit message. Overcommit hooks will enforce RuboCop, trailing whitespace, and commit message format (capitalized subject, no trailing period).
 
+> **Verify the commit actually contains every file you changed.** Staging an
+> explicit file list is safer than `git add .`, but it's also how an edited file
+> gets silently left behind — you commit, the build still passes (the working
+> tree has your fix), and the *old* version ships. After committing, confirm with
+> `git show --stat HEAD` (or `git status` is clean of intended changes). This bit
+> hard once: a scanner security fix was edited but never staged, so the unsafe
+> version merged and a correct Codex re-flag looked like a false positive. If a
+> review says "you didn't fix X" and you're sure you did, check the **pushed**
+> code (`git show origin/<branch>:<path>`), not your working tree.
+
 If a hook is a false positive, skip only that specific hook and document it:
 
 ```bash
@@ -320,6 +330,20 @@ For each comment, decide one of three responses:
 - **Actionable:** Fix the code, commit, push, then reply referencing the commit hash.
 - **Incorrect:** Reply with a clear technical explanation of why no change is needed.
 - **Deferred:** Reply acknowledging the concern and stating which future effort or PR will address it.
+
+> **Before replying "incorrect / already fixed", verify it — don't reason from
+> memory or your working tree.** Codex's findings are frequently subtle and
+> correct (this repo has seen a protocol-relative-URL open-redirect bypass and a
+> Prawn AFM-font encoding crash caught only on re-review). Two failure modes to
+> guard against:
+> - *"Already fixed"* — confirm the fix is in the **pushed/merged** code
+>   (`git show origin/<branch>:<path>`), not just edited locally. A dismissed-but-
+>   real finding shipped unsafe code once this way.
+> - *"False positive"* — reproduce the claim first. A 30-second probe
+>   (`bin/rails runner`, a focused spec, a curl) settles it. Only after the probe
+>   contradicts the finding do you reply "incorrect", and **quote the evidence**
+>   (command + output) in the reply. If the probe confirms it, fix it.
+> Expect several rounds; a fix can introduce a new (often higher-severity) finding.
 
 #### 11c: Reply to each comment
 
