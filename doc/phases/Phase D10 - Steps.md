@@ -55,7 +55,7 @@ alone doesn't recompile CSS — see agent memory `product-review-asset-staleness
 Prod precompiles at image build, so unaffected.
 
 ## 11. PR review
-_filled after PR opens_
+- **PR:** [#90](https://github.com/joel/move/pull/90) — opened, awaiting Codex.
 
 ## Final summary
 _filled at close_

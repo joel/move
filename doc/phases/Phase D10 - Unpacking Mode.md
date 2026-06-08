@@ -46,7 +46,7 @@ Volume/weight summary (D12); scan entry to unpacking (D9 provides the entry via 
 
 ## 10. Phase audit trail
 - **Issue:** [#89](https://github.com/joel/move/issues/89) (`enhancement`).
-- **PR:** _filled on push._
+- **PR:** [#90](https://github.com/joel/move/pull/90).
 - **E3 Stitch screens:** `screens/8e990c6d258d473cad16101819689246` (Active
   Checklist) · `screens/2cb7c29c027247f8955004bda7b8740b` (Box Unpacked
   Celebration).
