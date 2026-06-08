@@ -73,4 +73,4 @@ flowchart LR
 ## Verification
 - Unit: `407 examples, 0 failures` (+ provider/model/action/request specs).
 - System (`rack_test`): search flow green. RuboCop + Brakeman clean.
-- Live `/product-review`: _fill_.
+- Live `/product-review`: empty/hints, exact (coffee), synonym ("blow dryer"→Hair dryer · Close match · Box 5·Garage), no-results, pending_review excluded, nav active, mobile no-overflow, no N+1.
