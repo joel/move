@@ -7,11 +7,15 @@ module Boxes
   # to remove a room); a present name is resolved/created from the vocabulary.
   class Update < BaseAction
     include Boxes::RoomResolution
+    include Search::Reindexing
 
     ATTRS = %i[number length_cm width_cm height_cm weight_kg].freeze
 
     def call(box:, params:, editor:)
       yield persist(box, params)
+      # Box number / room feed the items' search_text (Domain §7.3); the item rows
+      # didn't change, so refresh their projections explicitly.
+      reindex_items(box.items.ids) if box.saved_change_to_number? || box.saved_change_to_room_id?
       yield emit_event(box, editor)
       Success(box)
     end

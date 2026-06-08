@@ -1,0 +1,23 @@
+# D1 — Hybrid search (Phase D8). No customer-facing copy is hard-coded in the
+# Phlex views — everything renders through searches.*.
+en:
+  searches:
+    placeholder: "Find anything…"
+    hint: "Search by name or meaning — phrasing need not match exactly."
+    examples:
+      - "kitchen electronics"
+      - "winter coats"
+      - "something to make coffee"
+    results_count:
+      one: "1 result for “%{query}”"
+      other: "%{count} results for “%{query}”"
+    location: "Location"
+    box: "Box %{number}"
+    match:
+      exact: "Exact match"
+      lexical: "Match"
+      fuzzy: "Close match"
+      semantic: "Related item"
+    empty:
+      title: "No matches for “%{query}”"
+      description: "Try fewer or different words — search understands meaning, not just exact text."

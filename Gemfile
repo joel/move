@@ -12,6 +12,8 @@ gem "propshaft"
 
 # Use postgresql as the database for Active Record
 gem "pg"
+# pgvector <-> Active Record mapping for D8 hybrid search (array<->vector, ANN).
+gem "neighbor"
 
 # Use the Puma web server [https://github.com/puma/puma]
 gem "puma", ">= 5.0"

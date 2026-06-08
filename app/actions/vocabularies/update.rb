@@ -12,8 +12,13 @@ module Vocabularies
   # would keep a hidden, unselectable tag that silently vanishes on their next
   # save.
   class Update < BaseAction
+    include Search::Reindexing
+
     def call(record:, vocabulary:, params:, actor:)
+      affected = affected_item_ids(record) # before rename/detach
       detached = yield persist(record, vocabulary, params)
+      # A rename (or tag→box detach) changes the items' denormalized search_text.
+      reindex_items(affected) if record.saved_change_to_name? || detached.positive?
       yield emit_event(record, vocabulary, actor, detached)
       Success(record)
     end

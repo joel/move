@@ -128,7 +128,11 @@ ssh:
 # Use accessory services (secrets come from .kamal/secrets).
 accessories:
   db:
-    image: postgres:18
+    # pgvector/pgvector:pg18 = postgres:18 + the `vector` extension (D8 hybrid
+    # search). Same PG18 cluster, so the existing data dir is reused — but the
+    # accessory image change needs a manual `kamal accessory` cutover (an app
+    # deploy does NOT reboot accessories). See new-app-recipe.md.
+    image: pgvector/pgvector:pg18
     # SSH target = raw origin IP (see servers.web note).
     host: 65.20.110.89
     env:

@@ -24,6 +24,34 @@ CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public;
 COMMENT ON EXTENSION citext IS 'data type for case-insensitive character strings';
 
 
+--
+-- Name: pg_trgm; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pg_trgm; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching based on trigrams';
+
+
+--
+-- Name: vector; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION vector; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION vector IS 'vector data type and ivfflat and hnsw access methods';
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -110,6 +138,24 @@ CREATE TABLE public.categories (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     move_id uuid NOT NULL,
     name character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: item_search_documents; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.item_search_documents (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    item_id uuid NOT NULL,
+    move_id uuid NOT NULL,
+    search_text text DEFAULT ''::text NOT NULL,
+    search_tsvector tsvector GENERATED ALWAYS AS (to_tsvector('english'::regconfig, COALESCE(search_text, ''::text))) STORED,
+    embedding public.vector(1536),
+    embedding_model character varying,
+    embedded_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
@@ -455,6 +501,14 @@ ALTER TABLE ONLY public.categories
 
 
 --
+-- Name: item_search_documents item_search_documents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_search_documents
+    ADD CONSTRAINT item_search_documents_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: item_tags item_tags_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -696,6 +750,41 @@ CREATE INDEX index_categories_on_move_id ON public.categories USING btree (move_
 --
 
 CREATE UNIQUE INDEX index_categories_on_move_id_and_lower_name ON public.categories USING btree (move_id, lower((name)::text));
+
+
+--
+-- Name: index_item_search_documents_on_embedding; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_item_search_documents_on_embedding ON public.item_search_documents USING hnsw (embedding public.vector_cosine_ops);
+
+
+--
+-- Name: index_item_search_documents_on_item_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_item_search_documents_on_item_id ON public.item_search_documents USING btree (item_id);
+
+
+--
+-- Name: index_item_search_documents_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_item_search_documents_on_move_id ON public.item_search_documents USING btree (move_id);
+
+
+--
+-- Name: index_item_search_documents_on_search_text_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_item_search_documents_on_search_text_trgm ON public.item_search_documents USING gin (search_text public.gin_trgm_ops);
+
+
+--
+-- Name: index_item_search_documents_on_search_tsvector; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_item_search_documents_on_search_tsvector ON public.item_search_documents USING gin (search_tsvector);
 
 
 --
@@ -1159,6 +1248,14 @@ ALTER TABLE ONLY public.user_webauthn_keys
 
 
 --
+-- Name: item_search_documents fk_rails_b44f0ebef7; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_search_documents
+    ADD CONSTRAINT fk_rails_b44f0ebef7 FOREIGN KEY (move_id) REFERENCES public.moves(id) ON DELETE CASCADE;
+
+
+--
 -- Name: user_verification_keys fk_rails_b5d6b8f85b; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1199,6 +1296,14 @@ ALTER TABLE ONLY public.boxes
 
 
 --
+-- Name: item_search_documents fk_rails_e5a5152ee5; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_search_documents
+    ADD CONSTRAINT fk_rails_e5a5152ee5 FOREIGN KEY (item_id) REFERENCES public.items(id) ON DELETE CASCADE;
+
+
+--
 -- Name: item_tags fk_rails_edc62a420c; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1221,6 +1326,8 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260608090002'),
+('20260608090001'),
 ('20260607130001'),
 ('20260607120004'),
 ('20260607120003'),

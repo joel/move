@@ -13,7 +13,7 @@ class MoveScopedController < TenantController
   private
 
   def set_move
-    @move = authorized_scope(Move.all).find(params.expect(:move_id))
+    @move = Current.move = authorized_scope(Move.all).find(params.expect(:move_id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
   end

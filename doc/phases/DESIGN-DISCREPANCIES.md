@@ -176,6 +176,27 @@ three sibling surfaces from **one** controller + view (kind registry).
 
 ---
 
+## ⚠️ §D1 — "Search" screen — non-blocking decisions (D8)
+
+The canonical screen `Search (Dark) - Refined Palette`
+(`screens/ca6172ef…`) was implemented in Phase D8.
+
+- **No per-item images → text-first result cards.** The mockup shows a photo on
+  every result card; the data model has no per-item image (recognition captures
+  box-level media, not per-item crops — Technical Foundation §13). Cards render
+  the item name, a match badge, and the box/room location instead. Adding
+  per-item images would be a domain change, not a D8 fix.
+- **Match badges map to the hybrid signal.** "Exact Match" / "Related Item" in
+  the design map to `Search::Items#matched_on` → exact / lexical / fuzzy /
+  semantic, surfaced as a chip.
+- **Voice/mic search omitted** (the mockup shows a mic button) — out of scope.
+  The filter control is likewise deferred.
+- **Nav entry point wired (not stubbed).** Unlike D7, Search is a primary
+  destination, so it's linked from the shell via `Current.move` (Boxes + Search
+  light up; Scan/Summary/Menu remain stubs until D9/D12/D13). **Status: ⚠️ decided.**
+
+---
+
 ## ⚠️ §PALETTE — Two colour systems coexist
 
 - **Observation:** `designTheme` exposes a full Material-3 token set **and** a "Refined Palette" (`page-dark #2A2822`, `card-dark #34312A`, `page-light #F2ECE1`, `card-light #FAF6EF`, `accent-sage-dark #9FB089`). Many newer screens carry a `… - Refined Palette` variant; the design-system prose references the Refined Palette values directly.
@@ -217,6 +238,7 @@ three sibling surfaces from **one** controller + view (kind registry).
 | B2 | ⚠️ | D4 | ✅ decided | file-upload (not live camera), static online pill, retry writable-only |
 | C2 | ⚠️ | D6 | ✅ decided | quantity read-only on review (Keep = accept as-is); tweaks via Correct → C3 edit |
 | D2 | ⚠️ | D7 | ✅ decided | one medallion/kind, search→D8, no-JS add/rename, entry point→D13 |
+| D1 | ⚠️ | D8 | ✅ decided | text-first cards (no per-item images), mic/filter omitted, nav wired |
 | E2 | ✅ | D9 | resolved | 4 state screens created (`09263080…`, `8086fa25…`, `de9f2c2a…`, `47000d2e…`) |
 | E3 | ✅ | D10 | resolved | 2 screens created (`8e990c6d…`, `2cb7c29c…`) |
 | F3 | ✅ | D13 | resolved | 3 screens created (`6f780b58…`, `11d53a11…`, `02012642…`) |

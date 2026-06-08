@@ -20,7 +20,7 @@ module Views
           ) do
             render Components::FlashToasts.new
             render Components::GoogleOneTap.new
-            render(Components::Ui::AppLayout.new(active: :boxes), &)
+            render(Components::Ui::AppLayout.new, &)
           end
         end
       end

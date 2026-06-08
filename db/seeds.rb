@@ -162,7 +162,11 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     { box: "4", name: "Paperback Novels", qty: 12, fragile: false,
       category: "Books", tags: ["Heavy"], review: "needs_correction", presence: "in_box" },
     { box: "4", name: "Winter Coat", qty: 1, fragile: false,
-      category: "Clothing", tags: [], review: "confirmed", presence: "removed" }
+      category: "Clothing", tags: [], review: "confirmed", presence: "removed" },
+    # D8 search demo: a confirmed "Hair dryer" so a semantic/fuzzy query like
+    # "blow dryer" recovers it (shared "dryer" + embedding proximity).
+    { box: "5", name: "Hair dryer", qty: 1, fragile: false,
+      category: "Electronics", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" }
   ]
   manual_items.each do |attrs|
     box = move.boxes.find_by(number: attrs[:box])
@@ -238,11 +242,19 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     end
   end
 
+  # D8: build the hybrid-search projection for every seeded item synchronously
+  # (background workers don't run during db:seed). Fake embedder → deterministic,
+  # no network. After this, search works immediately in /product-review.
+  move.items.includes(:category, :tags, box: :room).find_each do |item|
+    Search::RefreshDocument.new.call(item: item)
+  end
+
   Rails.logger.info(
     "[seeds] #{organization.slug}: #{move.boxes.count} boxes, #{move.rooms.count} rooms, " \
     "#{move.categories.count} categories, #{move.tags.count} tags, " \
     "#{move.items.count} items, #{move.media.count} media, " \
-    "#{move.recognition_suggestions.unresolved.count} to review"
+    "#{move.recognition_suggestions.unresolved.count} to review, " \
+    "#{ItemSearchDocument.count} search docs"
   )
 end
 

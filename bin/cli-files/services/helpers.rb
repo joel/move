@@ -20,7 +20,9 @@ module AppCLI
     WAIT_IMAGE = "workeverywhere/wait:2.12.1".freeze
     DB_IMAGES = {
       "mysql" => "mysql:latest",
-      "postgresql" => "postgres:18"
+      # pgvector/pgvector:pg18 = postgres:18 + the `vector` extension (D8 hybrid
+      # search). Same PG18 cluster layout, so the existing data volume is reused.
+      "postgresql" => "pgvector/pgvector:pg18"
     }.freeze
     DEFAULT_DB_PORTS = {
       "mysql" => 3306,

@@ -8,14 +8,17 @@ module Components
     #
     #   render Components::Ui::AppLayout.new(active: :boxes) { content }
     class AppLayout < Components::Base
-      def initialize(active: :boxes, **attrs)
-        @active = active.to_sym
+      # Active section + destinations default to the request context (Current),
+      # so Move-scoped surfaces light up the right nav item and link Move-aware.
+      def initialize(active: nil, **attrs)
+        @active = (active || Current.nav_section || :boxes).to_sym
+        @destinations = Components::Ui::NavDestinations.for_move
         @attrs = attrs
       end
 
       def view_template(&)
         div(class: "flex min-h-screen bg-page text-text-warm", **@attrs) do
-          render Components::Ui::Sidebar.new(active: @active)
+          render Components::Ui::Sidebar.new(active: @active, destinations: @destinations)
           mobile_top_bar
           main(
             class: "flex min-h-screen w-full flex-1 flex-col " \
@@ -23,7 +26,7 @@ module Components
           ) do
             div(class: "mx-auto flex w-full max-w-5xl flex-col gap-section-gap", &)
           end
-          render Components::Ui::BottomTabBar.new(active: @active)
+          render Components::Ui::BottomTabBar.new(active: @active, destinations: @destinations)
         end
       end
 

@@ -43,10 +43,13 @@ Apartment.configure do |config|
   config.pg_exclude_clone_tables = true
 
   # When cloning, Apartment rewrites every `public.X` qualifier to the new
-  # tenant schema. The citext type lives only in public, so exclude it from
-  # that rewrite — otherwise tenant tables reference a non-existent
-  # `<tenant>.citext` type and creation fails.
-  config.pg_excluded_names = %w[citext]
+  # tenant schema. Types/opclasses that live only in public must be excluded from
+  # that rewrite — otherwise cloned tenant tables/indexes reference a
+  # non-existent `<tenant>.X` and creation fails:
+  #   - citext      — the citext extension type
+  #   - vector      — pgvector column type on item_search_documents (D8)
+  #   - *_ops       — opclasses behind the trigram + HNSW search indexes (D8)
+  config.pg_excluded_names = %w[citext vector vector_cosine_ops gin_trgm_ops]
 
   # Tenants are the Organization slugs. Guarded so db:create/db:migrate work on a
   # fresh database before the organizations table exists.
