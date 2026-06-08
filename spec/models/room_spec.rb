@@ -25,4 +25,11 @@ RSpec.describe Room do
     create(:room, move: create(:move), name: "Kitchen")
     expect(build(:room, move: create(:move), name: "Kitchen")).to be_valid
   end
+
+  it "enforces case-insensitive uniqueness at the DB level (bypassing validation)" do
+    move = create(:move)
+    create(:room, move:, name: "Kitchen")
+    dup = build(:room, move:, name: "kitchen")
+    expect { dup.save!(validate: false) }.to raise_error(ActiveRecord::RecordNotUnique)
+  end
 end
