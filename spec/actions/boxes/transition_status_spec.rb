@@ -60,4 +60,49 @@ RSpec.describe Boxes::TransitionStatus do
       "box.status_changed", hash_including(to: "sealed")
     )
   end
+
+  describe "unpacked cascade" do
+    it "marks every in-box item removed when the box is unpacked" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      kept = create(:item, move:, box:, presence_state: "in_box")
+      already = create(:item, move:, box:, presence_state: "removed")
+
+      expect(transition(box, "unpacked")).to be_success
+      expect(box.reload.status).to eq("unpacked")
+      expect(kept.reload.presence_state).to eq("removed")
+      expect(already.reload.presence_state).to eq("removed")
+    end
+
+    it "does not touch items in other boxes" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      other = create(:box, :with_room, move:, status: "unpacking")
+      outsider = create(:item, move:, box: other, presence_state: "in_box")
+
+      transition(box, "unpacked")
+
+      expect(outsider.reload.presence_state).to eq("in_box")
+    end
+
+    it "rolls the cascade back if the status update fails" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      item = create(:item, move:, box:, presence_state: "in_box")
+      allow(box).to receive(:update!).and_raise(
+        ActiveRecord::RecordInvalid.new(box)
+      )
+
+      expect(transition(box, "unpacked")).to be_failure
+      expect(item.reload.presence_state).to eq("in_box")
+    end
+  end
+
+  describe "reopen (unpacked -> unpacking)" do
+    it "reopens an unpacked box without restoring its items" do
+      box = create(:box, :with_room, move:, status: "unpacked")
+      item = create(:item, move:, box:, presence_state: "removed")
+
+      expect(transition(box, "unpacking")).to be_success
+      expect(box.reload.status).to eq("unpacking")
+      expect(item.reload.presence_state).to eq("removed")
+    end
+  end
 end
