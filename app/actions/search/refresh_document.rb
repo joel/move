@@ -21,6 +21,12 @@ module Search
       # A concurrent refresh inserted the row first (one doc per item) — reload
       # the winner's row and update it so duplicate jobs converge instead of one
       # being dropped.
+      #
+      # find_by! (not .sole / find_sole_by): the DB unique index on item_id
+      # already guarantees ≤1 row, so .sole's "more than one?" assertion is dead
+      # code here and costs an extra LIMIT-2 probe. find_by! is the idiomatic
+      # "fetch the existing unique row". (Reach for .sole when an exactly-one
+      # invariant is NOT backed by a constraint.)
       write(ItemSearchDocument.find_by!(item_id: item.id), item, embedder)
     end
 
