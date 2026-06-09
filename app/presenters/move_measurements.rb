@@ -36,12 +36,24 @@ class MoveMeasurements
     end
   end
 
+  # Finest volume resolution we render (matches BoxMeasurements' 3-decimal m³).
+  MIN_VOLUME_LABEL = "<0.001"
+
   private
 
-  # Up to 2 decimals, trailing zeros stripped: 42.50→"42.5", 12.00→"12",
-  # 0.21→"0.21". Keeps tiny single-box totals legible without noisy precision.
+  # Trailing-zeros-stripped decimal that never reports a measured nonzero volume
+  # as "0": tries 2 decimals (clean for normal totals — 42.50→"42.5", 0.21→
+  # "0.21"), escalates to 3 for sub-0.01 values (1,000 cm³ = 0.001 m³→"0.001"),
+  # and falls back to a "<0.001" threshold for anything finer rather than
+  # collapsing a positive value to zero.
   def format_decimal(value)
-    format("%.2f", value).sub(/\.?0+$/, "")
+    return "0" if value.zero?
+
+    (2..3).each do |precision|
+      formatted = format("%.#{precision}f", value).sub(/\.?0+$/, "")
+      return formatted unless formatted == "0"
+    end
+    MIN_VOLUME_LABEL
   end
 
   # Whole-number weight with a thousands separator (design: "1,240 kg").

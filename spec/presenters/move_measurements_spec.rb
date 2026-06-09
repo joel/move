@@ -12,6 +12,13 @@ RSpec.describe MoveMeasurements do
       expect(m.volume(12_000_000)).to have_attributes(value: "12", unit: "m³")
     end
 
+    it "never reports a measured nonzero volume as 0" do
+      # 1,000 cm³ = 0.001 m³ — escalates to 3 decimals instead of "0.00"→"0".
+      expect(m.volume(1_000)).to have_attributes(value: "0.001", unit: "m³")
+      # Below the rendered resolution: a threshold, not a false zero.
+      expect(m.volume(100)).to have_attributes(value: "<0.001", unit: "m³")
+    end
+
     it "formats weight in kg with a thousands separator" do
       expect(m.weight(8)).to have_attributes(value: "8", unit: "kg")
       expect(m.weight(1240)).to have_attributes(value: "1,240", unit: "kg")
