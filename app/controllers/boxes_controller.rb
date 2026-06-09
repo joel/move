@@ -114,7 +114,7 @@ class BoxesController < MoveScopedController
   # Archived Moves are read-only — no creating, editing or transitioning boxes.
   # Explicit key (not lazy) since this runs across several actions.
   def require_writable_move!
-    return deny_move_mutation! unless move_editor?
+    authorize_move_mutation!
     return if @move.writable?
 
     redirect_to move_boxes_path(@move), alert: t("boxes.archived")

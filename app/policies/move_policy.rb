@@ -20,6 +20,13 @@ class MovePolicy < ApplicationPolicy
     user.present?
   end
 
+  # Holds an editing role (admin/contributor) on the Move. The controller pairs
+  # this with the archived (read-only) redirect, so a viewer gets a 403 while an
+  # editor on an archived Move gets the friendly read-only redirect instead.
+  def edit_contents?
+    editor_role?(record)
+  end
+
   # F1 — managing members and their roles is admin-only.
   def manage_members?
     admin_of?(record)

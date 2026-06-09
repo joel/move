@@ -156,11 +156,14 @@ membership, whose `role` is one of:
   (`authorized_scope(Move.all).find`) **404s a non-member** before any nested
   resource loads. This is what closes the manifest-export gap (#86): a member of
   another Move in the same Organization can no longer read a box manifest.
-- **Mutation gate = editor role.** `BoxPolicy`/`ItemPolicy`/… require the
-  admin/contributor tier *and* a writable (non-archived) Move; the shared
-  `require_writable_move!` controller guard refuses a viewer with 403
-  (`move_editor?` → `deny_move_mutation!`). Vocabulary curation and member
-  management are admin-only.
+- **Mutation gate = editor role.** The authorization decision lives in
+  ActionPolicy: `MovePolicy#edit_contents?` (admin/contributor) is checked via
+  `authorize!` in the shared `require_writable_move!` guard, so a viewer gets the
+  standard ActionPolicy 403. The guard then applies the **archived → read-only
+  redirect** (a UX/response concern, not authorization). `BoxPolicy`/`ItemPolicy`
+  additionally answer the complete rule (`editor_of?` = editor *and* writable)
+  for the `authorize!`-based actions. Vocabulary curation and member management
+  are admin-only.
 
 ```mermaid
 flowchart TD
@@ -168,8 +171,8 @@ flowchart TD
   SM -->|"not a member<br/>(relation_scope)"| NF["404 (non-disclosing)"]
   SM -->|"member"| ACT{action kind}
   ACT -->|read| OK["render (viewer+)"]
-  ACT -->|mutate| ED{"move_editor?<br/>(admin/contributor)"}
-  ED -->|viewer| F403["403 deny_move_mutation!"]
+  ACT -->|mutate| ED{"authorize!<br/>MovePolicy#edit_contents?"}
+  ED -->|viewer| F403["403 (ActionPolicy)"]
   ED -->|editor| WR{"move.writable?"}
   WR -->|archived| RO["redirect: read-only"]
   WR -->|writable| OK2["run action"]

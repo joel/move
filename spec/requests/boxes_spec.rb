@@ -182,4 +182,30 @@ RSpec.describe "Boxes" do
       expect(response).to have_http_status(:not_found)
     end
   end
+
+  # D11 — mutation is gated on the editor role via ActionPolicy
+  # (MovePolicy#edit_contents?, checked in require_writable_move!).
+  describe "role enforcement on mutation" do
+    it "forbids a viewer from creating a box (403)" do
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+
+      expect do
+        post move_boxes_path(move), params: { box: { number: "9" } }
+      end.not_to change(move.boxes, :count)
+
+      expect(response).to have_http_status(:forbidden)
+    end
+
+    it "lets a contributor create a box" do
+      contributor = create(:user)
+      create(:move_membership, move:, user: contributor, role: "contributor")
+      stub_current_user(contributor)
+
+      expect do
+        post move_boxes_path(move), params: { box: { number: "9" } }
+      end.to change(move.boxes, :count).by(1)
+    end
+  end
 end

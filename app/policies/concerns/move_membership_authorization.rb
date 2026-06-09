@@ -32,13 +32,17 @@ module MoveMembershipAuthorization
     membership_on(move).present?
   end
 
-  # Admin or contributor may mutate the Move's content, and only while the Move
-  # is writable (non-archived).
-  def editor_of?(move)
-    membership = membership_on(move)
-    return false if membership.nil?
+  # Holds an editing role (admin or contributor) on the Move — independent of
+  # whether the Move is currently writable. Used where archived state is handled
+  # separately (the controller's archived → read-only redirect).
+  def editor_role?(move)
+    membership_on(move)&.can_edit? || false
+  end
 
-    membership.can_edit? && move.writable?
+  # May mutate the Move's content *now*: an editing role on a writable
+  # (non-archived) Move. The complete rule for authorize! paths.
+  def editor_of?(move)
+    editor_role?(move) && move.writable?
   end
 
   # Only an admin may manage members/roles and curate the Move's vocabulary.

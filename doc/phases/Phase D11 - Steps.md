@@ -29,10 +29,11 @@ screen↔phase map.
   New `MoveMembershipAuthorization` policy concern (`reader_of?/editor_of?/admin_of?`).
   `MovePolicy.relation_scope` → members-only (this is what closes #86 — non-members
   404 at `set_move`); Box/Item/RecognitionSuggestion read = member, mutate =
-  editor+writable; Vocabulary curate = admin. Controller mutation chokepoint:
-  `move_editor?`/`deny_move_mutation!` in `MoveScopedController`, called from each
-  `require_writable_move!` (viewer → 403). The `:move` factory now mirrors
-  `Moves::Create` (creator → admin member) so move-scoped specs act as a member.
+  editor+writable; Vocabulary curate = admin. Mutation authz stays in ActionPolicy:
+  each `require_writable_move!` calls `authorize! @move, to: :edit_contents?, with:
+  MovePolicy` (viewer → standard 403) and then applies the archived → read-only
+  redirect (a UX concern). The `:move` factory now mirrors `Moves::Create`
+  (creator → admin member) so move-scoped specs act as a member.
 - **Member actions** — `MoveMemberships::Add` (Organization-bounded, rejects a
   non-Org user non-disclosingly), `ChangeRole`, `Remove` (both with a last-admin
   guard); each emits a `move_membership.*` event.
