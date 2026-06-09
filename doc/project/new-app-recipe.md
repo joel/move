@@ -18,6 +18,7 @@ origin (Vultr) and Cloudflare-managed DNS.
 | Auth | Rodauth (passwordless: passkeys, email link, Google) via `rodauth-rails` |
 | Multi-tenancy | `ros-apartment` — **PostgreSQL schema-per-tenant** |
 | Business logic | `app/actions/` (Dry::Monads), never in models/controllers |
+| Assistant API | `mcp` gem — stateless MCP JSON-RPC at `POST /mcp` on the org subdomain, Bearer per-Move token, tools wrap `app/actions/` |
 | DB | **`pgvector/pgvector:pg18`** (postgres 18 + pgvector; dev `bin/cli`, CI service, prod accessory — all pinned). pg_trgm is contrib. |
 | Schema dump | `schema_format = :sql` → `db/structure.sql` |
 | Deploy | **Kamal 2** + kamal-proxy, image on Docker Hub |
@@ -336,7 +337,10 @@ capture → recognition):
 | `type "<tenant>.vector" does not exist` creating/cloning a tenant | the `vector` extension (+ `*_ops` opclasses) live in `public`; Apartment rewrites `public.X`→`<tenant>.X` on clone | add `vector vector_cosine_ops gin_trgm_ops` to `config.pg_excluded_names` (like `citext`) |
 | `template database … has a collation version mismatch` after swapping to `pgvector/pgvector:pg18` | the pgvector image ships an older glibc (2.36) than stock `postgres:18` (2.41); a volume created by stock 18 mismatches | dev: reinit the data volume fresh. prod cutover: `ALTER DATABASE <db> REFRESH COLLATION VERSION;` (+ `REINDEX DATABASE`) **or** dump/restore into a fresh cluster — do this during the `kamal accessory` cutover |
 | pgvector search returns nothing in prod after deploy | accessory still on plain `postgres:18` (app deploy doesn't reboot accessories) | manual `kamal accessory` cutover to `pgvector/pgvector:pg18`, then `bin/rails db:migrate` |
+| MCP `POST /mcp` returns 404 | hit on the apex, not an org subdomain — the Apartment elevator found no tenant (by design, non-disclosing) | call `https://<slug>.<host>/mcp`; the Bearer token then resolves the Move |
+| MCP `input_schema` raises `Invalid JSON Schema … '#/required' … minimum … 1` | passed `required: []` for a no-arg tool | omit `required:` entirely when there are no required args |
+| request-spec `post`/`get` silently doesn't dispatch (`response` nil) | a spec helper param named `method`/`id` shadows methods the integration Runner uses | rename the helper params (e.g. `rpc_method`, `req_id`) |
 
 ---
 
-_Last updated: 2026-06-07, after fixing per-tenant migration on deploy (issue #52)._
+_Last updated: 2026-06-09, after adding the D13 MCP assistant endpoint._
