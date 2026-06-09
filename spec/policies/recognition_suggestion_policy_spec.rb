@@ -6,34 +6,45 @@ RSpec.describe RecognitionSuggestionPolicy do
   let(:user) { create(:user) }
 
   describe "read access" do
-    it "permits any signed-in user to view the queue/item" do
-      suggestion = create(:recognition_suggestion)
-      expect(described_class.new(suggestion, user:).apply(:show?)).to be(true)
+    it "permits a member (any role) to view the queue/item" do
+      move = create(:move)
+      create(:move_membership, move:, user:, role: "viewer")
+
+      expect(described_class.new(create(:recognition_suggestion, move:), user:).apply(:show?)).to be(true)
+    end
+
+    it "denies a signed-in non-member" do
+      expect(described_class.new(create(:recognition_suggestion), user:).apply(:show?)).to be(false)
     end
 
     it "denies an anonymous user" do
-      suggestion = create(:recognition_suggestion)
-      expect(described_class.new(suggestion, user: nil).apply(:show?)).to be(false)
+      expect(described_class.new(create(:recognition_suggestion), user: nil).apply(:show?)).to be(false)
     end
   end
 
   describe "resolution (keep/correct/mark_false_positive)" do
-    it "permits a signed-in user on a writable Move" do
-      suggestion = create(:recognition_suggestion, move: create(:move, status: "started"))
-      policy = described_class.new(suggestion, user:)
+    it "permits an editor (admin/contributor) on a writable Move" do
+      move = create(:move, status: "started")
+      create(:move_membership, move:, user:, role: "contributor")
+      policy = described_class.new(create(:recognition_suggestion, move:), user:)
 
       %i[keep? correct? mark_false_positive?].each do |rule|
         expect(policy.apply(rule)).to be(true), "expected #{rule} permitted"
       end
     end
 
-    it "denies resolution on an archived Move" do
-      suggestion = create(:recognition_suggestion, move: create(:move, status: "archived"))
-      policy = described_class.new(suggestion, user:)
+    it "denies a viewer" do
+      move = create(:move, status: "started")
+      create(:move_membership, move:, user:, role: "viewer")
 
-      %i[keep? correct? mark_false_positive?].each do |rule|
-        expect(policy.apply(rule)).to be(false), "expected #{rule} denied"
-      end
+      expect(described_class.new(create(:recognition_suggestion, move:), user:).apply(:keep?)).to be(false)
+    end
+
+    it "denies resolution on an archived Move" do
+      move = create(:move, :archived)
+      create(:move_membership, move:, user:, role: "admin")
+
+      expect(described_class.new(create(:recognition_suggestion, move:), user:).apply(:keep?)).to be(false)
     end
   end
 end

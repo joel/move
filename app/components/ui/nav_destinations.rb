@@ -12,8 +12,10 @@ module Components
       STUB_HREF = "#"
 
       # Move-aware destinations: Boxes (D2) and Search (D8) link to the active
-      # Move when one is in context (Current.move); Scan/Summary/Menu stay stubs
-      # until their phases (D9/D12/D13). With no Move, all are stubs (D0).
+      # Move when one is in context (Current.move); Scan/Summary stay stubs until
+      # their phases (D9/D12). Menu routes admins to F1 Members & Roles (D11);
+      # for non-admins it stays a stub until the D13 settings hub replaces it.
+      # With no Move, all are stubs (D0).
       def self.for_move(move = Current.move)
         h = Rails.application.routes.url_helpers
         [
@@ -24,8 +26,17 @@ module Components
           Destination.new(:scan, "ui.nav.scan", Components::Icons::Camera,
                           move ? h.move_scan_path(move) : STUB_HREF, true),
           Destination.new(:summary, "ui.nav.summary", Components::Icons::Chart, STUB_HREF, false),
-          Destination.new(:menu, "ui.nav.menu", Components::Icons::Menu, STUB_HREF, false)
+          Destination.new(:menu, "ui.nav.menu", Components::Icons::Menu, menu_href(move, h), false)
         ]
+      end
+
+      # F1 Members is admin-only, so only surface the link for an admin of the
+      # current Move; everyone else keeps the stub (no dead-end 403 from the nav).
+      def self.menu_href(move, helpers)
+        return STUB_HREF if move.nil? || Current.user.nil?
+        return STUB_HREF unless move.membership_for(Current.user)&.admin?
+
+        helpers.move_members_path(move)
       end
 
       # Backwards-compatible stateless default (no Move context).

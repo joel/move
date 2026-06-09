@@ -25,7 +25,16 @@ class ApplicationController < ActionController::Base
 
   helper_method :current_user, :current_tenant
 
+  before_action :set_current_user
+
   private
+
+  # Expose the signed-in User to in-request rendering (role-aware nav) via
+  # Current, mirroring Current.move/tenant. Reset after each request by
+  # ActiveSupport::CurrentAttributes.
+  def set_current_user
+    Current.user = current_user
+  end
 
   def current_user
     rodauth.rails_account

@@ -62,6 +62,11 @@ Rails.application.routes.draw do
     delete "vocabularies/:kind/:id", to: "vocabularies#destroy", constraints: kind
     # D1 — Hybrid search over the Move's items (full-text + trigram + pgvector).
     get "search", to: "searches#index", as: :search
+    # F1 — Members & roles (admin-only). Add an existing Organization user, change
+    # a member's role, or remove them. Role changes go through a member action.
+    resources :members, only: %i[index create destroy] do
+      member { patch :update_role }
+    end
   end
   resources :posts
   resources :users

@@ -1,21 +1,23 @@
 # frozen_string_literal: true
 
 # Items are isolated by the Apartment tenant schema and scoped to a Move/Box in
-# the controller. Read access for any signed-in member; mutating an Item (D5
-# create/edit/move/remove/restore) additionally requires a writable
-# (non-archived) Move — so a viewer on an archived Move cannot mutate. Per-role
-# viewer/contributor rules arrive in D11.
+# the controller (a non-member 404s at the Move). Any member may read; mutating
+# an Item (D5 create/edit/move/remove/restore) requires the admin/contributor
+# (editor) tier and a writable (non-archived) Move — so a viewer, or any member
+# on an archived Move, cannot mutate.
 class ItemPolicy < ApplicationPolicy
+  include MoveMembershipAuthorization
+
   def index?
-    user.present?
+    reader_of?(record_move)
   end
 
   def show?
-    user.present?
+    reader_of?(record_move)
   end
 
   def create?
-    user.present? && record.move&.writable?
+    editor_of?(record_move)
   end
 
   alias update? create?
@@ -27,5 +29,11 @@ class ItemPolicy < ApplicationPolicy
     next relation.none if user.blank?
 
     relation
+  end
+
+  private
+
+  def record_move
+    record.is_a?(Move) ? record : record&.move
   end
 end

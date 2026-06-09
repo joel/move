@@ -17,4 +17,13 @@ class MoveScopedController < TenantController
   rescue ActiveRecord::RecordNotFound
     head :not_found
   end
+
+  # Authorize that the current user holds an editing role (admin/contributor) on
+  # the Move — the authorization decision lives in MovePolicy#edit_contents?, so a
+  # viewer is refused with the standard ActionPolicy 403. Subclasses'
+  # require_writable_move! call this before applying the archived (read-only)
+  # redirect, which is a separate UX concern (a writable check, not authorization).
+  def authorize_move_mutation!
+    authorize! @move, to: :edit_contents?, with: MovePolicy
+  end
 end

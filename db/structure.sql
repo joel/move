@@ -221,7 +221,7 @@ CREATE TABLE public.move_memberships (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     move_id uuid NOT NULL,
     user_id uuid NOT NULL,
-    role character varying DEFAULT 'member'::character varying NOT NULL,
+    role character varying DEFAULT 'viewer'::character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
@@ -1326,6 +1326,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260609120001'),
 ('20260608090002'),
 ('20260608090001'),
 ('20260607130001'),

@@ -104,6 +104,7 @@ class RecognitionSuggestionsController < MoveScopedController
   end
 
   def require_writable_move!
+    authorize_move_mutation!
     return if @move.writable?
 
     redirect_to move_box_review_index_path(@move, @box), alert: t("items.archived")

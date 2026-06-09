@@ -139,6 +139,7 @@ class ItemsController < MoveScopedController
   end
 
   def require_writable_move!
+    authorize_move_mutation!
     return if @move.writable?
 
     redirect_to move_boxes_path(@move), alert: t("items.archived")

@@ -1,24 +1,40 @@
 # frozen_string_literal: true
 
-# Moves are already isolated by the Apartment tenant schema, so the relation
-# scope is the tenant's full set. Membership-level rules live here for the
-# mutating actions added in later phases.
+# Moves are isolated by the Apartment tenant schema, and from D11 further scoped
+# to the user's MoveMemberships: the relation scope returns only Moves the user
+# belongs to, so a signed-in user from another Move in the same Organization
+# cannot load it. Role-level rules (read/edit/admin) live in
+# MoveMembershipAuthorization.
 class MovePolicy < ApplicationPolicy
+  include MoveMembershipAuthorization
+
   def index?
     user.present?
   end
 
   def show?
-    user.present?
+    reader_of?(record)
   end
 
   def create?
     user.present?
   end
 
+  # Holds an editing role (admin/contributor) on the Move. The controller pairs
+  # this with the archived (read-only) redirect, so a viewer gets a 403 while an
+  # editor on an archived Move gets the friendly read-only redirect instead.
+  def edit_contents?
+    editor_role?(record)
+  end
+
+  # F1 — managing members and their roles is admin-only.
+  def manage_members?
+    admin_of?(record)
+  end
+
   relation_scope do |relation|
     next relation.none if user.blank?
 
-    relation
+    relation.where(id: MoveMembership.where(user_id: user.id).select(:move_id))
   end
 end
