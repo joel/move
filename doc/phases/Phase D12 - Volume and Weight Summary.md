@@ -41,4 +41,12 @@ Deliver the mover-facing picture: total volume, optional total weight, per-room 
 MCP `get_volume_summary` (D13); export/share (deferred).
 
 ## 9. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Verification: · Release `v0.17.0-summary`:
+- **Issue:** [#100](https://github.com/joel/move/issues/100) (`enhancement`).
+- **Branch:** `feature/summary`. **Steps log:** `Phase D12 - Steps.md`.
+- **Unit-toggle decision:** persists `Move#unit_system` (display-only over
+  canonical cm/kg; hidden on archived Moves).
+- **Verification:** live at `acme.workeverywhere.docker` — totals/per-room/box
+  count, 3-box incomplete banner, metric↔imperial display-only conversion
+  (canonical unchanged), archived Move read-only with no toggle; dark + light +
+  mobile clean. Full suite green; lint/brakeman clean.
+- **PR:** _on open_ · **Release `v0.17.0-summary`:** _after merge_.

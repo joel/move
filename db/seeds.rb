@@ -300,6 +300,11 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     b.qr_token = "demo-archived-box"
     b.room = archived_room
     b.status = "sealed"
+    # Dimensioned so F2's read-only summary shows a real total (no unit toggle).
+    b.length_cm = 50
+    b.width_cm = 40
+    b.height_cm = 30
+    b.weight_kg = 10
   end
   ["Winter Gear", "Holiday Decor"].each do |name|
     next if archived_box.items.exists?(name: name)
