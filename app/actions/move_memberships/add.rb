@@ -48,6 +48,12 @@ module MoveMemberships
       Success(move.move_memberships.create!(user: user, role: role.to_s))
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
+    rescue ActiveRecord::RecordNotUnique
+      # A concurrent duplicate (double-submit / two admins) can race past the
+      # uniqueness validation and hit the (move_id, user_id) unique index. Treat
+      # it as the same non-disclosing failure as a sequential duplicate, never a
+      # 500.
+      Failure(:already_member)
     end
 
     def emit_event(move, membership, actor)
