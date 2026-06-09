@@ -7,6 +7,8 @@
 # toggle changes display only (Technical Foundation §6.2). Thin: authorize → call
 # Moves::VolumeSummary → render.
 class SummariesController < MoveScopedController
+  before_action { Current.nav_section = :summary }
+
   # GET /moves/:move_id/summary
   def show
     authorize! @move, to: :show?, with: MovePolicy
