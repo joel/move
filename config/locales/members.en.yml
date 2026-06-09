@@ -1,0 +1,37 @@
+en:
+  members:
+    you: "You"
+    index:
+      title: "Members & Roles"
+      subtitle: "Manage who has access to this move's inventory and define their permissions."
+      invite: "Invite member"
+      roles_label: "Role definitions"
+      current: "Current members"
+    roles:
+      admin: "Admin"
+      contributor: "Contributor"
+      viewer: "Viewer"
+    role_descriptions:
+      admin: "Full control over the move, its members, and the complete inventory."
+      contributor: "Can add and edit boxes and items, but cannot manage other members."
+      viewer: "Read-only access to the inventory catalogue and the move summary."
+    add:
+      title: "Add a member"
+      user: "Organization member"
+      role: "Role"
+      submit: "Add member"
+    actions:
+      change_role: "Change role for %{name}"
+      remove: "Remove %{name}"
+      remove_confirm: "Remove %{name} from this move?"
+    create:
+      added: "Member added."
+      add_failed: "That person could not be added to this move."
+    update_role:
+      role_changed: "Role updated."
+      last_admin: "This move must keep at least one admin."
+      role_change_failed: "The role could not be updated."
+    destroy:
+      removed: "Member removed."
+      last_admin: "This move must keep at least one admin."
+      remove_failed: "The member could not be removed."

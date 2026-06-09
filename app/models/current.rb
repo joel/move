@@ -8,4 +8,6 @@ class Current < ActiveSupport::CurrentAttributes
   attribute :tenant
   attribute :move
   attribute :nav_section
+  # The signed-in User, for in-request rendering only (e.g. role-aware nav).
+  attribute :user
 end
