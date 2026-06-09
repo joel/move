@@ -296,16 +296,19 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   end
   archived_move.move_memberships.find_or_create_by!(user: owner) { |mm| mm.role = "admin" }
   archived_room = archived_move.rooms.find_or_create_by!(name: "Storage")
-  archived_box = archived_move.boxes.find_or_create_by!(number: "1") do |b|
-    b.qr_token = "demo-archived-box"
-    b.room = archived_room
-    b.status = "sealed"
-    # Dimensioned so F2's read-only summary shows a real total (no unit toggle).
-    b.length_cm = 50
-    b.width_cm = 40
-    b.height_cm = 30
-    b.weight_kg = 10
-  end
+  # find_or_initialize + assign-then-save so an archived box seeded before D12
+  # (by the D9 seeds, with no dimensions) still gets backfilled on re-seed —
+  # a create-only block would skip an existing record and leave F2 empty.
+  archived_box = archived_move.boxes.find_or_initialize_by(number: "1")
+  archived_box.qr_token ||= "demo-archived-box"
+  archived_box.room = archived_room
+  archived_box.status = "sealed"
+  # Dimensioned so F2's read-only summary shows a real total (no unit toggle).
+  archived_box.length_cm = 50
+  archived_box.width_cm = 40
+  archived_box.height_cm = 30
+  archived_box.weight_kg = 10
+  archived_box.save!
   ["Winter Gear", "Holiday Decor"].each do |name|
     next if archived_box.items.exists?(name: name)
 

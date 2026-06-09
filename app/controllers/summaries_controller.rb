@@ -26,10 +26,14 @@ class SummariesController < MoveScopedController
     authorize! @move, to: :edit_contents?, with: MovePolicy
     return redirect_to move_summary_path(@move), alert: t(".read_only") unless @move.writable?
 
-    unit_system = params.dig(:move, :unit_system)
-    if Move::UNIT_SYSTEMS.include?(unit_system) && @move.update(unit_system: unit_system)
+    result = Moves::SetUnitSystem.new.call(
+      move: @move, unit_system: params.dig(:move, :unit_system), actor: current_user
+    )
+
+    case result
+    in Dry::Monads::Success(_move)
       redirect_to move_summary_path(@move), notice: t(".changed")
-    else
+    in Dry::Monads::Failure(_)
       redirect_to move_summary_path(@move), alert: t(".invalid")
     end
   end
