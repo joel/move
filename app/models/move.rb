@@ -21,6 +21,7 @@ class Move < ApplicationRecord
   has_many :recognition_runs, dependent: :destroy
   has_many :recognition_suggestions, dependent: :destroy
   has_many :items, dependent: :destroy
+  has_many :integration_tokens, class_name: "MoveIntegrationToken", dependent: :destroy
 
   validates :name, presence: true
   validates :status, inclusion: { in: STATUSES }
