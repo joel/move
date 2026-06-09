@@ -11,11 +11,10 @@ module Components
 
       STUB_HREF = "#"
 
-      # Move-aware destinations: Boxes (D2) and Search (D8) link to the active
-      # Move when one is in context (Current.move); Scan/Summary stay stubs until
-      # their phases (D9/D12). Menu routes admins to F1 Members & Roles (D11);
-      # for non-admins it stays a stub until the D13 settings hub replaces it.
-      # With no Move, all are stubs (D0).
+      # Move-aware destinations: Boxes (D2), Search (D8), and Summary (D12) link to
+      # the active Move when one is in context (Current.move); Scan resolves too.
+      # Menu routes admins to F1 Members & Roles (D11); for non-admins it stays a
+      # stub until the D13 settings hub replaces it. With no Move, all are stubs (D0).
       def self.for_move(move = Current.move)
         h = Rails.application.routes.url_helpers
         [
@@ -25,7 +24,8 @@ module Components
                           move ? h.move_search_path(move) : STUB_HREF, false),
           Destination.new(:scan, "ui.nav.scan", Components::Icons::Camera,
                           move ? h.move_scan_path(move) : STUB_HREF, true),
-          Destination.new(:summary, "ui.nav.summary", Components::Icons::Chart, STUB_HREF, false),
+          Destination.new(:summary, "ui.nav.summary", Components::Icons::Chart,
+                          move ? h.move_summary_path(move) : STUB_HREF, false),
           Destination.new(:menu, "ui.nav.menu", Components::Icons::Menu, menu_href(move, h), false)
         ]
       end
