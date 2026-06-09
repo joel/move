@@ -156,6 +156,43 @@ RSpec.describe "MCP endpoint" do
     end
   end
 
+  describe "mutations on an archived (read-only) move" do
+    before { move.update!(status: "archived") }
+
+    it "blocks add_item_to_box without creating a record" do
+      box = create(:box, move:, number: 10)
+
+      body = nil
+      expect { body = tool_call("add_item_to_box", { box_number: 10, name: "Nope" }) }
+        .not_to change(box.items, :count)
+      expect(body.dig("result", "isError")).to be(true)
+    end
+
+    it "blocks move_item" do
+      from = create(:box, move:, number: 11)
+      create(:box, move:, number: 12)
+      item = create(:item, move:, box: from, name: "Frozen")
+
+      tool_call("move_item", { item_id: item.id, to_box_number: 12 })
+
+      expect(item.reload.box_id).to eq(from.id)
+    end
+
+    it "blocks mark_unpacked" do
+      box = create(:box, move:, number: 13)
+      item = create(:item, move:, box:, name: "Still here")
+
+      tool_call("mark_unpacked", { item_id: item.id })
+
+      expect(item.reload.presence_state).to eq("in_box")
+    end
+
+    it "still allows read tools" do
+      create(:box, move:, number: 14)
+      expect(structured(tool_call("list_boxes"))["boxes"].length).to eq(1)
+    end
+  end
+
   describe "get_volume_summary" do
     it "returns the Move's box count" do
       create(:box, move:, number: 8)

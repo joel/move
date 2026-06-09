@@ -17,6 +17,9 @@ module MoveMcp
       )
 
       def self.call(item_id:, to_box_number:, server_context:)
+        blocked = archived_block(server_context)
+        return blocked if blocked
+
         item = find_item(server_context, item_id)
         return error_response("No item #{item_id} in this move.") if item.nil?
 

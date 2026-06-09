@@ -41,6 +41,16 @@ module MoveMcp
           error_response("Action failed: #{failure}")
         end
 
+        # Mutations are blocked on an archived (read-only) Move — the same guard
+        # the web controllers apply via require_writable_move!. MCP bypasses those
+        # controllers, so each mutating tool must call this first. Returns an
+        # error response to short-circuit, or nil when the Move is writable.
+        def archived_block(context)
+          return if move(context).writable?
+
+          error_response("This move is archived and is read-only.")
+        end
+
         # --- lookups (Move-scoped; nil → caller returns error_response) ---
         def find_box(context, number)
           move(context).boxes.find_by(number: number.to_s)
