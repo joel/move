@@ -2,17 +2,19 @@
 
 module MoveMemberships
   # Changes a member's role on a Move (F1, D11). Admin-only (enforced in the
-  # controller via MovePolicy#manage_members?). Concurrent changes are
+  # controller via MovePolicy#manage_members?). Concurrent role changes are
   # last-action-wins.
   #
-  # Guards against demoting the Move's last admin: a Move must always retain at
-  # least one admin, or no one could manage its members.
+  # Demoting the Move's last admin is blocked: the guard and the update run in one
+  # transaction with a row lock (AdminGuard) so concurrent demotions cannot both
+  # slip past the check and leave the Move with no admin.
   class ChangeRole < BaseAction
+    include AdminGuard
+
     def call(membership:, role:, actor:)
       role = role.to_s
       yield ensure_known_role(role)
-      yield ensure_admin_remains(membership, role)
-      yield update_role(membership, role)
+      yield change_role(membership, role)
       yield emit_event(membership, actor)
       Success(membership)
     end
@@ -25,26 +27,19 @@ module MoveMemberships
       Success()
     end
 
-    # Block demoting the last remaining admin.
-    def ensure_admin_remains(membership, role)
-      return Success() unless membership.admin? && role != "admin"
-      return Success() if other_admins?(membership)
+    def change_role(membership, role)
+      MoveMembership.transaction do
+        next Failure(:last_admin) if demoting?(membership, role) && would_orphan_last_admin?(membership)
 
-      Failure(:last_admin)
-    end
-
-    def other_admins?(membership)
-      membership.move.move_memberships
-                .where(role: "admin")
-                .where.not(id: membership.id)
-                .exists?
-    end
-
-    def update_role(membership, role)
-      membership.update!(role: role)
-      Success(membership)
+        membership.update!(role: role)
+        Success(membership)
+      end
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
+    end
+
+    def demoting?(membership, role)
+      membership.admin? && role != "admin"
     end
 
     def emit_event(membership, actor)

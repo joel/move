@@ -4,43 +4,34 @@ module MoveMemberships
   # Removes a member from a Move (F1, D11). Admin-only (enforced in the
   # controller via MovePolicy#manage_members?).
   #
-  # Guards against removing the Move's last admin — a Move must always retain at
-  # least one admin who can manage its members.
+  # The last-admin guard and the destroy run in one transaction with a row lock
+  # (AdminGuard) so concurrent admin removals cannot both slip past the check.
   class Remove < BaseAction
+    include AdminGuard
+
     def call(membership:, actor:)
-      yield ensure_admin_remains(membership)
       details = capture(membership)
-      yield destroy(membership)
+      yield remove(membership)
       yield emit_event(details, actor)
       Success(details)
     end
 
     private
 
-    def ensure_admin_remains(membership)
-      return Success() unless membership.admin?
-      return Success() if other_admins?(membership)
+    def remove(membership)
+      MoveMembership.transaction do
+        next Failure(:last_admin) if would_orphan_last_admin?(membership)
 
-      Failure(:last_admin)
-    end
-
-    def other_admins?(membership)
-      membership.move.move_memberships
-                .where(role: "admin")
-                .where.not(id: membership.id)
-                .exists?
+        membership.destroy!
+        Success()
+      end
+    rescue ActiveRecord::RecordNotDestroyed => e
+      Failure(e.record.errors)
     end
 
     # Capture identifiers before destroy! — the record is gone afterwards.
     def capture(membership)
       { move_id: membership.move_id, user_id: membership.user_id, role: membership.role }
-    end
-
-    def destroy(membership)
-      membership.destroy!
-      Success()
-    rescue ActiveRecord::RecordNotDestroyed => e
-      Failure(e.record.errors)
     end
 
     def emit_event(details, actor)
