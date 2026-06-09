@@ -4,10 +4,9 @@
 # Move's unit system (Technical Foundation §6.2: canonical storage, display
 # conversion; changing the unit system never reinterprets stored values).
 # Plain Ruby — no `measured` gem dependency for this small conversion surface.
+# Conversion factors live in UnitConversions, shared with MoveMeasurements.
 class BoxMeasurements
-  CM_PER_INCH = 2.54
-  CM3_PER_FT3 = 28_316.846592
-  LB_PER_KG = 2.2046226218
+  include UnitConversions
 
   def initialize(box, unit_system: "metric")
     @box = box
@@ -31,7 +30,7 @@ class BoxMeasurements
     if @imperial
       "#{format("%.2f", cm3 / CM3_PER_FT3)} ft³"
     else
-      "#{format("%.3f", cm3 / 1_000_000.0)} m³"
+      "#{format("%.3f", cm3 / CM3_PER_M3)} m³"
     end
   end
 

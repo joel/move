@@ -67,6 +67,10 @@ Rails.application.routes.draw do
     resources :members, only: %i[index create destroy] do
       member { patch :update_role }
     end
+    # F2 — Volume & weight summary. Read-only aggregate for any Move member; the
+    # unit-system toggle persists Move#unit_system (editors only, never archived).
+    get "summary", to: "summaries#show", as: :summary
+    patch "summary/unit_system", to: "summaries#update_unit_system", as: :summary_unit_system
   end
   resources :posts
   resources :users
