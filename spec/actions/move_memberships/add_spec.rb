@@ -51,4 +51,17 @@ RSpec.describe MoveMemberships::Add do
 
     expect(result).to be_failure
   end
+
+  # A concurrent duplicate can race past the uniqueness validation and hit the
+  # unique index, raising RecordNotUnique — it must degrade to a non-disclosing
+  # failure (controller → add_failed), not a 500.
+  it "treats a concurrent duplicate (RecordNotUnique) as a non-disclosing failure" do
+    allow(move.move_memberships).to receive(:create!)
+      .and_raise(ActiveRecord::RecordNotUnique.new("PG::UniqueViolation"))
+
+    result = described_class.new.call(move:, user_id: candidate.id, role: "viewer", actor: admin)
+
+    expect(result).to be_failure
+    expect(result.failure).to eq(:already_member)
+  end
 end
