@@ -166,11 +166,14 @@ module Views
       end
 
       def role_form(membership)
-        form_with(url: update_role_move_member_path(@move, membership), method: :patch) do
+        form_with(
+          url: update_role_move_member_path(@move, membership),
+          method: :patch, data: { controller: "auto-submit" }
+        ) do
           div(class: "relative") do
             select(
               name: "member[role]",
-              onchange: "this.form.requestSubmit()",
+              data: { action: "change->auto-submit#submit" },
               aria_label: I18n.t("members.actions.change_role", name: member_name(membership.user)),
               class: "cursor-pointer appearance-none rounded-full border border-card-border " \
                      "bg-card py-2 pl-4 pr-9 text-body-md text-text-warm transition " \

@@ -49,7 +49,16 @@ screen↔phase map.
 ## 8. Runtime verification
 - `bundle exec rake` equivalent: 491 unit + 35 system specs green; RuboCop,
   ErbLint, Brakeman (0 warnings), bundle-audit clean.
-- `/product-review`: _filled during live verification._
+- `/product-review` (live, dev): auth journey OK (passwordless admin + viewer);
+  the F1 screen matches the Stitch design (role cards, add form, locked own row,
+  inline role selects); role change persists end-to-end; a viewer is denied the
+  screen (403) but still reads boxes (member read — #86 correct).
+- **Bug caught live (request spec missed it):** Phlex blocks inline `onchange`
+  handlers, so the role `<select>` raised `Phlex::ArgumentError`. The request
+  spec's index test only had the admin (own row → locked, no role form), so it
+  never rendered the select. Fix: an `auto-submit` Stimulus controller
+  (`change->auto-submit#submit`); the index spec now seeds a second member so the
+  role-form path is covered.
 
 ## Out of scope (follow-up issues)
 - New-user **email-token invitations** (create User + OrganizationMembership +

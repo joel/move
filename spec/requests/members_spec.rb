@@ -17,10 +17,15 @@ RSpec.describe "Members" do
 
   describe "GET /moves/:move_id/members" do
     it "renders the members screen for an admin" do
+      # A member other than the current admin exercises the inline role-change
+      # form (the own row is locked) — the path that renders the role <select>.
+      create(:move_membership, move:, user: candidate, role: "contributor")
+
       get move_members_path(move)
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Members &amp; Roles")
+      expect(response.body).to include("auto-submit")
     end
 
     it "forbids a contributor (admin-only screen)" do
