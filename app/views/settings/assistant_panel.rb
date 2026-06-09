@@ -12,10 +12,11 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::Routes
 
-      def initialize(move:, tokens:, manage_tokens:, revealed_token: nil)
+      def initialize(move:, tokens:, manage_tokens:, can_create: true, revealed_token: nil)
         @move = move
         @tokens = tokens
         @manage_tokens = manage_tokens
+        @can_create = can_create
         @revealed_token = revealed_token
       end
 
@@ -28,7 +29,7 @@ module Views
             end
             if @manage_tokens
               revealed_token_block if @revealed_token
-              create_token_form
+              create_token_form if @can_create
               token_list
             else
               p(class: "text-body-md text-muted") { I18n.t("integration_tokens.panel.admin_only") }

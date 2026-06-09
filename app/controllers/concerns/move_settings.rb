@@ -12,11 +12,14 @@ module MoveSettings
   # Build the Settings/Assistant view for @move. +revealed_token+ is the raw
   # token to display exactly once, right after creation (nil otherwise).
   def settings_view(revealed_token: nil)
+    manage_tokens = allowed_to?(:manage_integration_tokens?, @move, with: MovePolicy)
     Views::Settings::Show.new(
       move: @move,
       tokens: @move.integration_tokens.includes(:created_by).order(created_at: :desc),
       editable: editable_settings?,
-      manage_tokens: allowed_to?(:manage_integration_tokens?, @move, with: MovePolicy),
+      manage_tokens: manage_tokens,
+      # Creating a token is blocked on an archived Move (revoke stays available).
+      can_create_tokens: manage_tokens && @move.writable?,
       revealed_token: revealed_token
     )
   end

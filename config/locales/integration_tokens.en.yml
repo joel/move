@@ -26,6 +26,7 @@ en:
     create:
       created: "Token \"%{name}\" created."
       create_failed: "We couldn't create that token. Please try again."
+      read_only: "This move is archived, so new tokens can't be created."
     destroy:
       revoked: "Token revoked."
       revoke_failed: "We couldn't revoke that token. Please try again."

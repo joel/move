@@ -15,11 +15,12 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::Routes
 
-      def initialize(move:, tokens:, editable:, manage_tokens:, revealed_token: nil)
+      def initialize(move:, tokens:, editable:, manage_tokens:, can_create_tokens:, revealed_token: nil)
         @move = move
         @tokens = tokens
         @editable = editable
         @manage_tokens = manage_tokens
+        @can_create_tokens = can_create_tokens
         @revealed_token = revealed_token
       end
 
@@ -151,7 +152,8 @@ module Views
       # --- Assistant & Integrations: MCP tokens (admin-only) ---
       def assistant_section
         render Views::Settings::AssistantPanel.new(
-          move: @move, tokens: @tokens, manage_tokens: @manage_tokens, revealed_token: @revealed_token
+          move: @move, tokens: @tokens, manage_tokens: @manage_tokens,
+          can_create: @can_create_tokens, revealed_token: @revealed_token
         )
       end
 

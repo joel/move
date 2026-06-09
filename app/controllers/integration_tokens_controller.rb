@@ -13,6 +13,11 @@ class IntegrationTokensController < MoveScopedController
 
   # POST /moves/:move_id/integration_tokens
   def create
+    # Minting a token changes persisted state and grants external access, so it
+    # is blocked on an archived (read-only) Move — like the other settings
+    # writes. Revoke stays allowed (you may need to cut off access post-archive).
+    return redirect_to(move_settings_path(@move), alert: t(".read_only")) unless @move.writable?
+
     result = MoveIntegrationTokens::Create.new.call(
       move: @move, name: token_param(:name), actor: current_user
     )

@@ -22,13 +22,17 @@ class McpController < ActionController::API
     Current.source = :mcp
 
     server = MoveMcp::ServerBuilder.build(token: @token)
-    json = server.handle_json(request.body.read)
+    # Stateless Streamable HTTP transport (JSON response mode) so real MCP clients
+    # get spec-compliant HTTP semantics: Accept/Content-Type validation, 400 on
+    # malformed JSON, and the right status codes — not a bare JSON-RPC handler.
+    transport = MCP::Server::Transports::StreamableHTTPTransport.new(
+      server, stateless: true, enable_json_response: true
+    )
+    status, headers, body = transport.handle_request(request)
 
-    if json.nil? # a JSON-RPC notification has no response
-      head :accepted
-    else
-      render plain: json, content_type: "application/json"
-    end
+    headers.each { |key, value| response.set_header(key, value) unless key.casecmp?("content-type") }
+    render body: Array(body).join, status: status,
+           content_type: headers["Content-Type"] || headers["content-type"] || "application/json"
   end
 
   private

@@ -35,6 +35,16 @@ RSpec.describe "Integration tokens" do
       expect(response.body).not_to match(/mcp_[A-Za-z0-9_-]{20,}/)
     end
 
+    it "is blocked on an archived move (read-only)" do
+      move.update!(status: "archived")
+
+      expect do
+        post move_integration_tokens_path(move), params: { integration_token: { name: "Late" } }
+      end.not_to change(MoveIntegrationToken, :count)
+
+      expect(response).to redirect_to(move_settings_path(move))
+    end
+
     it "forbids a contributor (admin-only)" do
       contributor = create(:user)
       create(:move_membership, move:, user: contributor, role: "contributor")

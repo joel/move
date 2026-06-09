@@ -29,7 +29,8 @@ RSpec.describe "MCP endpoint" do
   # NB: do not name params `method`/`id` — they shadow methods the integration
   # `post` helper relies on (via Runner#method_missing), silently skipping dispatch.
   def rpc(rpc_method, rpc_params = {}, bearer: raw_token, req_id: 1)
-    headers = { "Content-Type" => "application/json" }
+    # The Streamable HTTP transport (JSON mode) requires Accept: application/json.
+    headers = { "Content-Type" => "application/json", "Accept" => "application/json" }
     headers["Authorization"] = "Bearer #{bearer}" if bearer
     body = { jsonrpc: "2.0", id: req_id, method: rpc_method, params: rpc_params }.to_json
     post "/mcp", params: body, headers: headers
@@ -70,6 +71,22 @@ RSpec.describe "MCP endpoint" do
 
     it "touches last_used_at on a valid call" do
       expect { tool_call("list_boxes") }.to(change { token.reload.last_used_at })
+    end
+  end
+
+  describe "HTTP transport semantics" do
+    it "returns 400 for malformed JSON (not a 200 JSON-RPC body)" do
+      post "/mcp", params: "{not json",
+                   headers: { "Content-Type" => "application/json", "Accept" => "application/json",
+                              "Authorization" => "Bearer #{raw_token}" }
+      expect(response).to have_http_status(:bad_request)
+    end
+
+    it "rejects a non-JSON Content-Type with 415" do
+      post "/mcp", params: "hi",
+                   headers: { "Content-Type" => "text/plain", "Accept" => "application/json",
+                              "Authorization" => "Bearer #{raw_token}" }
+      expect(response).to have_http_status(:unsupported_media_type)
     end
   end
 
