@@ -32,6 +32,19 @@ RSpec.describe "Settings" do
       expect(response).to have_http_status(:ok)
       # Viewers cannot manage tokens.
       expect(response.body).to include(I18n.t("integration_tokens.panel.admin_only"))
+      # A viewer on an active Move is told it's view-only — never "archived"
+      # (apostrophes render HTML-escaped, so match on the distinctive phrase).
+      expect(response.body).to include("view-only access")
+      expect(response.body).not_to include("is archived")
+    end
+
+    it "tells an editor on an archived move it is archived (not view-only)" do
+      move.update!(status: "archived")
+
+      get move_settings_path(move)
+
+      expect(response.body).to include("is archived")
+      expect(response.body).not_to include("view-only access")
     end
 
     it "404s a non-member" do

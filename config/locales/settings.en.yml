@@ -26,7 +26,8 @@ en:
         title: "Account"
         manage: "Account Settings"
         sign_out: "Sign Out"
-      read_only_note: "This move is archived, so its settings can't be changed."
+      archived_note: "This move is archived, so its settings can't be changed."
+      view_only_note: "You have view-only access, so these settings can't be changed."
     update_unit_system:
       unit_changed: "Measurement units updated."
       unit_invalid: "That unit system is not available."

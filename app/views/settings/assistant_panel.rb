@@ -40,7 +40,10 @@ module Views
       private
 
       def create_token_form
-        form_with(url: move_integration_tokens_path(@move), method: :post) do
+        # turbo: false — create renders the settings page inline (200) to reveal
+        # the raw token once. Turbo Drive ignores a non-redirect 200 on form
+        # submit, so the reveal would never show; a full navigation renders it.
+        form_with(url: move_integration_tokens_path(@move), method: :post, data: { turbo: false }) do
           div(class: "flex flex-col gap-4 sm:flex-row sm:items-end") do
             div(class: "flex-1") do
               render Components::Ui::Field.new(

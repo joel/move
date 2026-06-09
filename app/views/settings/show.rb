@@ -42,8 +42,11 @@ module Views
       private
 
       def read_only_note
+        # Non-editable for two distinct reasons: the Move is archived, or the
+        # viewer lacks an editing role. Don't tell a viewer the Move is archived.
+        key = @move.archived? ? "settings.show.archived_note" : "settings.show.view_only_note"
         p(class: "rounded-card border border-card-border bg-surface-container-high px-4 py-3 " \
-                 "text-body-md text-on-surface-variant") { I18n.t("settings.show.read_only_note") }
+                 "text-body-md text-on-surface-variant") { I18n.t(key) }
       end
 
       # --- Appearance: client-only dark-mode switch (theme Stimulus controller) ---
