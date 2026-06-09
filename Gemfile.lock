@@ -220,6 +220,9 @@ GEM
       reline (>= 0.4.2)
     jmespath (1.6.2)
     json (2.19.8)
+    json-schema (6.2.0)
+      addressable (~> 2.8)
+      bigdecimal (>= 3.1, < 5)
     jwt (3.2.0)
       base64
     kamal (2.11.0)
@@ -247,6 +250,8 @@ GEM
       net-smtp
     marcel (1.2.1)
     matrix (0.4.3)
+    mcp (0.18.0)
+      json-schema (>= 4.1)
     memory_profiler (1.1.0)
     mini_mime (1.1.5)
     minitest (6.0.6)
@@ -637,6 +642,7 @@ DEPENDENCIES
   image_processing (~> 2.0)
   importmap-rails
   kamal
+  mcp
   memory_profiler
   neighbor
   omniauth-google-oauth2
