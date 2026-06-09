@@ -23,6 +23,13 @@ RSpec.describe MoveMeasurements do
       expect(m.weight(8)).to have_attributes(value: "8", unit: "kg")
       expect(m.weight(1240)).to have_attributes(value: "1,240", unit: "kg")
     end
+
+    it "never reports a small recorded weight as 0" do
+      # 0.4 kg would round to "0"; keep a decimal instead.
+      expect(m.weight(0.4)).to have_attributes(value: "0.4", unit: "kg")
+      # Below the rendered resolution: a threshold, not a false zero.
+      expect(m.weight(0.004)).to have_attributes(value: "<0.01", unit: "kg")
+    end
   end
 
   describe "imperial" do

@@ -38,26 +38,40 @@ class MoveMeasurements
 
   # Finest volume resolution we render (matches BoxMeasurements' 3-decimal m³).
   MIN_VOLUME_LABEL = "<0.001"
+  # Finest weight resolution (the box form accepts 0.01-step weights).
+  MIN_WEIGHT_LABEL = "<0.01"
 
   private
 
   # Trailing-zeros-stripped decimal that never reports a measured nonzero volume
   # as "0": tries 2 decimals (clean for normal totals — 42.50→"42.5", 0.21→
   # "0.21"), escalates to 3 for sub-0.01 values (1,000 cm³ = 0.001 m³→"0.001"),
-  # and falls back to a "<0.001" threshold for anything finer rather than
-  # collapsing a positive value to zero.
+  # and falls back to a "<0.001" threshold for anything finer.
   def format_decimal(value)
     return "0" if value.zero?
 
-    (2..3).each do |precision|
+    escalating_decimal(value, precisions: 2..3, threshold: MIN_VOLUME_LABEL)
+  end
+
+  # Whole-number weight with a thousands separator for normal totals (design:
+  # "1,240 kg"), but a small recorded weight (e.g. 0.4 kg) keeps a decimal rather
+  # than rounding to a false "0 kg" — with a "<0.01" threshold for finer values.
+  def format_weight(value)
+    return "0" if value.zero?
+
+    rounded = value.round
+    return ActiveSupport::NumberHelper.number_to_delimited(rounded) if rounded.positive?
+
+    escalating_decimal(value, precisions: 1..2, threshold: MIN_WEIGHT_LABEL)
+  end
+
+  # First precision (low→high) whose fixed-point render is nonzero, else the
+  # threshold label — so a positive value never collapses to "0".
+  def escalating_decimal(value, precisions:, threshold:)
+    precisions.each do |precision|
       formatted = format("%.#{precision}f", value).sub(/\.?0+$/, "")
       return formatted unless formatted == "0"
     end
-    MIN_VOLUME_LABEL
-  end
-
-  # Whole-number weight with a thousands separator (design: "1,240 kg").
-  def format_weight(value)
-    ActiveSupport::NumberHelper.number_to_delimited(value.round)
+    threshold
   end
 end
