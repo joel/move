@@ -53,6 +53,7 @@ class CapturesController < MoveScopedController
   end
 
   def require_writable_move!
+    return deny_move_mutation! unless move_editor?
     return if @move.writable?
 
     redirect_to move_box_path(@move, @box), alert: t("boxes.archived")

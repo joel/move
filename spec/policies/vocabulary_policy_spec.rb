@@ -8,9 +8,9 @@ RSpec.describe VocabularyPolicy do
   let(:stranger) { create(:user) }
   let(:move) { create(:move, created_by: admin) }
 
+  # admin is the Move creator (the :move factory makes the creator an admin).
   before do
-    create(:move_membership, :admin, move:, user: admin)
-    create(:move_membership, move:, user: member, role: "member")
+    create(:move_membership, move:, user: member, role: "contributor")
   end
 
   describe "index? (view)" do
@@ -45,8 +45,7 @@ RSpec.describe VocabularyPolicy do
     end
 
     it "denies an admin on an archived (read-only) move" do
-      archived = create(:move, :archived, created_by: admin)
-      create(:move_membership, :admin, move: archived, user: admin)
+      archived = create(:move, :archived, created_by: admin) # creator → admin member
 
       expect(described_class.new(archived, user: admin).apply(:create?)).to be(false)
     end

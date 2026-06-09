@@ -33,4 +33,13 @@ class Move < ApplicationRecord
   def writable?
     !archived?
   end
+
+  # The membership joining +user+ to this Move, or nil if they are not a
+  # member. Used by MovePolicy/BoxPolicy to gate reads and mutations on
+  # move-level role (D11).
+  def membership_for(user)
+    return nil if user.nil?
+
+    move_memberships.find_by(user_id: user.id)
+  end
 end

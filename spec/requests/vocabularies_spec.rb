@@ -4,9 +4,9 @@ RSpec.describe "Vocabularies" do
   let(:user) { create(:user) }
   let(:move) { create(:move, created_by: user) }
 
-  # Admin membership — vocabulary management is admin-only.
+  # The Move creator is its admin (the :move factory wires this), and vocabulary
+  # management is admin-only.
   before do
-    create(:move_membership, :admin, move:, user:)
     stub_current_user(user)
     stub_current_tenant("acme")
   end
@@ -106,7 +106,7 @@ RSpec.describe "Vocabularies" do
     let(:plain_member) { create(:user) }
 
     before do
-      create(:move_membership, move:, user: plain_member, role: "member")
+      create(:move_membership, move:, user: plain_member, role: "contributor")
       stub_current_user(plain_member)
     end
 
@@ -158,14 +158,14 @@ RSpec.describe "Vocabularies" do
   end
 
   describe "membership enforcement on view" do
-    it "forbids a signed-in non-member from viewing the surface" do
+    it "404s a signed-in non-member non-disclosingly (move is out of their scope)" do
       stranger = create(:user) # no move_membership for this Move
       stub_current_user(stranger)
       create(:category, move:, name: "Kitchenware")
 
       get move_vocabularies_path(move, "categories")
 
-      expect(response).to have_http_status(:forbidden)
+      expect(response).to have_http_status(:not_found)
     end
   end
 end

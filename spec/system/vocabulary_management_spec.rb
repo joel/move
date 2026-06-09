@@ -7,7 +7,7 @@ RSpec.describe "Vocabulary management" do
   let(:move) { create(:move, created_by: admin, name: "Seattle Relocation") }
 
   before do
-    create(:move_membership, :admin, move:, user: admin)
+    # The creator is the Move's admin (wired by the :move factory).
     # The subdomain elevator sets the tenant on a real request; resolve against
     # the public template here and stub the controller's tenant check.
     stub_current_tenant("acme")
@@ -68,7 +68,7 @@ RSpec.describe "Vocabulary management" do
     let(:member) { create(:user) }
 
     before do
-      create(:move_membership, move:, user: member, role: "member")
+      create(:move_membership, move:, user: member, role: "contributor")
       login_as(user: member)
     end
 

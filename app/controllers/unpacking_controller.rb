@@ -92,6 +92,7 @@ class UnpackingController < MoveScopedController
 
   # Archived Moves are read-only — no toggling items or completing/reopening.
   def require_writable_move!
+    return deny_move_mutation! unless move_editor?
     return if @move.writable?
 
     redirect_to move_box_unpacking_path(@move, @box), alert: t("unpacking.archived")

@@ -17,4 +17,21 @@ class MoveScopedController < TenantController
   rescue ActiveRecord::RecordNotFound
     head :not_found
   end
+
+  # Whether the current user may mutate the Move's content — the admin/contributor
+  # (editor) tier. Viewers are read-only; non-members never reach here (set_move
+  # 404s them first).
+  def move_editor?
+    @move&.membership_for(current_user)&.can_edit? || false
+  end
+
+  # Refuse a mutation by a non-editor (a viewer) with 403. Subclasses'
+  # require_writable_move! call this before applying the archived (read-only)
+  # redirect: `return deny_move_mutation! unless move_editor?`.
+  def deny_move_mutation!
+    respond_to do |format|
+      format.html { render Views::Shared::Forbidden.new, status: :forbidden }
+      format.any { head :forbidden }
+    end
+  end
 end
