@@ -1,0 +1,37 @@
+# F3 — Settings & Assistant strings (Phase D13). No customer-facing copy is
+# hard-coded in the Phlex view; everything renders through settings.*.
+en:
+  settings:
+    show:
+      title: "Settings"
+      subtitle: "Preferences for this move and the assistant."
+      appearance:
+        title: "Appearance"
+        dark_mode: "Dark Mode"
+        dark_mode_caption: "A soothing interface for low-stress planning."
+      preferences:
+        title: "Move Preferences"
+        units: "Measurement Units"
+        metric: "Metric"
+        imperial: "Imperial"
+      recognition:
+        title: "AI Recognition"
+        threshold: "Auto-confirm Confidence"
+        threshold_caption: >-
+          Higher values send more items to manual review before they're added;
+          lower values are more hands-free but may need corrections later.
+        more_review: "More review"
+        more_handsfree: "More hands-free"
+      account:
+        title: "Account"
+        manage: "Account Settings"
+        sign_out: "Sign Out"
+      read_only_note: "This move is archived, so its settings can't be changed."
+    update_unit_system:
+      unit_changed: "Measurement units updated."
+      unit_invalid: "That unit system is not available."
+      read_only: "This move is archived and can't be changed."
+    update_auto_confirm_threshold:
+      threshold_changed: "Auto-confirm threshold updated."
+      threshold_invalid: "Choose a confidence between 0 and 1."
+      read_only: "This move is archived and can't be changed."

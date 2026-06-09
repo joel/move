@@ -71,6 +71,16 @@ Rails.application.routes.draw do
     # unit-system toggle persists Move#unit_system (editors only, never archived).
     get "summary", to: "summaries#show", as: :summary
     patch "summary/unit_system", to: "summaries#update_unit_system", as: :summary_unit_system
+    # F3 — Menu hub + Settings/Assistant. The menu is the controls hub; settings
+    # holds Move-level preferences (unit system, auto-confirm threshold — editors
+    # only, never archived; theme is a client preference). Integration tokens are
+    # the per-Move MCP credentials (admin-only create/revoke).
+    get "menu", to: "menu#show", as: :menu
+    get "settings", to: "settings#show", as: :settings
+    patch "settings/unit_system", to: "settings#update_unit_system", as: :settings_unit_system
+    patch "settings/auto_confirm_threshold", to: "settings#update_auto_confirm_threshold",
+                                             as: :settings_auto_confirm_threshold
+    resources :integration_tokens, only: %i[create destroy]
   end
   resources :posts
   resources :users

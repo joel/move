@@ -1,0 +1,26 @@
+# frozen_string_literal: true
+
+module Components
+  module Icons
+    # A gear — the medallion for the Settings destination.
+    class Settings < Components::Icons::Base
+      def view_template
+        svg(
+          class: @css, **@attrs, viewBox: "0 0 24 24", fill: "none",
+          stroke: "currentColor", stroke_width: "1.6",
+          stroke_linecap: "round", stroke_linejoin: "round", aria_hidden: "true"
+        ) do |s|
+          s.circle(cx: "12", cy: "12", r: "3")
+          s.path(
+            d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 " \
+               "1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 " \
+               "2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 " \
+               "0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 " \
+               "1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 " \
+               "2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+          )
+        end
+      end
+    end
+  end
+end

@@ -1,0 +1,31 @@
+# F3 — Assistant & Integrations (MCP tokens) strings (Phase D13). No
+# customer-facing copy is hard-coded in the Phlex view.
+en:
+  integration_tokens:
+    panel:
+      title: "Assistant & Integrations"
+      subtitle: "Manage API tokens for external assistants and tools connecting to this move's data."
+      create: "Create New Token"
+      name_label: "Token name"
+      name_placeholder: "e.g. Main Assistant"
+      submit: "Create token"
+      empty: "No integration tokens yet. Create one to connect an assistant."
+      admin_only: "Only move admins can manage integration tokens."
+    reveal:
+      title: "Copy your new token"
+      body: "This is the only time the token is shown. Store it somewhere safe — you won't be able to see it again."
+      copy: "Copy"
+      copied: "Copied"
+    token:
+      created_by: "Created by %{name}"
+      last_used: "Last used %{time}"
+      never_used: "Never used"
+      revoked: "Revoked %{time}"
+      revoke: "Revoke"
+      revoke_confirm: "Revoke \"%{name}\"? Any assistant using this token will lose access immediately."
+    create:
+      created: "Token \"%{name}\" created."
+      create_failed: "We couldn't create that token. Please try again."
+    destroy:
+      revoked: "Token revoked."
+      revoke_failed: "We couldn't revoke that token. Please try again."

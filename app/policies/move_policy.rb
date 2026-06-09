@@ -32,6 +32,18 @@ class MovePolicy < ApplicationPolicy
     admin_of?(record)
   end
 
+  # F3 — changing Move-level settings (unit system, auto-confirm threshold) needs
+  # an editing role, consistent with the F2 unit-system toggle. The controller
+  # pairs this with the archived read-only guard.
+  def edit_settings?
+    editor_role?(record)
+  end
+
+  # F3 — creating/revoking MCP integration tokens is admin-only (Domain §4.13).
+  def manage_integration_tokens?
+    admin_of?(record)
+  end
+
   relation_scope do |relation|
     next relation.none if user.blank?
 
