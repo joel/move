@@ -1,0 +1,43 @@
+# F2 — Volume & weight summary strings (Phase D12). No customer-facing copy is
+# hard-coded in the Phlex view; everything renders through summaries.*.
+en:
+  summaries:
+    show:
+      title: "Move Summary"
+      subtitle: "Volume and weight estimates for this move."
+      metrics_label: "Key metrics"
+      metric: "Metric"
+      imperial: "Imperial"
+      total_volume: "Total Volume"
+      volume_caption: "Derived from box dimensions"
+      no_volume: "Add box dimensions to estimate volume"
+      est_weight: "Est. Weight"
+      weight_caption: "Sum of recorded box weights"
+      no_weight: "No box weights recorded yet"
+      total_boxes: "Total Boxes"
+      across_rooms:
+        zero: "No rooms assigned yet"
+        one: "Across 1 room"
+        other: "Across %{count} rooms"
+      room_breakdown: "Room Breakdown"
+      unassigned: "Unassigned"
+      unknown_volume: "—"
+      box_count:
+        one: "1 box"
+        other: "%{count} boxes"
+      room_missing:
+        one: "1 box missing dimensions"
+        other: "%{count} boxes missing dimensions"
+      missing_warning_title: "Incomplete data"
+      missing_warning_body:
+        one: "1 box is missing dimensions. Adding them will improve estimate accuracy."
+        other: "%{count} boxes are missing dimensions. Adding them will improve estimate accuracy."
+      review: "Review"
+      empty_title: "Nothing to summarise yet"
+      empty_body: "Add boxes with dimensions to see total volume, weight, and a per-room breakdown."
+      empty_cta: "Add boxes"
+      error: "We couldn't load the summary. Please try again."
+    update_unit_system:
+      changed: "Unit system updated."
+      invalid: "That unit system is not available."
+      read_only: "This move is archived and can't be changed."
