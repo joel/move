@@ -10,4 +10,9 @@ class Current < ActiveSupport::CurrentAttributes
   attribute :nav_section
   # The signed-in User, for in-request rendering only (e.g. role-aware nav).
   attribute :user
+  # Where the current operation originates — :web (default request), :mcp (an
+  # MCP integration-token call), or :system (background/seed). Recorded in audit
+  # events so a mutation can be attributed to the assistant (Technical
+  # Foundation §6, §14.4). Web requests set this in ApplicationController.
+  attribute :source
 end

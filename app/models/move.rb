@@ -26,6 +26,8 @@ class Move < ApplicationRecord
   validates :name, presence: true
   validates :status, inclusion: { in: STATUSES }
   validates :unit_system, inclusion: { in: UNIT_SYSTEMS }
+  validates :auto_confirm_threshold,
+            numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 1 }
 
   def archived?
     status == "archived"
