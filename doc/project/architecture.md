@@ -135,6 +135,57 @@ subdomain (no redirect loop). The login UI is apex-only; subdomains are post-aut
 
 ---
 
+## 3a. Authorization: move membership & roles (D11)
+
+Tenancy isolates by Organization; **within** a tenant, access to a Move is gated
+by `move_memberships` (a tenant-schema join of `public.users` → Move). A user is
+**not** automatically allowed every Move in their Organization — they must hold a
+membership, whose `role` is one of:
+
+| role | reads (move, boxes, items, **manifest**) | mutates content (boxes/items/recognition) | curates vocabulary | manages members |
+|------|:---:|:---:|:---:|:---:|
+| **admin** | ✓ | ✓ | ✓ | ✓ |
+| **contributor** | ✓ | ✓ | – | – |
+| **viewer** | ✓ | – | – | – |
+
+`Moves::Create` makes the creator the first `admin`. Enforcement has two layers
+(ActionPolicy via `MoveMembershipAuthorization`):
+
+- **Read gate = membership.** `MovePolicy.relation_scope` returns only the Moves
+  the user belongs to, so `MoveScopedController#set_move`
+  (`authorized_scope(Move.all).find`) **404s a non-member** before any nested
+  resource loads. This is what closes the manifest-export gap (#86): a member of
+  another Move in the same Organization can no longer read a box manifest.
+- **Mutation gate = editor role.** `BoxPolicy`/`ItemPolicy`/… require the
+  admin/contributor tier *and* a writable (non-archived) Move; the shared
+  `require_writable_move!` controller guard refuses a viewer with 403
+  (`move_editor?` → `deny_move_mutation!`). Vocabulary curation and member
+  management are admin-only.
+
+```mermaid
+flowchart TD
+  R["Request to /moves/:id/&lt;nested&gt;"] --> SM["set_move:<br/>authorized_scope(Move.all).find"]
+  SM -->|"not a member<br/>(relation_scope)"| NF["404 (non-disclosing)"]
+  SM -->|"member"| ACT{action kind}
+  ACT -->|read| OK["render (viewer+)"]
+  ACT -->|mutate| ED{"move_editor?<br/>(admin/contributor)"}
+  ED -->|viewer| F403["403 deny_move_mutation!"]
+  ED -->|editor| WR{"move.writable?"}
+  WR -->|archived| RO["redirect: read-only"]
+  WR -->|writable| OK2["run action"]
+  ACT -->|manage members| AD{"admin?"}
+  AD -->|no| F403b["403"]
+  AD -->|yes| OK3["MoveMemberships::Add / ChangeRole / Remove"]
+```
+
+Member management (F1) is admin-only and **Organization-bounded**: a Move can only
+be shared with existing Organization members (`MoveMemberships::Add` rejects a
+non-Org user non-disclosingly). Changes emit `move_membership.added |
+role_changed | removed` events; a last-admin guard stops a Move losing its only
+admin. New-user email invitations are deferred.
+
+---
+
 ## 4. Component / config map
 
 | Component | Where | Notes |
