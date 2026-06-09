@@ -12,9 +12,10 @@ module Views
     class Show < Views::Base
       include Phlex::Rails::Helpers::ButtonTo
 
-      def initialize(move:, summary:)
+      def initialize(move:, summary:, editable: false)
         @move = move
         @summary = summary
+        @editable = editable
         @measurements = MoveMeasurements.new(unit_system: move.unit_system)
       end
 
@@ -39,8 +40,17 @@ module Views
           title: I18n.t("summaries.show.title"),
           subtitle: I18n.t("summaries.show.subtitle")
         ) do
-          unit_toggle unless @move.archived?
+          @editable ? unit_toggle : current_unit_label
         end
+      end
+
+      # Read-only members (and archived Moves) see which unit system is in
+      # effect as a plain chip, never an interactive control that would 403.
+      def current_unit_label
+        span(
+          class: "inline-flex self-start rounded-full border border-card-border " \
+                 "bg-card px-6 py-2 text-sm font-semibold text-on-surface-variant"
+        ) { I18n.t("summaries.show.#{@move.unit_system}") }
       end
 
       # Segmented pill: the active system is an inert label, the other a tiny

@@ -26,6 +26,37 @@ RSpec.describe "Summaries" do
       expect(response.body).to include(I18n.t("summaries.show.room_breakdown"))
     end
 
+    it "shows the unit toggle to an editor" do
+      get move_summary_path(move)
+
+      # The Imperial option is a submit button (the inactive option) only when
+      # the unit toggle is rendered.
+      expect(response.body).to include("summary/unit_system")
+    end
+
+    it "hides the unit toggle from a read-only viewer" do
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+
+      get move_summary_path(move)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("summary/unit_system")
+      # …but the active unit system is still shown as a plain label.
+      expect(response.body).to include(I18n.t("summaries.show.metric"))
+    end
+
+    it "hides the unit toggle on an archived move" do
+      archived = create(:move, :archived, created_by: user)
+      create(:box, move: archived, length_cm: 40, width_cm: 30, height_cm: 25)
+
+      get move_summary_path(archived)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("summary/unit_system")
+    end
+
     it "shows the incomplete-data banner when a box is missing dimensions" do
       create(:box, move:) # packing, no dimensions
 

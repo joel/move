@@ -15,7 +15,7 @@ class SummariesController < MoveScopedController
 
     case result
     in Dry::Monads::Success(summary)
-      render Views::Summaries::Show.new(move: @move, summary: summary)
+      render Views::Summaries::Show.new(move: @move, summary: summary, editable: editable_units?)
     in Dry::Monads::Failure(_)
       redirect_to move_boxes_path(@move), alert: t(".error")
     end
@@ -32,5 +32,15 @@ class SummariesController < MoveScopedController
     else
       redirect_to move_summary_path(@move), alert: t(".invalid")
     end
+  end
+
+  private
+
+  # The unit toggle is only shown to a user who could actually change it —
+  # an editor (admin/contributor) on a writable Move. A viewer or an archived
+  # Move sees the resolved unit system as plain text, never a control that would
+  # 403 on submit.
+  def editable_units?
+    @move.writable? && allowed_to?(:edit_contents?, @move, with: MovePolicy)
   end
 end
