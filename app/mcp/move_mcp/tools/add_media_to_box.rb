@@ -32,7 +32,9 @@ module MoveMcp
         attachable = decode(image_base64, filename, content_type)
         return error_response("Invalid base64 image data.") if attachable.nil?
 
-        result = ::Captures::Create.new.call(box: box, file: attachable, captured_by: actor(server_context))
+        result = ::Captures::Create.new.call(
+          box: box, file: attachable, captured_by: actor(server_context), captured_via: "mcp"
+        )
         return failure_response(result.failure) if result.failure?
 
         media = result.value!

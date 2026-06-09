@@ -193,6 +193,23 @@ RSpec.describe "MCP endpoint" do
     end
   end
 
+  describe "add_media_to_box" do
+    # 1x1 transparent PNG.
+    let(:png_base64) do
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC"
+    end
+
+    it "attaches media to a packing box and records mcp as the origin" do
+      box = create(:box, move:, number: 9, status: "packing")
+
+      tool_call("add_media_to_box", { box_number: 9, image_base64: png_base64, filename: "a.png" })
+
+      media = box.media.order(:created_at).last
+      expect(media).to be_present
+      expect(media.captured_via).to eq("mcp")
+    end
+  end
+
   describe "get_volume_summary" do
     it "returns the Move's box count" do
       create(:box, move:, number: 8)
