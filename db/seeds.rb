@@ -27,14 +27,23 @@ require "securerandom"
 
 # --- Demo accounts + organization (tenant) ----------------------------------
 # Sign in (passwordless) with these emails on the org subdomain
-# `<slug>.<tenant_zone>` (dev: acme.workeverywhere.docker):
-#   demo@example.com    — admin   (full vocabulary management — D7)
-#   member@example.com  — member  (read-only vocabularies: no edit affordance)
+# `<slug>.<tenant_zone>` (dev: acme.workeverywhere.docker). The first three are
+# members of the demo Move across all three D11 roles; the fourth is an
+# Organization member NOT on the Move, so the F1 "Add member" form has a
+# candidate to showcase:
+#   demo@example.com     — admin       (manage members, vocabularies, everything)
+#   member@example.com   — contributor (add/edit boxes & items; no member mgmt)
+#   viewer@example.com   — viewer      (read-only; no edit/manage affordances)
+#   invitee@example.com  — org member, addable to the Move via F1
 DEMO = {
   owner_email: "demo@example.com",
   owner_name: "Demo Mover",
   member_email: "member@example.com",
-  member_name: "Demo Member",
+  member_name: "Demo Contributor",
+  viewer_email: "viewer@example.com",
+  viewer_name: "Demo Viewer",
+  invitee_email: "invitee@example.com",
+  invitee_name: "Demo Invitee",
   org_name: "Acme Relocation",
   org_slug: "acme"
 }.freeze
@@ -49,6 +58,16 @@ member = User.find_or_create_by!(email: DEMO[:member_email]) do |u|
   u.status = 2 # verified
 end
 
+viewer = User.find_or_create_by!(email: DEMO[:viewer_email]) do |u|
+  u.name = DEMO[:viewer_name]
+  u.status = 2 # verified
+end
+
+invitee = User.find_or_create_by!(email: DEMO[:invitee_email]) do |u|
+  u.name = DEMO[:invitee_name]
+  u.status = 2 # verified
+end
+
 organization = Organization.find_by(slug: DEMO[:org_slug])
 unless organization
   result = Organizations::Create.new.call(
@@ -59,6 +78,13 @@ unless organization
   organization = result.value!
 end
 
+# Organization memberships (public schema) for the secondary demo users — a Move
+# can only be shared with Organization members, so these back the F1 candidate
+# list and the org-bounded invite rule.
+[member, viewer, invitee].each do |user|
+  organization.organization_memberships.find_or_create_by!(user: user) { |om| om.role = "member" }
+end
+
 # --- Tenant-scoped demo: a Move with rooms and boxes in varied states --------
 Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLength
   move = Move.find_or_create_by!(name: "Seattle Relocation") do |m|
@@ -66,8 +92,11 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     m.unit_system = "metric"
     m.created_by = owner
   end
+  # F1 — all three D11 roles represented on the demo Move. `invitee` is
+  # deliberately left off so the "Add member" form has a candidate to show.
   move.move_memberships.find_or_create_by!(user: owner) { |mm| mm.role = "admin" }
-  move.move_memberships.find_or_create_by!(user: member) { |mm| mm.role = "member" }
+  move.move_memberships.find_or_create_by!(user: member) { |mm| mm.role = "contributor" }
+  move.move_memberships.find_or_create_by!(user: viewer) { |mm| mm.role = "viewer" }
 
   rooms = ["Kitchen", "Living Room", "Bedroom", "Garage"].index_with do |name|
     move.rooms.find_or_create_by!(name: name)
