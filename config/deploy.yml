@@ -48,6 +48,10 @@ env:
     # move-app S3 identity on the shared SeaweedFS, scoped to the `move` bucket.
     - STORAGE_ACCESS_KEY_ID
     - STORAGE_SECRET_ACCESS_KEY
+    # OpenAI key for recognition + embedding adapters (providers flipped to
+    # openai below). MUST be in Doppler move/prd before deploy — see
+    # doc/project/ai-providers.md.
+    - OPENAI_API_KEY
   clear:
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
     # When you start using multiple servers, you should split out job processing to a dedicated machine.
@@ -81,6 +85,15 @@ env:
     # WebAuthn passkeys must bind to the registrable parent domain, not the
     # specific subdomain, so a passkey works on the apex and every org subdomain.
     WEBAUTHN_RP_ID: move-easy.org
+
+    # Real AI: OpenAI vision recognition + text embeddings (default elsewhere is
+    # the network-free `fake`). Requires OPENAI_API_KEY (env.secret above) to be
+    # set BEFORE this takes effect, else every recognition run fails and every
+    # embedding goes nil. After enabling, backfill real vectors with
+    # `kamal app exec --reuse 'bin/rails search:reindex'`. Both are pay-per-call.
+    # Full runbook + rollback: doc/project/ai-providers.md.
+    RECOGNITION_PROVIDER: openai
+    EMBEDDING_PROVIDER: openai
 
     # Log everything from Rails
     # RAILS_LOG_LEVEL: debug
