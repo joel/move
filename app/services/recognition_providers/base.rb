@@ -1,9 +1,13 @@
 # frozen_string_literal: true
 
+require "base64"
+
 module RecognitionProviders
   # Adapter contract. Subclasses turn an image + move/box context into a
   # normalized Result; they must never leak vendor response structure upward.
   class Base
+    include ProviderHttp
+
     # @param image [ActiveStorage::Attached::One] the Media image attachment
     # @param context [Hash] move vocabulary + box context (category/tag names, room)
     # @return [RecognitionProviders::Result]
@@ -12,6 +16,16 @@ module RecognitionProviders
     end
 
     protected
+
+    # The vision models reply with a JSON array, sometimes fenced in ```json —
+    # extract the bracketed array. Unparseable content yields no detections
+    # (an empty box) rather than raising; transport/API failures raise upstream
+    # via ProviderHttp before we ever reach here.
+    def parse_array(content)
+      JSON.parse(content[/\[.*\]/m] || content)
+    rescue JSON::ParserError
+      []
+    end
 
     # Coerce an array of provider hashes into DetectedObjects, dropping anything
     # without a label. Accepts string or symbol keys.

@@ -5,6 +5,8 @@ module EmbeddingProviders
   # a DIMENSIONS-long vector. The dimension is fixed across providers so the
   # pgvector column type (vector(1536)) and stored embeddings stay compatible.
   class Base
+    include ProviderHttp
+
     DIMENSIONS = 1536
 
     # @param text [String]
