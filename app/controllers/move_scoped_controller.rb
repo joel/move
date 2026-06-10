@@ -35,7 +35,7 @@ class MoveScopedController < TenantController
     authorize_move_mutation!
     return if @move.writable?
 
-    redirect_to read_only_redirect_path, alert: t("moves.read_only")
+    redirect_to read_only_redirect_path, alert: t("moves.archived_alert")
   end
 
   # Where require_writable_move! sends a user who tried to mutate an archived

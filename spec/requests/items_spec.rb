@@ -170,6 +170,9 @@ RSpec.describe "Items" do
       end.not_to change(Item, :count)
 
       expect(response).to redirect_to(move_boxes_path(move))
+      # The full archived alert (not the short moves.read_only status label —
+      # the two keys must not collide in YAML).
+      expect(flash[:alert]).to eq(I18n.t("moves.archived_alert"))
     end
   end
 end
