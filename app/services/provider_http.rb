@@ -28,16 +28,26 @@ module ProviderHttp
     parse_response(res)
   end
 
-  # 2xx → the parsed JSON body. Anything else raises with the status and the
-  # vendor's `error.message` (falling back to the bare status), never the key.
+  # 2xx → the strictly-parsed JSON body. A 2xx with a non-JSON body (e.g. an
+  # HTML proxy/interstitial page served with the wrong status) is a failure, not
+  # an empty success — raise so the run fails loudly instead of normalizing
+  # nothing to zero objects. Non-2xx raises with the status + the vendor's
+  # `error.message` (falling back to the bare status), never the key.
   def parse_response(res)
-    parsed = parse_body(res.body)
-    return parsed if res.code.to_i.between?(200, 299)
+    return parse_json!(res.body) if res.code.to_i.between?(200, 299)
 
-    detail = parsed.dig("error", "message").presence || "HTTP #{res.code}"
+    detail = parse_body(res.body).dig("error", "message").presence || "HTTP #{res.code}"
     raise Error, "#{self.class.name} request failed (#{res.code}): #{detail}"
   end
 
+  # Strict parse for a successful response — invalid JSON is an error.
+  def parse_json!(raw)
+    JSON.parse(raw.to_s)
+  rescue JSON::ParserError => e
+    raise Error, "#{self.class.name} returned a 2xx with a non-JSON body: #{e.message}"
+  end
+
+  # Lenient parse, used only to dig an error message out of a non-2xx body.
   def parse_body(raw)
     JSON.parse(raw.to_s)
   rescue JSON::ParserError

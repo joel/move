@@ -54,4 +54,11 @@ RSpec.describe RecognitionProviders::Openai do
     expect { provider.identify(image: image, context: context) }
       .to raise_error(ProviderHttp::Error, /HTTP 502/)
   end
+
+  it "raises (not a phantom empty success) when a 2xx body is not JSON" do
+    stub_http(code: "200", body: "<html>Proxy interstitial</html>")
+
+    expect { provider.identify(image: image, context: context) }
+      .to raise_error(ProviderHttp::Error, /2xx with a non-JSON body/)
+  end
 end
