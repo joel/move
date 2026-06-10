@@ -17,14 +17,22 @@ module RecognitionProviders
 
     protected
 
-    # The vision models reply with a JSON array, sometimes fenced in ```json —
-    # extract the bracketed array. Unparseable content yields no detections
-    # (an empty box) rather than raising; transport/API failures raise upstream
-    # via ProviderHttp before we ever reach here.
+    # The vision models reply with a JSON array, sometimes fenced in ```json or
+    # wrapped in prose — extract the bracketed array and parse it. A genuinely
+    # empty box yields a parseable empty array `[]` (the prompt asks for ONLY a
+    # JSON array), which stays a legitimate zero-detection success. But content
+    # that is non-blank yet contains no parseable JSON array (prose, an apology,
+    # prompt/model drift) must NOT be read as an empty box — raise so the run
+    # fails loudly and is retryable, instead of a phantom `succeeded` with zero
+    # items (transport/API failures already raise upstream via ProviderHttp).
     def parse_array(content)
-      JSON.parse(content[/\[.*\]/m] || content)
-    rescue JSON::ParserError
-      []
+      json = content.to_s[/\[.*\]/m]
+      parsed = JSON.parse(json) if json
+      raise ProviderHttp::Error, "#{self.class.name} returned a 2xx with no parseable JSON array" unless parsed.is_a?(Array)
+
+      parsed
+    rescue JSON::ParserError => e
+      raise ProviderHttp::Error, "#{self.class.name} returned a 2xx with a malformed JSON array: #{e.message}"
     end
 
     # Coerce an array of provider hashes into DetectedObjects, dropping anything
