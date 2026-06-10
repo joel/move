@@ -34,6 +34,17 @@ module Components
       def self.default
         for_move(nil)
       end
+
+      # Whether the current user may mutate the active Move's contents — drives
+      # whether chrome-level create affordances (the sidebar "New Box") are shown.
+      # A UI affordance read off Current (the server still enforces the boundary):
+      # an editing role (admin/contributor) on a writable Move. Hidden for viewers,
+      # archived Moves, and when there is no Move in context.
+      def self.editor?(move = Current.move)
+        return false if move.nil? || Current.user.nil?
+
+        move.writable? && (move.membership_for(Current.user)&.can_edit? || false)
+      end
     end
   end
 end

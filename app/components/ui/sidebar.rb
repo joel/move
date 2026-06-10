@@ -25,12 +25,14 @@ module Components
           div(class: "flex flex-grow flex-col gap-2") do
             @destinations.each { |dest| item(dest) }
           end
-          render Components::Ui::Button.new(
-            label: I18n.t("ui.buttons.new_box"),
-            icon: Components::Icons::Plus,
-            href: Components::Ui::NavDestinations::STUB_HREF,
-            full_width: true
-          )
+          if Components::Ui::NavDestinations.editor?
+            render Components::Ui::Button.new(
+              label: I18n.t("ui.buttons.new_box"),
+              icon: Components::Icons::Plus,
+              href: Components::Ui::NavDestinations::STUB_HREF,
+              full_width: true
+            )
+          end
         end
       end
 
