@@ -13,4 +13,18 @@
 # See app/actions/AGENTS.md.
 class BaseAction
   include Dry::Monads[:result, :do]
+
+  private
+
+  # The archived-Move invariant lives here, in one place, instead of being
+  # re-checked by every controller and MCP tool: a user-facing mutating action
+  # calls `yield ensure_writable(move)` as its first step. An archived Move is
+  # read-only (Move#writable?). Returns Failure(:move_archived) — controllers map
+  # it to the friendly read-only redirect, MCP tools to a read-only tool error.
+  # Reads and token revocation are not guarded (they stay allowed when archived).
+  def ensure_writable(move)
+    return Failure(:move_archived) unless move.writable?
+
+    Success()
+  end
 end

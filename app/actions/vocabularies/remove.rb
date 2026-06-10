@@ -12,6 +12,7 @@ module Vocabularies
     include Search::Reindexing
 
     def call(record:, vocabulary:, actor:)
+      yield ensure_writable(record.move)
       affected = affected_item_ids(record) # before detach/destroy
       detached = yield destroy(record)
       reindex_items(affected) # rebuild search_text without the removed value

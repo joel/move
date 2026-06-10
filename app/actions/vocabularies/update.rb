@@ -15,6 +15,7 @@ module Vocabularies
     include Search::Reindexing
 
     def call(record:, vocabulary:, params:, actor:)
+      yield ensure_writable(record.move)
       affected = affected_item_ids(record) # before rename/detach
       detached = yield persist(record, vocabulary, params)
       # A rename (or tag→box detach) changes the items' denormalized search_text.

@@ -13,6 +13,7 @@ module Boxes
   # individually.
   class TransitionStatus < BaseAction
     def call(box:, to:, actor:)
+      yield ensure_writable(box.move)
       to = to.to_s
       yield validate(box, to)
       yield persist(box, to)

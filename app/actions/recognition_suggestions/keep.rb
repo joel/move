@@ -8,6 +8,7 @@ module RecognitionSuggestions
   # Caller owns the tenant context + writable-Move guard (controller).
   class Keep < BaseAction
     def call(suggestion:, actor:)
+      yield ensure_writable(suggestion.move)
       yield persist(suggestion)
       yield emit_event(suggestion, actor)
       Success(suggestion)

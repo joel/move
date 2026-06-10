@@ -7,6 +7,7 @@ module Items
   # it to the same box. Caller owns tenant context + writable-Move guard.
   class MarkRemoved < BaseAction
     def call(item:, actor:)
+      yield ensure_writable(item.move)
       yield persist(item)
       yield emit_event(item, actor)
       Success(item)

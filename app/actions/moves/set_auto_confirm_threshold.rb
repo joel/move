@@ -9,6 +9,7 @@ module Moves
   # (controller) owns authorization and the archived read-only guard.
   class SetAutoConfirmThreshold < BaseAction
     def call(move:, threshold:, actor: nil)
+      yield ensure_writable(move)
       value = yield coerce(threshold)
       yield persist(move, value)
       yield emit_event(move, actor, value)

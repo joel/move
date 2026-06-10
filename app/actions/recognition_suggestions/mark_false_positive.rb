@@ -7,6 +7,7 @@ module RecognitionSuggestions
   # search — reversible via the item's Restore (D5). Caller owns tenant + guard.
   class MarkFalsePositive < BaseAction
     def call(suggestion:, actor:)
+      yield ensure_writable(suggestion.move)
       yield persist(suggestion)
       yield emit_event(suggestion, actor)
       Success(suggestion)
