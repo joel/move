@@ -48,8 +48,12 @@ module ProviderHttp
   end
 
   # Lenient parse, used only to dig an error message out of a non-2xx body.
+  # Always returns a Hash: a body that is missing, non-JSON, or valid JSON that
+  # isn't an object (a bare array/string/number) collapses to {} so the caller's
+  # `.dig("error", "message")` stays safe and the bare-status message is used.
   def parse_body(raw)
-    JSON.parse(raw.to_s)
+    parsed = JSON.parse(raw.to_s)
+    parsed.is_a?(Hash) ? parsed : {}
   rescue JSON::ParserError
     {}
   end
