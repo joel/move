@@ -80,4 +80,19 @@ RSpec.describe RecognitionRuns::Process do
     expect(box.items.count).to eq(0)
     expect(run.recognition_suggestions.count).to eq(0)
   end
+
+  context "when the Move was archived after capture (#118)" do
+    let(:move) { create(:move, :archived) }
+
+    it "drops the run: no processing, items, or suggestions on a read-only Move" do
+      result = described_class.new.call(run:)
+
+      expect(result).to be_failure
+      expect(result.failure).to eq(:move_archived)
+      # Left queued (never entered processing); nothing persisted.
+      expect(run.reload.status).to eq("queued")
+      expect(box.items).to be_empty
+      expect(run.recognition_suggestions).to be_empty
+    end
+  end
 end

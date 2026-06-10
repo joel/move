@@ -22,4 +22,17 @@ RSpec.describe RecognitionRuns::Retry do
       expect(result.failure).to eq(:not_retryable)
     end.not_to change(box.recognition_runs, :count)
   end
+
+  it "refuses to retry on an archived Move, queuing no new run (#118)" do
+    archived = create(:move, :archived)
+    abox = create(:box, move: archived)
+    amedia = create(:media, move: archived, box: abox)
+    run = create(:recognition_run, :failed, move: archived, box: abox, media: amedia)
+
+    expect do
+      result = described_class.new.call(run:)
+      expect(result).to be_failure
+      expect(result.failure).to eq(:move_archived)
+    end.not_to change(RecognitionRun, :count)
+  end
 end
