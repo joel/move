@@ -8,12 +8,13 @@ module Views
     class Item < Views::Base
       include Phlex::Rails::Helpers::ButtonTo
 
-      def initialize(move:, box:, suggestion:, position:, total:)
+      def initialize(move:, box:, suggestion:, position:, total:, editable: false)
         @move = move
         @box = box
         @suggestion = suggestion
         @position = position
         @total = total
+        @editable = editable
       end
 
       def view_template
@@ -65,8 +66,16 @@ module Views
             h2(class: "text-headline-lg text-text-warm") { @suggestion.proposed_name }
             chips
             quantity
-            actions
+            @editable ? actions : read_only_note
           end
+        end
+      end
+
+      # Review is a mutating workflow with nothing for a viewer to act on; show a
+      # note instead of the Keep/Correct/Ignore controls.
+      def read_only_note
+        p(class: "rounded-card bg-card px-4 py-3 text-body-md text-muted") do
+          I18n.t("reviews.item.view_only")
         end
       end
 

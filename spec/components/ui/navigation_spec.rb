@@ -30,10 +30,28 @@ RSpec.describe "Navigation chrome" do # rubocop:disable RSpec/DescribeClass
   end
 
   describe Components::Ui::Sidebar do
-    it "renders all five destinations and the New Box action" do
+    it "renders all five destinations" do
       html = described_class.new(active: :boxes).call
       labels.each { |label| expect(html).to include(label) }
+    end
+
+    it "hides the New Box action with no editable Move in context" do
+      # Stateless (no Current.move) → not an editor → no create affordance.
+      html = described_class.new(active: :boxes).call
+      expect(html).not_to include(I18n.t("ui.buttons.new_box"))
+    end
+
+    it "shows the New Box action for an editor on a writable Move" do
+      user = create(:user)
+      move = create(:move, created_by: user) # creator → admin (editor)
+      Current.user = user
+      Current.move = move
+
+      html = described_class.new(active: :boxes).call
+
       expect(html).to include(I18n.t("ui.buttons.new_box"))
+    ensure
+      Current.reset
     end
 
     it "is 280px wide and desktop-only" do

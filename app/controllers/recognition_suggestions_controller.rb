@@ -16,7 +16,8 @@ class RecognitionSuggestionsController < MoveScopedController
       move: @move, box: @box,
       queue: queue_suggestions,
       counts: review_counts,
-      first_unreviewed: queue_suggestions.first
+      first_unreviewed: queue_suggestions.first,
+      editable: editable_move?
     )
   end
 
@@ -24,7 +25,8 @@ class RecognitionSuggestionsController < MoveScopedController
   def show
     render Views::Reviews::Item.new(
       move: @move, box: @box, suggestion: @suggestion,
-      position: review_position(@suggestion), total: reviewable_total
+      position: review_position(@suggestion), total: reviewable_total,
+      editable: editable_move?
     )
   end
 

@@ -9,12 +9,13 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::FormWith
 
-      def initialize(move:, item:, boxes:, categories:, tags:, review_suggestion: nil)
+      def initialize(move:, item:, boxes:, categories:, tags:, review_suggestion: nil, editable: false)
         @move = move
         @item = item
         @boxes = boxes
         @categories = categories
         @tags = tags
+        @editable = editable
         # When the edit was reached via review "Correct", saving resolves this
         # suggestion and resumes the review rather than dead-ending on the item.
         @review_suggestion = review_suggestion
@@ -92,17 +93,48 @@ module Views
       def edit_panel
         section(class: "lg:col-span-7") do
           render Components::Ui::Card.new(padding: "p-6") do
-            render Components::ItemForm.new(
-              models: [@move, @item], item: @item,
-              categories: @categories, tags: @tags,
-              submit_label: I18n.t("items.show.save"), review_suggestion_id: @review_suggestion&.id
-            )
-            div(class: "mt-2 flex flex-wrap items-center gap-3 border-t border-card-border pt-5") do
-              move_control
-              presence_control
-            end
+            @editable ? editable_body : read_only_body
           end
         end
+      end
+
+      def editable_body
+        render Components::ItemForm.new(
+          models: [@move, @item], item: @item,
+          categories: @categories, tags: @tags,
+          submit_label: I18n.t("items.show.save"), review_suggestion_id: @review_suggestion&.id
+        )
+        div(class: "mt-2 flex flex-wrap items-center gap-3 border-t border-card-border pt-5") do
+          move_control
+          presence_control
+        end
+      end
+
+      # Read-only detail for viewers / archived Moves: the same attributes the
+      # form edits, rendered as labelled text instead of inputs/controls.
+      def read_only_body
+        div(class: "flex flex-col gap-5") do
+          detail_row(I18n.t("items.form.name"), @item.name)
+          detail_row(I18n.t("items.form.quantity"), @item.quantity.to_s)
+          detail_row(I18n.t("items.form.category"), @item.category&.name || "—")
+          detail_row(I18n.t("items.form.tags"), item_tag_labels)
+          detail_row(I18n.t("items.form.fragile"), I18n.t("items.show.#{@item.fragile? ? "yes" : "no"}"))
+          p(class: "border-t border-card-border pt-4 text-body-md text-muted") do
+            I18n.t(@move.archived? ? "items.show.archived" : "items.show.view_only")
+          end
+        end
+      end
+
+      def detail_row(label, value)
+        div(class: "flex flex-col gap-1") do
+          span(class: "text-label-caps uppercase text-muted") { label }
+          span(class: "text-body-lg text-text-warm") { value }
+        end
+      end
+
+      def item_tag_labels
+        names = @item.tags.map(&:name)
+        names.any? ? names.join(", ") : "—"
       end
 
       def move_control

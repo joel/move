@@ -74,6 +74,17 @@ RSpec.describe "Items" do
       expect(response).to redirect_to(move_item_path(move, item))
     end
 
+    it "re-renders the editable form (not the read-only view) on a validation error" do
+      item = create(:item, :manual, move:, box:, name: "Old")
+
+      patch move_item_path(move, item), params: { item: { name: "" } }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      # The editor must keep the form to fix the error, not fall into read-only.
+      expect(response.body).to include(I18n.t("items.show.save"))
+      expect(response.body).not_to include(I18n.t("items.show.view_only"))
+    end
+
     context "when editing was reached via review Correct (review_suggestion_id)" do
       it "resolves the edited suggestion on save and resumes at the next one" do
         editing = create(:recognition_suggestion, :with_item, move:, box:, state: "pending", confidence_score: 0.5)

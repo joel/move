@@ -6,13 +6,14 @@ module Views
     # filter, and the box grid (with a "Start New Box" tile). Renders inside the
     # AppLayout sidebar shell (see AppShellLayout).
     class Index < Views::Base
-      def initialize(move:, boxes:, rooms:, summary:, selected_room_id: nil, item_counts: {})
+      def initialize(move:, boxes:, rooms:, summary:, selected_room_id: nil, item_counts: {}, editable: false)
         @move = move
         @boxes = boxes
         @rooms = rooms
         @summary = summary
         @selected_room_id = selected_room_id
         @item_counts = item_counts
+        @editable = editable
       end
 
       def view_template
@@ -30,7 +31,7 @@ module Views
           title: I18n.t("boxes.index.title"),
           subtitle: @move.name
         ) do
-          add_button if @move.writable?
+          add_button if @editable
         end
       end
 
@@ -86,7 +87,7 @@ module Views
       def grid
         div(class: "grid grid-cols-1 gap-stack-gap sm:grid-cols-2 lg:grid-cols-3") do
           @boxes.each { |box| render Components::BoxCard.new(box: box, item_count: @item_counts[box.id].to_i) }
-          start_new_box_card if @move.writable?
+          start_new_box_card if @editable
         end
       end
 
@@ -125,7 +126,7 @@ module Views
           render Components::Ui::EmptyState.new(
             title: I18n.t("boxes.empty.title"),
             description: I18n.t("boxes.empty.description")
-          ) { add_button if @move.writable? }
+          ) { add_button if @editable }
         end
       end
     end

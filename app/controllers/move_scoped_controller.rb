@@ -26,4 +26,14 @@ class MoveScopedController < TenantController
   def authorize_move_mutation!
     authorize! @move, to: :edit_contents?, with: MovePolicy
   end
+
+  # Whether the current user may mutate this Move's contents *now*: an editing
+  # role (admin/contributor) on a writable (non-archived) Move. Surfaces pass
+  # this to their views as `editable:` so mutating affordances are hidden from
+  # viewers and on archived Moves — the UX complement to the server-side 403
+  # (the boundary is already enforced; this just stops showing dead controls).
+  # Mirrors MoveMembershipAuthorization#editor_of?.
+  def editable_move?
+    @move.writable? && allowed_to?(:edit_contents?, @move, with: MovePolicy)
+  end
 end

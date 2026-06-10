@@ -27,6 +27,10 @@ en:
       remove: "Remove"
       restore: "Restore to box"
       remove_confirm: "Mark this item as removed from its box?"
+      "yes": "Yes"
+      "no": "No"
+      archived: "This move is archived and is read-only."
+      view_only: "You have view-only access to this move."
     form:
       name: "Item name"
       name_placeholder: "e.g. Espresso Machine"

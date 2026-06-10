@@ -8,12 +8,13 @@ module Views
     class Queue < Views::Base
       include Phlex::Rails::Helpers::ButtonTo
 
-      def initialize(move:, box:, queue:, counts:, first_unreviewed:)
+      def initialize(move:, box:, queue:, counts:, first_unreviewed:, editable: false)
         @move = move
         @box = box
         @queue = queue
         @counts = counts
         @first = first_unreviewed
+        @editable = editable
       end
 
       def view_template
@@ -38,7 +39,7 @@ module Views
           title: I18n.t("reviews.queue.title"),
           subtitle: I18n.t("reviews.queue.subtitle", number: box_number)
         ) do
-          if @first
+          if @first && @editable
             render Components::Ui::Button.new(
               label: I18n.t("reviews.queue.start"), href: move_box_review_path(@move, @box, @first)
             )
@@ -89,7 +90,7 @@ module Views
             end
             div(class: "flex items-center gap-2") do
               render Components::Ui::RecognitionState.new(state: suggestion_state(suggestion))
-              actions(suggestion)
+              actions(suggestion) if @editable
             end
           end
         end

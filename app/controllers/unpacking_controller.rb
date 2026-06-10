@@ -15,12 +15,13 @@ class UnpackingController < MoveScopedController
 
   # GET /moves/:move_id/boxes/:box_id/unpacking
   def show
-    return render(Views::Unpacking::Celebration.new(move: @move, box: @box)) if @box.unpacked?
+    editable = editable_move?
+    return render(Views::Unpacking::Celebration.new(move: @move, box: @box, editable:)) if @box.unpacked?
 
     items = authorized_scope(@box.items).includes(:category)
     render Views::Unpacking::Checklist.new(
       move: @move, box: @box,
-      remaining: items.in_box.ordered, unpacked: items.removed.ordered
+      remaining: items.in_box.ordered, unpacked: items.removed.ordered, editable:
     )
   end
 
