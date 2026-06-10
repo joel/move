@@ -51,6 +51,18 @@ RSpec.describe "Captures" do
       follow_redirect!
       expect(response.body).to include(I18n.t("captures.errors.no_file"))
     end
+
+    it "rejects an unsupported image format with an actionable, specific message" do
+      expect do
+        post move_box_capture_path(move, box), params: { file: upload("unsupported.heic", "image/heic") }
+      end.not_to change(box.media, :count)
+
+      expect(response).to redirect_to(move_box_capture_path(move, box))
+      follow_redirect!
+      # Not the generic "try again" fallback — the user is told which formats work.
+      expect(response.body).to include("JPEG, PNG, WEBP, GIF")
+      expect(response.body).not_to include(I18n.t("captures.errors.failed"))
+    end
   end
 
   describe "GET capture/session" do

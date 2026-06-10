@@ -67,6 +67,9 @@ class CapturesController < MoveScopedController
     case reason
     when :no_file then t("captures.errors.no_file")
     when :not_capturable then t("captures.sealed")
+    # Surface validation messages (e.g. an unsupported image format) so the user
+    # gets actionable guidance instead of the generic "try again" fallback.
+    when ActiveModel::Errors then reason.full_messages.to_sentence.presence || t("captures.errors.failed")
     else t("captures.errors.failed")
     end
   end
