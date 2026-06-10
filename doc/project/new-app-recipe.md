@@ -340,7 +340,9 @@ capture → recognition):
 | MCP `POST /mcp` returns 404 | hit on the apex, not an org subdomain — the Apartment elevator found no tenant (by design, non-disclosing) | call `https://<slug>.<host>/mcp`; the Bearer token then resolves the Move |
 | MCP `input_schema` raises `Invalid JSON Schema … '#/required' … minimum … 1` | passed `required: []` for a no-arg tool | omit `required:` entirely when there are no required args |
 | request-spec `post`/`get` silently doesn't dispatch (`response` nil) | a spec helper param named `method`/`id` shadows methods the integration Runner uses | rename the helper params (e.g. `rpc_method`, `req_id`) |
+| recognition runs show `succeeded` with 0 items in prod after enabling openai | adapter parsed a non-2xx body as success (rate limit/bad key looked like an empty box) | adapters now raise on non-2xx via `ProviderHttp`; check `OPENAI_API_KEY` is set + within rate/credit limits ([`ai-providers.md`](ai-providers.md)) |
+| all recognition runs fail / embeddings nil right after flipping providers | `RECOGNITION_PROVIDER`/`EMBEDDING_PROVIDER: openai` set before `OPENAI_API_KEY` reached the env | add the key to Doppler `move/prd` **first**, then deploy; backfill with `kamal app exec --reuse 'bin/rails search:reindex'` |
 
 ---
 
-_Last updated: 2026-06-09, after adding the D13 MCP assistant endpoint._
+_Last updated: 2026-06-10, after wiring production OpenAI recognition + embedding providers (#78)._
