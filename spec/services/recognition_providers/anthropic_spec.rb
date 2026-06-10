@@ -39,4 +39,11 @@ RSpec.describe RecognitionProviders::Anthropic do
     expect { provider.identify(image: image, context: context) }
       .to raise_error(ProviderHttp::Error, /401.*invalid x-api-key/)
   end
+
+  it "raises (not a phantom empty box) when a 2xx message has no parseable JSON array" do
+    stub_http(code: "200", body: { content: [{ text: "Sorry, I can't identify anything." }] }.to_json)
+
+    expect { provider.identify(image: image, context: context) }
+      .to raise_error(ProviderHttp::Error, /no parseable JSON array/)
+  end
 end

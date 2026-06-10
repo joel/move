@@ -35,10 +35,24 @@ RSpec.describe RecognitionProviders::Openai do
     expect(result.objects.first.confidence).to eq(0.9)
   end
 
-  it "yields no detections when the model returns unparseable content (not a transport error)" do
-    stub_http(code: "200", body: { choices: [{ message: { content: "I see a lamp." } }] }.to_json)
+  it "treats an empty JSON array as a legitimate zero-detection result" do
+    stub_http(code: "200", body: { choices: [{ message: { content: "[]" } }] }.to_json)
 
     expect(provider.identify(image: image, context: context).objects).to be_empty
+  end
+
+  it "raises (not a phantom empty box) when a 2xx message has no parseable JSON array" do
+    stub_http(code: "200", body: { choices: [{ message: { content: "I see a lamp and a chair." } }] }.to_json)
+
+    expect { provider.identify(image: image, context: context) }
+      .to raise_error(ProviderHttp::Error, /no parseable JSON array/)
+  end
+
+  it "raises when a 2xx message is a malformed JSON array" do
+    stub_http(code: "200", body: { choices: [{ message: { content: "[{bad json]" } }] }.to_json)
+
+    expect { provider.identify(image: image, context: context) }
+      .to raise_error(ProviderHttp::Error, /malformed JSON array/)
   end
 
   it "raises on a non-2xx response, surfacing the status and vendor message (never the key)" do
