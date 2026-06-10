@@ -54,9 +54,11 @@ class ItemsController < MoveScopedController
     in Dry::Monads::Failure(errors)
       @item.assign_attributes(item_attributes)
       @item.errors.merge!(errors) if errors.respond_to?(:each)
+      # update is editor-gated (require_writable_move!), so re-render the editable
+      # form (not the read-only view) to show the validation errors.
       render Views::Items::Show.new(
         move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-        review_suggestion: review_suggestion, **vocabulary
+        review_suggestion: review_suggestion, editable: true, **vocabulary
       ), status: :unprocessable_content
     end
   end
