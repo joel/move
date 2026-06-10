@@ -9,6 +9,7 @@ module RecognitionRuns
     def call(run:)
       return Failure(:not_retryable) unless run&.failed?
 
+      yield ensure_writable(run.move)
       Enqueue.new.call(media: run.media)
     end
   end

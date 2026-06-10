@@ -8,6 +8,13 @@ module RecognitionRuns
   # `failed` (never stuck in processing) and return Failure — they never raise up.
   class Process < BaseAction
     def call(run:, provider: RecognitionProviders.resolve)
+      # Drop in-flight recognition when the Move was archived after capture: an
+      # archived Move is read-only, so don't process or persist anything. The run
+      # is left `queued` (never enters `processing`) and the job no-ops. Plain
+      # return (not `yield`) so the guard can't be swallowed by the rescue below.
+      guard = ensure_writable(run.move)
+      return guard if guard.failure?
+
       mark_processing(run)
       result = provider.identify(image: run.media.image, context: context(run))
       # Materialize atomically: if any detection fails to persist, roll back all
