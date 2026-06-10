@@ -140,13 +140,6 @@ class ItemsController < MoveScopedController
     { categories: @move.categories.ordered, tags: @move.tags.for_items.ordered }
   end
 
-  def require_writable_move!
-    authorize_move_mutation!
-    return if @move.writable?
-
-    redirect_to move_boxes_path(@move), alert: t("items.archived")
-  end
-
   def move_error(reason)
     case reason
     when :removed then t("items.move.removed_item")

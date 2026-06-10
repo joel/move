@@ -73,6 +73,12 @@ end
 - **Delete**: capture ids before `destroy!` (the record is gone afterwards).
 - **Guard + transition**: validate the business rule (`yield guard`) before the
   state change.
+- **Archived-Move guard**: a user-facing *mutating* action's first step is
+  `yield ensure_writable(<move>)` (`BaseAction#ensure_writable` → `Failure(:move_archived)`
+  on an archived Move). This is the single source of truth for "an archived Move
+  is read-only" — every caller (web, MCP, jobs) inherits it; controllers map the
+  failure to a friendly redirect, MCP tools to a read-only tool error. Read-only
+  actions (and token revoke) are not guarded.
 - **Tests**: actions are plain Ruby — unit-test them directly with `.new.call(...)`
   and assert on `Success`/`Failure`.
 

@@ -4,7 +4,6 @@
 en:
   items:
     box: "Box #%{number}"
-    archived: "This move is archived and is read-only."
     state:
       pending_review: "Pending review"
       auto_confirmed: "Auto-confirmed"

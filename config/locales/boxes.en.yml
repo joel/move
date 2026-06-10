@@ -105,4 +105,3 @@ en:
       room_required: "Assign a room before sealing this box."
       invalid: "That status change isn't allowed."
       failed: "Could not update the box status."
-    archived: "This move is archived and is read-only."
