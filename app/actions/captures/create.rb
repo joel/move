@@ -7,11 +7,11 @@ module Captures
   # into a sealed box is blocked (Domain §5.2). Online-only — a missing/empty file
   # fails honestly (no offline queue). Caller owns the writable-Move guard.
   class Create < BaseAction
-    def call(box:, file:, captured_by:)
+    def call(box:, file:, captured_by:, captured_via: "web")
       return Failure(:not_capturable) unless box.capturable?
       return Failure(:no_file) if file.blank?
 
-      media = yield persist(box, file)
+      media = yield persist(box, file, captured_via)
       yield RecognitionRuns::Enqueue.new.call(media: media)
       yield emit_event(media, captured_by)
       Success(media)
@@ -19,8 +19,12 @@ module Captures
 
     private
 
-    def persist(box, file)
-      media = box.media.new(move: box.move, media_type: "image", captured_via: "web", captured_at: Time.current)
+    # captured_via records the origin (web vs mcp); the MCP add_media tool passes
+    # "mcp" so assistant uploads aren't misclassified as browser captures.
+    def persist(box, file, captured_via)
+      media = box.media.new(
+        move: box.move, media_type: "image", captured_via: captured_via, captured_at: Time.current
+      )
       media.image.attach(file)
       media.save!
       Success(media)

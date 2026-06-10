@@ -48,4 +48,10 @@ F3 is designed as a Menu hub + a Settings/Assistant screen (mobile + desktop —
 Adaptive thresholds, messaging channels, org-wide tokens (explicitly forbidden — Workflow §14).
 
 ## 10. Phase audit trail
-_Fill on execution:_ Issue: · PR: · Menu/Settings Stitch screen ids: · Verification: · Release `v0.18.0-assistant-mcp`:
+- **Issue:** [#103](https://github.com/joel/move/issues/103).
+- **Branch / PR:** `feature/assistant-mcp` → PR (see Steps log).
+- **Stitch screens:** Menu Hub `screens/6f780b58…`; Settings & Assistant mobile `screens/11d53a11…` / desktop `screens/02012642…`.
+- **Decisions:** single PR; official `mcp` gem + stateless JSON-RPC on the org subdomain; unit/threshold editable by editors, token mgmt admin-only.
+- **Verification:** `/product-review` (see `Phase D13 - Steps.md`).
+- **Release `v0.18.0-assistant-mcp`:** _pending merge._
+- Full step log: [`Phase D13 - Steps.md`](Phase%20D13%20-%20Steps.md).

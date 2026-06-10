@@ -149,6 +149,11 @@ gem "dry-monads", "~> 1.10"
 # https://github.com/rails-on-services/apartment
 gem "ros-apartment", "~> 3.4", require: "apartment"
 
+# D13 — MCP assistant surface. Official Model Context Protocol SDK; the MCP
+# server + tool definitions are wired into a Rails controller via the stateless
+# StreamableHTTP transport (per-Move integration tokens, shared domain actions).
+gem "mcp"
+
 # D9 — Labels, QR & Scan. Pure-Ruby PDF generation for the A7 exterior label and
 # A4 manifest (no system binary, so deploys stay infra-free). QR codes are
 # rendered to PNG via rqrcode (+ chunky_png) and embedded in the PDFs.

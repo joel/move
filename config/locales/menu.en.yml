@@ -1,0 +1,18 @@
+# F3 — Menu hub strings (Phase D13). No customer-facing copy is hard-coded in
+# the Phlex view; everything renders through menu.*.
+en:
+  menu:
+    show:
+      title: "Menu"
+      subtitle: "Organize this move and manage app preferences."
+      organize: "Organize"
+      app: "App"
+      actions: "Actions"
+      categories: "Categories, Tags & Rooms"
+      members: "Members & Roles"
+      summary: "Summary & Volume"
+      settings: "Settings"
+      assistant: "Assistant & Integrations"
+      account: "Account"
+      switch_move: "Switch move"
+      sign_out: "Sign out"

@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["label", "iconLight", "iconDark"]
+  static targets = ["label", "iconLight", "iconDark", "switch", "knob"]
 
   connect() {
     this.mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
@@ -44,6 +44,16 @@ export default class extends Controller {
 
     if (this.hasIconLightTarget) {
       this.iconLightTarget.classList.toggle("hidden", isDark)
+    }
+
+    // F3 settings switch: reflect the active theme as the switch's on/off state.
+    if (this.hasSwitchTarget) {
+      this.switchTarget.setAttribute("aria-checked", isDark ? "true" : "false")
+    }
+
+    if (this.hasKnobTarget) {
+      this.knobTarget.classList.toggle("translate-x-6", isDark)
+      this.knobTarget.classList.toggle("translate-x-1", !isDark)
     }
   }
 

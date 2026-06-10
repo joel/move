@@ -34,6 +34,7 @@ class ApplicationController < ActionController::Base
   # ActiveSupport::CurrentAttributes.
   def set_current_user
     Current.user = current_user
+    Current.source = :web
   end
 
   def current_user

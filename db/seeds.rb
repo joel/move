@@ -35,6 +35,14 @@ require "securerandom"
 #   member@example.com   — contributor (add/edit boxes & items; no member mgmt)
 #   viewer@example.com   — viewer      (read-only; no edit/manage affordances)
 #   invitee@example.com  — org member, addable to the Move via F1
+#
+# D13 — the demo Move's "Main Assistant" MCP token is the fixed dev value below,
+# so you can call the assistant endpoint immediately:
+#   curl -s https://acme.workeverywhere.docker/mcp \
+#     -H "Authorization: Bearer mcp_demo_seattle_relocation_dev_token" \
+#     -H "Content-Type: application/json" \
+#     -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_boxes","arguments":{}}}'
+DEMO_MCP_TOKEN = "mcp_demo_seattle_relocation_dev_token"
 DEMO = {
   owner_email: "demo@example.com",
   owner_name: "Demo Mover",
@@ -315,6 +323,29 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     archived_box.items.create!(
       move: archived_move, name: name, quantity: 1, created_via: "manual", review_state: "confirmed"
     )
+  end
+
+  # D13 — MCP integration tokens (F3 Assistant panel). Two active tokens (one
+  # recently used, one never) plus a revoked one, so the panel shows live tokens
+  # and the model exercises the revoked state. Only the digest is stored; the
+  # raw value of "Main Assistant" is the fixed dev token documented above
+  # (DEMO_MCP_TOKEN), so a developer can call POST /mcp with it immediately.
+  move.integration_tokens.find_or_create_by!(name: "Main Assistant") do |t|
+    t.organization_id = organization.id
+    t.created_by = owner
+    t.token_digest = MoveIntegrationToken.digest(DEMO_MCP_TOKEN)
+    t.last_used_at = 2.hours.ago
+  end
+  move.integration_tokens.find_or_create_by!(name: "Inventory Bot") do |t|
+    t.organization_id = organization.id
+    t.created_by = owner
+    t.token_digest = MoveIntegrationToken.digest(SecureRandom.urlsafe_base64(32))
+  end
+  move.integration_tokens.find_or_create_by!(name: "Old Laptop Script") do |t|
+    t.organization_id = organization.id
+    t.created_by = owner
+    t.token_digest = MoveIntegrationToken.digest(SecureRandom.urlsafe_base64(32))
+    t.revoked_at = 3.days.ago
   end
 
   # D8: build the hybrid-search projection for every seeded item synchronously

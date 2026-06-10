@@ -252,4 +252,60 @@ are added to Apartment's `pg_excluded_names` so tenant clones don't rewrite them
 to `<tenant>.X`. See `new-app-recipe.md` for the image swap + accessory cutover +
 glibc-collation gotcha.
 
-_Last updated: 2026-06-08._
+## 7. MCP assistant surface (D13)
+
+An AI assistant reaches a single Move through the **official `mcp` gem** at
+`POST /mcp` on the **org subdomain** — a stateless JSON-RPC endpoint
+(`McpController < ActionController::API`, no session/CSRF). Tenancy resolution
+reuses the existing two layers, then a third credential resolves the Move:
+
+1. The **Apartment elevator** (Rack middleware) resolves the **Organization** from
+   the subdomain and switches the schema — exactly as for a web request. The apex
+   (no tenant) is a non-disclosing **404**.
+2. The **Bearer integration token** resolves the **Move** within that schema:
+   `MoveIntegrationToken.authenticate` looks up the SHA-256 digest among *active*
+   (non-revoked) tokens. Absent / unknown / revoked → **401**.
+3. The controller sets `Current.move` + `Current.source = :mcp`, touches
+   `last_used_at`, and builds a per-request `MCP::Server` whose `server_context`
+   is `{ move:, token:, actor: token.created_by }`.
+
+The eight tools (`list_boxes`, `get_box_contents`, `search_items`,
+`add_item_to_box`, `add_media_to_box`, `move_item`, `mark_unpacked`,
+`get_volume_summary`) are thin wrappers over the **same `app/actions`** the web UI
+calls — so MCP cannot bypass authorization, validation, audit, or tenant scoping.
+Every record is loaded through the token's `move` association, so a token can
+never reach another Move or Organization. Mutating tools emit `mcp.tool_called`;
+`MoveMcp::AuditSubscriber` records token lifecycle (`integration_token.*`) and
+tool mutations with source `mcp` (events-not-callbacks).
+
+Tokens are admin-only (create/revoke) and managed in the F3 Settings/Assistant
+screen; the raw token is shown **once** at creation (only its digest is stored)
+and revocation is independent of MoveMembership.
+
+```mermaid
+sequenceDiagram
+  participant C as MCP client
+  participant E as Apartment elevator
+  participant M as McpController
+  participant T as MoveIntegrationToken
+  participant S as MCP::Server + tools
+  participant A as app/actions
+
+  C->>E: POST <slug>.host/mcp (Bearer mcp_…)
+  E->>E: subdomain → switch to org schema (apex → 404)
+  E->>M: dispatch
+  M->>T: authenticate(bearer) within tenant
+  alt absent / revoked
+    T-->>M: nil
+    M-->>C: 401
+  else active
+    T-->>M: token (→ Move)
+    M->>M: Current.move / source=:mcp, touch last_used_at
+    M->>S: handle_json (server_context = {move, token, actor})
+    S->>A: tool → shared action (Move-scoped)
+    A-->>S: Success/Failure (+ domain + mcp.tool_called events)
+    S-->>C: JSON-RPC result
+  end
+```
+
+_Last updated: 2026-06-09._

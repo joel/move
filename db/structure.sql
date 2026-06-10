@@ -214,6 +214,25 @@ CREATE TABLE public.media (
 
 
 --
+-- Name: move_integration_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.move_integration_tokens (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    created_by_user_id uuid NOT NULL,
+    name character varying NOT NULL,
+    token_digest character varying NOT NULL,
+    revoked_at timestamp(6) without time zone,
+    last_used_at timestamp(6) without time zone,
+    permissions jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: move_memberships; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -530,6 +549,14 @@ ALTER TABLE ONLY public.items
 
 ALTER TABLE ONLY public.media
     ADD CONSTRAINT media_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: move_integration_tokens move_integration_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.move_integration_tokens
+    ADD CONSTRAINT move_integration_tokens_pkey PRIMARY KEY (id);
 
 
 --
@@ -858,6 +885,27 @@ CREATE INDEX index_media_on_move_id ON public.media USING btree (move_id);
 
 
 --
+-- Name: index_move_integration_tokens_on_created_by_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_move_integration_tokens_on_created_by_user_id ON public.move_integration_tokens USING btree (created_by_user_id);
+
+
+--
+-- Name: index_move_integration_tokens_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_move_integration_tokens_on_move_id ON public.move_integration_tokens USING btree (move_id);
+
+
+--
+-- Name: index_move_integration_tokens_on_token_digest; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_move_integration_tokens_on_token_digest ON public.move_integration_tokens USING btree (token_digest);
+
+
+--
 -- Name: index_move_memberships_on_move_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1104,6 +1152,14 @@ ALTER TABLE ONLY public.item_tags
 
 
 --
+-- Name: move_integration_tokens fk_rails_2b00dd7f7c; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.move_integration_tokens
+    ADD CONSTRAINT fk_rails_2b00dd7f7c FOREIGN KEY (move_id) REFERENCES public.moves(id) ON DELETE CASCADE;
+
+
+--
 -- Name: recognition_suggestions fk_rails_320e554aa8; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1326,6 +1382,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260609130001'),
 ('20260609120001'),
 ('20260608090002'),
 ('20260608090001'),
