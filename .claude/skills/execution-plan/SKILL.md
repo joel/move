@@ -319,6 +319,22 @@ unset GITHUB_TOKEN && gh api repos/<owner>/<repo>/pulls/<PR>/comments \
 If Codex left inline comments, triage every one via Step 11 (fix / explain / defer),
 then reply and resolve. If Codex only reacted 👍 (no comments), note that and proceed.
 
+> **Where the verdict lives — clean vs. findings come through different APIs:**
+> - **Findings** → a formal review (`pulls/<PR>/reviews`, `state: COMMENTED`, carries
+>   a `commit_id`) **plus** inline `pulls/<PR>/comments`. These are what you triage.
+> - **A CLEAN round** → a PR **issue comment** (`issues/<PR>/comments`) whose body
+>   starts with `Codex Review: Didn't find any major issues` — **not** a formal
+>   review and **without** a `commit_id`.
+>
+> So **polling only `pulls/<PR>/reviews` will miss a clean pass** and look like
+> "Codex hasn't responded" forever. Always also check `issues/<PR>/comments` for the
+> "Didn't find any major issues" line. To confirm the verdict is on the *latest*
+> commit when it's a clean issue-comment (no `commit_id`), reason from the timeline:
+> the clean comment's `created_at` is after your last push / `@codex review`. Before
+> merging, verify: CI green + `mergeStateStatus: CLEAN` + **0 unresolved review
+> threads** + the latest Codex activity is either a clean comment or a resolved
+> formal review on HEAD.
+
 **The review is ITERATIVE — expect several rounds, not one.** Each round commonly
 surfaces fresh P1/P2s as earlier ones are fixed (substantial PRs here have taken
 **5–6 rounds / ~9 findings**). After every fix push: re-trigger `@codex review`,
@@ -331,6 +347,15 @@ Practical notes:
   succession gets some coalesced/ignored. Space them out, poll patiently (~45s),
   and confirm via a review on the current HEAD sha / the trigger's reaction, not
   just elapsed time.
+- **Codex can be slow or fail to auto-trigger** — it usually posts within ~1–5 min,
+  but occasionally nothing appears for 10–15 min (or the auto-trigger never fires).
+  If CI is green and there's still no Codex activity after ~10 min, post one
+  `@codex review` (spaced, not spammed) and keep polling. Don't merge on "green +
+  silent Codex" when the user's gate is "Codex clean" — wait for the actual verdict.
+- **Background-poll the verdict, don't hand-loop** — when waiting on Codex, run a
+  background poll that watches for *both* a formal review on HEAD (findings) *and*
+  the clean issue-comment, with a generous deadline; re-trigger + re-poll if it
+  times out silent.
 - A finding can be valid but **already mitigated** (e.g. a release-scan flags a
   deploy risk you handled via a runbook step) — reply with the evidence and
   resolve; don't re-fix.
