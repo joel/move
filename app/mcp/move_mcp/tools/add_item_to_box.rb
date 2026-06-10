@@ -16,9 +16,6 @@ module MoveMcp
       )
 
       def self.call(box_number:, name:, server_context:, quantity: 1)
-        blocked = archived_block(server_context)
-        return blocked if blocked
-
         box = find_box(server_context, box_number)
         return error_response("No box ##{box_number} in this move.") if box.nil?
 

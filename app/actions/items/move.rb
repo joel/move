@@ -7,6 +7,7 @@ module Items
   # rejected. Returns the failure reason as a symbol for a precise message.
   class Move < BaseAction
     def call(item:, target_box:, mover:)
+      yield ensure_writable(item.move)
       yield validate(item, target_box)
       yield persist(item, target_box)
       yield emit_event(item, target_box, mover)

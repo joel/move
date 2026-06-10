@@ -15,6 +15,7 @@ module MoveIntegrationTokens
     Result = Data.define(:token, :raw_token)
 
     def call(move:, name:, actor:)
+      yield ensure_writable(move)
       yield validate_name(name)
       organization = yield current_organization
       raw_token = MoveIntegrationToken.generate_raw_token

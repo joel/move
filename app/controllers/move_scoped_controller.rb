@@ -20,11 +20,28 @@ class MoveScopedController < TenantController
 
   # Authorize that the current user holds an editing role (admin/contributor) on
   # the Move — the authorization decision lives in MovePolicy#edit_contents?, so a
-  # viewer is refused with the standard ActionPolicy 403. Subclasses'
-  # require_writable_move! call this before applying the archived (read-only)
-  # redirect, which is a separate UX concern (a writable check, not authorization).
+  # viewer is refused with the standard ActionPolicy 403.
   def authorize_move_mutation!
     authorize! @move, to: :edit_contents?, with: MovePolicy
+  end
+
+  # Shared before_action guard for mutating controller actions: enforce the
+  # editing role (403 for viewers), then redirect with a friendly read-only alert
+  # on an archived Move. The writable *invariant* lives in the actions
+  # (BaseAction#ensure_writable → Failure(:move_archived)); this is the controller's
+  # presentation of it, in one place instead of copy-pasted per controller. Each
+  # subclass declares only its redirect target via read_only_redirect_path.
+  def require_writable_move!
+    authorize_move_mutation!
+    return if @move.writable?
+
+    redirect_to read_only_redirect_path, alert: t("moves.archived_alert")
+  end
+
+  # Where require_writable_move! sends a user who tried to mutate an archived
+  # Move. Subclasses override; defaults to the Move's Boxes home.
+  def read_only_redirect_path
+    move_boxes_path(@move)
   end
 
   # Whether the current user may mutate this Move's contents *now*: an editing

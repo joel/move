@@ -91,11 +91,9 @@ class UnpackingController < MoveScopedController
     redirect_to move_box_unpacking_path(@move, @box), alert: t("unpacking.not_available")
   end
 
-  # Archived Moves are read-only — no toggling items or completing/reopening.
-  def require_writable_move!
-    authorize_move_mutation!
-    return if @move.writable?
-
-    redirect_to move_box_unpacking_path(@move, @box), alert: t("unpacking.archived")
+  # Archived-Move redirect target (require_writable_move!) — back to the
+  # (read-only) unpacking checklist rather than the box.
+  def read_only_redirect_path
+    move_box_unpacking_path(@move, @box)
   end
 end

@@ -8,6 +8,7 @@ module RecognitionSuggestions
   # cannot be corrected — keep/ignore it instead. Caller owns tenant + guard.
   class Correct < BaseAction
     def call(suggestion:, actor:)
+      yield ensure_writable(suggestion.move)
       yield validate(suggestion)
       yield persist(suggestion)
       yield emit_event(suggestion, actor)

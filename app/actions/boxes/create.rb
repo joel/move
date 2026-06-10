@@ -9,6 +9,7 @@ module Boxes
     include Boxes::RoomResolution
 
     def call(move:, params:, creator:)
+      yield ensure_writable(move)
       box = yield persist(move, params)
       yield emit_event(box, creator)
       Success(box)

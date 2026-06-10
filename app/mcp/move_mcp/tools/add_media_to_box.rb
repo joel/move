@@ -23,9 +23,6 @@ module MoveMcp
       )
 
       def self.call(box_number:, image_base64:, server_context:, filename: "capture.jpg", content_type: "image/jpeg")
-        blocked = archived_block(server_context)
-        return blocked if blocked
-
         box = find_box(server_context, box_number)
         return error_response("No box ##{box_number} in this move.") if box.nil?
 

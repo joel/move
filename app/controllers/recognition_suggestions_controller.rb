@@ -105,11 +105,9 @@ class RecognitionSuggestionsController < MoveScopedController
     head :not_found
   end
 
-  def require_writable_move!
-    authorize_move_mutation!
-    return if @move.writable?
-
-    redirect_to move_box_review_index_path(@move, @box), alert: t("items.archived")
+  # Archived-Move redirect target (require_writable_move!) — back to the queue.
+  def read_only_redirect_path
+    move_box_review_index_path(@move, @box)
   end
 
   # Resolution actions only apply to unresolved (pending/conflict) suggestions —

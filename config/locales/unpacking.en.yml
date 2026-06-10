@@ -18,7 +18,6 @@ en:
     back_to_boxes: "Back to boxes"
     undo: "Undo"
     not_available: "This box isn't being unpacked yet."
-    archived: "This move is archived and is read-only."
     flash:
       completed: "Box marked unpacked."
       failed: "Could not mark the box unpacked."

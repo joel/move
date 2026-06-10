@@ -2,6 +2,10 @@
 # hard-coded in the Phlex components; everything renders through moves.*.
 en:
   moves:
+    # Shared archived (read-only) flash for mutating controller actions
+    # (MoveScopedController#require_writable_move!). Distinct from moves.read_only
+    # below (a short status label) — duplicate keys would collide in YAML.
+    archived_alert: "This move is archived and is read-only."
     index:
       title: "Your moves"
       subtitle: "Select a destination to continue organizing."

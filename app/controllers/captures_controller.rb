@@ -52,13 +52,6 @@ class CapturesController < MoveScopedController
     head :not_found
   end
 
-  def require_writable_move!
-    authorize_move_mutation!
-    return if @move.writable?
-
-    redirect_to move_box_path(@move, @box), alert: t("boxes.archived")
-  end
-
   # Capture into a sealed/closed box is blocked until it is unsealed (Domain §5.2).
   def require_capturable!
     return if @box.capturable?
@@ -76,5 +69,10 @@ class CapturesController < MoveScopedController
     when :not_capturable then t("captures.sealed")
     else t("captures.errors.failed")
     end
+  end
+
+  # Archived-Move redirect target (require_writable_move!) — back to the box.
+  def read_only_redirect_path
+    move_box_path(@move, @box)
   end
 end

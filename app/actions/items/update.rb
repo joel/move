@@ -10,6 +10,7 @@ module Items
     include Items::FormResolution
 
     def call(item:, params:, editor:)
+      yield ensure_writable(item.move)
       category = yield resolve_category(item.move, params[:category_id])
       tags = yield resolve_tags(item.move, params[:tag_ids])
       yield persist(item, params, category, tags)

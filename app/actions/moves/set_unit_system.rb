@@ -8,6 +8,7 @@ module Moves
   # The caller (controller) owns authorization and the archived read-only guard.
   class SetUnitSystem < BaseAction
     def call(move:, unit_system:, actor: nil)
+      yield ensure_writable(move)
       yield validate(unit_system)
       yield persist(move, unit_system)
       yield emit_event(move, actor, unit_system)

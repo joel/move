@@ -8,6 +8,7 @@ module Captures
   # fails honestly (no offline queue). Caller owns the writable-Move guard.
   class Create < BaseAction
     def call(box:, file:, captured_by:, captured_via: "web")
+      yield ensure_writable(box.move)
       return Failure(:not_capturable) unless box.capturable?
       return Failure(:no_file) if file.blank?
 
