@@ -31,8 +31,11 @@ module RecognitionProviders
       raise ProviderHttp::Error, "#{self.class.name} returned a 2xx with no parseable JSON array" unless parsed.is_a?(Array)
 
       parsed
-    rescue JSON::ParserError => e
-      raise ProviderHttp::Error, "#{self.class.name} returned a 2xx with a malformed JSON array: #{e.message}"
+    rescue JSON::ParserError
+      # Deliberately generic — JSON::ParserError#message embeds the offending
+      # input (model content / detected labels), which fail_run would persist to
+      # recognition_runs.error_message. Raw vendor/model content is never stored.
+      raise ProviderHttp::Error, "#{self.class.name} returned a 2xx with a malformed JSON array"
     end
 
     # Coerce an array of provider hashes into DetectedObjects, dropping anything
