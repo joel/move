@@ -36,6 +36,10 @@ jobs:
       # move-app S3 identity for the shared SeaweedFS (Active Storage).
       STORAGE_ACCESS_KEY_ID: ${{ secrets.STORAGE_ACCESS_KEY_ID }}
       STORAGE_SECRET_ACCESS_KEY: ${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
+      # OpenAI key for the recognition + embedding adapters. Must be exported here
+      # too: the runner has no Doppler CLI, so .kamal/secrets' Doppler fallback
+      # would fail the deploy if this weren't in the environment.
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
       - name: Checkout code

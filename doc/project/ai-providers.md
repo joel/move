@@ -54,6 +54,9 @@ turns on genuine vision recognition and semantic search.
    the Doppler CLI (local deploys).
 2. **It is already referenced in config** (this is committed):
    - `.kamal/secrets` resolves `OPENAI_API_KEY`.
+   - `.github/workflows/deploy.yml` exports `OPENAI_API_KEY` into the runner env
+     (the runner has no Doppler CLI, so `.kamal/secrets`' Doppler fallback would
+     fail the deploy without this).
    - `config/deploy.yml` `env.secret` includes `OPENAI_API_KEY`.
    - `config/deploy.yml` `env.clear` sets `RECOGNITION_PROVIDER: openai` and
      `EMBEDDING_PROVIDER: openai` (optional overrides:
