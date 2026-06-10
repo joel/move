@@ -73,11 +73,13 @@ turns on genuine vision recognition and semantic search.
 
 ## Accepted image formats
 
-The vision providers only read **PNG, JPEG, WEBP, GIF**, so `Media` rejects any
-other upload (HEIC, TIFF, SVG, BMP…) at validation rather than letting it fail
-recognition later. Mobile web uploads are already JPEG; this mainly affects a
-desktop user attaching an unsupported file directly. Transcoding such formats
-to JPEG (to accept them transparently) is tracked in #123.
+`Media` accepts only **PNG, JPEG, WEBP** — the formats the vision providers
+reliably read — and rejects anything else (HEIC, TIFF, SVG, BMP…) at validation
+rather than letting it fail recognition later. (GIF is excluded too: the
+providers reject *animated* GIFs and a MIME check can't distinguish them.)
+Mobile web uploads are already JPEG; this mainly affects a desktop user
+attaching an unsupported file directly. Transcoding such formats to JPEG (to
+accept them transparently) is tracked in #123.
 
 ## Rolling back
 

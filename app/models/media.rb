@@ -10,9 +10,11 @@ class Media < ApplicationRecord
   # Formats the recognition vision providers (OpenAI/Anthropic) can actually
   # read. The app must not accept an image it can only fail on later: anything
   # else (HEIC, TIFF, SVG, BMP…) is rejected at upload rather than producing a
-  # consistently-failing recognition run once a real provider is enabled.
+  # consistently-failing recognition run once a real provider is enabled. GIF is
+  # excluded: the providers reject *animated* GIFs, and a MIME check alone can't
+  # tell them apart — not worth an animation probe for a non-inventory format.
   # Transcoding unsupported formats to JPEG is tracked as a follow-up.
-  SUPPORTED_IMAGE_TYPES = %w[image/jpeg image/png image/webp image/gif].freeze
+  SUPPORTED_IMAGE_TYPES = %w[image/jpeg image/png image/webp].freeze
 
   belongs_to :move
   belongs_to :box

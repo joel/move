@@ -17,11 +17,18 @@ RSpec.describe Media do
   end
 
   it "accepts the formats the recognition providers can read" do
-    %w[image/jpeg image/png image/webp image/gif].each do |type|
+    %w[image/jpeg image/png image/webp].each do |type|
       media = build(:media)
       media.image.attach(io: StringIO.new("bytes"), filename: "photo", content_type: type)
       expect(media).to be_valid, "expected #{type} to be accepted"
     end
+  end
+
+  it "rejects GIF (providers reject animated GIFs and a MIME check can't tell them apart)" do
+    media = build(:media)
+    media.image.attach(io: StringIO.new("bytes"), filename: "photo.gif", content_type: "image/gif")
+    expect(media).not_to be_valid
+    expect(media.errors.where(:image, :unsupported_format)).to be_present
   end
 
   it "rejects an image format the providers can't read (e.g. HEIC) at upload" do

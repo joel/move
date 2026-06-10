@@ -60,7 +60,7 @@ RSpec.describe "Captures" do
       expect(response).to redirect_to(move_box_capture_path(move, box))
       follow_redirect!
       # Not the generic "try again" fallback — the user is told which formats work.
-      expect(response.body).to include("JPEG, PNG, WEBP, GIF")
+      expect(response.body).to include("JPEG, PNG, WEBP")
       expect(response.body).not_to include(I18n.t("captures.errors.failed"))
     end
   end
