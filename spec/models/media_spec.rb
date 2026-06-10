@@ -16,6 +16,35 @@ RSpec.describe Media do
     expect(media.errors.attribute_names).to include(:image, :media_type, :captured_via)
   end
 
+  it "accepts the formats the recognition providers can read" do
+    %w[image/jpeg image/png image/webp].each do |type|
+      media = build(:media)
+      media.image.attach(io: StringIO.new("bytes"), filename: "photo", content_type: type)
+      expect(media).to be_valid, "expected #{type} to be accepted"
+    end
+  end
+
+  it "rejects GIF (providers reject animated GIFs and a MIME check can't tell them apart)" do
+    media = build(:media)
+    media.image.attach(io: StringIO.new("bytes"), filename: "photo.gif", content_type: "image/gif")
+    expect(media).not_to be_valid
+    expect(media.errors.where(:image, :unsupported_format)).to be_present
+  end
+
+  it "rejects an image format the providers can't read (e.g. HEIC) at upload" do
+    media = build(:media)
+    media.image.attach(io: StringIO.new("bytes"), filename: "photo.heic", content_type: "image/heic")
+    expect(media).not_to be_valid
+    expect(media.errors.where(:image, :unsupported_format)).to be_present
+  end
+
+  it "rejects a non-image upload" do
+    media = build(:media)
+    media.image.attach(io: StringIO.new("nope"), filename: "doc.pdf", content_type: "application/pdf")
+    expect(media).not_to be_valid
+    expect(media.errors.where(:image, :not_an_image)).to be_present
+  end
+
   describe "#recognition_state" do
     it "reflects the latest run's status" do
       media = create(:media)

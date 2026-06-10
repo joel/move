@@ -199,7 +199,7 @@ admin. New-user email invitations are deferred.
 | Page layouts | `app/views/layouts/*` | `ApplicationLayout` (TopNav, auth/marketing) vs `AppShellLayout` (D0 sidebar + bottom tab bar, in-app surfaces); shared `<head>` in `ChromeHead`. Controllers opt in via `layout -> { … }` (e.g. `BoxesController`) |
 | File storage | `config/storage.yml`, `config/deploy.yml` | Active Storage; dev/test = Disk, prod = the **shared host-wide SeaweedFS S3** gateway (also used by sibling apps) via move's own `move` bucket (`STORAGE_ENDPOINT=http://seaweedfs:8333`, `force_path_style`). Images served through **proxy URLs** (internal endpoint never exposed). Media tables are per-tenant (not Apartment-excluded) |
 | Background jobs | `config/queue.yml`, `app/jobs/*` | Solid Queue: async (dev), `:inline` (test), in-Puma (prod, `SOLID_QUEUE_IN_PUMA`). Jobs restore the Apartment tenant from args (`Current` is never carried across the enqueue boundary) |
-| Recognition | `app/services/recognition_providers/*` | Provider-agnostic adapter interface (`fake`/`openai`/`anthropic` via `RECOGNITION_PROVIDER`); normalized `label/confidence/count` only — no raw vendor data or bounding boxes |
+| Recognition | `app/services/recognition_providers/*` | Provider-agnostic adapter interface (`fake`/`openai`/`anthropic` via `RECOGNITION_PROVIDER`); normalized `label/confidence/count` only — no raw vendor data or bounding boxes. Vendor adapters POST via shared `provider_http.rb`, which raises on non-2xx so a rate-limited/unauthorized call fails the run loudly instead of a phantom empty `succeeded`. Enabling openai in prod: [`ai-providers.md`](ai-providers.md) |
 | Deterministic dump | `config/initializers/structure_sql.rb` | exclude tenant schemas + normalize search_path |
 | Per-env tenancy | `config/environments/*.rb` | `tenant_zone`, `cookie_domain`, `config.hosts` |
 | Deploy | `config/deploy.yml` | `proxy.ssl: false`, no host, forward_headers; db accessory `postgres:18` at `/var/lib/postgresql` |
@@ -244,7 +244,9 @@ flowchart LR
 Embeddings come from **textual metadata only** (never images) and are
 (re)generated async; lexical/trigram is always correct. Providers mirror
 `RecognitionProviders` (env `EMBEDDING_PROVIDER`: fake default, openai
-`text-embedding-3-small`).
+`text-embedding-3-small`). A provider error degrades to a nil vector
+(`Search::RefreshDocument` rescue) so search stays lexical-correct. Enabling
+openai + backfilling (`bin/rails search:reindex`): [`ai-providers.md`](ai-providers.md).
 
 **Infra:** Postgres image is `pgvector/pgvector:pg18` (stock 18 lacks pgvector;
 pg_trgm is contrib). The `vector` type + `*_ops` opclasses live in `public` and

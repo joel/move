@@ -44,14 +44,51 @@ RSpec.describe EmbeddingProviders do
   end
 
   describe EmbeddingProviders::Openai do
+    subject(:provider) { described_class.new }
+
+    def stub_http(code:, body:)
+      response = instance_double(Net::HTTPResponse, code: code, body: body)
+      allow(Net::HTTP).to receive(:start).and_return(response)
+    end
+
     it "raises without an API key" do
       allow(ENV).to receive(:[]).and_call_original
       allow(ENV).to receive(:[]).with("OPENAI_API_KEY").and_return(nil)
-      expect { described_class.new.embed("x") }.to raise_error(/OPENAI_API_KEY/)
+      expect { provider.embed("x") }.to raise_error(/OPENAI_API_KEY/)
     end
 
     it "returns a blank result for blank text without calling the API" do
-      expect(described_class.new.embed("").vector).to be_nil
+      expect(provider.embed("").vector).to be_nil
+    end
+
+    context "with an API key" do
+      before do
+        allow(ENV).to receive(:[]).and_call_original
+        allow(ENV).to receive(:[]).with("OPENAI_API_KEY").and_return("sk-test")
+      end
+
+      it "returns the embedding vector on a 2xx response" do
+        stub_http(code: "200", body: { data: [{ embedding: [0.1, 0.2, 0.3] }] }.to_json)
+
+        result = provider.embed("hair dryer")
+
+        expect(result.provider).to eq("openai")
+        expect(result.vector).to eq([0.1, 0.2, 0.3])
+        expect(result.model).to eq("text-embedding-3-small")
+      end
+
+      it "raises on a non-2xx response, surfacing the status and vendor message" do
+        stub_http(code: "429", body: { error: { message: "Rate limit reached" } }.to_json)
+
+        expect { provider.embed("hair dryer") }
+          .to raise_error(ProviderHttp::Error, /429.*Rate limit reached/)
+      end
+
+      it "raises when a 2xx response carries no embedding" do
+        stub_http(code: "200", body: { data: [] }.to_json)
+
+        expect { provider.embed("hair dryer") }.to raise_error(ProviderHttp::Error, /missing data/)
+      end
     end
   end
 end

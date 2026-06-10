@@ -11,6 +11,7 @@ infrastructure / "how it actually runs and ships" reference.)
 |---|---|
 | [`architecture.md`](architecture.md) | Runtime request flow, schema-per-tenant model, per-request tenant resolution, component map — with diagrams. |
 | [`new-app-recipe.md`](new-app-recipe.md) | Step-by-step reproducible recipe (commands + config) to build/deploy a new multi-tenant app on this stack. |
+| [`ai-providers.md`](ai-providers.md) | Recognition + embedding provider adapters: fake vs. openai/anthropic, how to enable OpenAI in prod (key → flip → reindex), cost, rollback. |
 | [`diagrams/`](diagrams) | Editable Excalidraw scenes (open at [excalidraw.com](https://excalidraw.com/)). |
 
 ## TL;DR of the production architecture
