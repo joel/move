@@ -26,6 +26,7 @@ en:
       fragile: "Fragile"
       quantity: "Quantity"
       ignore_confirm: "Mark this detection as a false positive? It will leave the box inventory."
+      view_only: "You have view-only access — reviewing is read-only."
     actions:
       keep: "Keep"
       correct: "Correct"

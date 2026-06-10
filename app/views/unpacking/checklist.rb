@@ -10,11 +10,12 @@ module Views
     class Checklist < Views::Base
       include Phlex::Rails::Helpers::ButtonTo
 
-      def initialize(move:, box:, remaining:, unpacked:)
+      def initialize(move:, box:, remaining:, unpacked:, editable: false)
         @move = move
         @box = box
         @remaining = remaining.to_a
         @unpacked = unpacked.to_a
+        @editable = editable
       end
 
       def view_template
@@ -24,13 +25,15 @@ module Views
           progress_card
           remaining_section
           unpacked_section if @unpacked.any?
-          complete_cta if writable?
+          complete_cta if editable?
         end
       end
 
       private
 
-      def writable? = @move.writable?
+      # Mutating affordances show only for an editor on a writable Move — viewers
+      # (and archived Moves) see the checklist read-only. The server still 403s.
+      def editable? = @editable
 
       def total = @remaining.size + @unpacked.size
 
@@ -53,7 +56,7 @@ module Views
 
       def chips
         render Components::Ui::Chip.new(label: @box.room.name, kind: :room) if @box.room
-        render Components::Ui::Chip.new(label: I18n.t("unpacking.read_only"), kind: :tag) unless writable?
+        render Components::Ui::Chip.new(label: I18n.t("unpacking.read_only"), kind: :tag) unless editable?
       end
 
       # Sticky so the remaining count stays in view while the list scrolls
@@ -84,7 +87,7 @@ module Views
       end
 
       def remaining_row(item)
-        if writable?
+        if editable?
           button_to(
             move_box_unpacking_remove_path(@move, @box, item),
             method: :patch, class: "#{row_classes} hover:bg-surface-container-high"
@@ -112,7 +115,7 @@ module Views
       end
 
       def unpacked_row(item)
-        if writable?
+        if editable?
           button_to(
             move_box_unpacking_restore_path(@move, @box, item),
             method: :patch, class: "#{row_classes} hover:opacity-100",

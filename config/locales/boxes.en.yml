@@ -69,7 +69,8 @@ en:
       dimensions: "Dimensions"
       volume: "Vol: %{value}"
       weight: "Weight Est."
-      read_only: "This move is archived — boxes are read-only."
+      archived: "This move is archived — boxes are read-only."
+      view_only: "You have view-only access — boxes are read-only."
       items: "Items"
       pending_review:
         one: "1 pending review"

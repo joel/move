@@ -15,11 +15,12 @@ module Views
         "unpacking" => "unpacking", "unpacked" => "unpacked"
       }.freeze
 
-      def initialize(move:, box:, items: [], media: [])
+      def initialize(move:, box:, items: [], media: [], editable: false)
         @move = move
         @box = box
         @items = items
         @media = media
+        @editable = editable
         @measurements = BoxMeasurements.new(box, unit_system: move.unit_system)
       end
 
@@ -55,7 +56,7 @@ module Views
               h2(class: "text-headline-xl text-text-warm") { box_title }
               div(class: "flex flex-wrap gap-2") { chips }
             end
-            edit_link if @move.writable?
+            edit_link if @editable
           end
           measurements_row
         end
@@ -99,12 +100,13 @@ module Views
         render Components::Ui::Card.new(padding: "p-6") do
           div(class: "flex flex-col gap-3") do
             unpacking_action
-            if @move.writable?
+            if @editable
               capture_action
               add_item_action
               lifecycle_actions
             else
-              p(class: "text-body-md text-muted") { I18n.t("boxes.show.read_only") }
+              # Archived vs viewer — don't tell a viewer the Move is archived.
+              p(class: "text-body-md text-muted") { I18n.t(@move.archived? ? "boxes.show.archived" : "boxes.show.view_only") }
             end
             print_actions
           end

@@ -22,7 +22,8 @@ class BoxesController < MoveScopedController
       rooms: @move.rooms.order(:name),
       summary: move_summary,
       selected_room_id: selected_room&.id,
-      item_counts: @move.items.in_box.group(:box_id).count
+      item_counts: @move.items.in_box.group(:box_id).count,
+      editable: editable_move?
     )
   end
 
@@ -32,7 +33,8 @@ class BoxesController < MoveScopedController
       move: @move, box: @box,
       items: authorized_scope(@box.items).in_box.ordered,
       # Preload the blob only (proxy URLs use the original; no variants/preview).
-      media: @box.media.includes(image_attachment: :blob).recent_first
+      media: @box.media.includes(image_attachment: :blob).recent_first,
+      editable: editable_move?
     )
   end
 

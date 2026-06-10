@@ -47,7 +47,7 @@ RSpec.describe "Box detail & lifecycle" do
     visit move_box_path(archived, box)
 
     expect(page).to have_text("Box #001")
-    expect(page).to have_text(I18n.t("boxes.show.read_only"))
+    expect(page).to have_text(I18n.t("boxes.show.archived"))
     expect(page).to have_no_button(I18n.t("boxes.actions.seal"))
     expect(page).to have_no_link(I18n.t("boxes.show.edit"))
   end

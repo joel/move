@@ -13,7 +13,7 @@ class ItemsController < MoveScopedController
   def show
     render Views::Items::Show.new(
       move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-      review_suggestion: review_suggestion, **vocabulary
+      review_suggestion: review_suggestion, editable: editable_move?, **vocabulary
     )
   end
 

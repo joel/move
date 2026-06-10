@@ -9,9 +9,10 @@ module Views
     class Celebration < Views::Base
       include Phlex::Rails::Helpers::ButtonTo
 
-      def initialize(move:, box:)
+      def initialize(move:, box:, editable: false)
         @move = move
         @box = box
+        @editable = editable
       end
 
       def view_template
@@ -55,7 +56,7 @@ module Views
             label: I18n.t("unpacking.back_to_boxes"), full_width: true,
             href: move_boxes_path(@move)
           )
-          undo_button if @move.writable?
+          undo_button if @editable
         end
       end
 
