@@ -7,6 +7,13 @@ class Media < ApplicationRecord
   MEDIA_TYPES = %w[image].freeze
   CAPTURED_VIA = %w[web mcp].freeze
 
+  # Formats the recognition vision providers (OpenAI/Anthropic) can actually
+  # read. The app must not accept an image it can only fail on later: anything
+  # else (HEIC, TIFF, SVG, BMP…) is rejected at upload rather than producing a
+  # consistently-failing recognition run once a real provider is enabled.
+  # Transcoding unsupported formats to JPEG is tracked as a follow-up.
+  SUPPORTED_IMAGE_TYPES = %w[image/jpeg image/png image/webp image/gif].freeze
+
   belongs_to :move
   belongs_to :box
   has_many :recognition_runs, dependent: :destroy
@@ -21,9 +28,20 @@ class Media < ApplicationRecord
 
   def image_must_be_an_image
     return unless image.attached?
-    return if image.content_type.to_s.start_with?("image/")
 
-    errors.add(:image, :not_an_image)
+    content_type = image.content_type.to_s
+    return if SUPPORTED_IMAGE_TYPES.include?(content_type)
+
+    if content_type.start_with?("image/")
+      errors.add(:image, :unsupported_format, formats: supported_formats_label)
+    else
+      errors.add(:image, :not_an_image)
+    end
+  end
+
+  # "JPEG, PNG, WEBP, GIF" — for the user-facing rejection message.
+  def supported_formats_label
+    SUPPORTED_IMAGE_TYPES.map { |type| type.split("/").last.upcase }.join(", ")
   end
 
   scope :recent_first, -> { order(captured_at: :desc) }

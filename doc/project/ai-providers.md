@@ -71,6 +71,14 @@ turns on genuine vision recognition and semantic search.
    recognition run reaches `succeeded` with real detections; run a semantic
    search (synonym, not exact token) → confirm relevant hits.
 
+## Accepted image formats
+
+The vision providers only read **PNG, JPEG, WEBP, GIF**, so `Media` rejects any
+other upload (HEIC, TIFF, SVG, BMP…) at validation rather than letting it fail
+recognition later. Mobile web uploads are already JPEG; this mainly affects a
+desktop user attaching an unsupported file directly. Transcoding such formats
+to JPEG (to accept them transparently) is tracked in #123.
+
 ## Rolling back
 
 Set `RECOGNITION_PROVIDER`/`EMBEDDING_PROVIDER` back to `fake` (or unset) in

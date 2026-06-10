@@ -39,3 +39,11 @@ en:
     destroy:
       notice: "Account was successfully deleted."
   hello: "Hello world"
+  activerecord:
+    errors:
+      models:
+        media:
+          attributes:
+            image:
+              not_an_image: "must be an image"
+              unsupported_format: "must be a %{formats} image — that format can't be recognized"
