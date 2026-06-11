@@ -21,6 +21,17 @@ RSpec.describe ImageNormalizer do
     false
   end
 
+  # Skip on a dev host that lacks the codec plugin, but FAIL in CI — there the
+  # plugins are installed on purpose (see ci.yml), so a missing decoder is a
+  # regression in codec coverage, not an environment quirk, and must not silently
+  # downgrade these real-bytes specs to pending.
+  def require_decode!(name)
+    return if vips_decodes?(name)
+    raise "libvips cannot decode #{name}: codec plugin missing in CI (regression)" if ENV["CI"]
+
+    skip "libvips here lacks the codec plugin to decode #{name}"
+  end
+
   it "returns a native (JPEG/PNG/WEBP) upload unchanged" do
     file = upload("sample_image.png", "image/png")
     expect(described_class.call(file)).to be(file)
@@ -69,7 +80,7 @@ RSpec.describe ImageNormalizer do
   end
 
   it "transcodes a real HEIC photo to JPEG end to end" do
-    skip "libvips here lacks the libheif HEVC (libde265) decoder" unless vips_decodes?("sample.heic")
+    require_decode!("sample.heic")
 
     result = described_class.call(upload("sample.heic", "image/heic"))
 
@@ -78,7 +89,7 @@ RSpec.describe ImageNormalizer do
   end
 
   it "transcodes a real AVIF image to JPEG end to end" do
-    skip "libvips here lacks the libheif AV1 (aom/dav1d) decoder" unless vips_decodes?("sample.avif")
+    require_decode!("sample.avif")
 
     result = described_class.call(upload("sample.avif", "image/avif"))
 
