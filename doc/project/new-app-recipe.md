@@ -254,6 +254,17 @@ capture → recognition):
    `force_path_style: true`). dev/test = Disk; prod = `:seaweedfs`. Serve images
    via **proxy URLs** (`rails_storage_proxy_path`) so the internal S3 endpoint is
    never exposed to the browser.
+   - **Local `bin/cli` routing:** split the local SeaweedFS container into two
+     Traefik services. Route `storage.<dev-domain>` to the filer Web UI on
+     `:8888`; route `bucket.<dev-domain>` to the S3 gateway on `:8333` with an
+     `addPrefix` middleware for the app bucket (for Move: `/move`). Do not point
+     the storage host at `:8333`, or the supposed Web UI URL returns S3 XML bucket
+     listings instead.
+   - **Local low-disk tolerance:** run the dev SeaweedFS command with
+     `-volume.minFreeSpace=100MiB -master.volumePreallocate=false
+     -master.volumeSizeLimitMB=64`. The default 1% free-space floor and large
+     preallocation are production-minded; on a nearly full laptop they make tiny
+     seed uploads fail with S3 500s.
    - **Check first:** these boxes already run **one shared, host-wide `seaweedfs`
      container** (anonymous S3, on the `kamal` network) that every app uses via
      its **own bucket** (catalyst→`catalyst`, move→`move`). **Reuse it** — do NOT
@@ -342,8 +353,10 @@ capture → recognition):
 | request-spec `post`/`get` silently doesn't dispatch (`response` nil) | a spec helper param named `method`/`id` shadows methods the integration Runner uses | rename the helper params (e.g. `rpc_method`, `req_id`) |
 | recognition runs show `succeeded` with 0 items in prod after enabling openai | adapter parsed a non-2xx body as success (rate limit/bad key looked like an empty box) | adapters now raise on non-2xx via `ProviderHttp`; check `OPENAI_API_KEY` is set + within rate/credit limits ([`ai-providers.md`](ai-providers.md)) |
 | all recognition runs fail / embeddings nil right after flipping providers | `RECOGNITION_PROVIDER`/`EMBEDDING_PROVIDER: openai` set before `OPENAI_API_KEY` reached the env | add the key to Doppler `move/prd` **first**, then deploy; backfill with `kamal app exec --reuse 'bin/rails search:reindex'` |
-| `Missing host to link to!` from `service_url_for_direct_upload` outside an Active Storage controller (e.g. the MCP presign tool) | the **Disk** service builds a Rails-route URL needing a host; non-AS controllers don't set `ActiveStorage::Current.url_options` | set `ActiveStorage::Current.url_options = { protocol:, host:, port: }` from the request in the controller (`McpController#handle`). S3 (prod) returns an absolute presigned URL and is unaffected |
+| Active Storage **Direct Upload presigned URL is unreachable** by an external (MCP) client | the prod S3 gateway (SeaweedFS) is **internal-only** (`STORAGE_ENDPOINT=http://seaweedfs:8333`, no public route — downloads go via the app's Rails proxy), so a presigned PUT URL points at an internal host | **app-proxy the upload**: client POSTs bytes to an app endpoint (`POST /mcp/uploads`) that streams them into a blob and returns a Move-scoped `signed_id`. Don't expose SeaweedFS publicly just for uploads (#110) |
+| `https://storage.<dev-domain>/` shows S3 XML instead of the SeaweedFS UI | the storage host's Traefik router points at S3 `:8333` instead of filer `:8888`, or the running container still has stale labels | route storage → Web UI `:8888`, bucket → S3 `:8333`; restart/recreate the local storage container so Traefik sees the new labels |
+| `db:seed` fails with `Aws::S3::Errors::InternalError` while attaching seed media | dev Active Storage is writing to SeaweedFS, but the local storage service is stopped/stale or SeaweedFS marked volumes read-only because the host is below its default 1% free-space threshold | `bin/reset` must teardown/start storage before seeding; run SeaweedFS with the local low-disk flags above, and free host disk when it is truly exhausted |
 
 ---
 
-_Last updated: 2026-06-10, after wiring production OpenAI recognition + embedding providers (#78)._
+_Last updated: 2026-06-11, after splitting local SeaweedFS Web UI and bucket routing (#137)._

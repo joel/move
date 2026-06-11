@@ -16,6 +16,7 @@ module MoveMcp
         # --- server_context accessors (a plain Hash, delegated by ServerContext) ---
         def move(context)  = context[:move]
         def token(context) = context[:token]
+        def base_url(context) = context[:base_url]
         # Attribute MCP mutations to the token's owning user for the domain events
         # (Technical Foundation §14.1 step 4); the mcp.* audit names the token.
         def actor(context) = context[:token]&.created_by

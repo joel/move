@@ -23,7 +23,10 @@ RSpec.describe "MCP endpoint" do
   # McpController is ActionController::API, so the shared stub_current_* helpers
   # (which target ApplicationController) don't reach it — stub the instance.
   before do
-    allow_any_instance_of(McpController).to receive(:current_tenant).and_return("acme") # rubocop:disable RSpec/AnyInstance
+    # current_tenant lives in McpAuthentication, shared by both MCP controllers.
+    [McpController, McpUploadsController].each do |controller|
+      allow_any_instance_of(controller).to receive(:current_tenant).and_return("acme") # rubocop:disable RSpec/AnyInstance
+    end
   end
 
   # NB: do not name params `method`/`id` — they shadow methods the integration
@@ -213,38 +216,55 @@ RSpec.describe "MCP endpoint" do
   describe "direct upload: create_media_upload + add_media_to_box" do
     def png_bytes = Rails.root.join("spec/fixtures/files/sample_image.png").binread
 
-    # Full round-trip: presign via the tool (Move-scoped signed_id), then simulate
-    # the client PUT by writing the bytes to the reserved blob's key. Returns the
-    # signed_id to hand to add_media_to_box.
-    def presign_and_upload(bytes, filename: "a.png", content_type: "image/png")
-      data = structured(tool_call("create_media_upload", {
-                                    byte_size: bytes.bytesize, checksum: Digest::MD5.base64digest(bytes),
-                                    filename:, content_type:
-                                  }))
-      signed_id = data["signed_id"]
-      blob = ActiveStorage::Blob.find_signed!(signed_id, purpose: Captures::Create.signed_id_purpose(move))
-      blob.service.upload(blob.key, StringIO.new(bytes)) # the "PUT"
-      signed_id
+    def auth_headers(extra = {})
+      { "Authorization" => "Bearer #{raw_token}", "Content-Type" => "application/octet-stream" }.merge(extra)
     end
 
-    describe "create_media_upload (presign)" do
-      it "reserves a blob and returns a presigned PUT target" do
-        bytes = png_bytes
-        data = structured(tool_call("create_media_upload", {
-                                      byte_size: bytes.bytesize, checksum: Digest::MD5.base64digest(bytes),
-                                      filename: "a.png", content_type: "image/png"
-                                    }))
+    # Full round-trip through the real endpoints: create_media_upload returns the
+    # app upload URL; POST the raw bytes there (McpUploadsController streams them
+    # into a blob and returns a Move-scoped signed_id) to hand to add_media_to_box.
+    def upload(bytes, filename: "a.png")
+      url = structured(tool_call("create_media_upload", {}))["url"]
+      post "#{url}?filename=#{filename}", params: bytes, headers: auth_headers
+      expect(response).to have_http_status(:created)
+      response.parsed_body["signed_id"]
+    end
 
-        expect(data["signed_id"]).to be_present
-        expect(data["url"]).to be_present
-        expect(data["method"]).to eq("PUT")
+    describe "create_media_upload" do
+      it "returns the app upload URL" do
+        data = structured(tool_call("create_media_upload", {}))
+
+        expect(data["url"]).to end_with("/mcp/uploads")
+        expect(data["method"]).to eq("POST")
       end
 
-      it "rejects an oversized upload at presign (before reserving a blob)" do
-        expect do
-          body = tool_call("create_media_upload", { byte_size: Media::MAX_IMAGE_BYTES + 1, checksum: "x" })
-          expect(body.to_json).to match(/too large/i)
-        end.not_to change(ActiveStorage::Blob, :count)
+      it "rejects an oversized declared size up front" do
+        body = tool_call("create_media_upload", { byte_size: Media::MAX_IMAGE_BYTES + 1 })
+        expect(body.to_json).to match(/too large/i)
+      end
+    end
+
+    describe "POST /mcp/uploads (streaming upload)" do
+      it "streams the bytes into a blob and returns a Move-scoped signed_id" do
+        post "/mcp/uploads", params: png_bytes, headers: auth_headers
+
+        expect(response).to have_http_status(:created)
+        signed = response.parsed_body["signed_id"]
+        # The signed_id verifies under this Move's purpose, not another's.
+        expect(ActiveStorage::Blob.find_signed(signed, purpose: Captures::Create.signed_id_purpose(move))).to be_present
+        expect(ActiveStorage::Blob.find_signed(signed, purpose: Captures::Create.signed_id_purpose(create(:move)))).to be_nil
+      end
+
+      it "rejects an upload whose Content-Length exceeds the cap" do
+        post "/mcp/uploads", params: "x" * 50,
+                             headers: auth_headers("Content-Length" => (Media::MAX_IMAGE_BYTES + 1).to_s)
+
+        expect(response).to have_http_status(:content_too_large)
+      end
+
+      it "401s without a token" do
+        post "/mcp/uploads", params: png_bytes, headers: { "Content-Type" => "application/octet-stream" }
+        expect(response).to have_http_status(:unauthorized)
       end
     end
 
@@ -252,7 +272,7 @@ RSpec.describe "MCP endpoint" do
       let!(:box) { create(:box, move:, number: 9, status: "packing") }
 
       it "attaches an uploaded blob and queues recognition (captured_via mcp)" do
-        tool_call("add_media_to_box", { box_number: 9, signed_id: presign_and_upload(png_bytes) })
+        tool_call("add_media_to_box", { box_number: 9, signed_id: upload(png_bytes) })
 
         media = box.media.order(:created_at).last
         expect(media).to be_present
@@ -262,7 +282,7 @@ RSpec.describe "MCP endpoint" do
 
       it "transcodes a non-native uploaded blob (TIFF) to JPEG on attach" do
         tiff = Rails.root.join("spec/fixtures/files/sample.tiff").binread
-        signed = presign_and_upload(tiff, filename: "a.tiff", content_type: "image/tiff")
+        signed = upload(tiff, filename: "a.tiff")
 
         tool_call("add_media_to_box", { box_number: 9, signed_id: signed })
 
@@ -270,7 +290,7 @@ RSpec.describe "MCP endpoint" do
       end
 
       it "rejects a non-image blob by sniffing the bytes (not the declared type)" do
-        signed = presign_and_upload("this is not an image", content_type: "image/png")
+        signed = upload("this is not an image")
 
         body = tool_call("add_media_to_box", { box_number: 9, signed_id: signed })
 

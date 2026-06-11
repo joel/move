@@ -2,49 +2,33 @@
 
 module MoveMcp
   module Tools
-    # Step 1 of the MCP Direct Upload handshake (#110). Mirrors
-    # `POST /rails/active_storage/direct_uploads`: reserves an Active Storage blob
-    # and returns a presigned URL the client PUTs the bytes to (bypassing the app
-    # — no base64 in the JSON-RPC body). The returned `signed_id` is then handed
-    # to `add_media_to_box` to attach + queue recognition.
+    # Step 1 of the MCP Direct Upload handshake (#110). Returns an **app-hosted**
+    # upload URL the client POSTs the raw image bytes to (POST /mcp/uploads) —
+    # app-proxied rather than a presigned S3 URL because SeaweedFS is internal-only
+    # (not client-reachable). The bytes never transit the JSON-RPC body / are not
+    # base64. The upload responds with a Move-scoped `signed_id`, which is then
+    # handed to `add_media_to_box` to attach + queue recognition.
     #
-    # The byte-size cap is enforced HERE, before any blob is finalized. The
-    # client-declared content type is NOT trusted — the attach step sniffs the
-    # actual bytes (ImageNormalizer). The blob is created in the request's tenant
-    # schema, so it's already isolated to the token's Organization.
+    # The byte-size cap is checked here on the declared size (a cheap early
+    # rejection) and again on the actual bytes at the upload endpoint.
     class CreateMediaUpload < Base
       tool_name "create_media_upload"
-      description "Reserve a direct-upload URL for an image. PUT the bytes to the " \
-                  "returned url with the given headers, then call add_media_to_box with the signed_id."
+      description "Get an upload URL for an image. POST the raw bytes to the returned url " \
+                  "(optionally ?filename=), then call add_media_to_box with the signed_id from the response."
+      # No `required:` key — the MCP gem rejects an empty required array
+      # (Invalid JSON Schema: '#/required' minimum 1).
       input_schema(
         properties: {
-          byte_size: { type: "integer", description: "Exact size of the image in bytes." },
-          checksum: { type: "string", description: "Base64-encoded MD5 of the image bytes." },
-          filename: { type: "string", description: "Filename (defaults to capture.jpg)." },
-          content_type: { type: "string", description: "MIME type hint (defaults to image/jpeg; not trusted — re-sniffed on attach)." }
-        },
-        required: %w[byte_size checksum]
+          byte_size: { type: "integer", description: "Approximate size of the image in bytes (for an early size check)." }
+        }
       )
 
-      def self.call(byte_size:, checksum:, server_context:, filename: "capture.jpg", content_type: "image/jpeg")
+      def self.call(server_context:, byte_size: nil)
         # Fail fast on a read-only Move (the attach step would reject it anyway).
         return failure_response(:move_archived) if move(server_context).archived?
+        return error_response("Image is too large (max #{Media::MAX_IMAGE_BYTES_LABEL}).") if byte_size.to_i > Media::MAX_IMAGE_BYTES
 
-        size = byte_size.to_i
-        return error_response("byte_size must be positive.") if size <= 0
-        return error_response("Image is too large (max #{Media::MAX_IMAGE_BYTES_LABEL}).") if size > Media::MAX_IMAGE_BYTES
-
-        blob = ActiveStorage::Blob.create_before_direct_upload!(
-          filename: filename, byte_size: size, checksum: checksum, content_type: content_type
-        )
-        data_response(
-          # Move-scoped purpose so the id is only attachable within this token's
-          # Move (blobs are shared in `public`; see Captures::Create.signed_id_purpose).
-          signed_id: blob.signed_id(purpose: ::Captures::Create.signed_id_purpose(move(server_context))),
-          url: blob.service_url_for_direct_upload,
-          method: "PUT",
-          headers: blob.service_headers_for_direct_upload
-        )
+        data_response(url: "#{base_url(server_context)}/mcp/uploads", method: "POST")
       end
     end
   end
