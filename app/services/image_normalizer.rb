@@ -29,7 +29,13 @@ require "stringio"
 # see doc/project/ai-providers.md. There is deliberately no SVG/vector path.
 class ImageNormalizer
   NATIVE = %w[image/jpeg image/png image/webp].freeze
-  TRANSCODABLE = %w[image/heic image/heif image/avif image/tiff image/bmp image/gif].freeze
+  # Includes the HEIC/HEIF *sequence* brands (image/heic-sequence,
+  # image/heif-sequence) that Marcel sniffs from Live Photo / burst files —
+  # libvips decodes their first frame just like the still variants.
+  TRANSCODABLE = %w[
+    image/heic image/heic-sequence image/heif image/heif-sequence
+    image/avif image/tiff image/bmp image/gif
+  ].freeze
   JPEG_QUALITY = 88
 
   class UnsupportedFormat < StandardError; end

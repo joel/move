@@ -47,6 +47,16 @@ RSpec.describe ImageNormalizer do
     expect(jpeg?(result[:io].read)).to be(true)  # actually transcoded to real JPEG
   end
 
+  it "transcodes HEIC/HEIF sequence brands (Live Photo/burst), not just the still variants" do
+    # No HEIC encoder to build a real fixture, so drive the routing: a sequence
+    # MIME (what Marcel sniffs from a Live Photo) must take the transcode path.
+    %w[image/heic-sequence image/heif-sequence].each do |seq_type|
+      allow(Marcel::MimeType).to receive(:for).and_return(seq_type)
+      result = described_class.call(upload("sample.tiff", "image/tiff")) # real decodable bytes
+      expect(result).to include(content_type: "image/jpeg")
+    end
+  end
+
   it "raises UnsupportedFormat for a vector/non-raster image (SVG)" do
     expect { described_class.call(upload("sample.svg", "image/svg+xml")) }
       .to raise_error(described_class::UnsupportedFormat)
