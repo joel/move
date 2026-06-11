@@ -62,28 +62,28 @@ module Captures
     end
 
     # A web upload arrives as `file`; a direct upload as a `signed_id` for an
-    # Active Storage blob already in storage (its bytes are read so the type can
-    # be sniffed/transcoded, never trusting the client-declared content type).
+    # Active Storage blob already in storage. Read the blob's bytes WITHOUT its
+    # (client-declared, untrusted) content type so ImageNormalizer sniffs the real
+    # type and Active Storage re-identifies it on re-attach.
     def resolve_upload(box, file, signed_id)
       return { attachable: file, blob: nil } if signed_id.blank?
 
       blob = ActiveStorage::Blob.find_signed!(signed_id, purpose: self.class.signed_id_purpose(box.move))
-      { attachable: { io: StringIO.new(blob.download), filename: blob.filename.to_s, content_type: blob.content_type },
-        blob: blob }
+      { attachable: { io: StringIO.new(blob.download), filename: blob.filename.to_s }, blob: blob }
     end
 
+    # Attach the normalized bytes (transcoded, or the originals re-wrapped) and let
+    # Active Storage derive the content type from the bytes — never the
+    # client-declared one. For a direct upload that means storing a fresh,
+    # type-correct blob and purging the reserved one (the parity-with-web choice
+    # for #110); web uploads attach in place (no blob to purge).
     def attach_media(box, captured_via, upload, normalized)
-      blob = upload[:blob]
-      # Native direct-upload → keep the already-stored blob (no re-store). A
-      # transcode (or any web upload) → store the normalized result instead, and
-      # the original direct-upload blob is now orphaned.
-      kept_original = blob && normalized.equal?(upload[:attachable])
       media = box.media.new(
         move: box.move, media_type: "image", captured_via: captured_via, captured_at: Time.current
       )
-      media.image.attach(kept_original ? blob : normalized)
+      media.image.attach(normalized)
       media.save!
-      blob.purge_later if blob && !kept_original
+      upload[:blob]&.purge_later
       media
     end
 
