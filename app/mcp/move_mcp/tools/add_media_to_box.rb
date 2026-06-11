@@ -26,6 +26,10 @@ module MoveMcp
         box = find_box(server_context, box_number)
         return error_response("No box ##{box_number} in this move.") if box.nil?
 
+        # Cap before decoding: Base64.strict_decode64 would otherwise materialize
+        # the whole payload in memory ahead of the shared ImageNormalizer guard.
+        return error_response("Image is too large (max #{Media::MAX_IMAGE_BYTES_LABEL}).") if oversized?(image_base64)
+
         attachable = decode(image_base64, filename, content_type)
         return error_response("Invalid base64 image data.") if attachable.nil?
 
@@ -37,6 +41,12 @@ module MoveMcp
         media = result.value!
         audit(server_context, box_number: box.number.to_i, media_id: media.id)
         data_response(media_id: media.id, box_number: box.number.to_i, recognition: "queued")
+      end
+
+      # Estimate decoded bytes from the encoded length (4 base64 chars -> 3
+      # bytes) so we can reject before allocating the decoded image.
+      def self.oversized?(image_base64)
+        (image_base64.to_s.bytesize * 3 / 4) > Media::MAX_IMAGE_BYTES
       end
 
       def self.decode(image_base64, filename, content_type)
