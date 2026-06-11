@@ -7,6 +7,31 @@ RSpec.describe ImageNormalizer do
   def upload(name, type) = Rack::Test::UploadedFile.new(fixture(name), type)
   def jpeg?(bytes) = Marcel::MimeType.for(StringIO.new(bytes)) == "image/jpeg"
 
+  # Whether the running libvips can actually decode a fixture — HEIC needs the
+  # libheif HEVC plugin (libde265) and AVIF the AV1 plugin (aom/dav1d), which are
+  # present in the app/CI image but not every dev host. Lets the real-bytes
+  # decode specs skip (rather than fail) where the codec plugin is absent.
+  def vips_decodes?(name)
+    require "vips"
+    # libvips is lazy — .avg forces actual pixel decode so a missing codec plugin
+    # raises here rather than later during transcode.
+    Vips::Image.new_from_buffer(fixture(name).binread, "").avg
+    true
+  rescue Vips::Error
+    false
+  end
+
+  # Skip on a dev host that lacks the codec plugin, but FAIL in CI — there the
+  # plugins are installed on purpose (see ci.yml), so a missing decoder is a
+  # regression in codec coverage, not an environment quirk, and must not silently
+  # downgrade these real-bytes specs to pending.
+  def require_decode!(name)
+    return if vips_decodes?(name)
+    raise "libvips cannot decode #{name}: codec plugin missing in CI (regression)" if ENV["CI"]
+
+    skip "libvips here lacks the codec plugin to decode #{name}"
+  end
+
   it "returns a native (JPEG/PNG/WEBP) upload unchanged" do
     file = upload("sample_image.png", "image/png")
     expect(described_class.call(file)).to be(file)
@@ -45,6 +70,31 @@ RSpec.describe ImageNormalizer do
 
     expect(result).not_to be(attachable)         # NOT passed through as a "native jpeg"
     expect(jpeg?(result[:io].read)).to be(true)  # actually transcoded to real JPEG
+  end
+
+  # --- Real-bytes verification for the modern phone formats (#128) ---
+
+  it "sniffs a real HEIC photo as a heic/heif MIME type" do
+    # Proves Marcel detects real HEIC bytes as a TRANSCODABLE type (no decoder needed).
+    expect(Marcel::MimeType.for(fixture("sample.heic").open)).to match(%r{\Aimage/hei[cf]})
+  end
+
+  it "transcodes a real HEIC photo to JPEG end to end" do
+    require_decode!("sample.heic")
+
+    result = described_class.call(upload("sample.heic", "image/heic"))
+
+    expect(result).to include(content_type: "image/jpeg")
+    expect(jpeg?(result[:io].read)).to be(true)
+  end
+
+  it "transcodes a real AVIF image to JPEG end to end" do
+    require_decode!("sample.avif")
+
+    result = described_class.call(upload("sample.avif", "image/avif"))
+
+    expect(result).to include(content_type: "image/jpeg")
+    expect(jpeg?(result[:io].read)).to be(true)
   end
 
   it "transcodes HEIC/HEIF sequence brands (Live Photo/burst), not just the still variants" do

@@ -55,10 +55,19 @@ jobs:
         uses: ruby/setup-ruby@v1
       -
         # ruby-vips dlopens libvips.so.42 at runtime; ImageNormalizer transcodes
-        # uploads (HEIC/TIFF/… -> JPEG). The bare runner has no libvips, so the
-        # image_normalizer/captures specs need it (mirrors the Dockerfile).
-        name: "Install libvips"
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips42
+        # uploads (HEIC/TIFF/AVIF/… -> JPEG). The bare runner has no libvips, so
+        # the image_normalizer/captures specs need it (mirrors the Dockerfile).
+        # The libheif HEVC (libde265) + AV1 (aomdec) plugins let the real-HEIC /
+        # real-AVIF decode specs run rather than skip.
+        name: "Install libvips + HEIF decoders"
+        run: |
+          sudo apt-get update
+          # Noble (current ubuntu-latest) renamed libvips42 -> libvips42t64 in the
+          # t64 transition. Prefer the real name; fall back to libvips42 for
+          # runner images that still use it.
+          decoders="libheif1 libheif-plugin-libde265 libheif-plugin-aomdec"
+          sudo apt-get install -y --no-install-recommends libvips42t64 $decoders \
+            || sudo apt-get install -y --no-install-recommends libvips42 $decoders
       -
         name: "Install Dependencies"
         run: bundle install --jobs 4 --retry 3
