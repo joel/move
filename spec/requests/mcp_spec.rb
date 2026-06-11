@@ -231,11 +231,13 @@ RSpec.describe "MCP endpoint" do
     end
 
     describe "create_media_upload" do
-      it "returns the app upload URL" do
+      it "returns the app upload URL and advertises the auth/method/body contract" do
         data = structured(tool_call("create_media_upload", {}))
 
         expect(data["url"]).to end_with("/mcp/uploads")
         expect(data["method"]).to eq("POST")
+        expect(data.dig("headers", "Authorization")).to include("Bearer")
+        expect(data["instructions"]).to match(/raw image bytes/i)
       end
 
       it "rejects an oversized declared size up front" do
