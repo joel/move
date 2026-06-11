@@ -73,13 +73,26 @@ turns on genuine vision recognition and semantic search.
 
 ## Accepted image formats
 
-`Media` accepts only **PNG, JPEG, WEBP** — the formats the vision providers
-reliably read — and rejects anything else (HEIC, TIFF, SVG, BMP…) at validation
-rather than letting it fail recognition later. (GIF is excluded too: the
-providers reject *animated* GIFs and a MIME check can't distinguish them.)
-Mobile web uploads are already JPEG; this mainly affects a desktop user
-attaching an unsupported file directly. Transcoding such formats to JPEG (to
-accept them transparently) is tracked in #123.
+Uploads are normalized by [`ImageNormalizer`](../../app/services/image_normalizer.rb)
+before they're stored (called from `Captures::Create`, so it covers both web
+capture and the MCP `add_media` tool). The type is **sniffed from the bytes**
+(Marcel), not trusted from the client:
+
+- **PNG / JPEG / WEBP** — stored as-is (browser- and provider-native).
+- **HEIC / HEIF / AVIF / TIFF / BMP / GIF** — decoded (first frame), auto-rotated
+  from EXIF, and re-encoded to **JPEG** via libvips. So an iPhone HEIC photo
+  "just works" end to end.
+- **Anything else** (SVG/vector, PDF, or a file that won't decode) — rejected
+  with an actionable message; no recognition run is created.
+
+This keeps every stored blob renderable in-browser (the display surfaces serve
+the original blob straight to `<img>`) and readable by the vision providers.
+`Media::SUPPORTED_IMAGE_TYPES` (PNG/JPEG/WEBP) remains as a storage backstop.
+
+> **libvips needs the HEIF/AVIF/TIFF decoders.** The app image ships
+> `libheif1` + `libde265` (HEVC) + the dav1d plugin (AVIF), so decode works with
+> no extra build step. There is no HEIC/AVIF *encoder* (we only decode → JPEG).
+> Implemented in #123 (follow-up from #78).
 
 ## Rolling back
 

@@ -22,13 +22,19 @@ module Captures
 
     # captured_via records the origin (web vs mcp); the MCP add_media tool passes
     # "mcp" so assistant uploads aren't misclassified as browser captures.
+    # Non-JPEG/PNG/WEBP uploads (e.g. iPhone HEIC) are transcoded to JPEG up
+    # front so the stored blob is browser- and provider-safe; truly unsupported
+    # input (SVG/PDF/undecodable) fails the capture with a clear reason.
     def persist(box, file, captured_via)
+      file = ImageNormalizer.call(file)
       media = box.media.new(
         move: box.move, media_type: "image", captured_via: captured_via, captured_at: Time.current
       )
       media.image.attach(file)
       media.save!
       Success(media)
+    rescue ImageNormalizer::UnsupportedFormat
+      Failure(:unsupported_image)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
     end

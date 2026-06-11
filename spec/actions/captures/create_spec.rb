@@ -38,6 +38,13 @@ RSpec.describe Captures::Create do
   it "rejects a non-image upload" do
     result = described_class.new.call(box:, file: upload("not.txt", "text/plain"), captured_by: user)
     expect(result).to be_failure
-    expect(result.failure).to be_a(ActiveModel::Errors)
+    expect(result.failure).to eq(:unsupported_image)
+  end
+
+  it "transcodes a non-native image (TIFF) to JPEG before storing" do
+    result = described_class.new.call(box:, file: upload("sample.tiff", "image/tiff"), captured_by: user)
+
+    expect(result).to be_success
+    expect(result.value!.image.content_type).to eq("image/jpeg")
   end
 end

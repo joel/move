@@ -7,13 +7,10 @@ class Media < ApplicationRecord
   MEDIA_TYPES = %w[image].freeze
   CAPTURED_VIA = %w[web mcp].freeze
 
-  # Formats the recognition vision providers (OpenAI/Anthropic) can actually
-  # read. The app must not accept an image it can only fail on later: anything
-  # else (HEIC, TIFF, SVG, BMP…) is rejected at upload rather than producing a
-  # consistently-failing recognition run once a real provider is enabled. GIF is
-  # excluded: the providers reject *animated* GIFs, and a MIME check alone can't
-  # tell them apart — not worth an animation probe for a non-inventory format.
-  # Transcoding unsupported formats to JPEG is tracked as a follow-up.
+  # The formats actually *stored* — what every display surface and the vision
+  # providers can read. This is a storage backstop: uploads are normalized by
+  # ImageNormalizer before attach (HEIC/TIFF/etc. transcoded to JPEG, unsupported
+  # rejected), so by the time a blob reaches here it is already one of these.
   SUPPORTED_IMAGE_TYPES = %w[image/jpeg image/png image/webp].freeze
 
   belongs_to :move

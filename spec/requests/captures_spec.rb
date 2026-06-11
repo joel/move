@@ -52,15 +52,25 @@ RSpec.describe "Captures" do
       expect(response.body).to include(I18n.t("captures.errors.no_file"))
     end
 
-    it "rejects an unsupported image format with an actionable, specific message" do
+    it "transcodes a non-native upload (TIFF) to JPEG and captures it" do
       expect do
-        post move_box_capture_path(move, box), params: { file: upload("unsupported.heic", "image/heic") }
+        post move_box_capture_path(move, box), params: { file: upload("sample.tiff", "image/tiff") }
+      end.to change(box.media, :count).by(1)
+
+      expect(response).to redirect_to(move_box_capture_path(move, box))
+      expect(box.media.last.image.content_type).to eq("image/jpeg")
+    end
+
+    it "rejects an unsupported image (SVG) with an actionable, specific message" do
+      expect do
+        post move_box_capture_path(move, box), params: { file: upload("sample.svg", "image/svg+xml") }
       end.not_to change(box.media, :count)
 
       expect(response).to redirect_to(move_box_capture_path(move, box))
       follow_redirect!
-      # Not the generic "try again" fallback — the user is told which formats work.
-      expect(response.body).to include("JPEG, PNG, WEBP")
+      # Apostrophe-free slice of captures.errors.unsupported_image (the rendered
+      # toast HTML-escapes the "isn't" apostrophe).
+      expect(response.body).to include("Use a photo (JPEG, PNG, WEBP, HEIC, or TIFF)")
       expect(response.body).not_to include(I18n.t("captures.errors.failed"))
     end
   end
