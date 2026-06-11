@@ -91,12 +91,12 @@ RSpec.describe "MCP endpoint" do
   end
 
   describe "tools/list" do
-    it "advertises the eight initial tools" do
+    it "advertises the available tools" do
       body = rpc("tools/list")
       names = body.dig("result", "tools").pluck("name")
       expect(names).to contain_exactly(
         "list_boxes", "get_box_contents", "search_items", "add_item_to_box",
-        "add_media_to_box", "move_item", "mark_unpacked", "get_volume_summary"
+        "create_media_upload", "add_media_to_box", "move_item", "mark_unpacked", "get_volume_summary"
       )
     end
   end
@@ -210,39 +210,73 @@ RSpec.describe "MCP endpoint" do
     end
   end
 
-  describe "add_media_to_box" do
-    # 1x1 transparent PNG.
-    let(:png_base64) do
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC"
+  describe "direct upload: create_media_upload + add_media_to_box" do
+    def png_bytes = Rails.root.join("spec/fixtures/files/sample_image.png").binread
+
+    # Simulate a completed Direct Upload PUT: a blob whose bytes are in storage.
+    def uploaded_blob(bytes, filename: "a.png", content_type: "image/png")
+      ActiveStorage::Blob.create_and_upload!(io: StringIO.new(bytes), filename:, content_type:)
     end
 
-    it "attaches media to a packing box and records mcp as the origin" do
-      box = create(:box, move:, number: 9, status: "packing")
+    describe "create_media_upload (presign)" do
+      it "reserves a blob and returns a presigned PUT target" do
+        bytes = png_bytes
+        data = structured(tool_call("create_media_upload", {
+                                      byte_size: bytes.bytesize, checksum: Digest::MD5.base64digest(bytes),
+                                      filename: "a.png", content_type: "image/png"
+                                    }))
 
-      tool_call("add_media_to_box", { box_number: 9, image_base64: png_base64, filename: "a.png" })
+        expect(data["signed_id"]).to be_present
+        expect(data["url"]).to be_present
+        expect(data["method"]).to eq("PUT")
+      end
 
-      media = box.media.order(:created_at).last
-      expect(media).to be_present
-      expect(media.captured_via).to eq("mcp")
+      it "rejects an oversized upload at presign (before reserving a blob)" do
+        expect do
+          body = tool_call("create_media_upload", { byte_size: Media::MAX_IMAGE_BYTES + 1, checksum: "x" })
+          expect(body.to_json).to match(/too large/i)
+        end.not_to change(ActiveStorage::Blob, :count)
+      end
     end
 
-    it "rejects an oversized base64 image before decoding it" do
-      stub_const("Media::MAX_IMAGE_BYTES", 5) # png_base64 estimates well over 5 bytes
-      box = create(:box, move:, number: 9, status: "packing")
+    describe "add_media_to_box (attach by signed_id)" do
+      let!(:box) { create(:box, move:, number: 9, status: "packing") }
 
-      body = tool_call("add_media_to_box", { box_number: 9, image_base64: png_base64, filename: "a.png" })
+      it "attaches an uploaded blob and queues recognition (captured_via mcp)" do
+        blob = uploaded_blob(png_bytes)
 
-      expect(box.media.count).to eq(0)
-      expect(body.to_json).to match(/too large/i)
-    end
+        tool_call("add_media_to_box", { box_number: 9, signed_id: blob.signed_id })
 
-    it "accepts a payload whose decoded size is exactly the limit (padding-aware)" do
-      stub_const("Media::MAX_IMAGE_BYTES", Base64.strict_decode64(png_base64).bytesize)
-      box = create(:box, move:, number: 9, status: "packing")
+        media = box.media.order(:created_at).last
+        expect(media).to be_present
+        expect(media.captured_via).to eq("mcp")
+        expect(media.image.content_type).to eq("image/png")
+      end
 
-      tool_call("add_media_to_box", { box_number: 9, image_base64: png_base64, filename: "a.png" })
+      it "transcodes a non-native uploaded blob (TIFF) to JPEG on attach" do
+        tiff = Rails.root.join("spec/fixtures/files/sample.tiff").binread
+        blob = uploaded_blob(tiff, filename: "a.tiff", content_type: "image/tiff")
 
-      expect(box.media.count).to eq(1)
+        tool_call("add_media_to_box", { box_number: 9, signed_id: blob.signed_id })
+
+        expect(box.media.last.image.content_type).to eq("image/jpeg")
+      end
+
+      it "rejects a non-image blob by sniffing the bytes (not the declared type)" do
+        blob = uploaded_blob("this is not an image", content_type: "image/png")
+
+        body = tool_call("add_media_to_box", { box_number: 9, signed_id: blob.signed_id })
+
+        expect(box.media.count).to eq(0)
+        expect(body.to_json).to match(/supported image/i)
+      end
+
+      it "rejects an unknown/invalid signed_id" do
+        body = tool_call("add_media_to_box", { box_number: 9, signed_id: "bogus" })
+
+        expect(box.media.count).to eq(0)
+        expect(body.to_json).to match(/could not be found|Action failed/i)
+      end
     end
   end
 

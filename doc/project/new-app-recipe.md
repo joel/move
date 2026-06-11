@@ -342,6 +342,7 @@ capture → recognition):
 | request-spec `post`/`get` silently doesn't dispatch (`response` nil) | a spec helper param named `method`/`id` shadows methods the integration Runner uses | rename the helper params (e.g. `rpc_method`, `req_id`) |
 | recognition runs show `succeeded` with 0 items in prod after enabling openai | adapter parsed a non-2xx body as success (rate limit/bad key looked like an empty box) | adapters now raise on non-2xx via `ProviderHttp`; check `OPENAI_API_KEY` is set + within rate/credit limits ([`ai-providers.md`](ai-providers.md)) |
 | all recognition runs fail / embeddings nil right after flipping providers | `RECOGNITION_PROVIDER`/`EMBEDDING_PROVIDER: openai` set before `OPENAI_API_KEY` reached the env | add the key to Doppler `move/prd` **first**, then deploy; backfill with `kamal app exec --reuse 'bin/rails search:reindex'` |
+| `Missing host to link to!` from `service_url_for_direct_upload` outside an Active Storage controller (e.g. the MCP presign tool) | the **Disk** service builds a Rails-route URL needing a host; non-AS controllers don't set `ActiveStorage::Current.url_options` | set `ActiveStorage::Current.url_options = { protocol:, host:, port: }` from the request in the controller (`McpController#handle`). S3 (prod) returns an absolute presigned URL and is unaffected |
 
 ---
 

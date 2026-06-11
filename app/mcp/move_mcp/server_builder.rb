@@ -13,6 +13,7 @@ module MoveMcp
       Tools::GetBoxContents,
       Tools::SearchItems,
       Tools::AddItemToBox,
+      Tools::CreateMediaUpload,
       Tools::AddMediaToBox,
       Tools::MoveItem,
       Tools::MarkUnpacked,

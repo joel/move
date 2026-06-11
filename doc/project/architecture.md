@@ -271,10 +271,21 @@ reuses the existing two layers, then a third credential resolves the Move:
    `last_used_at`, and builds a per-request `MCP::Server` whose `server_context`
    is `{ move:, token:, actor: token.created_by }`.
 
-The eight tools (`list_boxes`, `get_box_contents`, `search_items`,
-`add_item_to_box`, `add_media_to_box`, `move_item`, `mark_unpacked`,
-`get_volume_summary`) are thin wrappers over the **same `app/actions`** the web UI
-calls — so MCP cannot bypass authorization, validation, audit, or tenant scoping.
+The tools (`list_boxes`, `get_box_contents`, `search_items`,
+`add_item_to_box`, `create_media_upload`, `add_media_to_box`, `move_item`,
+`mark_unpacked`, `get_volume_summary`) are thin wrappers over the **same
+`app/actions`** the web UI calls — so MCP cannot bypass authorization,
+validation, audit, or tenant scoping.
+
+**Image upload is Direct Upload, not base64** (#110): `create_media_upload`
+reserves an Active Storage blob (size-capped, in the tenant schema) and returns a
+presigned PUT URL; the client PUTs the bytes straight to storage; then
+`add_media_to_box` attaches by `signed_id` through `Captures::Create`, which
+sniffs the bytes (never the client-declared type) and transcodes non-JPEG/PNG/WEBP
+to JPEG. Bytes never transit the JSON-RPC body. (`McpController` sets
+`ActiveStorage::Current.url_options` so the Disk service's presign URL resolves in
+dev/test; prod's S3 returns an absolute presigned URL.) `/mcp` rate-limiting is
+tracked in #134.
 Every record is loaded through the token's `move` association, so a token can
 never reach another Move or Organization. Mutating tools emit `mcp.tool_called`;
 `MoveMcp::AuditSubscriber` records token lifecycle (`integration_token.*`) and

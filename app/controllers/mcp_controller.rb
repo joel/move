@@ -20,6 +20,12 @@ class McpController < ActionController::API
     Current.tenant = Apartment::Tenant.current
     Current.move = @token.move
     Current.source = :mcp
+    # create_media_upload (Direct Upload presign) builds a service URL; the Disk
+    # service (dev/test) needs a host to link to. Prod's S3 returns an absolute
+    # presigned URL and ignores this.
+    ActiveStorage::Current.url_options = {
+      protocol: request.protocol, host: request.host, port: request.optional_port
+    }
 
     server = MoveMcp::ServerBuilder.build(token: @token)
     # Stateless Streamable HTTP transport (JSON response mode) so real MCP clients
