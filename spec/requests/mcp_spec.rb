@@ -255,16 +255,27 @@ RSpec.describe "MCP endpoint" do
         expect(ActiveStorage::Blob.find_signed(signed, purpose: Captures::Create.signed_id_purpose(create(:move)))).to be_nil
       end
 
-      it "rejects an upload whose Content-Length exceeds the cap" do
-        post "/mcp/uploads", params: "x" * 50,
-                             headers: auth_headers("Content-Length" => (Media::MAX_IMAGE_BYTES + 1).to_s)
+      it "rejects an over-cap body before storing it (independent of Content-Length)" do
+        stub_const("Media::MAX_IMAGE_BYTES", 10)
 
+        expect do
+          post "/mcp/uploads", params: "x" * 50, headers: auth_headers
+        end.not_to change(ActiveStorage::Blob, :count)
         expect(response).to have_http_status(:content_too_large)
       end
 
       it "401s without a token" do
         post "/mcp/uploads", params: png_bytes, headers: { "Content-Type" => "application/octet-stream" }
         expect(response).to have_http_status(:unauthorized)
+      end
+
+      it "403s when the Move is archived (can't bypass create_media_upload's guard)" do
+        move.update!(status: "archived")
+
+        expect do
+          post "/mcp/uploads", params: png_bytes, headers: auth_headers
+        end.not_to change(ActiveStorage::Blob, :count)
+        expect(response).to have_http_status(:forbidden)
       end
     end
 
