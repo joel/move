@@ -38,7 +38,9 @@ module MoveMcp
           filename: filename, byte_size: size, checksum: checksum, content_type: content_type
         )
         data_response(
-          signed_id: blob.signed_id,
+          # Move-scoped purpose so the id is only attachable within this token's
+          # Move (blobs are shared in `public`; see Captures::Create.signed_id_purpose).
+          signed_id: blob.signed_id(purpose: ::Captures::Create.signed_id_purpose(move(server_context))),
           url: blob.service_url_for_direct_upload,
           method: "PUT",
           headers: blob.service_headers_for_direct_upload

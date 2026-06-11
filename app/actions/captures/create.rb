@@ -15,6 +15,15 @@ module Captures
   #                    a non-native format, transcoded to JPEG (parity with the
   #                    web path); the original blob is then purged.
   class Create < BaseAction
+    # Active Storage signed_ids are signed with the global secret and ActiveStorage::Blob
+    # lives in the shared `public` schema (Apartment-excluded), so a bare signed_id is
+    # valid across every Organization/Move. Bind direct-upload ids to the Move via a
+    # Move-scoped purpose: create_media_upload mints with this purpose and the attach
+    # verifies with it, so a token can only attach a blob reserved for its own Move.
+    def self.signed_id_purpose(move)
+      "mcp_media_upload/#{move.id}"
+    end
+
     def call(box:, captured_by:, file: nil, signed_id: nil, captured_via: "web")
       yield ensure_writable(box.move)
       return Failure(:not_capturable) unless box.capturable?
@@ -32,7 +41,7 @@ module Captures
     # real type from the bytes (never the client-declared type) and transcodes
     # non-JPEG/PNG/WEBP to JPEG; unsupported/undecodable input fails the capture.
     def persist(box, file, signed_id, captured_via)
-      upload = resolve_upload(file, signed_id)
+      upload = resolve_upload(box, file, signed_id)
       normalized = ImageNormalizer.call(upload[:attachable])
       Success(attach_media(box, captured_via, upload, normalized))
     rescue ActiveSupport::MessageVerifier::InvalidSignature, ActiveRecord::RecordNotFound,
@@ -51,10 +60,10 @@ module Captures
     # A web upload arrives as `file`; a direct upload as a `signed_id` for an
     # Active Storage blob already in storage (its bytes are read so the type can
     # be sniffed/transcoded, never trusting the client-declared content type).
-    def resolve_upload(file, signed_id)
+    def resolve_upload(box, file, signed_id)
       return { attachable: file, blob: nil } if signed_id.blank?
 
-      blob = ActiveStorage::Blob.find_signed!(signed_id)
+      blob = ActiveStorage::Blob.find_signed!(signed_id, purpose: self.class.signed_id_purpose(box.move))
       { attachable: { io: StringIO.new(blob.download), filename: blob.filename.to_s, content_type: blob.content_type },
         blob: blob }
     end

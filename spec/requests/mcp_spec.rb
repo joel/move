@@ -213,9 +213,18 @@ RSpec.describe "MCP endpoint" do
   describe "direct upload: create_media_upload + add_media_to_box" do
     def png_bytes = Rails.root.join("spec/fixtures/files/sample_image.png").binread
 
-    # Simulate a completed Direct Upload PUT: a blob whose bytes are in storage.
-    def uploaded_blob(bytes, filename: "a.png", content_type: "image/png")
-      ActiveStorage::Blob.create_and_upload!(io: StringIO.new(bytes), filename:, content_type:)
+    # Full round-trip: presign via the tool (Move-scoped signed_id), then simulate
+    # the client PUT by writing the bytes to the reserved blob's key. Returns the
+    # signed_id to hand to add_media_to_box.
+    def presign_and_upload(bytes, filename: "a.png", content_type: "image/png")
+      data = structured(tool_call("create_media_upload", {
+                                    byte_size: bytes.bytesize, checksum: Digest::MD5.base64digest(bytes),
+                                    filename:, content_type:
+                                  }))
+      signed_id = data["signed_id"]
+      blob = ActiveStorage::Blob.find_signed!(signed_id, purpose: Captures::Create.signed_id_purpose(move))
+      blob.service.upload(blob.key, StringIO.new(bytes)) # the "PUT"
+      signed_id
     end
 
     describe "create_media_upload (presign)" do
@@ -243,9 +252,7 @@ RSpec.describe "MCP endpoint" do
       let!(:box) { create(:box, move:, number: 9, status: "packing") }
 
       it "attaches an uploaded blob and queues recognition (captured_via mcp)" do
-        blob = uploaded_blob(png_bytes)
-
-        tool_call("add_media_to_box", { box_number: 9, signed_id: blob.signed_id })
+        tool_call("add_media_to_box", { box_number: 9, signed_id: presign_and_upload(png_bytes) })
 
         media = box.media.order(:created_at).last
         expect(media).to be_present
@@ -255,17 +262,17 @@ RSpec.describe "MCP endpoint" do
 
       it "transcodes a non-native uploaded blob (TIFF) to JPEG on attach" do
         tiff = Rails.root.join("spec/fixtures/files/sample.tiff").binread
-        blob = uploaded_blob(tiff, filename: "a.tiff", content_type: "image/tiff")
+        signed = presign_and_upload(tiff, filename: "a.tiff", content_type: "image/tiff")
 
-        tool_call("add_media_to_box", { box_number: 9, signed_id: blob.signed_id })
+        tool_call("add_media_to_box", { box_number: 9, signed_id: signed })
 
         expect(box.media.last.image.content_type).to eq("image/jpeg")
       end
 
       it "rejects a non-image blob by sniffing the bytes (not the declared type)" do
-        blob = uploaded_blob("this is not an image", content_type: "image/png")
+        signed = presign_and_upload("this is not an image", content_type: "image/png")
 
-        body = tool_call("add_media_to_box", { box_number: 9, signed_id: blob.signed_id })
+        body = tool_call("add_media_to_box", { box_number: 9, signed_id: signed })
 
         expect(box.media.count).to eq(0)
         expect(body.to_json).to match(/supported image/i)
@@ -273,6 +280,20 @@ RSpec.describe "MCP endpoint" do
 
       it "rejects an unknown/invalid signed_id" do
         body = tool_call("add_media_to_box", { box_number: 9, signed_id: "bogus" })
+
+        expect(box.media.count).to eq(0)
+        expect(body.to_json).to match(/could not be found|Action failed/i)
+      end
+
+      it "rejects a blob signed for a different Move (cross-Move binding)" do
+        other_move = create(:move)
+        blob = ActiveStorage::Blob.create_and_upload!(
+          io: StringIO.new(png_bytes), filename: "a.png", content_type: "image/png"
+        )
+        # A valid signed_id, but bound to another Move's purpose — must not attach here.
+        signed = blob.signed_id(purpose: Captures::Create.signed_id_purpose(other_move))
+
+        body = tool_call("add_media_to_box", { box_number: 9, signed_id: signed })
 
         expect(box.media.count).to eq(0)
         expect(body.to_json).to match(/could not be found|Action failed/i)
