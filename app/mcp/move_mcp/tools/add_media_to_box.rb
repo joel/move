@@ -43,10 +43,14 @@ module MoveMcp
         data_response(media_id: media.id, box_number: box.number.to_i, recognition: "queued")
       end
 
-      # Estimate decoded bytes from the encoded length (4 base64 chars -> 3
-      # bytes) so we can reject before allocating the decoded image.
+      # Decoded byte size from the encoded length WITHOUT decoding (4 base64
+      # chars -> 3 bytes, minus the 1-2 '=' padding bytes), so a payload decoding
+      # to exactly MAX_IMAGE_BYTES isn't wrongly rejected at the boundary.
       def self.oversized?(image_base64)
-        (image_base64.to_s.bytesize * 3 / 4) > Media::MAX_IMAGE_BYTES
+        s = image_base64.to_s
+        padding = s[-2..].to_s.count("=") # 0, 1, or 2 trailing '=' bytes
+        decoded_bytes = ((s.bytesize / 4) * 3) - padding
+        decoded_bytes > Media::MAX_IMAGE_BYTES
       end
 
       def self.decode(image_base64, filename, content_type)
