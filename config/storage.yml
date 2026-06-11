@@ -11,7 +11,10 @@ local:
 # accepts anonymous access so the keys can be placeholders there, real keys in prod.
 seaweedfs:
   service: S3
-  endpoint: <%= ENV.fetch("STORAGE_ENDPOINT", "https://storage.workeverywhere.docker:8333") %>
+  # Default to the gateway's container DNS on the shared network (reachable from
+  # the app container in dev and prod). storage.workeverywhere.docker is the Web
+  # UI host (Traefik :8888), not the S3 API — don't default to it.
+  endpoint: <%= ENV.fetch("STORAGE_ENDPOINT", "http://seaweedfs:8333") %>
   bucket: <%= ENV.fetch("STORAGE_BUCKET", "move") %>
   region: <%= ENV.fetch("STORAGE_REGION", "us-east-1") %>
   access_key_id: <%= ENV.fetch("STORAGE_ACCESS_KEY_ID", "move-dev") %>
