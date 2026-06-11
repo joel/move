@@ -50,7 +50,7 @@ module Views
                        "border border-dashed border-card-border bg-surface-container-high text-muted") do
               render Components::Icons::Camera.new(css: "h-12 w-12")
             end
-            form.file_field :file, accept: "image/jpeg,image/png,image/webp",
+            form.file_field :file, accept: "image/*",
                                    capture: "environment", required: true,
                                    class: "w-full text-body-md text-muted file:mr-4 file:rounded-full " \
                                           "file:border-0 file:bg-surface-container-high file:px-4 file:py-2 " \

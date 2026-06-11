@@ -22,3 +22,4 @@ en:
     errors:
       no_file: "Choose an image to capture (you appear to be offline or no file was selected)."
       failed: "That capture could not be saved. Check your connection and try again."
+      unsupported_image: "That file isn't a supported image. Use a photo (JPEG, PNG, WEBP, HEIC, or TIFF)."
