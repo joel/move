@@ -197,7 +197,8 @@ module AppCLI
           "--env RAILS_ENV=#{env_config.env}",
           "--env RAILS_LOG_TO_STDOUT=true",
           "--env RAILS_SERVE_STATIC_FILES=true",
-          "--env RAILS_ALLOW_ALL_HOSTS=true"
+          "--env RAILS_ALLOW_ALL_HOSTS=true",
+          "--env-file .env.#{env_config.env}"
         ]
 
         flags << "--env BUNDLE_WITHOUT=production" if env_config.short == "dev"

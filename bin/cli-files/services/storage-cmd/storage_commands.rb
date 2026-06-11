@@ -15,6 +15,9 @@ module AppCLI
       desc "stop", "Stop the local SeaweedFS storage service"
       delegate :stop, to: :storage_service
 
+      desc "teardown", "Teardown the local SeaweedFS storage service"
+      delegate :teardown, to: :storage_service
+
       desc "logs", "View SeaweedFS storage service logs"
       delegate :logs, to: :storage_service
 

@@ -1,25 +1,39 @@
 #!/usr/bin/env ruby
 
+require "json"
 require_relative "../services/helpers"
 
 module AppCLI
   module Services
     # Local SeaweedFS object store (S3-compatible) backing Active
     # Storage in dev. Mirrors MailService: a detached container on the
-    # shared Traefik network, reachable by the browser (direct upload)
-    # and the app container at https://storage.workeverywhere.docker.
+    # shared Traefik network. The Web UI is exposed at the storage host,
+    # while the bucket host keeps browser/S3 access bucket-scoped.
     # Persistence via a named volume so blobs survive restarts.
     class StorageService
       STORAGE_CONTAINER = "seaweedfs".freeze
       STORAGE_IMAGE = "chrislusf/seaweedfs:3.97".freeze
-      STORAGE_PORT = "8333".freeze
+      S3_PORT = "8333".freeze
+      WEB_UI_PORT = "8888".freeze
+      DEV_MIN_FREE_SPACE = "100MiB".freeze
+      DEV_VOLUME_SIZE_LIMIT_MB = "64".freeze
       STORAGE_HOST = "storage.workeverywhere.docker".freeze
-      STORAGE_ROUTER = "#{Services::APP_NAME}-seaweedfs".freeze
+      S3_ROUTER = "#{Services::APP_NAME}-seaweedfs-s3".freeze
+      WEB_UI_ROUTER = "#{Services::APP_NAME}-seaweedfs-web".freeze
       STORAGE_VOLUME = "#{Services::APP_NAME}-seaweedfs-data".freeze
       STORAGE_BUCKET = Services::APP_NAME
+      SERVER_ARGS = [
+        "server",
+        "-s3",
+        "-dir=/data",
+        "-ip.bind=0.0.0.0",
+        "-volume.minFreeSpace=#{DEV_MIN_FREE_SPACE}",
+        "-master.volumePreallocate=false",
+        "-master.volumeSizeLimitMB=#{DEV_VOLUME_SIZE_LIMIT_MB}"
+      ].freeze
       # Virtual-host bucket access: bucket.workeverywhere.docker/<key>
       # resolves to the app bucket via a Traefik addPrefix
-      # middleware. Both routers share the single S3 gateway on :8333.
+      # middleware before it reaches the S3 gateway on :8333.
       BUCKET_HOST = "bucket.workeverywhere.docker".freeze
       BUCKET_ROUTER = "#{Services::APP_NAME}-bucket".freeze
       BUCKET_MIDDLEWARE = "#{Services::APP_NAME}-bucket-prefix".freeze
@@ -50,9 +64,16 @@ module AppCLI
         runner.ensure_volume(STORAGE_VOLUME)
 
         status = runner.container_status(STORAGE_CONTAINER)
+        if status == "running" && !runtime_config_current?
+          shell.say("Storage service is running with stale routing; recreating it.")
+          stop
+          status = runner.container_status(STORAGE_CONTAINER)
+        end
+
         if status == "running"
           shell.say("Storage service already running.")
           wait_for_s3_ready
+          wait_for_web_ui_ready
           ensure_bucket
           ensure_cors
           return
@@ -65,6 +86,7 @@ module AppCLI
 
         runner.run(storage_run_command)
         wait_for_s3_ready
+        wait_for_web_ui_ready
         ensure_bucket
         ensure_cors
       end
@@ -103,7 +125,7 @@ module AppCLI
       # with no bucket/CORS silently breaks every direct upload.
       def ensure_bucket
         code = curl_status(
-          "-X PUT http://localhost:#{STORAGE_PORT}/#{STORAGE_BUCKET}"
+          "-X PUT http://localhost:#{S3_PORT}/#{STORAGE_BUCKET}"
         )
         # 409 = BucketAlreadyOwnedByYou — already provisioned, which
         # is success for an idempotent ensure.
@@ -126,7 +148,7 @@ module AppCLI
           f.flush
           code = curl_status(
             "-X PUT --data-binary @#{f.path} " \
-            "'http://localhost:#{STORAGE_PORT}/" \
+            "'http://localhost:#{S3_PORT}/" \
             "#{STORAGE_BUCKET}?cors'"
           )
           next if success_code?(code)
@@ -140,6 +162,35 @@ module AppCLI
 
       private
 
+      def runtime_config_current?
+        labels = container_labels
+        labels["traefik.http.routers.#{WEB_UI_ROUTER}.service"] == WEB_UI_ROUTER &&
+          labels["traefik.http.services.#{WEB_UI_ROUTER}.loadbalancer.server.port"] == WEB_UI_PORT &&
+          labels["traefik.http.routers.#{BUCKET_ROUTER}.service"] == S3_ROUTER &&
+          labels["traefik.http.services.#{S3_ROUTER}.loadbalancer.server.port"] == S3_PORT &&
+          container_args == SERVER_ARGS
+      end
+
+      def container_labels
+        output = runner.capture(
+          "docker inspect #{STORAGE_CONTAINER} --format '{{ json .Config.Labels }}'",
+          quiet: true
+        )
+        JSON.parse(output.to_s)
+      rescue JSON::ParserError
+        {}
+      end
+
+      def container_args
+        output = runner.capture(
+          "docker inspect #{STORAGE_CONTAINER} --format '{{ json .Args }}'",
+          quiet: true
+        )
+        JSON.parse(output.to_s)
+      rescue JSON::ParserError
+        []
+      end
+
       # Poll the S3 endpoint until it answers (the container is up but
       # the S3 gateway needs a moment). Fail fast if it never does, so
       # `storage start` does not falsely report success.
@@ -147,7 +198,7 @@ module AppCLI
         i = 0
         while i < attempts
           ready = success_code?(
-            curl_status("http://localhost:#{STORAGE_PORT}/")
+            curl_status("http://localhost:#{S3_PORT}/")
           )
           break if ready
 
@@ -159,7 +210,26 @@ module AppCLI
 
         raise Thor::Error,
               "SeaweedFS S3 endpoint did not become ready on " \
-              "localhost:#{STORAGE_PORT} after #{attempts}s."
+              "localhost:#{S3_PORT} after #{attempts}s."
+      end
+
+      def wait_for_web_ui_ready(attempts: 30, interval: 1)
+        i = 0
+        while i < attempts
+          ready = success_code?(
+            curl_status("http://localhost:#{WEB_UI_PORT}/")
+          )
+          break if ready
+
+          shell.say("Waiting for SeaweedFS Web UI...") if (i % 5).zero?
+          sleep(interval)
+          i += 1
+        end
+        return if i < attempts
+
+        raise Thor::Error,
+              "SeaweedFS Web UI did not become ready on " \
+              "localhost:#{WEB_UI_PORT} after #{attempts}s."
       end
 
       # Returns the HTTP status string (e.g. "200") or nil if curl
@@ -200,33 +270,35 @@ module AppCLI
         [
           "docker run --rm --detach",
           "--name #{STORAGE_CONTAINER}",
-          "--publish #{STORAGE_PORT}:8333",
+          "--publish #{S3_PORT}:8333",
+          "--publish #{WEB_UI_PORT}:8888",
           "--network #{Services::NETWORK_NAME}",
           "--volume #{STORAGE_VOLUME}:/data",
           "--label traefik.enable=true",
-          # S3 API host (path-style) — the endpoint the app signs and
-          # reads/writes through.
-          "--label 'traefik.http.routers.#{STORAGE_ROUTER}.rule=" \
+          # Web UI host for local inspection.
+          "--label 'traefik.http.routers.#{WEB_UI_ROUTER}.rule=" \
           "Host(`#{STORAGE_HOST}`)'",
-          "--label traefik.http.routers.#{STORAGE_ROUTER}.entrypoints=websecure",
-          "--label traefik.http.routers.#{STORAGE_ROUTER}.tls=true",
-          "--label traefik.http.routers.#{STORAGE_ROUTER}.service=#{STORAGE_ROUTER}",
+          "--label traefik.http.routers.#{WEB_UI_ROUTER}.entrypoints=websecure",
+          "--label traefik.http.routers.#{WEB_UI_ROUTER}.tls=true",
+          "--label traefik.http.routers.#{WEB_UI_ROUTER}.service=#{WEB_UI_ROUTER}",
           # Bucket host — bucket.workeverywhere.docker/<key> maps to the
           # app bucket by prefixing the path before it reaches the
-          # (path-style) S3 gateway; shares the one backend service.
+          # (path-style) S3 gateway.
           "--label 'traefik.http.routers.#{BUCKET_ROUTER}.rule=" \
           "Host(`#{BUCKET_HOST}`)'",
           "--label traefik.http.routers.#{BUCKET_ROUTER}.entrypoints=websecure",
           "--label traefik.http.routers.#{BUCKET_ROUTER}.tls=true",
-          "--label traefik.http.routers.#{BUCKET_ROUTER}.service=#{STORAGE_ROUTER}",
+          "--label traefik.http.routers.#{BUCKET_ROUTER}.service=#{S3_ROUTER}",
           "--label traefik.http.routers.#{BUCKET_ROUTER}.middlewares=#{BUCKET_MIDDLEWARE}",
           "--label traefik.http.middlewares.#{BUCKET_MIDDLEWARE}." \
           "addprefix.prefix=/#{STORAGE_BUCKET}",
-          "--label traefik.http.services.#{STORAGE_ROUTER}." \
+          "--label traefik.http.services.#{S3_ROUTER}." \
           "loadbalancer.server.port=8333",
+          "--label traefik.http.services.#{WEB_UI_ROUTER}." \
+          "loadbalancer.server.port=8888",
           "--label traefik.docker.network=#{Services::NETWORK_NAME}",
           STORAGE_IMAGE,
-          "server -s3 -dir=/data -ip.bind=0.0.0.0"
+          SERVER_ARGS.join(" ")
         ]
       end
     end
