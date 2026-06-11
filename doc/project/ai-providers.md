@@ -94,9 +94,18 @@ the original blob straight to `<img>`) and readable by the vision providers.
 `Media::SUPPORTED_IMAGE_TYPES` (PNG/JPEG/WEBP) remains as a storage backstop.
 
 > **libvips needs the HEIF/AVIF/TIFF decoders.** The app image ships
-> `libheif1` + `libde265` (HEVC) + the dav1d plugin (AVIF), so decode works with
+> `libheif1` + `libde265` (HEVC) + the AV1 plugin (AVIF), so decode works with
 > no extra build step. There is no HEIC/AVIF *encoder* (we only decode → JPEG).
 > Implemented in #123 (follow-up from #78).
+
+**Real-bytes verification (#128).** `spec/fixtures/files/sample.heic` (a real
+HEIC photo) and `sample.avif` back end-to-end specs that decode→JPEG through the
+actual `ImageNormalizer` path — no stubbing. They self-skip where libvips lacks
+the codec plugin (e.g. a dev host without `libheif-plugin-libde265`); CI installs
+`libheif-plugin-libde265` + `libheif-plugin-aomdec` so they run there, and the
+app image already has them. A Marcel-sniff spec (no decoder needed) always
+asserts real HEIC bytes are detected as a `heic/heif` type. The HEIC fixture
+can't be regenerated locally (no HEVC encoder in the toolchain).
 
 ## Rolling back
 
