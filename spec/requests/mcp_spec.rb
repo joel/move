@@ -23,7 +23,10 @@ RSpec.describe "MCP endpoint" do
   # McpController is ActionController::API, so the shared stub_current_* helpers
   # (which target ApplicationController) don't reach it — stub the instance.
   before do
-    allow_any_instance_of(McpController).to receive(:current_tenant).and_return("acme") # rubocop:disable RSpec/AnyInstance
+    # current_tenant lives in McpAuthentication, shared by both MCP controllers.
+    [McpController, McpUploadsController].each do |controller|
+      allow_any_instance_of(controller).to receive(:current_tenant).and_return("acme") # rubocop:disable RSpec/AnyInstance
+    end
   end
 
   # NB: do not name params `method`/`id` — they shadow methods the integration
@@ -91,12 +94,12 @@ RSpec.describe "MCP endpoint" do
   end
 
   describe "tools/list" do
-    it "advertises the eight initial tools" do
+    it "advertises the available tools" do
       body = rpc("tools/list")
       names = body.dig("result", "tools").pluck("name")
       expect(names).to contain_exactly(
         "list_boxes", "get_box_contents", "search_items", "add_item_to_box",
-        "add_media_to_box", "move_item", "mark_unpacked", "get_volume_summary"
+        "create_media_upload", "add_media_to_box", "move_item", "mark_unpacked", "get_volume_summary"
       )
     end
   end
@@ -210,39 +213,122 @@ RSpec.describe "MCP endpoint" do
     end
   end
 
-  describe "add_media_to_box" do
-    # 1x1 transparent PNG.
-    let(:png_base64) do
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC"
+  describe "direct upload: create_media_upload + add_media_to_box" do
+    def png_bytes = Rails.root.join("spec/fixtures/files/sample_image.png").binread
+
+    def auth_headers(extra = {})
+      { "Authorization" => "Bearer #{raw_token}", "Content-Type" => "application/octet-stream" }.merge(extra)
     end
 
-    it "attaches media to a packing box and records mcp as the origin" do
-      box = create(:box, move:, number: 9, status: "packing")
-
-      tool_call("add_media_to_box", { box_number: 9, image_base64: png_base64, filename: "a.png" })
-
-      media = box.media.order(:created_at).last
-      expect(media).to be_present
-      expect(media.captured_via).to eq("mcp")
+    # Full round-trip through the real endpoints: create_media_upload returns the
+    # app upload URL; POST the raw bytes there (McpUploadsController streams them
+    # into a blob and returns a Move-scoped signed_id) to hand to add_media_to_box.
+    def upload(bytes, filename: "a.png")
+      url = structured(tool_call("create_media_upload", {}))["url"]
+      post "#{url}?filename=#{filename}", params: bytes, headers: auth_headers
+      expect(response).to have_http_status(:created)
+      response.parsed_body["signed_id"]
     end
 
-    it "rejects an oversized base64 image before decoding it" do
-      stub_const("Media::MAX_IMAGE_BYTES", 5) # png_base64 estimates well over 5 bytes
-      box = create(:box, move:, number: 9, status: "packing")
+    describe "create_media_upload" do
+      it "returns the app upload URL" do
+        data = structured(tool_call("create_media_upload", {}))
 
-      body = tool_call("add_media_to_box", { box_number: 9, image_base64: png_base64, filename: "a.png" })
+        expect(data["url"]).to end_with("/mcp/uploads")
+        expect(data["method"]).to eq("POST")
+      end
 
-      expect(box.media.count).to eq(0)
-      expect(body.to_json).to match(/too large/i)
+      it "rejects an oversized declared size up front" do
+        body = tool_call("create_media_upload", { byte_size: Media::MAX_IMAGE_BYTES + 1 })
+        expect(body.to_json).to match(/too large/i)
+      end
     end
 
-    it "accepts a payload whose decoded size is exactly the limit (padding-aware)" do
-      stub_const("Media::MAX_IMAGE_BYTES", Base64.strict_decode64(png_base64).bytesize)
-      box = create(:box, move:, number: 9, status: "packing")
+    describe "POST /mcp/uploads (streaming upload)" do
+      it "streams the bytes into a blob and returns a Move-scoped signed_id" do
+        post "/mcp/uploads", params: png_bytes, headers: auth_headers
 
-      tool_call("add_media_to_box", { box_number: 9, image_base64: png_base64, filename: "a.png" })
+        expect(response).to have_http_status(:created)
+        signed = response.parsed_body["signed_id"]
+        # The signed_id verifies under this Move's purpose, not another's.
+        expect(ActiveStorage::Blob.find_signed(signed, purpose: Captures::Create.signed_id_purpose(move))).to be_present
+        expect(ActiveStorage::Blob.find_signed(signed, purpose: Captures::Create.signed_id_purpose(create(:move)))).to be_nil
+      end
 
-      expect(box.media.count).to eq(1)
+      it "rejects an over-cap body before storing it (independent of Content-Length)" do
+        stub_const("Media::MAX_IMAGE_BYTES", 10)
+
+        expect do
+          post "/mcp/uploads", params: "x" * 50, headers: auth_headers
+        end.not_to change(ActiveStorage::Blob, :count)
+        expect(response).to have_http_status(:content_too_large)
+      end
+
+      it "401s without a token" do
+        post "/mcp/uploads", params: png_bytes, headers: { "Content-Type" => "application/octet-stream" }
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it "403s when the Move is archived (can't bypass create_media_upload's guard)" do
+        move.update!(status: "archived")
+
+        expect do
+          post "/mcp/uploads", params: png_bytes, headers: auth_headers
+        end.not_to change(ActiveStorage::Blob, :count)
+        expect(response).to have_http_status(:forbidden)
+      end
+    end
+
+    describe "add_media_to_box (attach by signed_id)" do
+      let!(:box) { create(:box, move:, number: 9, status: "packing") }
+
+      it "attaches an uploaded blob and queues recognition (captured_via mcp)" do
+        tool_call("add_media_to_box", { box_number: 9, signed_id: upload(png_bytes) })
+
+        media = box.media.order(:created_at).last
+        expect(media).to be_present
+        expect(media.captured_via).to eq("mcp")
+        expect(media.image.content_type).to eq("image/png")
+      end
+
+      it "transcodes a non-native uploaded blob (TIFF) to JPEG on attach" do
+        tiff = Rails.root.join("spec/fixtures/files/sample.tiff").binread
+        signed = upload(tiff, filename: "a.tiff")
+
+        tool_call("add_media_to_box", { box_number: 9, signed_id: signed })
+
+        expect(box.media.last.image.content_type).to eq("image/jpeg")
+      end
+
+      it "rejects a non-image blob by sniffing the bytes (not the declared type)" do
+        signed = upload("this is not an image")
+
+        body = tool_call("add_media_to_box", { box_number: 9, signed_id: signed })
+
+        expect(box.media.count).to eq(0)
+        expect(body.to_json).to match(/supported image/i)
+      end
+
+      it "rejects an unknown/invalid signed_id" do
+        body = tool_call("add_media_to_box", { box_number: 9, signed_id: "bogus" })
+
+        expect(box.media.count).to eq(0)
+        expect(body.to_json).to match(/could not be found|Action failed/i)
+      end
+
+      it "rejects a blob signed for a different Move (cross-Move binding)" do
+        other_move = create(:move)
+        blob = ActiveStorage::Blob.create_and_upload!(
+          io: StringIO.new(png_bytes), filename: "a.png", content_type: "image/png"
+        )
+        # A valid signed_id, but bound to another Move's purpose — must not attach here.
+        signed = blob.signed_id(purpose: Captures::Create.signed_id_purpose(other_move))
+
+        body = tool_call("add_media_to_box", { box_number: 9, signed_id: signed })
+
+        expect(box.media.count).to eq(0)
+        expect(body.to_json).to match(/could not be found|Action failed/i)
+      end
     end
   end
 

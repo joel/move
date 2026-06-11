@@ -197,7 +197,7 @@ admin. New-user email invitations are deferred.
 | Subdomain elevator | `config/initializers/apartment_elevator.rb` | zone-based (`.docker`/`.app` aren't always public suffixes), 404 on unknown |
 | Auth | `app/misc/rodauth_main.rb` | passwordless; **all tables `Sequel[:public][:…]`**; onboarding creates tenant post-verify |
 | Page layouts | `app/views/layouts/*` | `ApplicationLayout` (TopNav, auth/marketing) vs `AppShellLayout` (D0 sidebar + bottom tab bar, in-app surfaces); shared `<head>` in `ChromeHead`. Controllers opt in via `layout -> { … }` (e.g. `BoxesController`) |
-| File storage | `config/storage.yml`, `config/deploy.yml` | Active Storage; dev/test = Disk, prod = the **shared host-wide SeaweedFS S3** gateway (also used by sibling apps) via move's own `move` bucket (`STORAGE_ENDPOINT=http://seaweedfs:8333`, `force_path_style`). Images served through **proxy URLs** (internal endpoint never exposed). Media tables are per-tenant (not Apartment-excluded) |
+| File storage | `config/storage.yml`, `config/deploy.yml`, `bin/cli-files/storage-cmd/storage_service.rb` | Active Storage; dev/test = Disk, prod = the **shared host-wide SeaweedFS S3** gateway (also used by sibling apps) via move's own `move` bucket (`STORAGE_ENDPOINT=http://seaweedfs:8333`, `force_path_style`). Local `bin/cli storage start` exposes the SeaweedFS Web UI at `https://storage.workeverywhere.docker` (filer `:8888`) and the app bucket at `https://bucket.workeverywhere.docker` (S3 `:8333` with `/move` prefixed). Images served through **proxy URLs** (internal endpoint never exposed). Media tables are per-tenant (not Apartment-excluded) |
 | Background jobs | `config/queue.yml`, `app/jobs/*` | Solid Queue: async (dev), `:inline` (test), in-Puma (prod, `SOLID_QUEUE_IN_PUMA`). Jobs restore the Apartment tenant from args (`Current` is never carried across the enqueue boundary) |
 | Recognition | `app/services/recognition_providers/*` | Provider-agnostic adapter interface (`fake`/`openai`/`anthropic` via `RECOGNITION_PROVIDER`); normalized `label/confidence/count` only — no raw vendor data or bounding boxes. Vendor adapters POST via shared `provider_http.rb`, which raises on non-2xx so a rate-limited/unauthorized call fails the run loudly instead of a phantom empty `succeeded`. Enabling openai in prod: [`ai-providers.md`](ai-providers.md) |
 | Deterministic dump | `config/initializers/structure_sql.rb` | exclude tenant schemas + normalize search_path |
@@ -209,6 +209,18 @@ admin. New-user email invitations are deferred.
 | Deploy CI | `.github/workflows/deploy.yml` | Kamal on push to `main`; `workflow_dispatch` recovery lever |
 | Skip-marker guard | `.git-hooks/commit_msg/forbid_skip_markers.rb` | rejects `[skip ci]` / `skip-checks: true` |
 | Edge/TLS | Cloudflare Tunnel + `cloudflared` (origin) | `/etc/cloudflared/config.yml` → `http://ORIGIN_IP:80` |
+
+Local storage routing intentionally keeps the admin UI and bucket surface on
+different hosts:
+
+```mermaid
+flowchart LR
+  B["Browser"] -->|"https://storage.workeverywhere.docker"| T["Traefik websecure"]
+  B -->|"https://bucket.workeverywhere.docker/&lt;key&gt;"| T
+  T -->|"move-seaweedfs-web"| UI["SeaweedFS filer Web UI<br/>:8888"]
+  T -->|"move-bucket + addPrefix /move"| S3["SeaweedFS S3 gateway<br/>:8333"]
+  S3 --> V["move bucket"]
+```
 
 ---
 
@@ -271,10 +283,23 @@ reuses the existing two layers, then a third credential resolves the Move:
    `last_used_at`, and builds a per-request `MCP::Server` whose `server_context`
    is `{ move:, token:, actor: token.created_by }`.
 
-The eight tools (`list_boxes`, `get_box_contents`, `search_items`,
-`add_item_to_box`, `add_media_to_box`, `move_item`, `mark_unpacked`,
-`get_volume_summary`) are thin wrappers over the **same `app/actions`** the web UI
-calls — so MCP cannot bypass authorization, validation, audit, or tenant scoping.
+The tools (`list_boxes`, `get_box_contents`, `search_items`,
+`add_item_to_box`, `create_media_upload`, `add_media_to_box`, `move_item`,
+`mark_unpacked`, `get_volume_summary`) are thin wrappers over the **same
+`app/actions`** the web UI calls — so MCP cannot bypass authorization,
+validation, audit, or tenant scoping.
+
+**Image upload is app-proxied streaming, not base64** (#110): `create_media_upload`
+returns an app-hosted upload URL (size-capped); the client **POSTs the raw bytes
+to `POST /mcp/uploads`** (`McpUploadsController`, same Bearer auth), which streams
+them into an Active Storage blob and returns a **Move-scoped `signed_id`**
+(`Captures::Create.signed_id_purpose`, tenant+move — blobs are shared in `public`);
+then `add_media_to_box` attaches by `signed_id` through `Captures::Create`, which
+sniffs the bytes (never the client-declared type) and transcodes non-JPEG/PNG/WEBP
+to JPEG. Bytes never transit the JSON-RPC body / are not base64. It's app-proxied
+(not a presigned S3 URL) because the SeaweedFS gateway is internal-only — not
+client-reachable. Abandoned (never-attached) blobs are reclaimed daily by
+`PurgeAbandonedUploadsJob`. `/mcp` rate-limiting is tracked in #134.
 Every record is loaded through the token's `move` association, so a token can
 never reach another Move or Organization. Mutating tools emit `mcp.tool_called`;
 `MoveMcp::AuditSubscriber` records token lifecycle (`integration_token.*`) and

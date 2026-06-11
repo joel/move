@@ -16,6 +16,7 @@ module MoveMcp
         # --- server_context accessors (a plain Hash, delegated by ServerContext) ---
         def move(context)  = context[:move]
         def token(context) = context[:token]
+        def base_url(context) = context[:base_url]
         # Attribute MCP mutations to the token's owning user for the domain events
         # (Technical Foundation §14.1 step 4); the mcp.* audit names the token.
         def actor(context) = context[:token]&.created_by
@@ -41,9 +42,15 @@ module MoveMcp
         # Failure(:move_archived)), so MCP mutating tools no longer pre-check — the
         # action's failure flows through here with a friendly message.
         def failure_response(failure)
-          return error_response("This move is archived and is read-only.") if failure == :move_archived
-
-          error_response("Action failed: #{failure}")
+          message = {
+            move_archived: "This move is archived and is read-only.",
+            not_capturable: "That box is sealed — unseal it before adding media.",
+            no_file: "No upload was provided.",
+            invalid_upload: "The upload could not be found — presign and PUT the bytes first.",
+            image_too_large: "Image is too large (max #{Media::MAX_IMAGE_BYTES_LABEL}).",
+            unsupported_image: "That file isn't a supported image (use JPEG, PNG, WEBP, HEIC, or TIFF)."
+          }[failure]
+          error_response(message || "Action failed: #{failure}")
         end
 
         # --- lookups (Move-scoped; nil → caller returns error_response) ---

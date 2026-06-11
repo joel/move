@@ -13,19 +13,22 @@ module MoveMcp
       Tools::GetBoxContents,
       Tools::SearchItems,
       Tools::AddItemToBox,
+      Tools::CreateMediaUpload,
       Tools::AddMediaToBox,
       Tools::MoveItem,
       Tools::MarkUnpacked,
       Tools::GetVolumeSummary
     ].freeze
 
-    def self.build(token:)
+    # base_url (the request's scheme+host) lets create_media_upload return an
+    # absolute, client-reachable upload URL on the app's public host.
+    def self.build(token:, base_url: nil)
       MCP::Server.new(
         name: "move",
         version: "1.0",
         instructions: "Tools to inspect and update a single Move's boxes and items.",
         tools: TOOLS,
-        server_context: { move: token.move, token: token, actor: token.created_by }
+        server_context: { move: token.move, token: token, actor: token.created_by, base_url: base_url }
       )
     end
   end

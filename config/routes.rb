@@ -6,6 +6,9 @@ Rails.application.routes.draw do
   # by the Apartment elevator) and authenticated by a per-Move Bearer integration
   # token, not a session. JSON-RPC over a single POST (no SSE session state).
   post "mcp", to: "mcp#handle"
+  # MCP Direct Upload (#110): the client POSTs raw image bytes here (app-proxied
+  # to storage, since SeaweedFS is internal-only); returns a Move-scoped signed_id.
+  post "mcp/uploads", to: "mcp_uploads#create"
   # A1 — Create / select Move (entry screen on an Organization subdomain).
   # A2 — Boxes Home: the box list/grid is the hub of a Move.
   resources :moves, only: %i[index new create] do
