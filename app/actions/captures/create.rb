@@ -18,10 +18,14 @@ module Captures
     # Active Storage signed_ids are signed with the global secret and ActiveStorage::Blob
     # lives in the shared `public` schema (Apartment-excluded), so a bare signed_id is
     # valid across every Organization/Move. Bind direct-upload ids to the Move via a
-    # Move-scoped purpose: create_media_upload mints with this purpose and the attach
-    # verifies with it, so a token can only attach a blob reserved for its own Move.
+    # purpose: create_media_upload mints with it and the attach verifies with it, so a
+    # token can only attach a blob reserved for its own Move.
+    #
+    # move.id is a UUID (globally unique), but the tenant schema is included too so the
+    # binding stays correct even if Move PKs ever became per-tenant integers — a
+    # signed_id from one Organization can never verify under another's.
     def self.signed_id_purpose(move)
-      "mcp_media_upload/#{move.id}"
+      "mcp_media_upload/#{Apartment::Tenant.current}/#{move.id}"
     end
 
     def call(box:, captured_by:, file: nil, signed_id: nil, captured_via: "web")
