@@ -68,6 +68,7 @@ class CapturesController < MoveScopedController
     when :no_file then t("captures.errors.no_file")
     when :not_capturable then t("captures.sealed")
     when :unsupported_image then t("captures.errors.unsupported_image")
+    when :image_too_large then t("captures.errors.image_too_large", max: Media::MAX_IMAGE_BYTES_LABEL)
     # Surface validation messages (e.g. an unsupported image format) so the user
     # gets actionable guidance instead of the generic "try again" fallback.
     when ActiveModel::Errors then reason.full_messages.to_sentence.presence || t("captures.errors.failed")

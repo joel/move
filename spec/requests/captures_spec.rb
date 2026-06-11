@@ -61,6 +61,17 @@ RSpec.describe "Captures" do
       expect(box.media.last.image.content_type).to eq("image/jpeg")
     end
 
+    it "rejects an oversized upload with a clear message" do
+      stub_const("Media::MAX_IMAGE_BYTES", 5)
+      expect do
+        post move_box_capture_path(move, box), params: { file: upload }
+      end.not_to change(box.media, :count)
+
+      expect(response).to redirect_to(move_box_capture_path(move, box))
+      follow_redirect!
+      expect(response.body).to include("too large")
+    end
+
     it "rejects an unsupported image (SVG) with an actionable, specific message" do
       expect do
         post move_box_capture_path(move, box), params: { file: upload("sample.svg", "image/svg+xml") }

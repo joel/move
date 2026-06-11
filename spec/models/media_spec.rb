@@ -45,6 +45,13 @@ RSpec.describe Media do
     expect(media.errors.where(:image, :not_an_image)).to be_present
   end
 
+  it "rejects an image over the size limit (storage backstop)" do
+    stub_const("Media::MAX_IMAGE_BYTES", 5)
+    media = build(:media) # factory attaches a real PNG > 5 bytes
+    expect(media).not_to be_valid
+    expect(media.errors.where(:image, :too_large)).to be_present
+  end
+
   describe "#recognition_state" do
     it "reflects the latest run's status" do
       media = create(:media)

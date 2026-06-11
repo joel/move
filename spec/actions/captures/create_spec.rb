@@ -47,4 +47,13 @@ RSpec.describe Captures::Create do
     expect(result).to be_success
     expect(result.value!.image.content_type).to eq("image/jpeg")
   end
+
+  it "rejects an upload larger than the size limit" do
+    stub_const("Media::MAX_IMAGE_BYTES", 5)
+    result = described_class.new.call(box:, file: upload, captured_by: user)
+
+    expect(result).to be_failure
+    expect(result.failure).to eq(:image_too_large)
+    expect(box.media.count).to eq(0)
+  end
 end

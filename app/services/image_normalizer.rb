@@ -39,11 +39,13 @@ class ImageNormalizer
   JPEG_QUALITY = 88
 
   class UnsupportedFormat < StandardError; end
+  class ImageTooLarge < StandardError; end
 
   # @param attachable [ActionDispatch::Http::UploadedFile, Rack::Test::UploadedFile,
   #   Hash] the upload (an UploadedFile, or the {io:, filename:, content_type:}
   #   attachable hash the MCP tool builds).
   # @return the original attachable (native) or a JPEG attachable hash (transcoded).
+  # @raise [ImageTooLarge] when the upload exceeds Media::MAX_IMAGE_BYTES.
   # @raise [UnsupportedFormat] for non-image / vector / undecodable input.
   def self.call(attachable) = new(attachable).call
 
@@ -52,6 +54,10 @@ class ImageNormalizer
   end
 
   def call
+    # Reject oversized uploads from their reported size BEFORE reading the bytes
+    # into memory or handing them to libvips (a decode/re-encode in the request).
+    raise ImageTooLarge if reported_byte_size > Media::MAX_IMAGE_BYTES
+
     # Detect from the CONTENT (magic) only — never the client-supplied type or
     # filename. The MCP add_media tool defaults content_type to "image/jpeg" and
     # filename to "capture.jpg", so trusting either would let a HEIC upload pass
@@ -89,6 +95,12 @@ class ImageNormalizer
         @attachable.rewind if @attachable.respond_to?(:rewind)
         @attachable.read.tap { @attachable.rewind if @attachable.respond_to?(:rewind) }
       end
+  end
+
+  # Size from the IO's own metadata (UploadedFile#size / StringIO#size) — no read.
+  def reported_byte_size
+    io = @attachable.is_a?(Hash) ? @attachable[:io] : @attachable
+    io.respond_to?(:size) ? io.size.to_i : bytes.bytesize
   end
 
   # Only used to name the transcoded output blob — never to decide the type.

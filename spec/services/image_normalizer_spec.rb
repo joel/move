@@ -57,6 +57,12 @@ RSpec.describe ImageNormalizer do
     end
   end
 
+  it "raises ImageTooLarge for an upload over the size limit (before reading/transcoding)" do
+    stub_const("Media::MAX_IMAGE_BYTES", 5) # any real fixture exceeds 5 bytes
+    expect { described_class.call(upload("sample_image.png", "image/png")) }
+      .to raise_error(described_class::ImageTooLarge)
+  end
+
   it "raises UnsupportedFormat for a vector/non-raster image (SVG)" do
     expect { described_class.call(upload("sample.svg", "image/svg+xml")) }
       .to raise_error(described_class::UnsupportedFormat)
