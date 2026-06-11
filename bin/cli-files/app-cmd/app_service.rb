@@ -200,6 +200,12 @@ module AppCLI
           "--env RAILS_ALLOW_ALL_HOSTS=true"
         ]
 
+        # docker run --env-file fails if the file is absent (e.g. a checkout that
+        # hasn't run bin/setup), so only pass it when it exists. Use an absolute
+        # path so the check and the flag agree regardless of bin/cli's CWD.
+        env_file = File.join(AppCLI::ROOT, ".env.#{env_config.env}")
+        flags << "--env-file #{env_file}" if File.exist?(env_file)
+
         flags << "--env BUNDLE_WITHOUT=production" if env_config.short == "dev"
 
         if env_config.mysql? || env_config.postgresql?
