@@ -349,9 +349,18 @@ Practical notes:
   just elapsed time.
 - **Codex can be slow or fail to auto-trigger** — it usually posts within ~1–5 min,
   but occasionally nothing appears for 10–15 min (or the auto-trigger never fires).
-  If CI is green and there's still no Codex activity after ~10 min, post one
-  `@codex review` (spaced, not spammed) and keep polling. Don't merge on "green +
-  silent Codex" when the user's gate is "Codex clean" — wait for the actual verdict.
+  In practice the auto-trigger is **unreliable enough to bake a nudge into the poll**:
+  if there's no Codex activity ~5 min after a push, post one `@codex review` (spaced,
+  not spammed) and keep polling. Don't merge on "green + silent Codex" when the user's
+  gate is "Codex clean" — wait for the actual verdict.
+- **Codex re-anchors ALREADY-RESOLVED inline comments to the new HEAD** on each
+  re-review, so a naive "inline comments where `commit_id == HEAD`" filter resurfaces
+  resolved findings as if they were new — every round. Dedupe by comment **`id`** and
+  cross-check the review **thread `isResolved`** (the GraphQL `reviewThreads` query):
+  a finding is new only if its id is unseen AND its thread is unresolved. A non-zero
+  `inline_on_head` with `unresolved_count == 0` means "all re-anchored, nothing new" —
+  safe to merge. (Bit me on every PR this session; treat `commit_id == HEAD` as "maybe
+  shown again," never as "new.")
 - **Background-poll the verdict, don't hand-loop** — when waiting on Codex, run a
   background poll that watches for *both* a formal review on HEAD (findings) *and*
   the clean issue-comment, with a generous deadline; re-trigger + re-poll if it
