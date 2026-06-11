@@ -28,7 +28,18 @@ module MoveMcp
         return failure_response(:move_archived) if move(server_context).archived?
         return error_response("Image is too large (max #{Media::MAX_IMAGE_BYTES_LABEL}).") if byte_size.to_i > Media::MAX_IMAGE_BYTES
 
-        data_response(url: "#{base_url(server_context)}/mcp/uploads", method: "POST")
+        data_response(
+          url: "#{base_url(server_context)}/mcp/uploads",
+          method: "POST",
+          # Only literally-usable headers here — never a placeholder a client might
+          # send verbatim. The auth requirement is described in `instructions`
+          # (the token value can't be templated).
+          headers: { "Content-Type" => "application/octet-stream" },
+          instructions: "POST the raw image bytes as the request body to `url`, sending the SAME " \
+                        "`Authorization: Bearer <token>` header as this MCP session, plus the Content-Type " \
+                        "above. Optionally add ?filename=. The JSON response contains a signed_id — pass it " \
+                        "to add_media_to_box."
+        )
       end
     end
   end

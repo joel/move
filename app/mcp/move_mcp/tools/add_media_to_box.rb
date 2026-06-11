@@ -14,7 +14,7 @@ module MoveMcp
       input_schema(
         properties: {
           box_number: { type: "integer", description: "The box number to attach the image to." },
-          signed_id: { type: "string", description: "The signed_id returned by create_media_upload (after the PUT)." }
+          signed_id: { type: "string", description: "The signed_id from the create_media_upload upload response (after POSTing the bytes)." }
         },
         required: %w[box_number signed_id]
       )
