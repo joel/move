@@ -35,6 +35,18 @@ RSpec.describe ImageNormalizer do
     expect(described_class.call(file)).to be(file)
   end
 
+  it "ignores the MCP default type/filename (image/jpeg + capture.jpg) and transcodes by content" do
+    # The MCP add_media tool defaults a HEIC upload to content_type image/jpeg +
+    # filename capture.jpg; the decision must come from the bytes, not that.
+    bytes = fixture("sample.tiff").binread
+    attachable = { io: StringIO.new(bytes), filename: "capture.jpg", content_type: "image/jpeg" }
+
+    result = described_class.call(attachable)
+
+    expect(result).not_to be(attachable)         # NOT passed through as a "native jpeg"
+    expect(jpeg?(result[:io].read)).to be(true)  # actually transcoded to real JPEG
+  end
+
   it "raises UnsupportedFormat for a vector/non-raster image (SVG)" do
     expect { described_class.call(upload("sample.svg", "image/svg+xml")) }
       .to raise_error(described_class::UnsupportedFormat)

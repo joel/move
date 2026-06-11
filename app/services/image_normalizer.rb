@@ -1,8 +1,12 @@
 # frozen_string_literal: true
 
 require "marcel"
-require "vips"
 require "stringio"
+
+# NB: ruby-vips (`require "vips"`) is loaded lazily inside #transcode, not here —
+# it dlopens libvips at require time, and only the transcode path actually needs
+# it. Requiring it at load would make boot/eager-load fail anywhere libvips is
+# absent (e.g. the bare CI runner) even for the PNG/JPEG/WEBP pass-through path.
 
 # Normalizes an uploaded image to a format the browser AND the recognition
 # vision providers can both handle. Captures accept photos from a file input or
@@ -42,7 +46,11 @@ class ImageNormalizer
   end
 
   def call
-    type = Marcel::MimeType.for(StringIO.new(bytes), name: filename, declared_type: declared_type)
+    # Detect from the CONTENT (magic) only — never the client-supplied type or
+    # filename. The MCP add_media tool defaults content_type to "image/jpeg" and
+    # filename to "capture.jpg", so trusting either would let a HEIC upload pass
+    # as an already-safe JPEG and get stored unconverted.
+    type = Marcel::MimeType.for(StringIO.new(bytes))
     return @attachable if NATIVE.include?(type)
     return transcode(type) if TRANSCODABLE.include?(type)
 
@@ -52,6 +60,7 @@ class ImageNormalizer
   private
 
   def transcode(type)
+    require "vips"
     # access: :sequential keeps memory flat for large photos; first frame only
     # for animated GIF/HEIF; autorot bakes EXIF orientation; strip drops metadata.
     jpeg = Vips::Image.new_from_buffer(bytes, "", access: :sequential)
@@ -76,16 +85,11 @@ class ImageNormalizer
       end
   end
 
+  # Only used to name the transcoded output blob — never to decide the type.
   def filename
     if @attachable.is_a?(Hash) then @attachable[:filename].to_s
     elsif @attachable.respond_to?(:original_filename) then @attachable.original_filename.to_s
     else "upload"
-    end
-  end
-
-  def declared_type
-    if @attachable.is_a?(Hash) then @attachable[:content_type]
-    elsif @attachable.respond_to?(:content_type) then @attachable.content_type
     end
   end
 end
