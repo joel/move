@@ -31,13 +31,14 @@ module MoveMcp
         data_response(
           url: "#{base_url(server_context)}/mcp/uploads",
           method: "POST",
-          headers: {
-            "Authorization" => "Bearer <your MCP integration token>",
-            "Content-Type" => "application/octet-stream"
-          },
-          instructions: "POST the raw image bytes as the request body to `url` with these headers " \
-                        "(reuse the same Bearer token as this MCP session; optionally add ?filename=). " \
-                        "The JSON response contains a signed_id — pass it to add_media_to_box."
+          # Only literally-usable headers here — never a placeholder a client might
+          # send verbatim. The auth requirement is described in `instructions`
+          # (the token value can't be templated).
+          headers: { "Content-Type" => "application/octet-stream" },
+          instructions: "POST the raw image bytes as the request body to `url`, sending the SAME " \
+                        "`Authorization: Bearer <token>` header as this MCP session, plus the Content-Type " \
+                        "above. Optionally add ?filename=. The JSON response contains a signed_id — pass it " \
+                        "to add_media_to_box."
         )
       end
     end

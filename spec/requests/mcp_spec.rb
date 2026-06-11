@@ -236,8 +236,9 @@ RSpec.describe "MCP endpoint" do
 
         expect(data["url"]).to end_with("/mcp/uploads")
         expect(data["method"]).to eq("POST")
-        expect(data.dig("headers", "Authorization")).to include("Bearer")
-        expect(data["instructions"]).to match(/raw image bytes/i)
+        # Only literally-usable headers (no placeholder auth a client might send verbatim).
+        expect(data["headers"]).to eq("Content-Type" => "application/octet-stream")
+        expect(data["instructions"]).to include("Authorization: Bearer")
       end
 
       it "rejects an oversized declared size up front" do
