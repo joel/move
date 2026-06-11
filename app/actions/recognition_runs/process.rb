@@ -12,6 +12,16 @@ module RecognitionRuns
       # archived Move is read-only, so don't process or persist anything. The run
       # is left `queued` (never enters `processing`) and the job no-ops. Plain
       # return (not `yield`) so the guard can't be swallowed by the rescue below.
+      #
+      # #120 decision (Option A): the run is intentionally left non-terminal
+      # rather than written to `failed`/`cancelled` — the strictest read-only
+      # behaviour is zero writes to a read-only Move. A lingering `queued` run is
+      # invisible today (the capture surface is behind require_writable_move!, and
+      # a run is not an Item so it never inflates pending-review counts), and there
+      # is no Move-archive action in the app (archiving happens only via seeds /
+      # console). If/when a `Moves::Archive` action is added, it should cancel
+      # in-flight runs to a terminal state there — i.e. during the transition,
+      # while the Move is still writable — which is the clean home for Option B.
       guard = ensure_writable(run.move)
       return guard if guard.failure?
 
