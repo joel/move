@@ -89,8 +89,10 @@ RSpec.describe RecognitionRuns::Process do
 
       expect(result).to be_failure
       expect(result.failure).to eq(:move_archived)
-      # Left queued (never entered processing); nothing persisted.
+      # #120 (Option A): the run is intentionally left non-terminal — zero writes
+      # to a read-only Move — rather than transitioned to failed/cancelled.
       expect(run.reload.status).to eq("queued")
+      expect(run).not_to be_terminal
       expect(box.items).to be_empty
       expect(run.recognition_suggestions).to be_empty
     end

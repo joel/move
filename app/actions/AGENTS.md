@@ -79,6 +79,13 @@ end
   is read-only" — every caller (web, MCP, jobs) inherits it; controllers map the
   failure to a friendly redirect, MCP tools to a read-only tool error. Read-only
   actions (and token revoke) are not guarded.
+  - **In-flight recognition on archive (#120, Option A):** because the guard
+    writes *nothing* to a read-only Move, a recognition run queued before the
+    Move was archived is left non-terminal (`queued`) rather than transitioned to
+    a terminal state. This is intentional (zero writes on read-only) and
+    invisible today (no archive UI; capture surface is gated by
+    `require_writable_move!`). A future `Moves::Archive` action should cancel
+    in-flight runs during the transition (while still writable).
 - **Tests**: actions are plain Ruby — unit-test them directly with `.new.call(...)`
   and assert on `Success`/`Failure`.
 
