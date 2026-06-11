@@ -19,7 +19,8 @@ WORKDIR /rails
 # pg_dump the PostgreSQL 18 server, which both schema_format :sql and Apartment's
 # use_sql tenant cloning rely on.
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y curl ca-certificates libjemalloc2 libvips && \
+    apt-get install --no-install-recommends -y curl ca-certificates libjemalloc2 libvips \
+      libheif-plugin-libde265 libheif-plugin-dav1d && \
     install -d /usr/share/postgresql-common/pgdg && \
     curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
       -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc && \
