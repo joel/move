@@ -33,6 +33,8 @@ module Captures
       media.image.attach(file)
       media.save!
       Success(media)
+    rescue ImageNormalizer::ImageTooLarge
+      Failure(:image_too_large)
     rescue ImageNormalizer::UnsupportedFormat
       Failure(:unsupported_image)
     rescue ActiveRecord::RecordInvalid => e

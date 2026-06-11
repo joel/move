@@ -85,6 +85,10 @@ capture and the MCP `add_media` tool). The type is **sniffed from the bytes**
 - **Anything else** (SVG/vector, PDF, or a file that won't decode) — rejected
   with an actionable message; no recognition run is created.
 
+Uploads over **`Media::MAX_IMAGE_BYTES` (25 MB)** are rejected up front by their
+reported size, before the bytes are read into memory or transcoded (a phone
+photo is a few MB); `Media` re-checks the stored blob's size as a backstop.
+
 This keeps every stored blob renderable in-browser (the display surfaces serve
 the original blob straight to `<img>`) and readable by the vision providers.
 `Media::SUPPORTED_IMAGE_TYPES` (PNG/JPEG/WEBP) remains as a storage backstop.

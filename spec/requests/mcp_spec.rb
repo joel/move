@@ -225,6 +225,25 @@ RSpec.describe "MCP endpoint" do
       expect(media).to be_present
       expect(media.captured_via).to eq("mcp")
     end
+
+    it "rejects an oversized base64 image before decoding it" do
+      stub_const("Media::MAX_IMAGE_BYTES", 5) # png_base64 estimates well over 5 bytes
+      box = create(:box, move:, number: 9, status: "packing")
+
+      body = tool_call("add_media_to_box", { box_number: 9, image_base64: png_base64, filename: "a.png" })
+
+      expect(box.media.count).to eq(0)
+      expect(body.to_json).to match(/too large/i)
+    end
+
+    it "accepts a payload whose decoded size is exactly the limit (padding-aware)" do
+      stub_const("Media::MAX_IMAGE_BYTES", Base64.strict_decode64(png_base64).bytesize)
+      box = create(:box, move:, number: 9, status: "packing")
+
+      tool_call("add_media_to_box", { box_number: 9, image_base64: png_base64, filename: "a.png" })
+
+      expect(box.media.count).to eq(1)
+    end
   end
 
   describe "get_volume_summary" do

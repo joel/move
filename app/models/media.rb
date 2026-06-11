@@ -13,6 +13,12 @@ class Media < ApplicationRecord
   # rejected), so by the time a blob reaches here it is already one of these.
   SUPPORTED_IMAGE_TYPES = %w[image/jpeg image/png image/webp].freeze
 
+  # Upper bound on a capture image. Enforced up front by ImageNormalizer (before
+  # the upload is read into memory / transcoded) and re-checked here as a
+  # storage backstop. A phone photo is a few MB; 25 MB is generous headroom.
+  MAX_IMAGE_BYTES = 25 * 1024 * 1024
+  MAX_IMAGE_BYTES_LABEL = ActiveSupport::NumberHelper.number_to_human_size(MAX_IMAGE_BYTES)
+
   belongs_to :move
   belongs_to :box
   has_many :recognition_runs, dependent: :destroy
@@ -24,6 +30,7 @@ class Media < ApplicationRecord
   validates :captured_at, presence: true
   validates :image, presence: true
   validate :image_must_be_an_image
+  validate :image_within_size_limit
 
   def image_must_be_an_image
     return unless image.attached?
@@ -36,6 +43,14 @@ class Media < ApplicationRecord
     else
       errors.add(:image, :not_an_image)
     end
+  end
+
+  # Backstop for the up-front ImageNormalizer size check.
+  def image_within_size_limit
+    return unless image.attached?
+    return if image.blob.byte_size <= MAX_IMAGE_BYTES
+
+    errors.add(:image, :too_large, max: MAX_IMAGE_BYTES_LABEL)
   end
 
   # "JPEG, PNG, WEBP, GIF" — for the user-facing rejection message.
