@@ -197,9 +197,13 @@ module AppCLI
           "--env RAILS_ENV=#{env_config.env}",
           "--env RAILS_LOG_TO_STDOUT=true",
           "--env RAILS_SERVE_STATIC_FILES=true",
-          "--env RAILS_ALLOW_ALL_HOSTS=true",
-          "--env-file .env.#{env_config.env}"
+          "--env RAILS_ALLOW_ALL_HOSTS=true"
         ]
+
+        # docker run --env-file fails if the file is absent (e.g. a checkout that
+        # hasn't run bin/setup), so only pass it when it exists.
+        env_file = ".env.#{env_config.env}"
+        flags << "--env-file #{env_file}" if File.exist?(File.join(AppCLI::ROOT, env_file))
 
         flags << "--env BUNDLE_WITHOUT=production" if env_config.short == "dev"
 
