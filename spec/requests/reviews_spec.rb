@@ -99,6 +99,20 @@ RSpec.describe "Per-photo review" do
       expect(item.reload.presence_state).to eq("removed")
       expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
     end
+
+    it "keeps an emptied photo in the walk so later photos can't be skipped" do
+      only_item = detected(name: "Lone detection")
+      later = create(:media, move:, box:, captured_at: 1.hour.from_now)
+      create(:item, move:, box:, source_media: later, name: "Sofa", review_state: "pending_review")
+
+      patch move_box_review_remove_item_path(move, box, media, only_item)
+      follow_redirect!
+
+      # Back on the now-empty photo 1, still "Photo 1 of 2" with Next → the later
+      # photo (not a premature "Finish").
+      expect(response.body).to include(I18n.t("reviews.photo.progress", position: 1, total: 2))
+      expect(response.body).to include(move_box_review_photo_path(move, box, later))
+    end
   end
 
   describe "POST .../items (add a missed item)" do

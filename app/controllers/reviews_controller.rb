@@ -66,13 +66,15 @@ class ReviewsController < MoveScopedController
 
   private
 
-  # All photos in this box that have at least one in-box item, in capture order —
-  # the stable walk for position / total / next. (Stays all-photos: opening a
-  # photo confirms its items via "reviewed-when-shown", so a set filtered to
-  # unresolved would drop the photo you're currently on.)
+  # Every photo in this box that ever produced an item (in-box OR removed), in
+  # capture order — the stable walk for position / total / next. It deliberately
+  # does NOT filter on in_box: removing the last detection from the current photo
+  # must not drop it from the walk (that would make `next_after` return nil and
+  # let the reviewer skip the remaining photos via "Finish"). The per-photo list
+  # itself is still in-box only (see `photo_items`).
   def review_media
     @review_media ||= begin
-      ids = @box.items.in_box.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
+      ids = @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
       @box.media.where(id: ids).order(:captured_at, :created_at).to_a
     end
   end
