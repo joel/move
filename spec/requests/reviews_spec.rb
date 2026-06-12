@@ -26,6 +26,17 @@ RSpec.describe "Per-photo review" do
       expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
     end
 
+    it "resumes at the first photo that still has unreviewed items" do
+      done = create(:media, move:, box:, captured_at: 2.hours.ago)
+      create(:item, move:, box:, source_media: done, name: "Sofa", review_state: "confirmed")
+      pending_photo = media # captured now (after `done`)
+      detected(name: "Lamp")
+
+      get move_box_review_path(move, box)
+
+      expect(response).to redirect_to(move_box_review_photo_path(move, box, pending_photo))
+    end
+
     it "redirects back to the box when there is nothing to review" do
       get move_box_review_path(move, box)
 

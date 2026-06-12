@@ -13,9 +13,11 @@ class ReviewsController < MoveScopedController
   before_action :require_writable_move!, only: %i[rename_item remove_item add_item]
 
   # GET /moves/:move_id/boxes/:box_id/review
-  # Enter the walk at the first photo that still has items to review.
+  # Enter at the first photo that still has *unreviewed* items (resuming a
+  # partially-reviewed box must not land on an already-confirmed photo); fall
+  # back to the first photo, then to the box when there's nothing at all.
   def index
-    media = review_media.first
+    media = first_unreviewed_media || review_media.first
     return redirect_to(move_box_path(@move, @box), notice: t("reviews.flash.nothing")) unless media
 
     redirect_to move_box_review_photo_path(@move, @box, media)
@@ -64,13 +66,25 @@ class ReviewsController < MoveScopedController
 
   private
 
-  # Photos in this box that still have at least one in-box item to review, in
-  # capture order — the stable walk for position / total / next.
+  # All photos in this box that have at least one in-box item, in capture order —
+  # the stable walk for position / total / next. (Stays all-photos: opening a
+  # photo confirms its items via "reviewed-when-shown", so a set filtered to
+  # unresolved would drop the photo you're currently on.)
   def review_media
     @review_media ||= begin
       ids = @box.items.in_box.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
       @box.media.where(id: ids).order(:captured_at, :created_at).to_a
     end
+  end
+
+  # The first photo (in walk order) that still holds an unreviewed item — where
+  # the entry should drop the user when resuming a partially-reviewed box.
+  def first_unreviewed_media
+    ids = @box.items.in_box.where(review_state: %w[pending_review needs_correction])
+              .where.not(source_media_id: nil).distinct.pluck(:source_media_id)
+    return nil if ids.empty?
+
+    review_media.find { |m| ids.include?(m.id) }
   end
 
   # Every in-box item detected in (or hand-added to) this photo, in detection
