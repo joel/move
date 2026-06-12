@@ -137,32 +137,70 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     end
   end
 
-  # A captured photo + a completed recognition run on box 1, with the auto-confirm
-  # vs pending-review item split (Coffee maker/Books auto, Mugs pending). Records
-  # are seeded directly (not via the live pipeline) so db:seed is deterministic.
+  # Box 1 is the review showcase: several photos, each with a handful of detections
+  # spanning the confidence bands and review states, so the per-photo review walk
+  # (PHOTO X OF Y → "Next Photo" → "Finish review") is demoable end to end — edit a
+  # name inline, remove a wrong detection, add a missed item, page to the next
+  # photo. Records are seeded directly (not via the live pipeline) so db:seed stays
+  # deterministic. (Conflict detections aren't surfaced by the per-photo UI; their
+  # seeding returns once #145 settles conflict handling in the new model.)
+  #
+  # [name, confidence 0-1, review_state] per photo, ordered as the walk visits them.
+  review_photos = {
+    "Kitchen counter" => [
+      ["Coffee maker", 0.97, "auto_confirmed"],
+      ["Stack of books", 0.88, "auto_confirmed"],
+      ["Set of mugs", 0.62, "pending_review"],
+      ["Table lamp", 0.55, "pending_review"],
+      ["Picture frame", 0.41, "pending_review"]
+    ],
+    "Open shelving" => [
+      ["Throw blanket", 0.68, "pending_review"],
+      ["Decorative vase", 0.47, "pending_review"],
+      ["Wall art", 0.53, "pending_review"],
+      ["Bookshelf", 0.44, "pending_review"],
+      ["Magazines", 0.58, "needs_correction"]
+    ],
+    "Floor corner" => [
+      ["Area rug", 0.58, "pending_review"],
+      ["Floor lamp", 0.62, "pending_review"],
+      ["Coffee table", 0.52, "pending_review"],
+      ["Floor vase", 0.51, "pending_review"],
+      ["Wall clock", 0.54, "pending_review"]
+    ]
+  }
+
   demo_box = move.boxes.find_by(number: "1")
   if demo_box&.media&.none?
-    media = demo_box.media.new(move: move, media_type: "image", captured_via: "web", captured_at: Time.current)
-    media.image.attach(
-      io: Rails.public_path.join("icon.png").open, filename: "capture.png", content_type: "image/png"
-    )
-    media.save!
-    run = demo_box.recognition_runs.create!(
-      move: move, media: media, provider: "fake", provider_model: "fake-1", status: "succeeded",
-      started_at: 1.minute.ago, completed_at: Time.current,
-      metadata: { "item_count" => 3, "provider" => "fake" }
-    )
-    [["Coffee maker", 0.97, true], ["Stack of books", 0.88, true], ["Set of mugs", 0.62, false]].each do |name, conf, auto|
-      suggestion = run.recognition_suggestions.create!(
-        move: move, box: demo_box, media: media, proposed_name: name, proposed_quantity: 1,
-        confidence_score: conf, state: auto ? "auto_accepted" : "pending"
+    review_photos.each_with_index do |(label, detections), idx|
+      media = demo_box.media.new(
+        move: move, media_type: "image", captured_via: "web",
+        # Stagger capture times so the walk orders the photos as listed above.
+        captured_at: (review_photos.size - idx).minutes.ago
       )
-      item = demo_box.items.create!(
-        move: move, source_media: media, source_recognition_suggestion_id: suggestion.id, name: name,
-        quantity: 1, confidence_score: conf, created_via: "recognition",
-        review_state: auto ? "auto_confirmed" : "pending_review"
+      # Attach before save — Media validates image presence.
+      media.image.attach(
+        io: Rails.public_path.join("icon.png").open,
+        filename: "#{label.parameterize}.png", content_type: "image/png"
       )
-      suggestion.update!(item: item)
+      media.save!
+      run = demo_box.recognition_runs.create!(
+        move: move, media: media, provider: "fake", provider_model: "fake-1", status: "succeeded",
+        started_at: 1.minute.ago, completed_at: Time.current,
+        metadata: { "item_count" => detections.size, "provider" => "fake" }
+      )
+      detections.each do |name, conf, review_state|
+        suggestion = run.recognition_suggestions.create!(
+          move: move, box: demo_box, media: media, proposed_name: name, proposed_quantity: 1,
+          confidence_score: conf, state: review_state == "auto_confirmed" ? "auto_accepted" : "pending"
+        )
+        item = demo_box.items.create!(
+          move: move, source_media: media, source_recognition_suggestion_id: suggestion.id,
+          name: name, quantity: 1, confidence_score: conf, created_via: "recognition",
+          review_state: review_state
+        )
+        suggestion.update!(item: item)
+      end
     end
   end
 
@@ -234,63 +272,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     item.save!
   end
 
-  # --- D6: a review-ready box — pending suggestions across confidence bands and
-  # a conflict (confirmed item + a late detection of the same name) so the review
-  # queue (C1) and item-by-item (C2) are showcase-ready. Idempotent by name.
-  review_box = move.boxes.find_by(number: "1")
-  run = review_box&.recognition_runs&.first
-  review_media = review_box&.media&.first
-  if run && review_media
-    [
-      ["Table lamp", 0.55],
-      ["Picture frame", 0.41],
-      ["Throw blanket", 0.68],
-      ["Cast-iron skillet", 0.91],
-      ["Decorative vase", 0.47],
-      ["Wall Art", 0.53],
-      ["Floor Lamp", 0.62],
-      ["Area Rug", 0.58],
-      ["Decorative Pillow", 0.49],
-      ["Bookshelf", 0.44],
-      ["Coffee Table", 0.52],
-      ["Curtains", 0.39],
-      ["Decorative Bowl", 0.46],
-      ["Table Runner", 0.43],
-      ["Wall Mirror", 0.57],
-      ["Decorative Tray", 0.48],
-      ["Floor Vase", 0.51],
-      ["Throw Pillow", 0.45],
-      ["Decorative Lantern", 0.42],
-      ["Wall Clock", 0.54]
-    ].each do |name, conf|
-      next if review_box.recognition_suggestions.exists?(proposed_name: name)
-
-      suggestion = run.recognition_suggestions.create!(
-        move: move, box: review_box, media: review_media, proposed_name: name,
-        proposed_quantity: 1, confidence_score: conf, state: "pending"
-      )
-      item = review_box.items.create!(
-        move: move, source_media: review_media, source_recognition_suggestion_id: suggestion.id,
-        name: name, quantity: 1, confidence_score: conf, created_via: "recognition",
-        review_state: "pending_review"
-      )
-      suggestion.update!(item: item)
-    end
-
-    unless review_box.recognition_suggestions.exists?(state: "conflict")
-      confirmed = review_box.items.find_or_create_by!(name: "Cast-iron skillet") do |record|
-        record.move = move
-        record.quantity = 1
-        record.created_via = "manual"
-        record.review_state = "confirmed"
-      end
-      run.recognition_suggestions.create!(
-        move: move, box: review_box, media: review_media, item: confirmed,
-        proposed_name: "Cast-iron skillet", proposed_quantity: 1,
-        confidence_score: 0.91, state: "conflict"
-      )
-    end
-  end
+  # (D6 review items are seeded with their photos in the box-1 walk above.)
 
   # --- D9: an archived Move with a sealed box so the E2 *archived* scan state is
   # showcase-ready (read-only resolve). Scan demo: open /moves/<this move>/scan and
