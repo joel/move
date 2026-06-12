@@ -34,6 +34,10 @@ export default class extends Controller {
     this.inputTarget.removeAttribute("aria-invalid")
   }
 
+  disconnect() {
+    this.controller?.abort()
+  }
+
   save() {
     const name = this.inputTarget.value.trim()
     if (name === "" || name === this.last) {
@@ -42,10 +46,18 @@ export default class extends Controller {
     }
     const previous = this.last
 
+    // Supersede any in-flight save for this field: a rapid second edit aborts the
+    // first, so a slower/older response can't run #reject and revert a newer
+    // accepted value (#149). The latest request still uses keepalive so it
+    // survives navigating to the next photo.
+    this.controller?.abort()
+    this.controller = new AbortController()
+
     const token = document.querySelector('meta[name="csrf-token"]')?.content
     fetch(this.urlValue, {
       method: "PATCH",
       keepalive: true,
+      signal: this.controller.signal,
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
@@ -54,8 +66,9 @@ export default class extends Controller {
       body: JSON.stringify({ name }),
     })
       // Commit the new value only once the server confirms it; on a rejected
-      // name (or network error) revert to the last saved value and flag the
-      // field so the save isn't silently lost (#147).
+      // name revert to the last saved value and flag the field so the save isn't
+      // silently lost (#147). A superseded request rejects with AbortError and is
+      // ignored so it can't clobber the newer edit (#149).
       .then((response) => {
         if (response.ok) {
           this.last = name
@@ -63,7 +76,9 @@ export default class extends Controller {
           this.#reject(previous)
         }
       })
-      .catch(() => this.#reject(previous))
+      .catch((error) => {
+        if (error.name !== "AbortError") this.#reject(previous)
+      })
   }
 
   #reject(previous) {
