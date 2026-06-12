@@ -13,7 +13,8 @@ class ItemsController < MoveScopedController
   def show
     render Views::Items::Show.new(
       move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-      review_suggestion: review_suggestion, editable: editable_move?, **vocabulary
+      review_suggestion: review_suggestion, editable: editable_move?,
+      photo_siblings: photo_siblings(@item), **vocabulary
     )
   end
 
@@ -58,7 +59,8 @@ class ItemsController < MoveScopedController
       # form (not the read-only view) to show the validation errors.
       render Views::Items::Show.new(
         move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-        review_suggestion: review_suggestion, editable: true, **vocabulary
+        review_suggestion: review_suggestion, editable: true,
+        photo_siblings: photo_siblings(@item), **vocabulary
       ), status: :unprocessable_content
     end
   end
@@ -112,6 +114,15 @@ class ItemsController < MoveScopedController
     nxt = box.recognition_suggestions.unresolved.by_confidence.first
     target = nxt ? move_box_review_path(@move, box, nxt) : move_box_review_index_path(@move, box)
     redirect_to target, notice: t(".updated", name: item.name)
+  end
+
+  # How many *other* in-box items were detected in the same photo — drives the C3
+  # "detected with N other items in this photo" line so a single image reads as
+  # many items, not one. Zero for manually-added items (no source media).
+  def photo_siblings(item)
+    return 0 unless item.source_media_id
+
+    @move.items.in_box.where(source_media_id: item.source_media_id).where.not(id: item.id).count
   end
 
   # The specific suggestion being reviewed (carried through the edit), scoped to

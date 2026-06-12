@@ -62,6 +62,24 @@ RSpec.describe "Items" do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(I18n.t("items.show.title")).and include("Toaster")
     end
+
+    it "notes the other in-box items detected in the same photo" do
+      media = create(:media, move:, box:)
+      item = create(:item, move:, box:, name: "Coffee machine", source_media: media)
+      create(:item, move:, box:, name: "Kettle", source_media: media)
+
+      get move_item_path(move, item)
+
+      expect(response.body).to include(I18n.t("items.show.from_same_photo", count: 1))
+    end
+
+    it "omits the photo-siblings note for a manually-added item" do
+      item = create(:item, :manual, move:, box:, name: "Lamp")
+
+      get move_item_path(move, item)
+
+      expect(response.body).not_to include("in this photo")
+    end
   end
 
   describe "PATCH /moves/:move_id/items/:id" do

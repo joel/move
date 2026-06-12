@@ -30,6 +30,9 @@ en:
       "no": "No"
       archived: "This move is archived and is read-only."
       view_only: "You have view-only access to this move."
+      from_same_photo:
+        one: "Detected with 1 other item in this photo."
+        other: "Detected with %{count} other items in this photo."
     form:
       name: "Item name"
       name_placeholder: "e.g. Espresso Machine"
