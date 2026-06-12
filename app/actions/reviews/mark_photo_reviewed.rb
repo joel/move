@@ -39,8 +39,11 @@ module Reviews
       Failure(e.record.errors)
     end
 
+    # Scoped to the media's box — the same set the screen renders. An item that
+    # originated from this photo but was since moved to another box is no longer
+    # shown here, so it must not be confirmed out from under the reviewer.
     def pending_items(media)
-      media.move.items.where(
+      media.box.items.where(
         source_media_id: media.id, presence_state: "in_box", review_state: UNREVIEWED
       )
     end

@@ -32,6 +32,14 @@ RSpec.describe Reviews::MarkPhotoReviewed do
     expect(other.reload.review_state).to eq("pending_review")
   end
 
+  it "does not confirm an item that originated here but was moved to another box" do
+    moved = create(:item, move:, box: create(:box, move:), source_media: media, review_state: "pending_review")
+
+    described_class.new.call(media:, actor:)
+
+    expect(moved.reload.review_state).to eq("pending_review")
+  end
+
   it "leaves the linked suggestion as the AI's raw proposal (no resolution lifecycle)" do
     suggestion = create(:recognition_suggestion, :with_item, move:, box:, media:, state: "pending")
 
