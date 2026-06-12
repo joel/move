@@ -13,8 +13,7 @@ class ItemsController < MoveScopedController
   def show
     render Views::Items::Show.new(
       move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-      review_suggestion: review_suggestion, editable: editable_move?,
-      photo_siblings: photo_siblings(@item), **vocabulary
+      editable: editable_move?, photo_siblings: photo_siblings(@item), **vocabulary
     )
   end
 
@@ -49,7 +48,7 @@ class ItemsController < MoveScopedController
 
     case result
     in Dry::Monads::Success(item)
-      redirect_after_update(item)
+      redirect_to move_item_path(@move, item), notice: t(".updated", name: item.name)
     in Dry::Monads::Failure(Symbol => reason)
       redirect_to move_item_path(@move, @item), alert: vocabulary_error(reason)
     in Dry::Monads::Failure(errors)
@@ -59,8 +58,7 @@ class ItemsController < MoveScopedController
       # form (not the read-only view) to show the validation errors.
       render Views::Items::Show.new(
         move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-        review_suggestion: review_suggestion, editable: true,
-        photo_siblings: photo_siblings(@item), **vocabulary
+        editable: true, photo_siblings: photo_siblings(@item), **vocabulary
       ), status: :unprocessable_content
     end
   end
@@ -93,43 +91,13 @@ class ItemsController < MoveScopedController
 
   private
 
-  # An edit reached via review "Correct" carries review_suggestion_id; saving
-  # resolves *that* suggestion (works for conflicts too, whose linked item is the
-  # one being edited) and resumes the review at the next unresolved suggestion in
-  # its box (or the queue when none remain).
-  #
-  # Guard: only honour the review context when the carried suggestion actually
-  # belongs to the saved item. "Correct" only ever navigates to suggestion.item
-  # (see RecognitionSuggestionsController#correct), so a mismatch means a stale or
-  # crafted form trying to resolve an unrelated suggestion — fall back to a plain
-  # item-edit redirect and resolve nothing.
-  def redirect_after_update(item)
-    suggestion = review_suggestion
-    return redirect_to(move_item_path(@move, item), notice: t(".updated", name: item.name)) unless suggestion && suggestion.item_id == item.id
-
-    # Saving the edit is what resolves the suggestion (Correct only navigates here)
-    # — so an abandoned correction leaves it pending in the queue.
-    RecognitionSuggestions::Correct.new.call(suggestion:, actor: current_user) if suggestion.unresolved?
-    box = suggestion.box
-    nxt = box.recognition_suggestions.unresolved.by_confidence.first
-    target = nxt ? move_box_review_path(@move, box, nxt) : move_box_review_index_path(@move, box)
-    redirect_to target, notice: t(".updated", name: item.name)
-  end
-
   # How many *other* in-box items were detected in the same photo — drives the C3
   # "detected with N other items in this photo" line so a single image reads as
   # many items, not one. Zero for manually-added items (no source media).
   def photo_siblings(item)
-    return 0 unless item.source_media_id
+    return 0 unless item.created_via == "recognition" && item.source_media_id
 
     @move.items.in_box.where(source_media_id: item.source_media_id).where.not(id: item.id).count
-  end
-
-  # The specific suggestion being reviewed (carried through the edit), scoped to
-  # the tenant's Move. nil for an ordinary item edit (no review context).
-  def review_suggestion
-    id = params[:review_suggestion_id].presence
-    id && @move.recognition_suggestions.find_by(id:)
   end
 
   def set_box

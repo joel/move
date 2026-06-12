@@ -102,56 +102,6 @@ RSpec.describe "Items" do
       expect(response.body).to include(I18n.t("items.show.save"))
       expect(response.body).not_to include(I18n.t("items.show.view_only"))
     end
-
-    context "when editing was reached via review Correct (review_suggestion_id)" do
-      it "resolves the edited suggestion on save and resumes at the next one" do
-        editing = create(:recognition_suggestion, :with_item, move:, box:, state: "pending", confidence_score: 0.5)
-        nxt = create(:recognition_suggestion, :with_item, move:, box:, confidence_score: 0.3)
-
-        patch move_item_path(move, editing.item),
-              params: { item: { name: "Fixed" }, review_suggestion_id: editing.id }
-
-        expect(editing.reload.state).to eq("corrected")
-        expect(editing.item.review_state).to eq("confirmed")
-        expect(response).to redirect_to(move_box_review_path(move, box, nxt))
-      end
-
-      it "returns to the queue when no suggestions remain" do
-        editing = create(:recognition_suggestion, :with_item, move:, box:, state: "pending")
-
-        patch move_item_path(move, editing.item),
-              params: { item: { name: "Fixed" }, review_suggestion_id: editing.id }
-
-        expect(editing.reload.state).to eq("corrected")
-        expect(response).to redirect_to(move_box_review_index_path(move, box))
-      end
-
-      it "resolves a conflict on save even though its item points at a different suggestion" do
-        confirmed = create(:item, :confirmed, move:, box:, name: "Skillet")
-        conflict = create(:recognition_suggestion, :conflict, move:, box:, item: confirmed)
-
-        patch move_item_path(move, confirmed),
-              params: { item: { name: "Cast Skillet" }, review_suggestion_id: conflict.id }
-
-        expect(conflict.reload.state).to eq("corrected")
-        expect(response).to redirect_to(move_box_review_index_path(move, box))
-      end
-
-      it "ignores a carried suggestion that belongs to a different item (stale/crafted form)" do
-        edited = create(:item, :manual, move:, box:, name: "Lamp")
-        unrelated = create(:recognition_suggestion, :with_item, move:, box:, state: "pending")
-
-        patch move_item_path(move, edited),
-              params: { item: { name: "Desk Lamp" }, review_suggestion_id: unrelated.id }
-
-        # The unrelated suggestion (and its linked item) is left untouched…
-        expect(unrelated.reload.state).to eq("pending")
-        expect(unrelated.item.review_state).not_to eq("confirmed")
-        # …and we fall back to a plain item-edit redirect rather than the review flow.
-        expect(edited.reload.name).to eq("Desk Lamp")
-        expect(response).to redirect_to(move_item_path(move, edited))
-      end
-    end
   end
 
   describe "PATCH /moves/:move_id/items/:id/move" do

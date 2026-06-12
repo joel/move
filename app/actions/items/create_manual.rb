@@ -9,11 +9,11 @@ module Items
   class CreateManual < BaseAction
     include Items::FormResolution
 
-    def call(box:, params:, creator:)
+    def call(box:, params:, creator:, source_media: nil)
       yield ensure_writable(box.move)
       category = yield resolve_category(box.move, params[:category_id])
       tags = yield resolve_tags(box.move, params[:tag_ids])
-      item = yield persist(box, params, category, tags)
+      item = yield persist(box, params, category, tags, source_media)
       yield emit_event(item, creator)
       Success(item)
     end
@@ -21,8 +21,9 @@ module Items
     private
 
     # Item creation and tag assignment share one transaction so a validation
-    # failure leaves no half-tagged item.
-    def persist(box, params, category, tags)
+    # failure leaves no half-tagged item. `source_media` is set when the item is
+    # added during per-photo review so it joins that photo's item list.
+    def persist(box, params, category, tags, source_media)
       item = nil
       ActiveRecord::Base.transaction do
         item = box.items.create!(
@@ -31,6 +32,7 @@ module Items
           quantity: coerce_quantity(params[:quantity]),
           fragile: coerce_fragile(params[:fragile]),
           category: category,
+          source_media: source_media,
           created_via: "manual",
           review_state: "confirmed",
           presence_state: "in_box"

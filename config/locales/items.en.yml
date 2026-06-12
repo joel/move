@@ -20,7 +20,6 @@ en:
     show:
       title: "Item Details"
       back: "Back to box"
-      back_to_review: "Back to review"
       save: "Save Changes"
       move: "Move"
       remove: "Remove"
