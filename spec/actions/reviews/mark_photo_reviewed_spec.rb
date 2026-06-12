@@ -32,6 +32,15 @@ RSpec.describe Reviews::MarkPhotoReviewed do
     expect(other.reload.review_state).to eq("pending_review")
   end
 
+  it "resolves the confirmed item's linked pending suggestion to accepted" do
+    suggestion = create(:recognition_suggestion, :with_item, move:, box:, media:, state: "pending")
+
+    described_class.new.call(media:, actor:)
+
+    expect(suggestion.reload.state).to eq("accepted")
+    expect(suggestion.item.reload.review_state).to eq("confirmed")
+  end
+
   it "emits item.updated per confirmed item" do
     item = create(:item, move:, box:, source_media: media, review_state: "pending_review")
     allow(Rails.event).to receive(:notify)
