@@ -50,7 +50,12 @@ export default class extends Controller {
       this.inputTarget.value = this.target
       return
     }
-    if (name === this.target) return // no change in intent
+    if (name === this.target) {
+      // No change in intent — normalize the field (e.g. drop trailing whitespace)
+      // so what's shown matches the saved value.
+      this.inputTarget.value = this.target
+      return
+    }
     this.target = name
     this.#sync()
   }
