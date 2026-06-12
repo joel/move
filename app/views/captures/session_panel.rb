@@ -38,6 +38,7 @@ module Views
           thumb(media)
           div(class: "flex flex-1 flex-col gap-1") do
             state_badge(run)
+            items_found(run)
             retry_button(media) if run&.failed?
           end
         end
@@ -61,6 +62,19 @@ module Views
         return span(class: "text-label-caps uppercase text-muted") { I18n.t("ui.states.queued") } if run.nil?
 
         render Components::Ui::RecognitionState.new(state: RUN_TO_STATE.fetch(run.status, :queued))
+      end
+
+      # One photo can yield many items: surface the detection count once a run
+      # succeeds so the capture session reflects "many items per photo", not 1:1.
+      def items_found(run)
+        return unless run && %w[succeeded partially_succeeded].include?(run.status)
+
+        count = run.metadata["item_count"]
+        return if count.nil?
+
+        span(class: "text-label-caps uppercase text-muted") do
+          I18n.t("captures.session.items_found", count: count.to_i)
+        end
       end
 
       def retry_button(media)
