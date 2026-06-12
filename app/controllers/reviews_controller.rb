@@ -41,10 +41,17 @@ class ReviewsController < MoveScopedController
   end
 
   # PATCH .../review/photo/:media_id/items/:id/rename — live auto-save (blur).
-  # Name-only; returns 204 so the inline editor stays put (no navigation).
+  # Name-only; 204 on success (the inline editor stays put), 422 on a rejected
+  # name so the client can revert instead of showing a phantom save (#147).
   def rename_item
-    Items::Rename.new.call(item: @item, name: params.expect(:name), editor: current_user)
-    head :no_content
+    # Pass the raw scalar (not params.expect, which 400s on a blank value) so a
+    # rejected name flows through Items::Rename to a consistent 422.
+    case Items::Rename.new.call(item: @item, name: params[:name].to_s, editor: current_user)
+    in Dry::Monads::Success(_)
+      head :no_content
+    in Dry::Monads::Failure(_)
+      head :unprocessable_content
+    end
   end
 
   # PATCH .../review/photo/:media_id/items/:id/remove — drop a wrong detection.

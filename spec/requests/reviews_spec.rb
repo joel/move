@@ -88,6 +88,15 @@ RSpec.describe "Per-photo review" do
       expect(response).to have_http_status(:no_content)
       expect(item.reload.name).to eq("Coffee machine")
     end
+
+    it "answers 422 and keeps the name when the new name is blank (#147)" do
+      item = detected(name: "Lamp")
+
+      patch move_box_review_rename_item_path(move, box, media, item), params: { name: "" }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(item.reload.name).to eq("Lamp")
+    end
   end
 
   describe "PATCH .../remove" do

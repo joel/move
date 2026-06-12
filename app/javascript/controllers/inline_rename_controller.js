@@ -28,13 +28,19 @@ export default class extends Controller {
     this.inputTarget.blur()
   }
 
+  // Clear a prior error state when the reviewer returns to edit the field.
+  clearError() {
+    this.inputTarget.classList.remove("ring-2", "ring-error")
+    this.inputTarget.removeAttribute("aria-invalid")
+  }
+
   save() {
     const name = this.inputTarget.value.trim()
     if (name === "" || name === this.last) {
       this.inputTarget.value = this.last
       return
     }
-    this.last = name
+    const previous = this.last
 
     const token = document.querySelector('meta[name="csrf-token"]')?.content
     fetch(this.urlValue, {
@@ -47,5 +53,22 @@ export default class extends Controller {
       },
       body: JSON.stringify({ name }),
     })
+      // Commit the new value only once the server confirms it; on a rejected
+      // name (or network error) revert to the last saved value and flag the
+      // field so the save isn't silently lost (#147).
+      .then((response) => {
+        if (response.ok) {
+          this.last = name
+        } else {
+          this.#reject(previous)
+        }
+      })
+      .catch(() => this.#reject(previous))
+  }
+
+  #reject(previous) {
+    this.inputTarget.value = previous
+    this.inputTarget.classList.add("ring-2", "ring-error")
+    this.inputTarget.setAttribute("aria-invalid", "true")
   }
 }
