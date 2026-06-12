@@ -22,6 +22,8 @@ RSpec.describe "Capture image" do
     # :inline recognition runs during the request, so the session shows the result.
     expect(page).to have_current_path(move_box_capture_path(move, box), ignore_query: true)
     expect(page).to have_text(I18n.t("ui.states.succeeded"))
+    # One photo → many items: the session reflects the detection count, not 1:1.
+    expect(page).to have_text(I18n.t("captures.session.items_found", count: 3))
     expect(box.items.count).to eq(3)
     expect(box.items.where(review_state: "auto_confirmed").count).to eq(2)
   end

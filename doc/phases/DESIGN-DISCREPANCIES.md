@@ -6,6 +6,22 @@
 
 ---
 
+## ✅ §C2-REVIEW — Review model: per-item Keep/Correct/Ignore → per-photo edit/remove/navigate — RESOLVED
+
+- **Spec (original):** Design Spec §4 C1/C2 + Workflow §5 described a per-box review **queue** (C1) and a **one-suggestion-per-screen** item-by-item flow (C2) with **Keep / Correct / Ignore** actions and an explicit **"no bulk confirm"** rule. This made one photo with N detections appear as N separate full-photo screens — reading as "one photo = one item", slow for boxes with hundreds of items, and with no way to add a missed item.
+- **Resolution (2026-06-12, #143):** Product owner generated two new Stitch screens establishing a **per-photo** review model:
+  - `Review Item-by-Item (Dark) - Responsive` → `screens/c2c865975366419998a26905710a85f3`
+  - `Review Item-by-Item (Light) - Mobile View` → `screens/c5718290b1404577ad4946933875ffd6`
+- **Model change (intentional, supersedes the spec):**
+  - One screen **per photo** lists **every** item detected in it (incl. auto-confirmed) as an **editable field**; each row has a pencil (focus + select-all) and × (remove). Plus **"+ Add item"** and a single **"Next Photo"**.
+  - **Keep / Correct / Ignore are removed.** Correction is inline (rename auto-saves on blur — `Items::Rename`); "Ignore" becomes × (`Items::MarkRemoved`); "Keep" is implicit.
+  - **"Reviewed when shown":** opening a photo confirms its still-unreviewed items (`Reviews::MarkPhotoReviewed`) — this **replaces the "no bulk confirm" rule**, which no longer applies (there is no bulk-confirm *button*; advancing is navigation-only).
+  - The **C1 queue is dropped**; the box's pending badge enters the photo walk directly.
+- The recognition pipeline is unchanged — `RecognitionSuggestion`s are still produced as the audit trail; only their UI resolution path (the `RecognitionSuggestions::{Keep,Correct,MarkFalsePositive}` actions) was retired.
+- Recorded in `README.md` §2 (C1 retired, C2 repointed).
+
+---
+
 ## ✅ §A1 — "Create / select Move" screen — RESOLVED
 
 - **Spec:** Design Spec §4 A1 requires a screen to list Moves (name, status, progress hint, box count, pending-review count), an empty state, archived read-only treatment, and a "Create Move" form (name, planned date, origin/destination address, unit system).

@@ -2,50 +2,61 @@
 
 require "rails_helper"
 
-RSpec.describe "Recognition review flow" do
+RSpec.describe "Per-photo review flow" do
   let(:user) { create(:user) }
   let(:move) { create(:move, created_by: user, name: "Seattle Relocation") }
   let(:box) { create(:box, move:, number: "1", room: create(:room, move:, name: "Kitchen")) }
+  let(:media) { create(:media, move:, box:) }
 
   before do
     login_as(user: user)
     stub_current_tenant("acme")
   end
 
-  it "starts the queue and keeps a suggestion, confirming its item" do
-    suggestion = create(:recognition_suggestion, :with_item, move:, box:, proposed_name: "Toaster", confidence_score: 0.4)
-
-    visit move_box_review_index_path(move, box)
-    expect(page).to have_text("Toaster")
-    click_link I18n.t("reviews.queue.start")
-
-    click_button I18n.t("reviews.actions.keep")
-    expect(suggestion.reload.state).to eq("accepted")
-    expect(suggestion.item.review_state).to eq("confirmed")
+  def detected(name, **attrs)
+    create(:item, move:, box:, source_media: media, name:, review_state: "pending_review", **attrs)
   end
 
-  it "marks a detection as a false positive (leaves inventory)" do
-    suggestion = create(:recognition_suggestion, :with_item, move:, box:, proposed_name: "Glare")
+  it "lists a photo's items, confirms them on view, and removes a wrong one" do
+    keep = detected("Coffee machine")
+    drop = detected("Glass backsplash")
 
-    visit move_box_review_path(move, box, suggestion)
-    click_button I18n.t("reviews.actions.ignore")
+    visit move_box_review_path(move, box) # enters the first photo
+    expect(page).to have_field(with: "Coffee machine")
 
-    expect(suggestion.reload.state).to eq("false_positive")
-    expect(suggestion.item.presence_state).to eq("removed")
+    # Reviewed-when-shown: opening the photo confirms its pending items.
+    expect(keep.reload.review_state).to eq("confirmed")
+
+    click_button I18n.t("reviews.photo.remove_named", name: "Glass backsplash")
+    expect(drop.reload.presence_state).to eq("removed")
+    expect(page).to have_no_field(with: "Glass backsplash")
   end
 
-  it "routes Correct to the item edit, then resumes the review on save" do
-    suggestion = create(:recognition_suggestion, :with_item, move:, box:, proposed_name: "Kettle")
+  it "adds a missed item to the photo" do
+    detected("Coffee machine")
 
-    visit move_box_review_path(move, box, suggestion)
-    click_button I18n.t("reviews.actions.correct")
-    expect(page).to have_text(I18n.t("items.show.title"))
+    visit move_box_review_photo_path(move, box, media)
+    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
+    click_button I18n.t("reviews.photo.add")
 
-    fill_in "item[name]", with: "Electric Kettle"
-    click_button I18n.t("items.show.save")
+    expect(box.items.find_by(name: "Cutting board")).to have_attributes(
+      created_via: "manual", source_media_id: media.id
+    )
+    expect(page).to have_field(with: "Cutting board")
+  end
 
-    # Back in the review flow (queue empty now), not stranded on the item.
-    expect(page).to have_text(I18n.t("reviews.queue.title"))
-    expect(suggestion.reload.state).to eq("corrected")
+  it "navigates from one photo to the next, then finishes at the box" do
+    detected("Coffee machine")
+    second = create(:media, move:, box:)
+    create(:item, move:, box:, source_media: second, name: "Sofa", review_state: "pending_review")
+
+    visit move_box_review_photo_path(move, box, media)
+    expect(page).to have_text(I18n.t("reviews.photo.progress", position: 1, total: 2))
+
+    click_link I18n.t("reviews.photo.next")
+    expect(page).to have_field(with: "Sofa")
+
+    click_link I18n.t("reviews.photo.finish")
+    expect(page).to have_current_path(move_box_path(move, box))
   end
 end

@@ -9,16 +9,16 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::FormWith
 
-      def initialize(move:, item:, boxes:, categories:, tags:, review_suggestion: nil, editable: false)
+      def initialize(move:, item:, boxes:, categories:, tags:, editable: false, photo_siblings: 0)
         @move = move
         @item = item
         @boxes = boxes
         @categories = categories
         @tags = tags
         @editable = editable
-        # When the edit was reached via review "Correct", saving resolves this
-        # suggestion and resumes the review rather than dead-ending on the item.
-        @review_suggestion = review_suggestion
+        # Count of *other* in-box items detected in this item's source photo (0 for
+        # manual items) — surfaces the one-photo → many-items relationship on C3.
+        @photo_siblings = photo_siblings
       end
 
       def view_template
@@ -33,8 +33,8 @@ module Views
       private
 
       def back_link
-        href = @review_suggestion ? move_box_review_index_path(@move, @review_suggestion.box) : move_box_path(@move, @item.box)
-        label = @review_suggestion ? I18n.t("items.show.back_to_review") : I18n.t("items.show.back")
+        href = move_box_path(@move, @item.box)
+        label = I18n.t("items.show.back")
         a(
           href: href,
           class: "inline-flex items-center gap-2 text-label-caps uppercase text-muted hover:text-text-warm"
@@ -58,6 +58,17 @@ module Views
             media_image
             box_caption
           end
+          sibling_note
+        end
+      end
+
+      # "Detected with N other items in this photo" — only when this item came from
+      # a photo that yielded more than one in-box item.
+      def sibling_note
+        return unless @photo_siblings.positive?
+
+        p(class: "mt-3 text-body-md text-muted") do
+          I18n.t("items.show.from_same_photo", count: @photo_siblings)
         end
       end
 
@@ -102,7 +113,7 @@ module Views
         render Components::ItemForm.new(
           models: [@move, @item], item: @item,
           categories: @categories, tags: @tags,
-          submit_label: I18n.t("items.show.save"), review_suggestion_id: @review_suggestion&.id
+          submit_label: I18n.t("items.show.save")
         )
         div(class: "mt-2 flex flex-wrap items-center gap-3 border-t border-card-border pt-5") do
           move_control

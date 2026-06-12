@@ -17,15 +17,15 @@ Rails.application.routes.draw do
       member { patch :transition }
       # B3 — Manual add item (scoped to the box it lands in).
       resources :items, only: %i[new create]
-      # C1/C2 — Review flow: queue (index) + item-by-item (show) + per-suggestion
-      # actions, scoped to the box being finalized.
-      resources :recognition_suggestions, only: %i[index show], path: "review", as: :review do
-        member do
-          patch :keep
-          patch :correct
-          patch :mark_false_positive
-        end
-      end
+      # C2 — Per-photo review: walk the box's photos; each screen lists every item
+      # detected in that photo as an editable field (rename auto-saves on blur),
+      # with × to remove and "+ Add" for a missed item. "Next Photo" only
+      # navigates; opening a photo marks its unreviewed items reviewed.
+      get "review", to: "reviews#index", as: :review
+      get "review/photo/:media_id", to: "reviews#photo", as: :review_photo
+      patch "review/photo/:media_id/items/:id/rename", to: "reviews#rename_item", as: :review_rename_item
+      patch "review/photo/:media_id/items/:id/remove", to: "reviews#remove_item", as: :review_remove_item
+      post "review/photo/:media_id/items", to: "reviews#add_item", as: :review_add_item
       # B2 — Capture image & recognition. `session` is the polled session panel.
       get "capture", to: "captures#show", as: :capture
       post "capture", to: "captures#create"

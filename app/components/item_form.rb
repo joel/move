@@ -10,22 +10,18 @@ module Components
   class ItemForm < Components::Base
     include Phlex::Rails::Helpers::FormWith
 
-    def initialize(models:, item:, categories:, tags:, submit_label:, cancel_href: nil, review_suggestion_id: nil)
+    def initialize(models:, item:, categories:, tags:, submit_label:, cancel_href: nil)
       @models = models
       @item = item
       @categories = categories
       @tags = tags
       @submit_label = submit_label
       @cancel_href = cancel_href
-      @review_suggestion_id = review_suggestion_id
     end
 
     def view_template
       form_with(model: @models, class: "flex flex-col gap-6") do |form|
         render_errors if @item.errors.any?
-        # Carries the reviewed suggestion so saving an edit reached via "Correct"
-        # resolves it and resumes the review instead of dead-ending on the item.
-        input(type: "hidden", name: "review_suggestion_id", value: @review_suggestion_id) if @review_suggestion_id
         name_field
         category_and_quantity
         fragile_toggle

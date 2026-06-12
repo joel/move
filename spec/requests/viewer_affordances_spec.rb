@@ -86,19 +86,23 @@ RSpec.describe "Viewer read-only affordances" do
     end
   end
 
-  describe "review queue" do
+  describe "per-photo review" do
     let(:box) { create(:box, move:, number: "1") }
+    let(:media) { create(:media, move:, box:) }
 
-    it "shows keep/correct to an editor but not a viewer" do
-      create(:recognition_suggestion, move:, box:, proposed_name: "Mug")
+    it "shows the edit/add affordances to an editor but read-only to a viewer" do
+      create(:item, move:, box:, source_media: media, name: "Mug", review_state: "pending_review")
 
       as(admin)
-      get move_box_review_index_path(move, box)
-      expect(response.body).to include(I18n.t("reviews.actions.keep"))
+      get move_box_review_photo_path(move, box, media)
+      expect(response.body).to include(I18n.t("reviews.photo.add_placeholder"))
 
       as(viewer)
-      get move_box_review_index_path(move, box)
-      expect(response.body).not_to include(I18n.t("reviews.actions.keep"))
+      get move_box_review_photo_path(move, box, media)
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("reviews.photo.view_only"))
+        expect(response.body).not_to include(I18n.t("reviews.photo.add_placeholder"))
+      end
     end
   end
 end

@@ -40,12 +40,15 @@ RSpec.describe "Archived-Move guard in shared actions" do # rubocop:disable RSpe
     expect(item.reload.presence_state).to eq("in_box")
   end
 
-  it "blocks RecognitionSuggestions::Keep (suggestion.move)" do
-    suggestion = create(:recognition_suggestion, move:, box: create(:box, move:), proposed_name: "Mug")
+  it "blocks Reviews::MarkPhotoReviewed (media.move) leaving items unreviewed" do
+    box = create(:box, move:)
+    media = create(:media, move:, box:)
+    item = create(:item, move:, box:, source_media: media, review_state: "pending_review")
 
-    result = RecognitionSuggestions::Keep.new.call(suggestion:, actor:)
+    result = Reviews::MarkPhotoReviewed.new.call(media:, actor:)
 
     expect(result.failure).to eq(:move_archived)
+    expect(item.reload.review_state).to eq("pending_review")
   end
 
   it "allows reads / does not affect a writable Move" do
