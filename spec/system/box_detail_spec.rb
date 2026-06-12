@@ -40,6 +40,16 @@ RSpec.describe "Box detail & lifecycle" do
     expect(box.reload.status).to eq("packing")
   end
 
+  it "shows the review CTA for a box whose only items are needs_correction (#146)" do
+    box = create(:box, move:, number: "2", status: "packing")
+    media = create(:media, move:, box:)
+    create(:item, move:, box:, source_media: media, name: "Magazines", review_state: "needs_correction")
+
+    visit move_box_path(move, box)
+
+    expect(page).to have_link(I18n.t("boxes.show.pending_review", count: 1))
+  end
+
   it "is read-only on an archived move" do
     archived = create(:move, :archived, created_by: user)
     box = create(:box, :with_room, move: archived, number: "1", status: "packing")

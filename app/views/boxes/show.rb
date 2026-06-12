@@ -280,8 +280,12 @@ module Views
         )
       end
 
+      # pending_review and needs_correction are both "to review" in the C2 walk
+      # (first_unreviewed_media / MarkPhotoReviewed::UNREVIEWED), so the badge counts
+      # both — otherwise a box with only needs_correction items hides its review CTA
+      # (#146).
       def pending_count
-        @items.count { |item| item.review_state == "pending_review" }
+        @items.count { |item| %w[pending_review needs_correction].include?(item.review_state) }
       end
 
       def box_title
