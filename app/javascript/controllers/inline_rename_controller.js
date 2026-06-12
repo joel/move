@@ -6,25 +6,23 @@ import { Controller } from "@hotwired/stimulus"
 //                   action: "blur->inline-rename#save keydown.enter->inline-rename#blur" })
 //     button(data: { action: "inline-rename#focus" })   // pencil: focus + select all
 //
-// Writes are SERIALIZED per field: only one rename PATCH is in flight at a time,
-// and a rapid second edit is queued as the latest pending value (#149). This
-// guarantees the server applies edits in order (no concurrent requests to
-// reorder) and the newest edit wins — without relying on client-side aborts,
-// which can't stop a request the server already received. Each request uses
-// `keepalive: true` so a save triggered by clicking "Next Photo" still completes
-// after Turbo navigates away. A blank value is never saved (name is required) —
-// the field reverts.
+// Edits set `target` and the controller converges the server to it: at most one
+// PATCH is in flight, and when it resolves the controller re-syncs if `target`
+// moved meanwhile. This handles every interleaving consistently — rapid edits, a
+// revert to an earlier value while a newer save is still in flight, and navigating
+// away mid-save — without the field and the database diverging (#149/#151/#152).
+// Each PATCH uses keepalive so a save triggered by clicking "Next Photo" still
+// completes after Turbo navigates. A blank value is invalid (name required): the
+// field snaps back to the value being saved.
 export default class extends Controller {
   static values = { url: String }
   static targets = ["input"]
 
   connect() {
-    this.last = this.inputTarget.value
-    // Capture the endpoint so a queued flush can still fire after Turbo tears the
-    // controller down mid-navigation.
-    this.url = this.urlValue
-    this.pending = null
-    this.inFlight = false
+    this.committed = this.inputTarget.value // last value the server confirmed
+    this.target = this.committed // value the field + server should converge to
+    this.url = this.urlValue // captured so a flush can still fire after teardown
+    this.saving = false
   }
 
   // Pencil icon: focus the field and select all so typing replaces the label.
@@ -46,28 +44,22 @@ export default class extends Controller {
 
   save() {
     const name = this.inputTarget.value.trim()
-    if (name === "" || name === this.last) {
-      // Blanking or reverting to the saved value abandons the edit — drop any
-      // value queued while a request was in flight so a stale rename isn't
-      // flushed after the user backed out (#151).
-      this.pending = null
-      this.inputTarget.value = this.last
+    if (name === "") {
+      // Name is required — snap back to the value we're converging to rather than
+      // sending an empty name.
+      this.inputTarget.value = this.target
       return
     }
-    // Queue the latest value; #flush sends it once no request is in flight.
-    this.pending = name
-    if (!this.inFlight) this.#flush()
+    if (name === this.target) return // no change in intent
+    this.target = name
+    this.#sync()
   }
 
-  #flush() {
-    const name = this.pending
-    this.pending = null
-    if (name == null || name === this.last) {
-      this.inFlight = false
-      return
-    }
-    this.inFlight = true
-    const previous = this.last
+  // Drive the server toward `target`, one request at a time.
+  #sync() {
+    if (this.saving || this.target === this.committed) return
+    this.saving = true
+    const name = this.target
 
     const token = document.querySelector('meta[name="csrf-token"]')?.content
     fetch(this.url, {
@@ -81,32 +73,28 @@ export default class extends Controller {
       body: JSON.stringify({ name }),
     })
       .then((response) => {
-        this.inFlight = false
+        this.saving = false
         if (response.ok) {
-          // Commit only once the server confirms it, then send the next queued
-          // edit (if any) — keeping writes ordered and the field in sync (#149).
-          this.last = name
-          if (this.pending != null) this.#flush()
+          this.committed = name
+          this.#sync() // target moved while saving? converge again
         } else {
-          // A rejected name reverts the field and flags it; stop the chain so a
-          // failure isn't silently overwritten (#147).
-          this.pending = null
-          this.#reject(previous)
+          this.#revert()
         }
       })
       .catch(() => {
-        this.inFlight = false
-        this.pending = null
-        this.#reject(previous)
+        this.saving = false
+        this.#revert()
       })
   }
 
-  #reject(previous) {
-    // The controller may have been torn down by navigation before a response
-    // arrived; nothing to revert if the field is gone.
+  // Server refused (or network error): drop the desired change back to the last
+  // confirmed value and flag the field so a failed save isn't silently lost (#147).
+  #revert() {
+    this.target = this.committed
+    // The controller may have been torn down by navigation before the response.
     if (!this.hasInputTarget) return
 
-    this.inputTarget.value = previous
+    this.inputTarget.value = this.committed
     this.inputTarget.classList.add("ring-2", "ring-error")
     this.inputTarget.setAttribute("aria-invalid", "true")
   }
