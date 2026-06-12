@@ -50,6 +50,18 @@ RSpec.describe "Box detail & lifecycle" do
     expect(page).to have_link(I18n.t("boxes.show.pending_review", count: 1))
   end
 
+  it "hides the review CTA for a needs_correction item with no source photo (#146)" do
+    box = create(:box, move:, number: "3", status: "packing")
+    # No source_media → the photo-keyed walk can't review it (resolved on C3), so
+    # the badge must not advertise a CTA that dead-ends on "nothing to review".
+    create(:item, move:, box:, name: "Loose papers", review_state: "needs_correction")
+
+    visit move_box_path(move, box)
+
+    expect(page).to have_text("Box #003")
+    expect(page).to have_no_link(I18n.t("boxes.show.pending_review", count: 1))
+  end
+
   it "is read-only on an archived move" do
     archived = create(:move, :archived, created_by: user)
     box = create(:box, :with_room, move: archived, number: "1", status: "packing")
