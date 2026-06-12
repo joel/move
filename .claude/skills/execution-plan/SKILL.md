@@ -342,6 +342,32 @@ wait, re-check, address. **Loop until a round comes back clean** (or remaining
 items are explicitly deferred to tracked issues and their threads resolved) — only
 then is the PR review-complete.
 
+**Know when to stop — Codex findings have diminishing returns on mature code.** The
+loop converges in *severity*: early rounds catch real bugs (correctness, ordering,
+security); later rounds shrink to contrived sub-50ms timing interleavings or cosmetic
+nits on already-correct code. One small, well-tested controller this session drew **5
+sequential findings**, the last being "a trailing-space edit leaves untrimmed text in
+the field until reload." Each fix is cheap, but a full PR→CI→Codex→(deploy→release→
+scan) cycle *per nit* is not. Watch for the signature: repeated findings on the **same
+file**, each needing a more elaborate/unlikely condition to trigger, on a low-priority
+surface. When you see it:
+- Prefer **one principled rewrite** (a small state machine / invariant — e.g. "drive
+  state toward a single `target`") over another targeted patch. Patches to
+  async/optimistic-UI behaviour keep leaking the *adjacent* interleaving; one correct
+  model ends the whack-a-mole. (This session: abort → serialize → abandon-queue patches
+  each surfaced the next edge; a convergence state machine subsumed them all.)
+- **Surface the diminishing return to the user explicitly and recommend a stop** —
+  merge-on-next-clean, or accept further nits as known/tracked rather than fix them.
+  This is the user's call (it trades polish vs. cost); don't silently keep cycling, and
+  don't silently stop. Codex *will* keep finding ever-smaller things — "clean" on a
+  living controller is not guaranteed on any finite round.
+- Once the user says "accept further nits / merge on clean," a new Codex comment is
+  **resolved by acknowledgement** (reply that it's an accepted nit — fixed-later or
+  won't-fix with the rationale — and resolve the thread). It does **not** gate the
+  merge: branch protection gates on CI (`lint`/`test`) + `mergeStateStatus`, not on
+  Codex. The agent normally never merges, but the repo owner can explicitly authorize a
+  specific merge ("merge on clean") — that authorization is for that merge only.
+
 Practical notes:
 - **Codex drops rapid-fire triggers** — firing `@codex review` repeatedly in quick
   succession gets some coalesced/ignored. Space them out, poll patiently (~45s),
