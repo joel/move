@@ -32,13 +32,14 @@ RSpec.describe Reviews::MarkPhotoReviewed do
     expect(other.reload.review_state).to eq("pending_review")
   end
 
-  it "resolves the confirmed item's linked pending suggestion to accepted" do
+  it "leaves the linked suggestion as the AI's raw proposal (no resolution lifecycle)" do
     suggestion = create(:recognition_suggestion, :with_item, move:, box:, media:, state: "pending")
 
     described_class.new.call(media:, actor:)
 
-    expect(suggestion.reload.state).to eq("accepted")
+    # The human outcome lives on the Item; the suggestion stays an immutable record.
     expect(suggestion.item.reload.review_state).to eq("confirmed")
+    expect(suggestion.reload.state).to eq("pending")
   end
 
   it "emits item.updated per confirmed item" do

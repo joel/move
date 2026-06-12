@@ -18,10 +18,17 @@ module Reviews
 
     private
 
+    # Only the Item's review_state is touched. The linked RecognitionSuggestion is
+    # intentionally left as the AI's raw proposal: the item-centric review (rename
+    # inline / remove with ×) records the human's outcome entirely in the Item
+    # (review_state, presence_state, name), so the suggestion is an immutable
+    # capture of what recognition proposed — not a mutable accepted/corrected/
+    # false_positive lifecycle (that was the retired per-suggestion UI). Marking it
+    # `accepted` on view would mis-record detections the reviewer then renames or
+    # removes.
     def persist(media, actor)
       pending_items(media).find_each do |item|
         item.update!(review_state: "confirmed")
-        resolve_suggestion(item)
         Rails.event.notify(
           "item.updated", item_id: item.id, box_id: item.box_id, move_id: item.move_id,
                           editor_id: actor&.id
@@ -30,15 +37,6 @@ module Reviews
       Success(media)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
-    end
-
-    # Keep the audit trail consistent: confirming the item resolves its linked
-    # `pending` suggestion to `accepted` (mirroring the old Keep), so the
-    # recognition_suggestions.unresolved scope no longer reports a reviewed
-    # detection as outstanding. (Manual items have no suggestion → no-op.)
-    def resolve_suggestion(item)
-      # One suggestion per materialized item (1:1 via item_id).
-      RecognitionSuggestion.find_by(item_id: item.id, state: "pending")&.update!(state: "accepted")
     end
 
     def pending_items(media)

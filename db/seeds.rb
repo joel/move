@@ -341,7 +341,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     "[seeds] #{organization.slug}: #{move.boxes.count} boxes, #{move.rooms.count} rooms, " \
     "#{move.categories.count} categories, #{move.tags.count} tags, " \
     "#{move.items.count} items, #{move.media.count} media, " \
-    "#{move.recognition_suggestions.unresolved.count} to review, " \
+    "#{move.items.in_box.where(review_state: %w[pending_review needs_correction]).count} to review, " \
     "#{ItemSearchDocument.count} search docs"
   )
 end
