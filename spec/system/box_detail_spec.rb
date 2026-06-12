@@ -40,6 +40,41 @@ RSpec.describe "Box detail & lifecycle" do
     expect(box.reload.status).to eq("packing")
   end
 
+  it "shows the review CTA for a box whose only items are needs_correction (#146)" do
+    box = create(:box, move:, number: "2", status: "packing")
+    media = create(:media, move:, box:)
+    create(:item, move:, box:, source_media: media, name: "Magazines", review_state: "needs_correction")
+
+    visit move_box_path(move, box)
+
+    expect(page).to have_link(I18n.t("boxes.show.pending_review", count: 1))
+  end
+
+  it "hides the review CTA for a needs_correction item with no source photo (#146)" do
+    box = create(:box, move:, number: "3", status: "packing")
+    # No source_media → the photo-keyed walk can't review it (resolved on C3), so
+    # the badge must not advertise a CTA that dead-ends on "nothing to review".
+    create(:item, move:, box:, name: "Loose papers", review_state: "needs_correction")
+
+    visit move_box_path(move, box)
+
+    expect(page).to have_text("Box #003")
+    expect(page).to have_no_link(I18n.t("boxes.show.pending_review", count: 1))
+  end
+
+  it "ignores a moved-in item whose source photo belongs to another box (#146)" do
+    foreign_media = create(:media, move:, box: create(:box, move:, number: "4"))
+    box = create(:box, move:, number: "5", status: "packing")
+    # In this box, but its source photo lives in box 4 — the box-5 walk can't reach
+    # it, so the badge must not count it.
+    create(:item, move:, box:, source_media: foreign_media, review_state: "needs_correction")
+
+    visit move_box_path(move, box)
+
+    expect(page).to have_text("Box #005")
+    expect(page).to have_no_link(I18n.t("boxes.show.pending_review", count: 1))
+  end
+
   it "is read-only on an archived move" do
     archived = create(:move, :archived, created_by: user)
     box = create(:box, :with_room, move: archived, number: "1", status: "packing")

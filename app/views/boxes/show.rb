@@ -15,12 +15,15 @@ module Views
         "unpacking" => "unpacking", "unpacked" => "unpacked"
       }.freeze
 
-      def initialize(move:, box:, items: [], media: [], editable: false)
+      def initialize(move:, box:, items: [], media: [], editable: false, pending_count: 0)
         @move = move
         @box = box
         @items = items
         @media = media
         @editable = editable
+        # Count of items the C2 walk can review (computed by the controller — see
+        # BoxesController#reviewable_count): unreviewed AND photo-backed.
+        @pending_count = pending_count
         @measurements = BoxMeasurements.new(box, unit_system: move.unit_system)
       end
 
@@ -191,7 +194,7 @@ module Views
         section(class: "flex flex-col gap-stack-gap lg:col-span-8") do
           div(class: "flex items-center justify-between px-2") do
             h3(class: "text-headline-md text-text-warm") { I18n.t("boxes.show.items") }
-            pending_badge if pending_count.positive?
+            pending_badge if @pending_count.positive?
           end
           @items.any? ? items_list : items_empty
         end
@@ -203,7 +206,7 @@ module Views
         a(href: move_box_review_path(@move, @box), data: { turbo_prefetch: false },
           class: "rounded-full bg-tertiary/15 px-3 py-1 text-label-caps uppercase " \
                  "text-tertiary transition hover:bg-tertiary/25") do
-          I18n.t("boxes.show.pending_review", count: pending_count)
+          I18n.t("boxes.show.pending_review", count: @pending_count)
         end
       end
 
@@ -278,10 +281,6 @@ module Views
           title: I18n.t("boxes.show.gallery_empty_title"),
           description: I18n.t("boxes.show.gallery_empty_description")
         )
-      end
-
-      def pending_count
-        @items.count { |item| item.review_state == "pending_review" }
       end
 
       def box_title

@@ -131,7 +131,7 @@ module Views
         return {} unless @editable
 
         { inline_rename_target: "input",
-          action: "blur->inline-rename#save keydown.enter->inline-rename#blur" }
+          action: "focus->inline-rename#clearError blur->inline-rename#save keydown.enter->inline-rename#blur" }
       end
 
       def confidence_line(item)
