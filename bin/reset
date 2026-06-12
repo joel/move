@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# export STORAGE_ENDPOINT=http://seaweedfs:8333
+
+bin/cli app stop && \
+bin/cli db stop && \
+bin/cli storage teardown && \
+bin/cli app rebuild && \
+bin/cli app stop && \
+bin/cli storage start && \
+bin/cli app exec bin/rails db:drop db:create db:migrate db:seed db:schema:dump && \
+bin/cli mail start && \
+bin/cli app start
