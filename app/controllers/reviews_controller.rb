@@ -26,7 +26,10 @@ class ReviewsController < MoveScopedController
   # GET /moves/:move_id/boxes/:box_id/review/photo/:media_id
   def photo
     # "Reviewed when its photo is shown" — only an editor on a writable Move
-    # mutates (viewers / archived Moves see a read-only screen).
+    # mutates (viewers / archived Moves see a read-only screen). This is a GET-side
+    # effect, so every link that reaches a review photo disables Turbo prefetch
+    # (`data-turbo-prefetch="false"` on the box pending badge and the "Next Photo"
+    # link) — otherwise hovering them would confirm a photo before it is opened.
     Reviews::MarkPhotoReviewed.new.call(media: @media, actor: current_user) if editable_move?
 
     walk = review_media

@@ -197,9 +197,10 @@ module Views
         end
       end
 
-      # Enters the D6 per-photo review walk (C2) for this box.
+      # Enters the D6 per-photo review walk (C2). Prefetch off: opening a photo
+      # marks its items reviewed, so hover must not confirm them prematurely.
       def pending_badge
-        a(href: move_box_review_path(@move, @box),
+        a(href: move_box_review_path(@move, @box), data: { turbo_prefetch: false },
           class: "rounded-full bg-tertiary/15 px-3 py-1 text-label-caps uppercase " \
                  "text-tertiary transition hover:bg-tertiary/25") do
           I18n.t("boxes.show.pending_review", count: pending_count)
