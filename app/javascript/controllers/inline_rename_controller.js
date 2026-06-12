@@ -47,6 +47,10 @@ export default class extends Controller {
   save() {
     const name = this.inputTarget.value.trim()
     if (name === "" || name === this.last) {
+      // Blanking or reverting to the saved value abandons the edit — drop any
+      // value queued while a request was in flight so a stale rename isn't
+      // flushed after the user backed out (#151).
+      this.pending = null
       this.inputTarget.value = this.last
       return
     }
