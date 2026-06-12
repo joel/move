@@ -34,10 +34,6 @@ export default class extends Controller {
     this.inputTarget.removeAttribute("aria-invalid")
   }
 
-  disconnect() {
-    this.controller?.abort()
-  }
-
   save() {
     const name = this.inputTarget.value.trim()
     if (name === "" || name === this.last) {
