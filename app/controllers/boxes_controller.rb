@@ -100,12 +100,14 @@ class BoxesController < MoveScopedController
   private
 
   # Items the C2 review walk can act on: unreviewed (pending_review or
-  # needs_correction) AND photo-backed — the walk is keyed on source_media, so a
-  # photo-less correction is resolved on C3, not here. Drives the box review badge,
-  # keeping it from advertising a CTA that dead-ends on "nothing to review" (#146).
+  # needs_correction) AND backed by a photo *in this box*. The walk (review_media)
+  # only spans @box.media, so an item moved in from another box keeps its foreign
+  # source_media_id and isn't reviewable here — require the source photo to belong
+  # to @box, not just be present. A photo-less correction is resolved on C3. Drives
+  # the box review badge, keeping it from advertising a dead-end CTA (#146).
   def reviewable_count(items)
     items.where(review_state: %w[pending_review needs_correction])
-         .where.not(source_media_id: nil).count
+         .where(source_media_id: @box.media.select(:id)).count
   end
 
   def set_box

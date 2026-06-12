@@ -62,6 +62,19 @@ RSpec.describe "Box detail & lifecycle" do
     expect(page).to have_no_link(I18n.t("boxes.show.pending_review", count: 1))
   end
 
+  it "ignores a moved-in item whose source photo belongs to another box (#146)" do
+    foreign_media = create(:media, move:, box: create(:box, move:, number: "4"))
+    box = create(:box, move:, number: "5", status: "packing")
+    # In this box, but its source photo lives in box 4 — the box-5 walk can't reach
+    # it, so the badge must not count it.
+    create(:item, move:, box:, source_media: foreign_media, review_state: "needs_correction")
+
+    visit move_box_path(move, box)
+
+    expect(page).to have_text("Box #005")
+    expect(page).to have_no_link(I18n.t("boxes.show.pending_review", count: 1))
+  end
+
   it "is read-only on an archived move" do
     archived = create(:move, :archived, created_by: user)
     box = create(:box, :with_room, move: archived, number: "1", status: "packing")
