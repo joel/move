@@ -44,13 +44,12 @@ module RecognitionRuns
       Rails.event.notify("recognition_run.processing", recognition_run_id: run.id)
     end
 
-    # Feed the move's managed vocabulary to the provider so the model can fit
-    # each detection into an existing category/tag rather than inventing names.
+    # Feed the move's category vocabulary to the provider so the model can fit
+    # each detection into an existing category rather than inventing near-dupes.
     def context(run)
       {
         room: run.box.room&.name,
-        categories: run.move.categories.order(:name).pluck(:name),
-        tags: run.move.tags.for_items.order(:name).pluck(:name)
+        categories: run.move.categories.order(:name).pluck(:name)
       }
     end
 

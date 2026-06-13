@@ -114,16 +114,18 @@ module RecognitionProviders
     end
 
     # Vocabulary-aware prompt shared by every adapter. context carries :room plus
-    # :categories / :tags (arrays of names from the move taxonomy) built in
-    # RecognitionRuns::Process#context.
+    # :categories (names from the move's category vocabulary) built in
+    # RecognitionRuns::Process#context. Only categories are offered as candidates —
+    # the structured output has a single `category` field that maps to a Category,
+    # so feeding item tags here would let the model return a tag as a category.
     def prompt(context)
       lines = ["Identify the distinct physical objects in this moving-box photo."]
       lines << "The box is in the #{context[:room]}." if context[:room].present?
 
-      vocab = (Array(context[:categories]) + Array(context[:tags])).map(&:to_s).compact_blank.uniq
-      lines << if vocab.any?
+      categories = Array(context[:categories]).map(&:to_s).compact_blank.uniq
+      lines << if categories.any?
                  "Classify each item into a category. Prefer one of these existing " \
-                   "categories when it clearly fits (#{vocab.join(", ")}); only introduce a " \
+                   "categories when it clearly fits (#{categories.join(", ")}); only introduce a " \
                    "new, concise category when none of these match."
                else
                  "Classify each item with a concise category (e.g. Kitchenware, Books, Electronics)."

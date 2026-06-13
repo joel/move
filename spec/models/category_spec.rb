@@ -37,4 +37,18 @@ RSpec.describe Category do
     category.destroy
     expect(item.reload.category_id).to be_nil
   end
+
+  it "nullifies proposed_category on recognition suggestions when destroyed (stays deletable)" do
+    category = create(:category)
+    move = category.move
+    box = create(:box, move:)
+    media = create(:media, move:, box:)
+    run = create(:recognition_run, move:, box:, media:)
+    suggestion = run.recognition_suggestions.create!(
+      move:, box:, media:, proposed_name: "Mug", proposed_quantity: 1, proposed_category: category
+    )
+
+    expect { category.destroy! }.not_to raise_error
+    expect(suggestion.reload.proposed_category_id).to be_nil
+  end
 end

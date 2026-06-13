@@ -7,6 +7,11 @@
 class Category < ApplicationRecord
   belongs_to :move
   has_many :items, dependent: :nullify
+  # Recognition can propose a category before it's confirmed onto an item; detach
+  # those proposals on removal too (the FK is otherwise restrictive), so a
+  # category stays deletable once a run has ever suggested it.
+  has_many :proposed_recognition_suggestions, class_name: "RecognitionSuggestion",
+                                              foreign_key: :proposed_category_id, dependent: :nullify, inverse_of: :proposed_category
 
   validates :name, presence: true
   validates :name, uniqueness: { scope: :move_id, case_sensitive: false }

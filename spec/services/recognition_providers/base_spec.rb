@@ -6,17 +6,24 @@ RSpec.describe RecognitionProviders::Base do
   subject(:provider) { described_class.new }
 
   describe "#prompt" do
-    it "folds the move's category + tag vocabulary into the classification instruction" do
-      text = provider.send(:prompt, { room: "Kitchen", categories: ["Kitchenware"], tags: ["Heavy"] })
+    it "folds the move's category vocabulary into the classification instruction" do
+      text = provider.send(:prompt, { room: "Kitchen", categories: ["Kitchenware"] })
 
       expect(text).to include("Kitchen")
-      expect(text).to include("Kitchenware", "Heavy")
+      expect(text).to include("Kitchenware")
       expect(text).to include("Prefer one of these existing categories")
       expect(text).to match(/fragile/i)
     end
 
+    it "does not offer item tags as category candidates" do
+      text = provider.send(:prompt, { room: nil, categories: ["Kitchenware"], tags: ["Heavy"] })
+
+      expect(text).to include("Kitchenware")
+      expect(text).not_to include("Heavy")
+    end
+
     it "still asks for a category when the move has no vocabulary yet" do
-      text = provider.send(:prompt, { room: nil, categories: [], tags: [] })
+      text = provider.send(:prompt, { room: nil, categories: [] })
 
       expect(text).to include("Classify each item with a concise category")
       expect(text).not_to include("The box is in")

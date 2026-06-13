@@ -24,11 +24,12 @@ returning `{"objects": [...]}`, where each object is:
 | `category` | string | the model's classification — best-effort onto the Move's category vocabulary (an existing name when one fits, else a new concise one) |
 | `fragile` | boolean | whether the item can break/scratch easily |
 
-`RecognitionRuns::Process` feeds the Move's category + item-tag names into the
-prompt as vocabulary, then on materialization resolves `category` onto the Move's
-categories (reuse-or-create, case-insensitive) and sets `fragile` directly on the
-`Item`; both also ride on the `RecognitionSuggestion` (`proposed_category_id`,
-`proposed_fragile`) for the review queue. Before encoding, phone photos are
+`RecognitionRuns::Process` feeds the Move's **category** names into the prompt as
+candidates (only categories — the output has a single `category` field that maps
+to a `Category`, so tags are not offered), then on materialization resolves
+`category` onto the Move's categories (reuse-or-create, case-insensitive) and sets
+`fragile` directly on the `Item`; both also ride on the `RecognitionSuggestion`
+(`proposed_category_id`, `proposed_fragile`) for the review queue. Before encoding, phone photos are
 EXIF-auto-oriented and down-scaled to ≤1536px (libvips) to cut image tokens and
 latency. Each model default is overridable via `*_RECOGNITION_MODEL`.
 
@@ -100,12 +101,17 @@ with `GEMINI_API_KEY is not set`.
 
 1. **Add the secret to Doppler** (`move/prd`):
    `doppler secrets set GEMINI_API_KEY=… --project move --config prd`. It syncs
-   into GitHub Actions secrets; `.kamal/secrets` + `.github/workflows/deploy.yml`
-   already resolve/export `GEMINI_API_KEY` (committed), and `config/deploy.yml`
-   `env.secret` already includes it.
-2. **Flip the selector:** set `RECOGNITION_PROVIDER: gemini` in `config/deploy.yml`
+   into GitHub Actions secrets.
+2. **Wire the secret (committed once the key exists).** These are intentionally
+   *not* wired today — referencing a secret that isn't in Doppler makes kamal's
+   Doppler fallback fail the deploy in CI (no Doppler CLI), so adding them early
+   would break **every** `main` deploy while prod still runs openai:
+   - `.kamal/secrets` — add the `GEMINI_API_KEY=…` resolver line (mirror `OPENAI_API_KEY`).
+   - `config/deploy.yml` `env.secret` — add `- GEMINI_API_KEY`.
+   - `.github/workflows/deploy.yml` `env` — export `GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}`.
+3. **Flip the selector:** set `RECOGNITION_PROVIDER: gemini` in `config/deploy.yml`
    `env.clear` (optional `GEMINI_RECOGNITION_MODEL` override) and deploy.
-3. **Smoke-test** as for OpenAI. Roll back by setting `RECOGNITION_PROVIDER` to
+4. **Smoke-test** as for OpenAI. Roll back by setting `RECOGNITION_PROVIDER` to
    `openai`/`fake` and redeploying — no schema change.
 
 > The default model strings (`gpt-4o-mini`, `claude-3-5-sonnet-latest`,
