@@ -4,10 +4,11 @@ module Views
   module Boxes
     # A2 — Add box. Renders inside the AppLayout sidebar shell.
     class New < Views::Base
-      def initialize(move:, box:, rooms:)
+      def initialize(move:, box:, rooms:, dimension_presets: [])
         @move = move
         @box = box
         @rooms = rooms
+        @dimension_presets = dimension_presets
       end
 
       def view_template
@@ -22,7 +23,9 @@ module Views
         )
 
         render Components::Ui::Card.new do
-          render Components::BoxForm.new(move: @move, box: @box, rooms: @rooms)
+          render Components::BoxForm.new(
+            move: @move, box: @box, rooms: @rooms, dimension_presets: @dimension_presets
+          )
         end
       end
     end

@@ -41,13 +41,18 @@ class BoxesController < MoveScopedController
   # GET /moves/:move_id/boxes/new
   def new
     render Views::Boxes::New.new(
-      move: @move, box: @move.boxes.new, rooms: @move.rooms.order(:name)
+      move: @move, box: @move.boxes.new, rooms: @move.rooms.order(:name),
+      dimension_presets: @move.boxes.dimension_presets
     )
   end
 
   # GET /moves/:move_id/boxes/:id/edit
   def edit
-    render Views::Boxes::Edit.new(move: @move, box: @box, rooms: @move.rooms.order(:name))
+    render Views::Boxes::Edit.new(
+      move: @move, box: @box, rooms: @move.rooms.order(:name),
+      # Exclude the box being edited from its own suggestions.
+      dimension_presets: @move.boxes.where.not(id: @box.id).dimension_presets
+    )
   end
 
   # POST /moves/:move_id/boxes
@@ -62,7 +67,8 @@ class BoxesController < MoveScopedController
     in Dry::Monads::Failure(errors)
       box = @move.boxes.new(box_params)
       box.errors.merge!(errors) if errors.respond_to?(:each)
-      render Views::Boxes::New.new(move: @move, box: box, rooms: @move.rooms.order(:name)),
+      render Views::Boxes::New.new(move: @move, box: box, rooms: @move.rooms.order(:name),
+                                   dimension_presets: @move.boxes.dimension_presets),
              status: :unprocessable_content
     end
   end
@@ -79,7 +85,8 @@ class BoxesController < MoveScopedController
     in Dry::Monads::Failure(errors)
       @box.assign_attributes(box_params)
       @box.errors.merge!(errors) if errors.respond_to?(:each)
-      render Views::Boxes::Edit.new(move: @move, box: @box, rooms: @move.rooms.order(:name)),
+      render Views::Boxes::Edit.new(move: @move, box: @box, rooms: @move.rooms.order(:name),
+                                    dimension_presets: @move.boxes.where.not(id: @box.id).dimension_presets),
              status: :unprocessable_content
     end
   end

@@ -5,10 +5,11 @@ module Views
     # B1 — Edit box (number, room, dimensions, weight). form_with on a persisted
     # box issues a PATCH to the update action. Renders in the AppShellLayout.
     class Edit < Views::Base
-      def initialize(move:, box:, rooms:)
+      def initialize(move:, box:, rooms:, dimension_presets: [])
         @move = move
         @box = box
         @rooms = rooms
+        @dimension_presets = dimension_presets
       end
 
       def view_template
@@ -25,7 +26,8 @@ module Views
 
         render Components::Ui::Card.new do
           render Components::BoxForm.new(
-            move: @move, box: @box, rooms: @rooms, submit_label: I18n.t("boxes.edit.submit")
+            move: @move, box: @box, rooms: @rooms, submit_label: I18n.t("boxes.edit.submit"),
+            dimension_presets: @dimension_presets
           )
         end
       end

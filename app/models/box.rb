@@ -49,6 +49,21 @@ class Box < ApplicationRecord
 
   scope :ordered, -> { order(Arel.sql("number::bigint")) }
 
+  # Distinct complete L×W×H sizes already used in this (Move-scoped) relation, so
+  # the Add Box form can offer one-tap reuse instead of re-typing. Most-used size
+  # first, then most-recent, so a freshly-used size stays near the front. Returns
+  # lightweight hashes: [{ length_cm:, width_cm:, height_cm:, count: }].
+  def self.dimension_presets(limit: 6)
+    # NB: each NOT NULL needs its own where.not — a single multi-key where.not
+    # negates the *conjunction* (matching only all-null rows), not what we want.
+    where.not(length_cm: nil).where.not(width_cm: nil).where.not(height_cm: nil)
+         .group(:length_cm, :width_cm, :height_cm)
+         .order(Arel.sql("COUNT(*) DESC"), Arel.sql("MAX(created_at) DESC"))
+         .limit(limit)
+         .pluck(:length_cm, :width_cm, :height_cm, Arel.sql("COUNT(*)"))
+         .map { |l, w, h, n| { length_cm: l, width_cm: w, height_cm: h, count: n } }
+  end
+
   def packing?
     status == "packing"
   end

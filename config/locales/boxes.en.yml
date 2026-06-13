@@ -48,6 +48,8 @@ en:
       width_cm: "Width (cm)"
       height_cm: "Height (cm)"
       weight_kg: "Weight (kg)"
+      reuse_dimensions: "Reuse dimensions"
+      dimension_format: "%{length} × %{width} × %{height} cm"
       optional: "Optional"
       submit: "Add box"
       errors:
