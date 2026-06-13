@@ -464,6 +464,52 @@
   .ha-gradient-aura {
     background: var(--c-accent-sage);
   }
+
+  /* Reuse-dimensions quick-pick chip (Add Box form). Rest = sage outline;
+   * aria-pressed=true = sage fill. The Stimulus controller toggles the
+   * attribute, so active styling and a11y state stay in lockstep. */
+  .ha-dim-chip {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0 1.25rem;
+    border-radius: 9999px;
+    white-space: nowrap;
+    cursor: pointer;
+    background: transparent;
+    color: var(--c-text-warm);
+    border: 1px solid color-mix(in srgb, var(--c-accent-sage) 30%, transparent);
+    transition:
+      transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
+      background-color 200ms ease,
+      color 200ms ease;
+  }
+
+  .ha-dim-chip:active {
+    transform: scale(0.95);
+  }
+
+  .ha-dim-chip:focus-visible {
+    outline: 2px solid var(--c-accent-sage);
+    outline-offset: 2px;
+  }
+
+  .ha-dim-chip[aria-pressed="true"] {
+    background: var(--c-accent-sage);
+    color: var(--c-page);
+    border-color: transparent;
+  }
+
+  .ha-dim-chip-count {
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.15rem 0.4rem;
+    border-radius: 9999px;
+    background: color-mix(in srgb, currentColor 15%, transparent);
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────────

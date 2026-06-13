@@ -68,6 +68,24 @@ RSpec.describe "Boxes" do
 
       expect(response).to redirect_to(move_boxes_path(archived))
     end
+
+    it "offers reuse-dimensions chips when the move has dimensioned boxes" do
+      create_list(:box, 2, move:, length_cm: 40, width_cm: 30, height_cm: 25)
+
+      get new_move_box_path(move)
+
+      expect(response.body).to include(I18n.t("boxes.form.reuse_dimensions"))
+      expect(response.body).to include("40 × 30 × 25 cm")
+      expect(response.body).to include('data-dimension-presets-target="chip"')
+    end
+
+    it "omits the reuse-dimensions block when no box has dimensions" do
+      create(:box, move:) # dimensionless
+
+      get new_move_box_path(move)
+
+      expect(response.body).not_to include(I18n.t("boxes.form.reuse_dimensions"))
+    end
   end
 
   describe "POST /moves/:move_id/boxes" do
@@ -109,6 +127,19 @@ RSpec.describe "Boxes" do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Box #001").and include("Kitchen")
       expect(response.body).to include("40 × 30 × 25 cm").and include("0.030 m³")
+    end
+  end
+
+  describe "GET /moves/:move_id/boxes/:id/edit" do
+    it "excludes the edited box's own size from the reuse-dimensions chips" do
+      edited = create(:box, move:, number: "1", length_cm: 99, width_cm: 99, height_cm: 99)
+      create(:box, move:, number: "2", length_cm: 40, width_cm: 30, height_cm: 25)
+      create(:box, move:, number: "3", length_cm: 40, width_cm: 30, height_cm: 25)
+
+      get edit_move_box_path(move, edited)
+
+      expect(response.body).to include("40 × 30 × 25 cm")
+      expect(response.body).not_to include("99 × 99 × 99 cm")
     end
   end
 

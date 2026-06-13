@@ -22,6 +22,28 @@
 
 ---
 
+## ✅ §A2-REUSE-DIMS — "Add box" form had no way to reuse dimensions — RESOLVED
+
+- **Need:** Packing a stack of identical cardboard boxes means re-typing the same
+  Length / Width / Height on every Add Box (A2) form — tedious and a top cause of
+  the "Add dimensions" warning badge. There was no Stitch design for reusing an
+  already-used size.
+- **Resolution (2026-06-13):** Generated a new mobile dark screen on the canonical
+  design system (`assets/7d7093582cf24c509377983bb1b03565`):
+  - `Add a Box - Reuse Dimensions` → `screens/e4c1538e273e4b3893c03449b32f99c5`
+- **Model:** a **"Reuse dimensions"** label-caps heading + a horizontally
+  scrollable row of pill **chips** sits directly above the L/W/H inputs. Each chip
+  reads `40 × 30 × 25 cm`; the most-used size is the active (sage-filled) chip and
+  shows a trailing count badge (`· 3`). Tapping a chip fills **Length / Width /
+  Height only** — **weight stays blank** (contents differ per box). The chip row
+  only appears for sizes used by **2+ boxes** in the Move (the "stack of identical
+  boxes" intent; one-off measurements are suppressed); otherwise the form is
+  unchanged (empty state). No new table — the presets are the repeated existing
+  dimensions queried per Move (`Box.dimension_presets`, `min_count: 2`).
+- Recorded in `README.md` §2 (new A2 "Add box (form)" row).
+
+---
+
 ## ✅ §A1 — "Create / select Move" screen — RESOLVED
 
 - **Spec:** Design Spec §4 A1 requires a screen to list Moves (name, status, progress hint, box count, pending-review count), an empty state, archived read-only treatment, and a "Create Move" form (name, planned date, origin/destination address, unit system).

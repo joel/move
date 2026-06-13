@@ -51,6 +51,7 @@ Every Design-Spec screen (`Move - Design Specification v0.2.md §4`) maps to exa
 |--------|--------|-------|--------------------------------------------|
 | A1 | Create / select Move | D1 | `Select Move - List View` `screens/36ff167acabc4cdea672180472c59fef` · `Select Move - Empty State` `screens/fc59e54dc0924d32a7182ebf77361a0b` · `Create New Move - Form View` `screens/aef244f9c1534e03a77a3f79a345df7d` (all mobile) |
 | A2 | Boxes home | D2 | `Boxes Home (Dark) - Refined Palette` `screens/bda13a39e9cb48b99d72ea5af19041d7` / `Boxes Home (Light) - Mobile` `screens/af60fe3e5f4148ea815de6780fb719f8` |
+| A2 | Add box (form) | D2 | `Add a Box - Reuse Dimensions` `screens/e4c1538e273e4b3893c03449b32f99c5` (mobile, dark) — adds the "Reuse dimensions" quick-pick chip row above the L/W/H inputs |
 | B1 | Box detail | D3 | `Box Detail (Dark) - Refined Palette` `screens/bf7c4f4817464dd09f2b6d0b859cdf1d` / `Box Detail (Dark) - Mobile` `screens/29f0268b59e64a4d89e91f556b6cbfb5` |
 | B2 | Capture image | D4 | `Capture Image (Dark) - Responsive` `screens/99b7a1dce2924e21982207cc8812318f` / `Capture Image (Dark) - Mobile` `screens/5aa6c04e3e624be8a72302ae97384a36` |
 | B3 | Manual add item | D5 | `Manual Add Item (Dark) - Responsive` `screens/b37a2d0c54e246a8bfa0c031e6d705f6` / `Manual Add Item (Light) - Mobile` `screens/daf337c5f0af4e2c85f3bfba7047dbdf` |

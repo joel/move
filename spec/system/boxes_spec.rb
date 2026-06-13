@@ -40,6 +40,19 @@ RSpec.describe "Boxes Home" do
     expect(page).to have_text(I18n.t("boxes.card.missing_dimensions"))
   end
 
+  it "offers reuse-dimensions chips on the add-box form when sizes exist" do
+    create(:box, move:, number: "1", length_cm: 40, width_cm: 30, height_cm: 25)
+    create(:box, move:, number: "2", length_cm: 40, width_cm: 30, height_cm: 25)
+
+    visit new_move_box_path(move)
+
+    expect(page).to have_text(I18n.t("boxes.form.reuse_dimensions"))
+    chip = find("button.ha-dim-chip", text: "40 × 30 × 25 cm")
+    expect(chip["data-length"]).to eq("40")
+    expect(chip["data-width"]).to eq("30")
+    expect(chip["data-height"]).to eq("25")
+  end
+
   it "is read-only for an archived move" do
     archived = create(:move, :archived, created_by: user, name: "Old Move")
     create(:box, move: archived, number: "1")

@@ -8,20 +8,24 @@ module Components
     include Phlex::Rails::Helpers::FormWith
     include Phlex::Rails::Helpers::Pluralize
 
-    def initialize(move:, box:, rooms:, submit_label: nil)
+    def initialize(move:, box:, rooms:, submit_label: nil, dimension_presets: [])
       @move = move
       @box = box
       @rooms = rooms
       @submit_label = submit_label || I18n.t("boxes.form.submit")
+      @dimension_presets = dimension_presets
     end
 
     def view_template
-      form_with(model: [@move, @box], class: "flex flex-col gap-5") do |form|
+      # Stimulus host so a "reuse dimensions" chip can fill the L/W/H inputs.
+      form_with(model: [@move, @box], class: "flex flex-col gap-5",
+                data: { controller: "dimension-presets" }) do |form|
         render_errors if @box.errors.any?
 
         field(form, :number, I18n.t("boxes.form.number"), optional: true,
                                                           placeholder: I18n.t("boxes.form.number_placeholder"))
         room_field(form)
+        reuse_dimensions
         dimensions(form)
 
         div(class: "mt-2 flex flex-wrap gap-3") do
@@ -44,11 +48,60 @@ module Components
       end
     end
 
+    # A horizontally-scrollable row of "reuse dimensions" chips — only shown when
+    # this Move already has boxes with complete dimensions. Tapping a chip fills
+    # the L/W/H inputs (weight is left alone; it varies per box).
+    def reuse_dimensions
+      return if @dimension_presets.blank?
+
+      div(class: "flex flex-col gap-2") do
+        span(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.form.reuse_dimensions") }
+        div(class: "-mx-1 flex gap-3 overflow-x-auto scrollbar-hide px-1 py-1") do
+          @dimension_presets.each { |preset| dimension_chip(preset) }
+        end
+      end
+    end
+
+    def dimension_chip(preset)
+      button(
+        type: "button", class: "ha-dim-chip", "aria-pressed": preset_selected?(preset).to_s,
+        data: {
+          action: "dimension-presets#apply", dimension_presets_target: "chip",
+          length: format_dim(preset[:length_cm]),
+          width: format_dim(preset[:width_cm]),
+          height: format_dim(preset[:height_cm])
+        }
+      ) do
+        span(class: "text-body-md") { dimension_label(preset) }
+        span(class: "ha-dim-chip-count") { "· #{preset[:count]}" } if preset[:count].to_i > 1
+      end
+    end
+
+    # "40 × 30 × 25 cm" — trailing zeros trimmed so 40.00 reads as 40.
+    def dimension_label(preset)
+      I18n.t(
+        "boxes.form.dimension_format",
+        length: format_dim(preset[:length_cm]),
+        width: format_dim(preset[:width_cm]),
+        height: format_dim(preset[:height_cm])
+      )
+    end
+
+    def format_dim(value)
+      number = value.to_d
+      number.frac.zero? ? number.to_i.to_s : number.to_s("F")
+    end
+
+    # Pre-press the chip matching the box's current dimensions (edit form).
+    def preset_selected?(preset)
+      Box::DIMENSIONS.all? { |dim| @box[dim].present? && @box[dim] == preset[dim] }
+    end
+
     def dimensions(form)
       div(class: "grid grid-cols-2 gap-4 sm:grid-cols-4") do
-        number_field(form, :length_cm, I18n.t("boxes.form.length_cm"))
-        number_field(form, :width_cm, I18n.t("boxes.form.width_cm"))
-        number_field(form, :height_cm, I18n.t("boxes.form.height_cm"))
+        number_field(form, :length_cm, I18n.t("boxes.form.length_cm"), target: "length")
+        number_field(form, :width_cm, I18n.t("boxes.form.width_cm"), target: "width")
+        number_field(form, :height_cm, I18n.t("boxes.form.height_cm"), target: "height")
         number_field(form, :weight_kg, I18n.t("boxes.form.weight_kg"))
       end
     end
@@ -60,10 +113,11 @@ module Components
       end
     end
 
-    def number_field(form, name, text)
+    def number_field(form, name, text, target: nil)
       div(class: "flex flex-col gap-2") do
         form.label name, text, class: "text-label-caps uppercase text-muted"
-        form.number_field name, step: "0.01", min: "0", class: "ha-input"
+        data = target ? { dimension_presets_target: target } : {}
+        form.number_field name, step: "0.01", min: "0", class: "ha-input", data: data
       end
     end
 

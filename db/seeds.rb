@@ -112,7 +112,9 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
 
   # number => attributes. Covers every lifecycle state (packing/sealed/
   # in_transit/unpacking/unpacked), boxes with full / partial / no dimensions,
-  # and a roomless box (to demo the seal-requires-room guard).
+  # and a roomless box (to demo the seal-requires-room guard). Sizes repeat on
+  # purpose so the Add Box form's "Reuse dimensions" chips have something to
+  # offer: 40×30×25 appears 3× (a stack of identical boxes) and 60×40×40 twice.
   boxes = {
     "1" => { room: "Kitchen",     status: "sealed",     dims: [40, 30, 25, 8] },
     "2" => { room: "Kitchen",     status: "packing",    dims: [] },
@@ -121,7 +123,9 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     "5" => { room: "Garage",      status: "in_transit", dims: [80, 60, 50, 22] },
     "6" => { room: nil,           status: "packing",    dims: [] },
     "7" => { room: "Bedroom",     status: "unpacking",  dims: [55, 45, 35, 12] },
-    "8" => { room: "Living Room", status: "unpacked",   dims: [60, 40, 40, 14] }
+    "8" => { room: "Living Room", status: "unpacked",   dims: [60, 40, 40, 14] },
+    "9" => { room: "Kitchen",     status: "packing",    dims: [40, 30, 25, 7] },
+    "10" => { room: "Kitchen", status: "sealed", dims: [40, 30, 25, 9] }
   }
 
   boxes.each do |number, attrs|
