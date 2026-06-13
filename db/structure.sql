@@ -345,7 +345,8 @@ CREATE TABLE public.recognition_suggestions (
     confidence_score numeric(4,3),
     state character varying DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    proposed_category_id uuid
 );
 
 
@@ -1032,6 +1033,13 @@ CREATE INDEX index_recognition_suggestions_on_move_id ON public.recognition_sugg
 
 
 --
+-- Name: index_recognition_suggestions_on_proposed_category_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_recognition_suggestions_on_proposed_category_id ON public.recognition_suggestions USING btree (proposed_category_id);
+
+
+--
 -- Name: index_recognition_suggestions_on_recognition_run_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1280,6 +1288,14 @@ ALTER TABLE ONLY public.items
 
 
 --
+-- Name: recognition_suggestions fk_rails_9156700172; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.recognition_suggestions
+    ADD CONSTRAINT fk_rails_9156700172 FOREIGN KEY (proposed_category_id) REFERENCES public.categories(id);
+
+
+--
 -- Name: active_storage_variant_records fk_rails_993965df05; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1382,6 +1398,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260613120001'),
 ('20260609130001'),
 ('20260609120001'),
 ('20260608090002'),
