@@ -119,6 +119,18 @@ RSpec.describe RecognitionRuns::Process do
       expect(box.items.find_by(name: "Drill").category.name).to eq("Tools")
     end
 
+    it "recovers from a concurrent duplicate-category insert by reusing the winner" do
+      # The race: our find missed (the winner committed just after), so the insert
+      # passes model validation but the lower(name) DB index rejects it with
+      # RecordNotUnique. create_category must re-find and return the winner rather
+      # than fail the run. (The insert runs in a requires_new savepoint so the
+      # collision can't abort materialize's outer transaction — see the action.)
+      winner = create(:category, move:, name: "Tools")
+      allow(move.categories).to receive(:create!).and_raise(ActiveRecord::RecordNotUnique.new("dup"))
+
+      expect(described_class.new.send(:create_category, move, "Tools")).to eq(winner)
+    end
+
     it "leaves the item uncategorised when the model returns a blank category" do
       object = RecognitionProviders::DetectedObject.new(
         label: "Mystery item", confidence: 0.9, count: 1, category: nil, fragile: false

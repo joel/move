@@ -110,20 +110,27 @@ module RecognitionRuns
     # Best-effort map of the model's category name onto the Move's managed
     # vocabulary: reuse an existing category (case-insensitive) when one fits,
     # otherwise grow the vocabulary with the new name. Blank → nil (uncategorised).
-    # Mirrors Vocabularies::Create's race handling (the lower(name) unique index
-    # catches a concurrent insert; re-find the winner instead of 500ing).
     def resolve_category(move, name)
       name = name.to_s.strip
       return nil if name.blank?
 
-      existing = move.categories.where("LOWER(name) = ?", name.downcase).first
-      return existing if existing
+      move.categories.where("LOWER(name) = ?", name.downcase).first || create_category(move, name)
+    end
 
-      created = move.categories.create!(name: name)
+    # Insert the new category in its OWN savepoint. materialize runs inside one
+    # transaction, so without requires_new a unique-index collision (a concurrent
+    # run created the same name first) raises RecordNotUnique and aborts the whole
+    # transaction on PostgreSQL — the rescue's re-find would then run in an aborted
+    # transaction and the run would fail. The savepoint rolls back just the failed
+    # insert, leaving the outer transaction usable so we reuse the winner.
+    def create_category(move, name)
+      category = ActiveRecord::Base.transaction(requires_new: true) do
+        move.categories.create!(name: name)
+      end
       Rails.event.notify(
-        "vocabulary.created", kind: "category", record_id: created.id, move_id: move.id, actor_id: nil
+        "vocabulary.created", kind: "category", record_id: category.id, move_id: move.id, actor_id: nil
       )
-      created
+      category
     rescue ActiveRecord::RecordNotUnique
       move.categories.where("LOWER(name) = ?", name.downcase).first
     end
