@@ -261,14 +261,17 @@ module Views
         end
       end
 
+      # Tapping a photo opens the per-photo review walk (one photo → many items).
       def gallery_thumb(media)
-        div(class: "flex aspect-square items-center justify-center overflow-hidden " \
-                   "rounded-xl bg-surface-container-high text-muted") do
+        a(
+          href: move_box_review_photo_path(@move, @box, media_id: media.id),
+          class: "group flex aspect-square items-center justify-center overflow-hidden " \
+                 "rounded-xl bg-surface-container-high text-muted ring-accent-sage " \
+                 "transition hover:ring-2"
+        ) do
           if media.image.attached?
-            img(
-              src: view_context.rails_storage_proxy_path(media.image),
-              class: "h-full w-full object-cover", alt: "", loading: "lazy"
-            )
+            img(src: view_context.rails_storage_proxy_path(media.image), alt: "", loading: "lazy",
+                class: "h-full w-full object-cover transition group-hover:scale-105")
           else
             render Components::Icons::Camera.new(css: "h-7 w-7")
           end
