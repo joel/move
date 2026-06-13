@@ -18,4 +18,15 @@ RSpec.describe BoxLabelPdf do
       .not_to raise_error
     expect(pdf[0, 4]).to eq("%PDF")
   end
+
+  # #162 — print two identical labels per box in one job (and each label fits a
+  # single A7 page; the Unicode TTF used to overflow one label onto two).
+  it "renders exactly two pages" do
+    room = create(:room, move:, name: "Living Room")
+    box = create(:box, move:, room:, number: "9", qr_token: "tok-pages")
+    pdf = described_class.new(box:, scan_url: "https://acme.example/scan/tok-pages").render
+
+    # No pdf-reader dependency: the page-tree /Count is authoritative.
+    expect(pdf).to include("/Count 2")
+  end
 end

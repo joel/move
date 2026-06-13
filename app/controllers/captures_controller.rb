@@ -11,7 +11,9 @@ class CapturesController < MoveScopedController
 
   # GET /moves/:move_id/boxes/:box_id/capture
   def show
-    render Views::Captures::Show.new(move: @move, box: @box, media: session_media)
+    render Views::Captures::Show.new(
+      move: @move, box: @box, media: session_media, items_by_media: items_by_media
+    )
   end
 
   # POST /moves/:move_id/boxes/:box_id/capture
@@ -29,7 +31,9 @@ class CapturesController < MoveScopedController
   # GET /moves/:move_id/boxes/:box_id/capture/session — polled fragment.
   # NB: not named `session` — that collides with ActionController#session.
   def session_panel
-    render Views::Captures::SessionPanel.new(box: @box, media: session_media), layout: false
+    render Views::Captures::SessionPanel.new(
+      box: @box, media: session_media, items_by_media: items_by_media
+    ), layout: false
   end
 
   # POST /moves/:move_id/boxes/:box_id/capture/retry — new run for a failed media.
@@ -60,7 +64,16 @@ class CapturesController < MoveScopedController
   end
 
   def session_media
-    @box.media.includes(:recognition_runs, image_attachment: :blob).recent_first.limit(20)
+    @session_media ||=
+      @box.media.includes(:recognition_runs, image_attachment: :blob).recent_first.limit(20)
+  end
+
+  # Recognised, in-box items grouped by their source photo — lets the Items panel
+  # render each recognised item as a tappable row (→ Item Detail) under its photo.
+  def items_by_media
+    @box.items.in_box.where(source_media_id: session_media.map(&:id))
+        .includes(:category).order(:created_at)
+        .group_by(&:source_media_id)
   end
 
   def capture_error(reason)

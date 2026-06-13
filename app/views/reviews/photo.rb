@@ -194,7 +194,7 @@ module Views
       # (a GET-side effect), so hover-prefetching "Next Photo" must not confirm them
       # before the reviewer actually advances.
       def advance_link(key, href)
-        a(href: href, data: { turbo_prefetch: false },
+        a(href: href, data: { turbo_prefetch: "false" },
           class: "inline-flex w-full items-center justify-center gap-2 rounded-full bg-accent-sage " \
                  "px-6 py-3 text-sm font-bold text-page transition hover:opacity-90 active:scale-[0.98]") do
           plain I18n.t(key)

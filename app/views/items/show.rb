@@ -47,7 +47,11 @@ module Views
       def header
         render Components::Ui::SectionHeader.new(
           eyebrow: box_context(@item.box), title: I18n.t("items.show.title")
-        )
+        ) do
+          # Inline auto-save indicator (C3 has no Save button); replaced by the
+          # items#update Turbo Stream after each field change.
+          render Components::Ui::SaveStatus.new if @editable
+        end
       end
 
       # --- Left: source media ------------------------------------------------
@@ -112,8 +116,7 @@ module Views
       def editable_body
         render Components::ItemForm.new(
           models: [@move, @item], item: @item,
-          categories: @categories, tags: @tags,
-          submit_label: I18n.t("items.show.save")
+          categories: @categories, tags: @tags, autosave: true
         )
         div(class: "mt-2 flex flex-wrap items-center gap-3 border-t border-card-border pt-5") do
           move_control
@@ -177,7 +180,7 @@ module Views
         else
           button_to(
             I18n.t("items.show.remove"), mark_removed_move_item_path(@move, @item),
-            method: :patch, class: ghost_button,
+            method: :patch, class: danger_button,
             data: { turbo_confirm: I18n.t("items.show.remove_confirm") }
           )
         end
@@ -186,6 +189,12 @@ module Views
       def ghost_button
         "inline-flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm " \
           "font-bold text-text-warm transition hover:bg-surface-container-high active:scale-[0.98]"
+      end
+
+      # Destructive action — filled error red (mirrors Ui::Button :danger variant).
+      def danger_button
+        "inline-flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm " \
+          "font-bold bg-error text-on-error transition hover:opacity-90 active:scale-[0.98]"
       end
 
       def box_context(box)

@@ -128,6 +128,22 @@ RSpec.describe "Boxes" do
       expect(response.body).to include("Box #001").and include("Kitchen")
       expect(response.body).to include("40 × 30 × 25 cm").and include("0.030 m³")
     end
+
+    it "links an item-backed gallery photo to its review, opting out of Turbo prefetch" do
+      box = create(:box, move:, number: "1")
+      reviewable = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: reviewable, name: "Lamp")
+      empty_photo = create(:media, move:, box:) # no items → absent from the review walk
+
+      get move_box_path(move, box)
+
+      # #162 — item-backed photo links to review; prefetch off so a hover can't
+      # silently mark it reviewed. An item-less photo must NOT link (would render
+      # a "Photo 1 of 0" dead end).
+      expect(response.body).to include(%(href="#{move_box_review_photo_path(move, box, media_id: reviewable.id)}"))
+      expect(response.body).to include('data-turbo-prefetch="false"')
+      expect(response.body).not_to include(move_box_review_photo_path(move, box, media_id: empty_photo.id))
+    end
   end
 
   describe "GET /moves/:move_id/boxes/:id/edit" do

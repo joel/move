@@ -20,7 +20,7 @@ RSpec.describe "Captures" do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Capture for Box #001")
-      expect(response.body).to include(I18n.t("captures.shutter"))
+      expect(response.body).to include(I18n.t("captures.tap_to_capture"))
     end
 
     it "redirects a sealed box to the box detail (capture blocked)" do
@@ -95,6 +95,17 @@ RSpec.describe "Captures" do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include('data-pending="0"')
+    end
+
+    it "renders recognised items as tappable links to Item Detail once a run succeeds" do
+      media = create(:media, move:, box:)
+      create(:recognition_run, :succeeded, move:, box:, media:)
+      item = create(:item, move:, box:, name: "Espresso machine", source_media: media)
+
+      get move_box_capture_session_path(move, box)
+
+      expect(response.body).to include(%(href="#{move_item_path(move, item)}"))
+      expect(response.body).to include("Espresso machine")
     end
   end
 

@@ -43,23 +43,43 @@ class ItemsController < MoveScopedController
   end
 
   # PATCH /moves/:move_id/items/:id
+  # C3 auto-saves: the editable form submits on every field change as a Turbo
+  # Stream and only the inline "Saved ✓" badge is swapped (the form fields keep
+  # their DOM state). The HTML branches remain for non-Turbo clients / B-flows.
   def update
     result = Items::Update.new.call(item: @item, params: item_params, editor: current_user)
 
     case result
     in Dry::Monads::Success(item)
-      redirect_to move_item_path(@move, item), notice: t(".updated", name: item.name)
+      respond_to do |format|
+        format.turbo_stream { render turbo_stream: save_status_stream(:saved) }
+        format.html { redirect_to move_item_path(@move, item), notice: t(".updated", name: item.name) }
+      end
     in Dry::Monads::Failure(Symbol => reason)
-      redirect_to move_item_path(@move, @item), alert: vocabulary_error(reason)
+      message = vocabulary_error(reason)
+      respond_to do |format|
+        format.turbo_stream do
+          render turbo_stream: save_status_stream(:error, message:), status: :unprocessable_content
+        end
+        format.html { redirect_to move_item_path(@move, @item), alert: message }
+      end
     in Dry::Monads::Failure(errors)
       @item.assign_attributes(item_attributes)
       @item.errors.merge!(errors) if errors.respond_to?(:each)
-      # update is editor-gated (require_writable_move!), so re-render the editable
-      # form (not the read-only view) to show the validation errors.
-      render Views::Items::Show.new(
-        move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-        editable: true, photo_siblings: photo_siblings(@item), **vocabulary
-      ), status: :unprocessable_content
+      respond_to do |format|
+        format.turbo_stream do
+          render turbo_stream: save_status_stream(:error, message: @item.errors.full_messages.first),
+                 status: :unprocessable_content
+        end
+        # update is editor-gated (require_writable_move!), so re-render the editable
+        # form (not the read-only view) to show the validation errors.
+        format.html do
+          render Views::Items::Show.new(
+            move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
+            editable: true, photo_siblings: photo_siblings(@item), **vocabulary
+          ), status: :unprocessable_content
+        end
+      end
     end
   end
 
@@ -90,6 +110,14 @@ class ItemsController < MoveScopedController
   end
 
   private
+
+  # Turbo Stream that swaps the inline auto-save badge in the C3 header.
+  def save_status_stream(state, message: nil)
+    turbo_stream.replace(
+      Components::Ui::SaveStatus::ID,
+      view_context.render(Components::Ui::SaveStatus.new(state: state, message: message))
+    )
+  end
 
   # How many *other* in-box items were detected in the same photo — drives the C3
   # "detected with N other items in this photo" line so a single image reads as

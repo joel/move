@@ -4,12 +4,13 @@ en:
   captures:
     title: "Capture for Box #%{number} — %{room}"
     online: "Online"
-    shutter: "Capture image"
+    tap_to_capture: "Tap to capture"
+    capture_hint: "Ensure items are well lit and clearly visible"
     finish: "Finish box"
     add_item: "Add item manually"
     sealed: "This box is sealed — unseal it before capturing."
     session:
-      title: "Session"
+      title: "Items"
       count:
         zero: "No captures"
         one: "1 capture"

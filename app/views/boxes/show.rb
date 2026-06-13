@@ -15,7 +15,8 @@ module Views
         "unpacking" => "unpacking", "unpacked" => "unpacked"
       }.freeze
 
-      def initialize(move:, box:, items: [], media: [], editable: false, pending_count: 0)
+      def initialize(move:, box:, items: [], media: [], editable: false, pending_count: 0,
+                     reviewable_media_ids: [])
         @move = move
         @box = box
         @items = items
@@ -24,6 +25,9 @@ module Views
         # Count of items the C2 walk can review (computed by the controller — see
         # BoxesController#reviewable_count): unreviewed AND photo-backed.
         @pending_count = pending_count
+        # Media that produced an item (the per-photo review walk) — only these
+        # gallery photos link into review; the rest render as plain thumbnails.
+        @reviewable_media_ids = reviewable_media_ids
         @measurements = BoxMeasurements.new(box, unit_system: move.unit_system)
       end
 
@@ -185,7 +189,9 @@ module Views
       def detail_split
         div(class: "grid grid-cols-1 gap-stack-gap lg:grid-cols-12") do
           items_section
-          gallery_section
+          render Views::Boxes::Gallery.new(
+            move: @move, box: @box, media: @media, reviewable_media_ids: @reviewable_media_ids
+          )
         end
       end
 
@@ -203,7 +209,7 @@ module Views
       # Enters the D6 per-photo review walk (C2). Prefetch off: opening a photo
       # marks its items reviewed, so hover must not confirm them prematurely.
       def pending_badge
-        a(href: move_box_review_path(@move, @box), data: { turbo_prefetch: false },
+        a(href: move_box_review_path(@move, @box), data: { turbo_prefetch: "false" },
           class: "rounded-full bg-tertiary/15 px-3 py-1 text-label-caps uppercase " \
                  "text-tertiary transition hover:bg-tertiary/25") do
           I18n.t("boxes.show.pending_review", count: @pending_count)
@@ -241,45 +247,6 @@ module Views
         render Components::Ui::EmptyState.new(
           title: I18n.t("boxes.show.items_empty_title"),
           description: I18n.t("boxes.show.items_empty_description")
-        )
-      end
-
-      # Full-media gallery — never crops/bounding boxes (Domain §4.9, TF §13).
-      def gallery_section
-        aside(class: "flex flex-col gap-stack-gap lg:col-span-4") do
-          div(class: "flex items-center justify-between px-2") do
-            h3(class: "text-headline-md text-text-warm") { I18n.t("boxes.show.gallery") }
-            span(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.show.photos", count: @media.size) }
-          end
-          @media.any? ? gallery_grid : gallery_empty
-        end
-      end
-
-      def gallery_grid
-        div(class: "grid grid-cols-2 gap-3") do
-          @media.each { |media| gallery_thumb(media) }
-        end
-      end
-
-      def gallery_thumb(media)
-        div(class: "flex aspect-square items-center justify-center overflow-hidden " \
-                   "rounded-xl bg-surface-container-high text-muted") do
-          if media.image.attached?
-            img(
-              src: view_context.rails_storage_proxy_path(media.image),
-              class: "h-full w-full object-cover", alt: "", loading: "lazy"
-            )
-          else
-            render Components::Icons::Camera.new(css: "h-7 w-7")
-          end
-        end
-      end
-
-      def gallery_empty
-        render Components::Ui::EmptyState.new(
-          icon: Components::Icons::Camera,
-          title: I18n.t("boxes.show.gallery_empty_title"),
-          description: I18n.t("boxes.show.gallery_empty_description")
         )
       end
 
