@@ -42,6 +42,7 @@ RSpec.describe "Boxes Home" do
 
   it "offers reuse-dimensions chips on the add-box form when sizes exist" do
     create(:box, move:, number: "1", length_cm: 40, width_cm: 30, height_cm: 25)
+    create(:box, move:, number: "2", length_cm: 40, width_cm: 30, height_cm: 25)
 
     visit new_move_box_path(move)
 

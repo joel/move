@@ -88,34 +88,48 @@ RSpec.describe Box do
 
     it "groups identical L×W×H and counts them, most-used first" do
       create_list(:box, 3, move:, length_cm: 40, width_cm: 30, height_cm: 25)
-      create(:box, move:, length_cm: 60, width_cm: 40, height_cm: 40)
+      create_list(:box, 2, move:, length_cm: 60, width_cm: 40, height_cm: 40)
 
       presets = move.boxes.dimension_presets
 
       expect(presets.first).to include(length_cm: 40, width_cm: 30, height_cm: 25, count: 3)
-      expect(presets.pluck(:count)).to eq([3, 1])
+      expect(presets.pluck(:count)).to eq([3, 2])
+    end
+
+    it "excludes sizes used by only one box (no point reusing a one-off)" do
+      create_list(:box, 2, move:, length_cm: 40, width_cm: 30, height_cm: 25)
+      create(:box, move:, length_cm: 99, width_cm: 99, height_cm: 99) # singleton
+
+      sizes = move.boxes.dimension_presets.map { |p| [p[:length_cm].to_i] }
+      expect(sizes).to eq([[40]])
+    end
+
+    it "honours a custom min_count" do
+      create_list(:box, 2, move:, length_cm: 40, width_cm: 30, height_cm: 25)
+
+      expect(move.boxes.dimension_presets(min_count: 3)).to be_empty
     end
 
     it "excludes boxes missing any linear dimension" do
-      create(:box, move:, length_cm: 40, width_cm: 30, height_cm: nil)
+      create_list(:box, 2, move:, length_cm: 40, width_cm: 30, height_cm: nil)
       create(:box, move:) # all nil
 
       expect(move.boxes.dimension_presets).to be_empty
     end
 
     it "tie-breaks by recency when counts are equal" do
-      older = create(:box, move:, length_cm: 10, width_cm: 10, height_cm: 10,
-                           created_at: 2.days.ago)
-      newer = create(:box, move:, length_cm: 20, width_cm: 20, height_cm: 20,
+      older = create_list(:box, 2, move:, length_cm: 10, width_cm: 10, height_cm: 10,
+                                   created_at: 2.days.ago)
+      create_list(:box, 2, move:, length_cm: 20, width_cm: 20, height_cm: 20,
                            created_at: 1.hour.ago)
 
       first = move.boxes.dimension_presets.first
-      expect(first[:length_cm]).to eq(newer.length_cm)
-      expect(first[:length_cm]).not_to eq(older.length_cm)
+      expect(first[:length_cm]).to eq(20)
+      expect(first[:length_cm]).not_to eq(older.first.length_cm)
     end
 
     it "respects the limit" do
-      5.times { |i| create(:box, move:, length_cm: i + 1, width_cm: 1, height_cm: 1) }
+      4.times { |i| create_list(:box, 2, move:, length_cm: i + 1, width_cm: 1, height_cm: 1) }
 
       expect(move.boxes.dimension_presets(limit: 2).size).to eq(2)
     end

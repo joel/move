@@ -36,9 +36,10 @@
   reads `40 × 30 × 25 cm`; the most-used size is the active (sage-filled) chip and
   shows a trailing count badge (`· 3`). Tapping a chip fills **Length / Width /
   Height only** — **weight stays blank** (contents differ per box). The chip row
-  only appears when the Move already has boxes with complete dimensions; otherwise
-  the form is unchanged (empty state). No new table — the presets are the distinct
-  existing dimensions queried per Move.
+  only appears for sizes used by **2+ boxes** in the Move (the "stack of identical
+  boxes" intent; one-off measurements are suppressed); otherwise the form is
+  unchanged (empty state). No new table — the presets are the repeated existing
+  dimensions queried per Move (`Box.dimension_presets`, `min_count: 2`).
 - Recorded in `README.md` §2 (new A2 "Add box (form)" row).
 
 ---

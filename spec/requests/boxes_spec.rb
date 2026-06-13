@@ -134,6 +134,7 @@ RSpec.describe "Boxes" do
     it "excludes the edited box's own size from the reuse-dimensions chips" do
       edited = create(:box, move:, number: "1", length_cm: 99, width_cm: 99, height_cm: 99)
       create(:box, move:, number: "2", length_cm: 40, width_cm: 30, height_cm: 25)
+      create(:box, move:, number: "3", length_cm: 40, width_cm: 30, height_cm: 25)
 
       get edit_move_box_path(move, edited)
 
