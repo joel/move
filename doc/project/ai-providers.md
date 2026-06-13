@@ -99,19 +99,17 @@ turns on genuine vision recognition and semantic search.
 Same ordering rule as OpenAI — **add `GEMINI_API_KEY` first**, or every run fails
 with `GEMINI_API_KEY is not set`.
 
-1. **Add the secret to Doppler** (`move/prd`):
-   `doppler secrets set GEMINI_API_KEY=… --project move --config prd`. It syncs
-   into GitHub Actions secrets.
-2. **Wire the secret (committed once the key exists).** These are intentionally
-   *not* wired today — referencing a secret that isn't in Doppler makes kamal's
-   Doppler fallback fail the deploy in CI (no Doppler CLI), so adding them early
-   would break **every** `main` deploy while prod still runs openai:
-   - `.kamal/secrets` — add the `GEMINI_API_KEY=…` resolver line (mirror `OPENAI_API_KEY`).
-   - `config/deploy.yml` `env.secret` — add `- GEMINI_API_KEY`.
-   - `.github/workflows/deploy.yml` `env` — export `GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}`.
-3. **Flip the selector:** set `RECOGNITION_PROVIDER: gemini` in `config/deploy.yml`
+1. **The secret is provisioned and wired (done).** `GEMINI_API_KEY` lives in
+   Doppler `move/prd`, is synced into GitHub Actions secrets, and is committed
+   into `.kamal/secrets`, `config/deploy.yml` `env.secret`, and the deploy
+   workflow's `env`. It is injected into the container but unused while
+   `RECOGNITION_PROVIDER` stays `openai`.
+   > Ordering reminder: these references were added only **after** the key
+   > existed in both Doppler and GitHub Actions — wiring a secret that isn't
+   > synced makes kamal's Doppler fallback fail the CI deploy (no Doppler CLI).
+2. **Flip the selector:** set `RECOGNITION_PROVIDER: gemini` in `config/deploy.yml`
    `env.clear` (optional `GEMINI_RECOGNITION_MODEL` override) and deploy.
-4. **Smoke-test** as for OpenAI. Roll back by setting `RECOGNITION_PROVIDER` to
+3. **Smoke-test** as for OpenAI. Roll back by setting `RECOGNITION_PROVIDER` to
    `openai`/`fake` and redeploying — no schema change.
 
 > The default model strings (`gpt-5-mini`, `claude-haiku-4-5-20251001`,
