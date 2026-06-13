@@ -49,13 +49,13 @@ class Box < ApplicationRecord
 
   scope :ordered, -> { order(Arel.sql("number::bigint")) }
 
-  # Complete L×W×H sizes *repeated* across this (Move-scoped) relation, so the Add
-  # Box form can offer one-tap reuse instead of re-typing. Only sizes used by
-  # `min_count`+ boxes qualify — that matches the "stack of identical boxes" intent
-  # and suppresses the long tail of near-duplicate one-off measurements. Most-used
-  # first, then most-recent (a freshly-used size stays near the front), capped at
-  # `limit` as a safety net. Returns [{ length_cm:, width_cm:, height_cm:, count: }].
-  def self.dimension_presets(min_count: 2, limit: 6)
+  # Distinct complete L×W×H sizes already used in this (Move-scoped) relation, so
+  # the Add Box form can offer one-tap reuse instead of re-typing — the point is to
+  # reuse a size the moment you've entered it once (box #2 of a stack), so the
+  # default `min_count` is 1. Most-used first, then most-recent (a freshly-used
+  # size stays near the front), capped at `limit` to keep the chip row scannable.
+  # Returns [{ length_cm:, width_cm:, height_cm:, count: }].
+  def self.dimension_presets(min_count: 1, limit: 6)
     # NB: each NOT NULL needs its own where.not — a single multi-key where.not
     # negates the *conjunction* (matching only all-null rows), not what we want.
     where.not(length_cm: nil).where.not(width_cm: nil).where.not(height_cm: nil)

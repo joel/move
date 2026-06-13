@@ -96,18 +96,20 @@ RSpec.describe Box do
       expect(presets.pluck(:count)).to eq([3, 2])
     end
 
-    it "excludes sizes used by only one box (no point reusing a one-off)" do
-      create_list(:box, 2, move:, length_cm: 40, width_cm: 30, height_cm: 25)
-      create(:box, move:, length_cm: 99, width_cm: 99, height_cm: 99) # singleton
+    it "offers a size used by only one box (reuse kicks in on box #2)" do
+      create(:box, move:, length_cm: 40, width_cm: 30, height_cm: 25)
 
-      sizes = move.boxes.dimension_presets.map { |p| [p[:length_cm].to_i] }
-      expect(sizes).to eq([[40]])
+      presets = move.boxes.dimension_presets
+      expect(presets.map { |p| p[:length_cm].to_i }).to eq([40])
+      expect(presets.first[:count]).to eq(1)
     end
 
-    it "honours a custom min_count" do
-      create_list(:box, 2, move:, length_cm: 40, width_cm: 30, height_cm: 25)
+    it "honours a custom min_count to require repeats" do
+      create(:box, move:, length_cm: 40, width_cm: 30, height_cm: 25)
+      create_list(:box, 2, move:, length_cm: 60, width_cm: 40, height_cm: 40)
 
-      expect(move.boxes.dimension_presets(min_count: 3)).to be_empty
+      sizes = move.boxes.dimension_presets(min_count: 2).map { |p| p[:length_cm].to_i }
+      expect(sizes).to eq([60]) # the singleton 40×30×25 is filtered out
     end
 
     it "excludes boxes missing any linear dimension" do
