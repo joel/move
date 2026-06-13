@@ -128,6 +128,17 @@ RSpec.describe "Boxes" do
       expect(response.body).to include("Box #001").and include("Kitchen")
       expect(response.body).to include("40 × 30 × 25 cm").and include("0.030 m³")
     end
+
+    it "links each gallery photo to its per-photo review, opting out of Turbo prefetch" do
+      box = create(:box, move:, number: "1")
+      media = create(:media, move:, box:)
+
+      get move_box_path(move, box)
+
+      # #162 — prefetch on hover must not silently mark the photo reviewed.
+      expect(response.body).to include(%(href="#{move_box_review_photo_path(move, box, media_id: media.id)}"))
+      expect(response.body).to include('data-turbo-prefetch="false"')
+    end
   end
 
   describe "GET /moves/:move_id/boxes/:id/edit" do

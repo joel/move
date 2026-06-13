@@ -203,7 +203,7 @@ module Views
       # Enters the D6 per-photo review walk (C2). Prefetch off: opening a photo
       # marks its items reviewed, so hover must not confirm them prematurely.
       def pending_badge
-        a(href: move_box_review_path(@move, @box), data: { turbo_prefetch: false },
+        a(href: move_box_review_path(@move, @box), data: { turbo_prefetch: "false" },
           class: "rounded-full bg-tertiary/15 px-3 py-1 text-label-caps uppercase " \
                  "text-tertiary transition hover:bg-tertiary/25") do
           I18n.t("boxes.show.pending_review", count: @pending_count)
@@ -261,13 +261,15 @@ module Views
         end
       end
 
-      # Tapping a photo opens the per-photo review walk (one photo → many items).
+      # Opens the per-photo review walk. turbo_prefetch:false because that GET
+      # marks the photo's unreviewed items reviewed — hover prefetch would
+      # silently clear pending_review (matches the pending-badge / Next links).
       def gallery_thumb(media)
         a(
           href: move_box_review_photo_path(@move, @box, media_id: media.id),
-          class: "group flex aspect-square items-center justify-center overflow-hidden " \
-                 "rounded-xl bg-surface-container-high text-muted ring-accent-sage " \
-                 "transition hover:ring-2"
+          data: { turbo_prefetch: "false" },
+          class: "group flex aspect-square items-center justify-center overflow-hidden rounded-xl " \
+                 "bg-surface-container-high text-muted ring-accent-sage transition hover:ring-2"
         ) do
           if media.image.attached?
             img(src: view_context.rails_storage_proxy_path(media.image), alt: "", loading: "lazy",
