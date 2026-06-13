@@ -13,9 +13,9 @@ module RecognitionProviders
 
     def identify(image:, context:)
       key = ENV["ANTHROPIC_API_KEY"].presence or raise "ANTHROPIC_API_KEY is not set"
-      # TODO: confirm the production model string (claude-3-5-sonnet-latest kept
-      # as the working default; a Haiku 4.5 keeps cost near the OpenAI mini tier).
-      model = ENV.fetch("ANTHROPIC_RECOGNITION_MODEL", "claude-3-5-sonnet-latest")
+      # Haiku 4.5 (dated snapshot) keeps cost near the OpenAI mini tier; bump to a
+      # current Sonnet via ANTHROPIC_RECOGNITION_MODEL for higher recall.
+      model = ENV.fetch("ANTHROPIC_RECOGNITION_MODEL", "claude-haiku-4-5-20251001")
       json = post_json(
         ENDPOINT,
         headers: { "x-api-key" => key, "anthropic-version" => VERSION },

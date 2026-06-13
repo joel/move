@@ -11,9 +11,9 @@ module RecognitionProviders
 
     def identify(image:, context:)
       key = ENV["OPENAI_API_KEY"].presence or raise "OPENAI_API_KEY is not set"
-      # TODO: confirm the production model string (gpt-4o-mini kept as the working
-      # default; a GPT-4.1/5.x mini is cheaper/stronger once the string is pinned).
-      model = ENV.fetch("OPENAI_RECOGNITION_MODEL", "gpt-4o-mini")
+      # GPT-5 mini: flagship-family vision + strict structured outputs at mini-tier
+      # cost. Overridable via OPENAI_RECOGNITION_MODEL. (gpt-4o-mini was prev-gen.)
+      model = ENV.fetch("OPENAI_RECOGNITION_MODEL", "gpt-5-mini")
       json = post_json(
         ENDPOINT,
         headers: { "Authorization" => "Bearer #{key}" },

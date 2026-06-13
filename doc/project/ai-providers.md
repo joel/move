@@ -7,7 +7,7 @@ network-free **fake** so the app — and CI — run with **no API key and no cos
 
 | Capability | Module | Env selector | Adapters | Prod model (openai) |
 |---|---|---|---|---|
-| Image recognition | `app/services/recognition_providers/` | `RECOGNITION_PROVIDER` | `fake` (default), `openai`, `anthropic`, `gemini` | `gpt-4o-mini` |
+| Image recognition | `app/services/recognition_providers/` | `RECOGNITION_PROVIDER` | `fake` (default), `openai`, `anthropic`, `gemini` | `gpt-5-mini` |
 | Text embeddings (D8 search) | `app/services/embedding_providers/` | `EMBEDDING_PROVIDER` | `fake` (default), `openai` | `text-embedding-3-small` @ 1536d |
 
 ### Recognition detection contract
@@ -114,10 +114,10 @@ with `GEMINI_API_KEY is not set`.
 4. **Smoke-test** as for OpenAI. Roll back by setting `RECOGNITION_PROVIDER` to
    `openai`/`fake` and redeploying — no schema change.
 
-> The default model strings (`gpt-4o-mini`, `claude-3-5-sonnet-latest`,
-> `gemini-2.5-flash`) are sane working defaults but **verify the current best
-> string for your account** and pin via `*_RECOGNITION_MODEL` rather than relying
-> on the in-code default drifting out of date.
+> The default model strings (`gpt-5-mini`, `claude-haiku-4-5-20251001`,
+> `gemini-2.5-flash`) are current-generation, cost-matched defaults. Override per
+> environment via `*_RECOGNITION_MODEL` (e.g. a full `gpt-5`/Sonnet for higher
+> recall) rather than relying on the in-code default drifting out of date.
 
 ## Accepted image formats
 
