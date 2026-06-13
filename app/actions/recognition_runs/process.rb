@@ -123,6 +123,12 @@ module RecognitionRuns
     # transaction on PostgreSQL — the rescue's re-find would then run in an aborted
     # transaction and the run would fail. The savepoint rolls back just the failed
     # insert, leaving the outer transaction usable so we reuse the winner.
+    #
+    # The concurrent race surfaces two ways depending on timing: if the winner is
+    # already visible when create! validates, the model's case-insensitive
+    # uniqueness check raises RecordInvalid (no INSERT runs); if it commits only
+    # after our INSERT, the lower(name) DB index raises RecordNotUnique. Reuse the
+    # winner in both cases; re-raise anything that isn't this race (no matching row).
     def create_category(move, name)
       category = ActiveRecord::Base.transaction(requires_new: true) do
         move.categories.create!(name: name)
@@ -131,8 +137,8 @@ module RecognitionRuns
         "vocabulary.created", kind: "category", record_id: category.id, move_id: move.id, actor_id: nil
       )
       category
-    rescue ActiveRecord::RecordNotUnique
-      move.categories.where("LOWER(name) = ?", name.downcase).first
+    rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
+      move.categories.where("LOWER(name) = ?", name.downcase).first || raise(e)
     end
 
     def finish(run, result)

@@ -119,16 +119,34 @@ RSpec.describe RecognitionRuns::Process do
       expect(box.items.find_by(name: "Drill").category.name).to eq("Tools")
     end
 
-    it "recovers from a concurrent duplicate-category insert by reusing the winner" do
-      # The race: our find missed (the winner committed just after), so the insert
-      # passes model validation but the lower(name) DB index rejects it with
-      # RecordNotUnique. create_category must re-find and return the winner rather
-      # than fail the run. (The insert runs in a requires_new savepoint so the
-      # collision can't abort materialize's outer transaction — see the action.)
+    it "reuses the winner when the uniqueness validation catches the race (RecordInvalid)" do
+      # Deterministic timing: the winner is already visible when create! validates,
+      # so the model's case-insensitive uniqueness check raises RecordInvalid (no
+      # INSERT runs). create_category must still reuse it (case-insensitively)
+      # rather than let the run fail.
+      winner = create(:category, move:, name: "Tools")
+
+      expect(described_class.new.send(:create_category, move, "tools")).to eq(winner)
+    end
+
+    it "reuses the winner when the DB unique index catches the race (RecordNotUnique)" do
+      # The other timing: validation passed (winner not yet visible) but the
+      # lower(name) index rejects the INSERT with RecordNotUnique. The insert runs
+      # in a requires_new savepoint so the collision can't abort materialize's
+      # outer transaction (see the action); the rescue re-finds the winner.
       winner = create(:category, move:, name: "Tools")
       allow(move.categories).to receive(:create!).and_raise(ActiveRecord::RecordNotUnique.new("dup"))
 
       expect(described_class.new.send(:create_category, move, "Tools")).to eq(winner)
+    end
+
+    it "re-raises when create! fails for a reason other than the duplicate race" do
+      # A non-uniqueness validation failure (no matching row to fall back to) must
+      # surface, not be swallowed as an uncategorised item.
+      allow(move.categories).to receive(:create!).and_raise(ActiveRecord::RecordInvalid.new(Category.new))
+
+      expect { described_class.new.send(:create_category, move, "Tools") }
+        .to raise_error(ActiveRecord::RecordInvalid)
     end
 
     it "leaves the item uncategorised when the model returns a blank category" do
