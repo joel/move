@@ -30,14 +30,16 @@ RSpec.describe "Manual add & item detail" do
     expect(item.tags.map(&:name)).to contain_exactly("Heavy")
   end
 
-  it "edits an item from the detail screen (C3)" do
+  it "presents the detail screen as an auto-saving form with no Save button (C3)" do
     item = create(:item, :manual, move:, box: source, name: "Old")
 
     visit move_item_path(move, item)
-    fill_in "item[name]", with: "Dinner Plates"
-    click_button I18n.t("items.show.save")
 
-    expect(item.reload.name).to eq("Dinner Plates")
+    # Auto-save (change->auto-submit) is JS-only; the *update* itself is covered by
+    # the request spec. Here we assert the redesigned surface: the editable name
+    # field is present and there is no "Save Changes" button.
+    expect(page).to have_field("item[name]", with: "Old")
+    expect(page).to have_no_button(I18n.t("items.show.save"))
   end
 
   it "moves an item to another box, keeping presence in_box" do

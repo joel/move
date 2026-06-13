@@ -21,6 +21,8 @@ en:
       title: "Item Details"
       back: "Back to box"
       save: "Save Changes"
+      saved: "Saved"
+      save_failed: "Couldn’t save"
       move: "Move"
       remove: "Remove"
       restore: "Restore to box"

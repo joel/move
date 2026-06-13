@@ -10,27 +10,37 @@ module Components
   class ItemForm < Components::Base
     include Phlex::Rails::Helpers::FormWith
 
-    def initialize(models:, item:, categories:, tags:, submit_label:, cancel_href: nil)
+    def initialize(models:, item:, categories:, tags:, submit_label: nil, cancel_href: nil, autosave: false)
       @models = models
       @item = item
       @categories = categories
       @tags = tags
       @submit_label = submit_label
       @cancel_href = cancel_href
+      # C3 auto-saves: every field change submits the whole form (the form-level
+      # `change->auto-submit#submit` action), so there is no submit button. B3
+      # (manual add) keeps the button — a not-yet-created record can't auto-save.
+      @autosave = autosave
     end
 
     def view_template
-      form_with(model: @models, class: "flex flex-col gap-6") do |form|
+      form_with(model: @models, class: "flex flex-col gap-6", **form_attrs) do |form|
         render_errors if @item.errors.any?
         name_field
         category_and_quantity
         fragile_toggle
         tags_field
-        footer(form)
+        footer(form) unless @autosave
       end
     end
 
     private
+
+    def form_attrs
+      return {} unless @autosave
+
+      { data: { controller: "auto-submit", action: "change->auto-submit#submit" } }
+    end
 
     def name_field
       render Components::Ui::Field.new(

@@ -51,15 +51,16 @@ RSpec.describe "Viewer read-only affordances" do
     let(:box) { create(:box, move:, number: "1") }
     let(:item) { create(:item, move:, box:, name: "Lamp") }
 
-    it "shows the edit form/save to an editor but a read-only view to a viewer" do
+    it "shows the (auto-saving) edit form to an editor but a read-only view to a viewer" do
       as(admin)
       get move_item_path(move, item)
-      expect(response.body).to include(I18n.t("items.show.save"))
+      # The inline save-status badge marks the editable, auto-saving form.
+      expect(response.body).to include(Components::Ui::SaveStatus::ID)
 
       as(viewer)
       get move_item_path(move, item)
       aggregate_failures do
-        expect(response.body).not_to include(I18n.t("items.show.save"))
+        expect(response.body).not_to include(Components::Ui::SaveStatus::ID)
         expect(response.body).not_to include(I18n.t("items.show.remove"))
         expect(response.body).to include(I18n.t("items.show.view_only"))
         expect(response.body).to include("Lamp") # the detail is still shown

@@ -98,9 +98,34 @@ RSpec.describe "Items" do
       patch move_item_path(move, item), params: { item: { name: "" } }
 
       expect(response).to have_http_status(:unprocessable_content)
-      # The editor must keep the form to fix the error, not fall into read-only.
-      expect(response.body).to include(I18n.t("items.show.save"))
+      # The editor must keep the (auto-saving) form to fix the error, not fall into
+      # read-only — the inline save-status badge marks the editable surface.
+      expect(response.body).to include(Components::Ui::SaveStatus::ID)
       expect(response.body).not_to include(I18n.t("items.show.view_only"))
+    end
+  end
+
+  describe "PATCH /moves/:move_id/items/:id (Turbo auto-save)" do
+    it "swaps the save-status badge with a Saved confirmation" do
+      item = create(:item, :manual, move:, box:, name: "Old")
+
+      patch move_item_path(move, item), params: { item: { name: "New", quantity: "4" } }, as: :turbo_stream
+
+      expect(response).to have_http_status(:ok)
+      expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+      expect(response.body).to include("turbo-stream").and include(Components::Ui::SaveStatus::ID)
+      expect(response.body).to include(I18n.t("items.show.saved"))
+      expect(item.reload).to have_attributes(name: "New", quantity: 4)
+    end
+
+    it "returns an error badge stream (422) on a validation failure" do
+      item = create(:item, :manual, move:, box:, name: "Old")
+
+      patch move_item_path(move, item), params: { item: { name: "" } }, as: :turbo_stream
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include(Components::Ui::SaveStatus::ID).and include("text-error")
+      expect(item.reload.name).to eq("Old")
     end
   end
 

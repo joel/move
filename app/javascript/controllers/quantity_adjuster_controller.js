@@ -22,5 +22,8 @@ export default class extends Controller {
     const value = Math.max(this.minValue, next)
     this.inputTarget.value = value
     this.displayTarget.textContent = value
+    // Native inputs bubble `change` on their own; the hidden stepper input does
+    // not, so dispatch one — this is what lets the C3 form auto-save on +/-.
+    this.inputTarget.dispatchEvent(new Event("change", { bubbles: true }))
   }
 }
