@@ -10,13 +10,15 @@ module Components
       VARIANTS = {
         success: {
           icon: Components::Icons::Check,
-          surface: "bg-accent-sage/15 border-accent-sage/30 text-text-warm",
+          # Opaque surface so the message is fully legible; the sage stays as the
+          # border + medallion accent (the old /15 fill was unreadable — #162).
+          surface: "bg-surface-container-highest border-accent-sage/40 text-text-warm shadow-lg",
           medallion: "bg-accent-sage/20 text-accent-sage",
           title_key: "ui.toast.success_title"
         },
         error: {
           icon: Components::Icons::Alert,
-          surface: "bg-secondary/15 border-secondary/30 text-text-warm",
+          surface: "bg-surface-container-highest border-secondary/40 text-text-warm shadow-lg",
           medallion: "bg-secondary/20 text-secondary",
           title_key: "ui.toast.error_title"
         },
