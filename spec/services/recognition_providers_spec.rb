@@ -12,6 +12,7 @@ RSpec.describe RecognitionProviders do
     it "selects the vendor adapters by name" do
       expect(described_class.resolve("openai")).to be_a(RecognitionProviders::Openai)
       expect(described_class.resolve("anthropic")).to be_a(RecognitionProviders::Anthropic)
+      expect(described_class.resolve("gemini")).to be_a(RecognitionProviders::Gemini)
     end
   end
 end

@@ -40,6 +40,10 @@ jobs:
       # too: the runner has no Doppler CLI, so .kamal/secrets' Doppler fallback
       # would fail the deploy if this weren't in the environment.
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # Google Gemini key for the recognition adapter (unused while
+      # RECOGNITION_PROVIDER stays openai). Exported so the runner — which has no
+      # Doppler CLI — can satisfy .kamal/secrets without the Doppler fallback.
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
     steps:
       - name: Checkout code

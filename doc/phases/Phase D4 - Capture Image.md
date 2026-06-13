@@ -30,7 +30,8 @@ Deliver the image-only capture surface with unmistakable capture-to-box clarity,
 
 ## 5. Domain & actions required
 - `App::Media::Capture` (image-only, online upload via Active Storage, sets `captured_via: web`) → `App::RecognitionRuns::Enqueue` (Solid Queue).
-- Recognition behind the provider adapter interface (`RecognitionProviders::Base` → `Result`/`DetectedObject`), with a **fake/stub provider** for deterministic local/test runs; `RECOGNITION_PROVIDER` env selects fake/openai/anthropic (Technical Foundation §10.1).
+- Recognition behind the provider adapter interface (`RecognitionProviders::Base` → `Result`/`DetectedObject`), with a **fake/stub provider** for deterministic local/test runs; `RECOGNITION_PROVIDER` env selects fake/openai/anthropic/gemini (Technical Foundation §10.1).
+  - **Update (#160):** adapters use native structured output (no prose scraping), down-scale images to ≤1536px, and the model also returns `category` + `fragile` per detection — materialized onto the `Item` (category resolved best-effort onto the Move vocabulary) and the `RecognitionSuggestion`. Added the Gemini adapter. See `doc/project/ai-providers.md`.
 - `App::RecognitionRuns::Process` restores `Current` from job args, marks `processing`, persists normalized suggestions, applies the auto-confirm threshold (default 0.8) → `auto_confirmed` vs `pending_review`; run ends `succeeded | partially_succeeded | failed`.
 - **No vendor schema / raw responses** in domain tables; adapter discards any bounding boxes (Technical Foundation §10.4, §6.3). `App::RecognitionRuns::Retry` creates a new run.
 - Turbo/Stimulus for upload progress + recognition-state polling (Technical Foundation §12).

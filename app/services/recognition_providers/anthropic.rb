@@ -1,42 +1,62 @@
 # frozen_string_literal: true
 
 module RecognitionProviders
-  # Thin Anthropic (Claude) vision adapter (RECOGNITION_PROVIDER=anthropic). Not
-  # exercised in CI; shaped on the identify_objects.rb prototype. Returns the
-  # normalized Result and never leaks the raw response upward.
+  # Thin Anthropic (Claude) vision adapter (RECOGNITION_PROVIDER=anthropic).
+  # Forces a single tool whose input_schema is OBJECTS_SCHEMA, so the structured
+  # result arrives as a native tool_use input — no prose, no fences to parse.
+  # Not exercised in CI. Returns the normalized Result and never leaks the raw
+  # response upward.
   class Anthropic < Base
-    ENDPOINT = "https://api.anthropic.com/v1/messages"
-    VERSION = "2023-06-01"
+    ENDPOINT  = "https://api.anthropic.com/v1/messages"
+    VERSION   = "2023-06-01"
+    TOOL_NAME = "record_objects"
 
     def identify(image:, context:)
       key = ENV["ANTHROPIC_API_KEY"].presence or raise "ANTHROPIC_API_KEY is not set"
-      model = ENV.fetch("ANTHROPIC_RECOGNITION_MODEL", "claude-3-5-sonnet-latest")
+      # Haiku 4.5 (dated snapshot) keeps cost near the OpenAI mini tier; bump to a
+      # current Sonnet via ANTHROPIC_RECOGNITION_MODEL for higher recall.
+      model = ENV.fetch("ANTHROPIC_RECOGNITION_MODEL", "claude-haiku-4-5-20251001")
       json = post_json(
         ENDPOINT,
         headers: { "x-api-key" => key, "anthropic-version" => VERSION },
         body: body(model, image, context)
       )
-      content = json.dig("content", 0, "text").to_s
-      Result.new(provider: "anthropic", provider_model: model, objects: normalize(parse_array(content)))
+      Result.new(
+        provider: "anthropic", provider_model: model,
+        objects: normalize(extract_objects(tool_input(json)))
+      )
     end
 
     private
 
     def body(model, image, context)
+      img = encoded_image(image)
       {
         model: model,
-        max_tokens: 1024,
+        max_tokens: 2048, # a very full box can produce a long objects array
+        tool_choice: { type: "tool", name: TOOL_NAME },
+        tools: [{
+          name: TOOL_NAME,
+          description: "Record the distinct physical objects identified in the moving-box photo.",
+          input_schema: OBJECTS_SCHEMA
+        }],
         messages: [{
           role: "user",
           content: [
             { type: "text", text: prompt(context) },
             { type: "image", source: {
-              type: "base64", media_type: image.content_type,
-              data: Base64.strict_encode64(image.download)
+              type: "base64", media_type: img[:media_type], data: img[:base64]
             } }
           ]
         }]
       }
+    end
+
+    # The forced tool_use block carries an already-parsed input hash.
+    def tool_input(json)
+      block = Array(json["content"]).find { |b| b["type"] == "tool_use" && b["name"] == TOOL_NAME }
+      block&.dig("input") or
+        raise ProviderHttp::Error, "#{self.class.name} returned no #{TOOL_NAME} tool_use block"
     end
   end
 end

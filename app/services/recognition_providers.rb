@@ -7,11 +7,13 @@ module RecognitionProviders
   module_function
 
   # Resolve the configured adapter instance. `RECOGNITION_PROVIDER` (or the
-  # config.x default) selects fake/openai/anthropic; unknown falls back to fake.
+  # config.x default) selects fake/openai/anthropic/gemini; unknown falls back
+  # to fake.
   def resolve(name = configured_name)
     case name.to_s
     when "openai" then Openai.new
     when "anthropic" then Anthropic.new
+    when "gemini" then Gemini.new
     else Fake.new
     end
   end

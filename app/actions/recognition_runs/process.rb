@@ -44,8 +44,13 @@ module RecognitionRuns
       Rails.event.notify("recognition_run.processing", recognition_run_id: run.id)
     end
 
+    # Feed the move's category vocabulary to the provider so the model can fit
+    # each detection into an existing category rather than inventing near-dupes.
     def context(run)
-      { room: run.box.room&.name }
+      {
+        room: run.box.room&.name,
+        categories: run.move.categories.order(:name).pluck(:name)
+      }
     end
 
     def materialize(run, result)
@@ -60,18 +65,21 @@ module RecognitionRuns
     # existing item and leave it for human resolution in the review queue (D6).
     def materialize_one(run, object, threshold)
       quantity = [object.count.to_i, 1].max
+      category = resolve_category(run.move, object.category)
       existing = confirmed_match(run.box, object.label)
-      return conflict_suggestion(run, object, quantity, existing) if existing
+      return conflict_suggestion(run, object, quantity, existing, category) if existing
 
       auto = object.confidence.present? && object.confidence >= threshold
       suggestion = run.recognition_suggestions.create!(
         move: run.move, box: run.box, media: run.media,
         proposed_name: object.label, proposed_quantity: quantity,
+        proposed_category: category, proposed_fragile: object.fragile,
         confidence_score: object.confidence, state: auto ? "auto_accepted" : "pending"
       )
       item = run.box.items.create!(
         move: run.move, source_media: run.media, source_recognition_suggestion_id: suggestion.id,
         name: object.label, quantity: quantity, confidence_score: object.confidence,
+        category: category, fragile: object.fragile,
         created_via: "recognition", review_state: auto ? "auto_confirmed" : "pending_review"
       )
       suggestion.update!(item: item)
@@ -88,13 +96,49 @@ module RecognitionRuns
     end
 
     # Record the duplicate detection as a conflict without touching the existing
-    # item or adding a second inventory row.
-    def conflict_suggestion(run, object, quantity, existing)
+    # item or adding a second inventory row. The model's proposed category +
+    # fragility ride along on the suggestion for the reviewer to apply.
+    def conflict_suggestion(run, object, quantity, existing, category)
       run.recognition_suggestions.create!(
         move: run.move, box: run.box, media: run.media, item: existing,
         proposed_name: object.label, proposed_quantity: quantity,
+        proposed_category: category, proposed_fragile: object.fragile,
         confidence_score: object.confidence, state: "conflict"
       )
+    end
+
+    # Best-effort map of the model's category name onto the Move's managed
+    # vocabulary: reuse an existing category (case-insensitive) when one fits,
+    # otherwise grow the vocabulary with the new name. Blank → nil (uncategorised).
+    def resolve_category(move, name)
+      name = name.to_s.strip
+      return nil if name.blank?
+
+      move.categories.where("LOWER(name) = ?", name.downcase).first || create_category(move, name)
+    end
+
+    # Insert the new category in its OWN savepoint. materialize runs inside one
+    # transaction, so without requires_new a unique-index collision (a concurrent
+    # run created the same name first) raises RecordNotUnique and aborts the whole
+    # transaction on PostgreSQL — the rescue's re-find would then run in an aborted
+    # transaction and the run would fail. The savepoint rolls back just the failed
+    # insert, leaving the outer transaction usable so we reuse the winner.
+    #
+    # The concurrent race surfaces two ways depending on timing: if the winner is
+    # already visible when create! validates, the model's case-insensitive
+    # uniqueness check raises RecordInvalid (no INSERT runs); if it commits only
+    # after our INSERT, the lower(name) DB index raises RecordNotUnique. Reuse the
+    # winner in both cases; re-raise anything that isn't this race (no matching row).
+    def create_category(move, name)
+      category = ActiveRecord::Base.transaction(requires_new: true) do
+        move.categories.create!(name: name)
+      end
+      Rails.event.notify(
+        "vocabulary.created", kind: "category", record_id: category.id, move_id: move.id, actor_id: nil
+      )
+      category
+    rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
+      move.categories.where("LOWER(name) = ?", name.downcase).first || raise(e)
     end
 
     def finish(run, result)

@@ -52,6 +52,10 @@ env:
     # openai below). MUST be in Doppler move/prd before deploy — see
     # doc/project/ai-providers.md.
     - OPENAI_API_KEY
+    # Google Gemini key for the recognition adapter. In Doppler move/prd + synced
+    # to GitHub Actions. Injected but unused while RECOGNITION_PROVIDER stays
+    # openai; flip below to enable. See doc/project/ai-providers.md.
+    - GEMINI_API_KEY
   clear:
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
     # When you start using multiple servers, you should split out job processing to a dedicated machine.
@@ -91,7 +95,9 @@ env:
     # set BEFORE this takes effect, else every recognition run fails and every
     # embedding goes nil. After enabling, backfill real vectors with
     # `kamal app exec --reuse 'bin/rails search:reindex'`. Both are pay-per-call.
-    # Full runbook + rollback: doc/project/ai-providers.md.
+    # Full runbook + rollback: doc/project/ai-providers.md. To switch image
+    # recognition to Google Gemini, set GEMINI_API_KEY (env.secret above) then
+    # change RECOGNITION_PROVIDER to `gemini`.
     RECOGNITION_PROVIDER: openai
     EMBEDDING_PROVIDER: openai
 
