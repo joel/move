@@ -2,18 +2,21 @@
 
 module Views
   module Captures
-    # The "Session" panel: this box's recent captures with live recognition state.
+    # The "Items" panel: this box's recent captures with live recognition state.
     # Re-rendered by the polled `captures#session` endpoint; the root carries
-    # `data-pending` so the Stimulus poller knows when to stop.
+    # `data-pending` so the Stimulus poller knows when to stop. Once a photo's run
+    # succeeds it expands into one tappable row per recognised item (→ Item
+    # Detail); photos still queued/processing/failed render as a single status row.
     class SessionPanel < Views::Base
       RUN_TO_STATE = {
         "queued" => :queued, "processing" => :processing,
         "succeeded" => :succeeded, "partially_succeeded" => :succeeded, "failed" => :failed
       }.freeze
 
-      def initialize(box:, media:)
+      def initialize(box:, media:, items_by_media: {})
         @box = box
         @media = media
+        @items_by_media = items_by_media
       end
 
       def view_template
@@ -29,16 +32,61 @@ module Views
       end
 
       def list
-        @media.each { |media| row(media) }
+        @media.each { |media| rows(media) }
       end
 
-      def row(media)
+      # A succeeded photo becomes one tappable row per item; otherwise a single
+      # status row (queued / recognising / failed).
+      def rows(media)
         run = media.recognition_runs.max_by(&:created_at)
+        items = @items_by_media[media.id]
+        if succeeded?(run) && items&.any?
+          items.each { |item| item_row(media, item) }
+        else
+          status_row(media, run)
+        end
+      end
+
+      def succeeded?(run)
+        run && %w[succeeded partially_succeeded].include?(run.status)
+      end
+
+      # Tappable recognised-item row → Item Detail, so a wrong category/name can be
+      # fixed without leaving the capture flow.
+      def item_row(media, item)
+        a(
+          href: view_context.move_item_path(@box.move, item),
+          class: "flex items-center gap-3 rounded-xl border border-card-border " \
+                 "bg-surface-container p-3 transition hover:border-accent-sage " \
+                 "hover:bg-surface-container-high"
+        ) do
+          thumb(media)
+          div(class: "flex min-w-0 flex-1 flex-col gap-1") do
+            span(class: "truncate text-body-md font-bold text-text-warm") { item_label(item) }
+            chips(item)
+          end
+          render Components::Icons::ChevronRight.new(css: "h-4 w-4 shrink-0 text-muted")
+        end
+      end
+
+      def item_label(item)
+        item.quantity.to_i > 1 ? "#{item.name} ×#{item.quantity}" : item.name
+      end
+
+      def chips(item)
+        return unless item.category || item.fragile?
+
+        div(class: "flex flex-wrap gap-1.5") do
+          render Components::Ui::Chip.new(label: item.category.name, kind: :room) if item.category
+          render Components::Ui::Chip.new(label: I18n.t("boxes.item.fragile"), kind: :tag) if item.fragile?
+        end
+      end
+
+      def status_row(media, run)
         div(class: "flex items-center gap-3 rounded-xl border border-card-border bg-surface-container p-3") do
           thumb(media)
           div(class: "flex flex-1 flex-col gap-1") do
             state_badge(run)
-            items_found(run)
             retry_button(media) if run&.failed?
           end
         end
@@ -62,19 +110,6 @@ module Views
         return span(class: "text-label-caps uppercase text-muted") { I18n.t("ui.states.queued") } if run.nil?
 
         render Components::Ui::RecognitionState.new(state: RUN_TO_STATE.fetch(run.status, :queued))
-      end
-
-      # One photo can yield many items: surface the detection count once a run
-      # succeeds so the capture session reflects "many items per photo", not 1:1.
-      def items_found(run)
-        return unless run && %w[succeeded partially_succeeded].include?(run.status)
-
-        count = run.metadata["item_count"]
-        return if count.nil?
-
-        span(class: "text-label-caps uppercase text-muted") do
-          I18n.t("captures.session.items_found", count: count.to_i)
-        end
       end
 
       def retry_button(media)

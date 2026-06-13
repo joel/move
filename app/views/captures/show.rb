@@ -8,10 +8,11 @@ module Views
     class Show < Views::Base
       include Phlex::Rails::Helpers::FormWith
 
-      def initialize(move:, box:, media:)
+      def initialize(move:, box:, media:, items_by_media: {})
         @move = move
         @box = box
         @media = media
+        @items_by_media = items_by_media
       end
 
       def view_template
@@ -41,21 +42,29 @@ module Views
         end
       end
 
-      # Server-side multipart upload. On mobile, accept+capture opens the camera.
+      # Server-side multipart upload. The whole dashed tile is a single tap target
+      # (a label wrapping a visually-hidden file input): tapping it opens the
+      # camera (accept+capture) on mobile or the file picker on desktop. Selecting
+      # a photo fires `change`, which the form-level auto-submit controller turns
+      # into a submit — recognition starts immediately, with no shutter button.
       def capture_area
         render Components::Ui::Card.new(padding: "p-6", class: "lg:col-span-2") do
           form_with(url: move_box_capture_path(@move, @box), method: :post,
-                    class: "flex flex-col items-center gap-6") do |form|
-            div(class: "flex h-56 w-full items-center justify-center rounded-card " \
-                       "border border-dashed border-card-border bg-surface-container-high text-muted") do
-              render Components::Icons::Camera.new(css: "h-12 w-12")
+                    data: { controller: "auto-submit", action: "change->auto-submit#submit" }) do |form|
+            label(
+              class: "flex h-56 w-full cursor-pointer flex-col items-center justify-center gap-3 " \
+                     "rounded-card border border-dashed border-card-border bg-surface-container-high " \
+                     "text-muted transition hover:border-accent-sage hover:text-text-warm"
+            ) do
+              span(class: "flex h-16 w-16 items-center justify-center rounded-full " \
+                          "bg-accent-sage/15 text-accent-sage") do
+                render Components::Icons::Camera.new(css: "h-8 w-8")
+              end
+              span(class: "text-headline-md text-text-warm") { I18n.t("captures.tap_to_capture") }
+              span(class: "text-body-md text-muted") { I18n.t("captures.capture_hint") }
+              form.file_field :file, accept: "image/*", capture: "environment",
+                                     required: true, class: "sr-only"
             end
-            form.file_field :file, accept: "image/*",
-                                   capture: "environment", required: true,
-                                   class: "w-full text-body-md text-muted file:mr-4 file:rounded-full " \
-                                          "file:border-0 file:bg-surface-container-high file:px-4 file:py-2 " \
-                                          "file:text-text-warm"
-            form.submit I18n.t("captures.shutter"), class: "ha-button ha-button-primary w-full"
           end
         end
       end
@@ -76,7 +85,9 @@ module Views
             }
           ) do
             div(data: { recognition_poller_target: "frame" }) do
-              render Views::Captures::SessionPanel.new(box: @box, media: @media)
+              render Views::Captures::SessionPanel.new(
+                box: @box, media: @media, items_by_media: @items_by_media
+              )
             end
           end
           render Components::Ui::Button.new(

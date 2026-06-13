@@ -12,19 +12,21 @@ RSpec.describe "Capture image" do
     stub_current_tenant("acme")
   end
 
-  it "captures an image and lands recognized items (fake provider)" do
+  # The capture itself auto-submits on file selection (JS), which the rack_test
+  # driver can't drive — that path is covered by the request spec + /product-review.
+  # Here we assert the redesigned surface: the tap-to-capture tile and the renamed
+  # "Items" panel listing recognised items as tappable links to Item Detail.
+  it "shows the tap-to-capture tile and links recognised items to their detail" do
+    media = create(:media, move:, box:)
+    create(:recognition_run, :succeeded, move:, box:, media:)
+    item = create(:item, move:, box:, name: "Ceramic Plates", source_media: media)
+
     visit move_box_capture_path(move, box)
+
     expect(page).to have_text("Capture for Box #001 — Kitchen")
+    expect(page).to have_text(I18n.t("captures.tap_to_capture"))
+    expect(page).to have_text(I18n.t("captures.session.title")) # "Items", not "Session"
 
-    attach_file("file", Rails.root.join("spec/fixtures/files/sample_image.png"))
-    click_button I18n.t("captures.shutter")
-
-    # :inline recognition runs during the request, so the session shows the result.
-    expect(page).to have_current_path(move_box_capture_path(move, box), ignore_query: true)
-    expect(page).to have_text(I18n.t("ui.states.succeeded"))
-    # One photo → many items: the session reflects the detection count, not 1:1.
-    expect(page).to have_text(I18n.t("captures.session.items_found", count: 3))
-    expect(box.items.count).to eq(3)
-    expect(box.items.where(review_state: "auto_confirmed").count).to eq(2)
+    expect(page).to have_link("Ceramic Plates", href: move_item_path(move, item))
   end
 end
