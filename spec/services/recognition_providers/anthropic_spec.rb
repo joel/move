@@ -7,11 +7,21 @@ RSpec.describe RecognitionProviders::Anthropic do
 
   let(:image) { instance_double(ActiveStorage::Blob, content_type: "image/jpeg", download: "bytes") }
   let(:context) { { room: nil, categories: [], tags: [] } }
+  let(:captured) { {} }
 
+  # Capture the outgoing request so request-body specs can assert what we SEND.
   def stub_http(code:, body:)
     response = instance_double(Net::HTTPResponse, code: code, body: body)
-    allow(Net::HTTP).to receive(:start).and_return(response)
+    http = instance_double(Net::HTTP)
+    allow(http).to receive(:request) { |req|
+      captured[:request] = req
+      response
+    }
+    allow(Net::HTTP).to receive(:start).and_yield(http).and_return(response)
   end
+
+  def sent_request = captured.fetch(:request)
+  def sent_body = JSON.parse(sent_request.body)
 
   before do
     allow(ENV).to receive(:[]).and_call_original
@@ -21,6 +31,28 @@ RSpec.describe RecognitionProviders::Anthropic do
   it "raises when the API key is absent" do
     allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return(nil)
     expect { provider.identify(image: image, context: context) }.to raise_error(/ANTHROPIC_API_KEY/)
+  end
+
+  it "sends a forced tool_use request with the auth/version headers, model, and base64 image" do
+    body = { content: [{ type: "tool_use", name: "record_objects", input: { objects: [] } }] }.to_json
+    stub_http(code: "200", body: body)
+
+    provider.identify(image: image, context: context)
+
+    sent = sent_body
+    aggregate_failures do
+      expect(sent_request["x-api-key"]).to eq("sk-ant-test")
+      expect(sent_request["anthropic-version"]).to eq("2023-06-01")
+      expect(sent["model"]).to eq("claude-haiku-4-5-20251001")
+      expect(sent.dig("tool_choice", "type")).to eq("tool")
+      expect(sent.dig("tool_choice", "name")).to eq("record_objects")
+      tool = sent["tools"].first
+      expect(tool["name"]).to eq("record_objects")
+      expect(tool.dig("input_schema", "properties", "objects", "items", "required"))
+        .to include("category", "fragile")
+      expect(sent.dig("messages", 0, "content", 1, "source"))
+        .to eq("type" => "base64", "media_type" => "image/jpeg", "data" => Base64.strict_encode64("bytes"))
+    end
   end
 
   it "normalizes detections from the forced tool_use input, including category + fragile" do

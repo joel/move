@@ -7,11 +7,21 @@ RSpec.describe RecognitionProviders::Gemini do
 
   let(:image) { instance_double(ActiveStorage::Blob, content_type: "image/jpeg", download: "bytes") }
   let(:context) { { room: "Garage", categories: ["Tools"], tags: [] } }
+  let(:captured) { {} }
 
+  # Capture the outgoing request so request-body specs can assert what we SEND.
   def stub_http(code:, body:)
     response = instance_double(Net::HTTPResponse, code: code, body: body)
-    allow(Net::HTTP).to receive(:start).and_return(response)
+    http = instance_double(Net::HTTP)
+    allow(http).to receive(:request) { |req|
+      captured[:request] = req
+      response
+    }
+    allow(Net::HTTP).to receive(:start).and_yield(http).and_return(response)
   end
+
+  def sent_request = captured.fetch(:request)
+  def sent_body = JSON.parse(sent_request.body)
 
   def content_response(content)
     { candidates: [{ content: { parts: [{ text: content }] } }] }.to_json
@@ -25,6 +35,27 @@ RSpec.describe RecognitionProviders::Gemini do
   it "raises when the API key is absent" do
     allow(ENV).to receive(:[]).with("GEMINI_API_KEY").and_return(nil)
     expect { provider.identify(image: image, context: context) }.to raise_error(/GEMINI_API_KEY/)
+  end
+
+  it "sends a responseSchema request with the model in the URL, key header, and inline image" do
+    stub_http(code: "200", body: content_response({ objects: [] }.to_json))
+
+    provider.identify(image: image, context: context)
+
+    body = sent_body
+    aggregate_failures do
+      expect(sent_request.path).to include("models/gemini-2.5-flash:generateContent")
+      expect(sent_request["x-goog-api-key"]).to eq("g-test")
+      gen = body["generationConfig"]
+      expect(gen["responseMimeType"]).to eq("application/json")
+      items = gen.dig("responseSchema", "properties", "objects", "items")
+      expect(items["required"]).to include("category", "fragile")
+      # Gemini's schema dialect uses uppercase type enums.
+      expect(items.dig("properties", "fragile", "type")).to eq("BOOLEAN")
+      # Canonical camelCase proto json_name for the inline image part.
+      inline = body.dig("contents", 0, "parts", 1, "inlineData")
+      expect(inline).to include("mimeType" => "image/jpeg", "data" => Base64.strict_encode64("bytes"))
+    end
   end
 
   it "normalizes a responseSchema objects payload, including category + fragile" do

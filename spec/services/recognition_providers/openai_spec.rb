@@ -7,11 +7,24 @@ RSpec.describe RecognitionProviders::Openai do
 
   let(:image) { instance_double(ActiveStorage::Blob, content_type: "image/jpeg", download: "bytes") }
   let(:context) { { room: "Kitchen", categories: ["Lighting"], tags: [] } }
+  let(:captured) { {} }
 
+  # Capture the outgoing request so request-body specs can assert what we SEND
+  # (the adapters have no real-API CI coverage). start yields a stub http whose
+  # #request records the Net::HTTP::Post; the block runs, then start returns the
+  # canned response — so the response-parsing specs are unaffected.
   def stub_http(code:, body:)
     response = instance_double(Net::HTTPResponse, code: code, body: body)
-    allow(Net::HTTP).to receive(:start).and_return(response)
+    http = instance_double(Net::HTTP)
+    allow(http).to receive(:request) { |req|
+      captured[:request] = req
+      response
+    }
+    allow(Net::HTTP).to receive(:start).and_yield(http).and_return(response)
   end
+
+  def sent_request = captured.fetch(:request)
+  def sent_body = JSON.parse(sent_request.body)
 
   def content_response(content)
     { choices: [{ message: { content: content } }] }.to_json
@@ -25,6 +38,29 @@ RSpec.describe RecognitionProviders::Openai do
   it "raises when the API key is absent" do
     allow(ENV).to receive(:[]).with("OPENAI_API_KEY").and_return(nil)
     expect { provider.identify(image: image, context: context) }.to raise_error(/OPENAI_API_KEY/)
+  end
+
+  it "sends a strict json_schema request with the auth header, model, and data-URL image" do
+    stub_http(code: "200", body: content_response({ objects: [] }.to_json))
+
+    provider.identify(image: image, context: context)
+
+    body = sent_body
+    aggregate_failures do
+      expect(sent_request["authorization"]).to eq("Bearer sk-test")
+      expect(sent_request["content-type"]).to eq("application/json")
+      expect(body["model"]).to eq("gpt-5-mini")
+      fmt = body["response_format"]
+      expect(fmt["type"]).to eq("json_schema")
+      expect(fmt.dig("json_schema", "strict")).to be(true)
+      items = fmt.dig("json_schema", "schema", "properties", "objects", "items")
+      expect(items["required"]).to include("category", "fragile")
+      expect(items.dig("properties", "fragile", "type")).to eq("boolean")
+      content = body.dig("messages", 0, "content")
+      expect(content.dig(0, "text")).to include("moving-box photo")
+      expect(content.dig(1, "image_url", "url"))
+        .to eq("data:image/jpeg;base64,#{Base64.strict_encode64("bytes")}")
+    end
   end
 
   it "normalizes a structured-output objects payload, including category + fragile" do

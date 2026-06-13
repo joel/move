@@ -48,6 +48,10 @@ module RecognitionProviders
 
     private
 
+    # Field names use the canonical proto json_name (camelCase) throughout. The
+    # generativelanguage API is proto3, whose JSON mapping accepts both camelCase
+    # and the snake_case field name (inlineData/inline_data, mimeType/mime_type),
+    # so don't "correct" these to snake_case — keep one consistent style.
     def body(image, context)
       img = encoded_image(image)
       {
@@ -55,7 +59,7 @@ module RecognitionProviders
           role: "user",
           parts: [
             { text: prompt(context) },
-            { inline_data: { mime_type: img[:media_type], data: img[:base64] } }
+            { inlineData: { mimeType: img[:media_type], data: img[:base64] } }
           ]
         }],
         generationConfig: {
