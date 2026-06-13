@@ -7,8 +7,30 @@ network-free **fake** so the app — and CI — run with **no API key and no cos
 
 | Capability | Module | Env selector | Adapters | Prod model (openai) |
 |---|---|---|---|---|
-| Image recognition | `app/services/recognition_providers/` | `RECOGNITION_PROVIDER` | `fake` (default), `openai`, `anthropic` | `gpt-4o-mini` |
+| Image recognition | `app/services/recognition_providers/` | `RECOGNITION_PROVIDER` | `fake` (default), `openai`, `anthropic`, `gemini` | `gpt-4o-mini` |
 | Text embeddings (D8 search) | `app/services/embedding_providers/` | `EMBEDDING_PROVIDER` | `fake` (default), `openai` | `text-embedding-3-small` @ 1536d |
+
+### Recognition detection contract
+
+Every recognition adapter constrains the model to **native structured output**
+(OpenAI strict `json_schema`, Anthropic forced `tool_use`, Gemini `responseSchema`)
+returning `{"objects": [...]}`, where each object is:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `label` | string | the item name |
+| `confidence` | number 0–1 | the model's rough certainty |
+| `count` | integer | identical duplicates collapsed into one entry |
+| `category` | string | the model's classification — best-effort onto the Move's category vocabulary (an existing name when one fits, else a new concise one) |
+| `fragile` | boolean | whether the item can break/scratch easily |
+
+`RecognitionRuns::Process` feeds the Move's category + item-tag names into the
+prompt as vocabulary, then on materialization resolves `category` onto the Move's
+categories (reuse-or-create, case-insensitive) and sets `fragile` directly on the
+`Item`; both also ride on the `RecognitionSuggestion` (`proposed_category_id`,
+`proposed_fragile`) for the review queue. Before encoding, phone photos are
+EXIF-auto-oriented and down-scaled to ≤1536px (libvips) to cut image tokens and
+latency. Each model default is overridable via `*_RECOGNITION_MODEL`.
 
 Both vendor adapters POST JSON over HTTPS through the shared
 [`app/services/provider_http.rb`](../../app/services/provider_http.rb), which
@@ -71,6 +93,26 @@ turns on genuine vision recognition and semantic search.
    recognition run reaches `succeeded` with real detections; run a semantic
    search (synonym, not exact token) → confirm relevant hits.
 
+## Switching recognition to Google Gemini
+
+Same ordering rule as OpenAI — **add `GEMINI_API_KEY` first**, or every run fails
+with `GEMINI_API_KEY is not set`.
+
+1. **Add the secret to Doppler** (`move/prd`):
+   `doppler secrets set GEMINI_API_KEY=… --project move --config prd`. It syncs
+   into GitHub Actions secrets; `.kamal/secrets` + `.github/workflows/deploy.yml`
+   already resolve/export `GEMINI_API_KEY` (committed), and `config/deploy.yml`
+   `env.secret` already includes it.
+2. **Flip the selector:** set `RECOGNITION_PROVIDER: gemini` in `config/deploy.yml`
+   `env.clear` (optional `GEMINI_RECOGNITION_MODEL` override) and deploy.
+3. **Smoke-test** as for OpenAI. Roll back by setting `RECOGNITION_PROVIDER` to
+   `openai`/`fake` and redeploying — no schema change.
+
+> The default model strings (`gpt-4o-mini`, `claude-3-5-sonnet-latest`,
+> `gemini-2.5-flash`) are sane working defaults but **verify the current best
+> string for your account** and pin via `*_RECOGNITION_MODEL` rather than relying
+> on the in-code default drifting out of date.
+
 ## Accepted image formats
 
 Uploads are normalized by [`ImageNormalizer`](../../app/services/image_normalizer.rb)
@@ -121,4 +163,5 @@ in the app environment, then `bin/cli app restart`.
 
 ---
 
-_Last updated: 2026-06-10, wiring production OpenAI providers (#78)._
+_Last updated: 2026-06-13, structured-output adapters + Gemini + model-set
+category/fragility (#160)._
