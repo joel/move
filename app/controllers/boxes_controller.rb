@@ -34,7 +34,10 @@ class BoxesController < MoveScopedController
       move: @move, box: @box, items: items.ordered,
       # Preload the blob only (proxy URLs use the original; no variants/preview).
       media: @box.media.includes(image_attachment: :blob).recent_first,
-      editable: editable_move?, pending_count: reviewable_count(items)
+      editable: editable_move?, pending_count: reviewable_count(items),
+      # Photos that produced an item (in-box OR removed) — the per-photo review
+      # walk's membership; only these gallery photos link into review.
+      reviewable_media_ids: @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
     )
   end
 
