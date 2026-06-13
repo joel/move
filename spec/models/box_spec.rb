@@ -82,4 +82,42 @@ RSpec.describe Box do
       expect(move.boxes.ordered.pluck(:number)).to eq(%w[1 2 10])
     end
   end
+
+  describe ".dimension_presets" do
+    let(:move) { create(:move) }
+
+    it "groups identical L×W×H and counts them, most-used first" do
+      create_list(:box, 3, move:, length_cm: 40, width_cm: 30, height_cm: 25)
+      create(:box, move:, length_cm: 60, width_cm: 40, height_cm: 40)
+
+      presets = move.boxes.dimension_presets
+
+      expect(presets.first).to include(length_cm: 40, width_cm: 30, height_cm: 25, count: 3)
+      expect(presets.pluck(:count)).to eq([3, 1])
+    end
+
+    it "excludes boxes missing any linear dimension" do
+      create(:box, move:, length_cm: 40, width_cm: 30, height_cm: nil)
+      create(:box, move:) # all nil
+
+      expect(move.boxes.dimension_presets).to be_empty
+    end
+
+    it "tie-breaks by recency when counts are equal" do
+      older = create(:box, move:, length_cm: 10, width_cm: 10, height_cm: 10,
+                           created_at: 2.days.ago)
+      newer = create(:box, move:, length_cm: 20, width_cm: 20, height_cm: 20,
+                           created_at: 1.hour.ago)
+
+      first = move.boxes.dimension_presets.first
+      expect(first[:length_cm]).to eq(newer.length_cm)
+      expect(first[:length_cm]).not_to eq(older.length_cm)
+    end
+
+    it "respects the limit" do
+      5.times { |i| create(:box, move:, length_cm: i + 1, width_cm: 1, height_cm: 1) }
+
+      expect(move.boxes.dimension_presets(limit: 2).size).to eq(2)
+    end
+  end
 end
