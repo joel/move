@@ -118,6 +118,19 @@ RSpec.describe RecognitionProviders::Openai do
       .to raise_error(ProviderHttp::Error, /429.*Rate limit reached/)
   end
 
+  it "surfaces an exhausted-quota error (429 insufficient_quota) without the key" do
+    stub_http(code: "429", body: { error: {
+      message: "You exceeded your current quota, please check your plan and billing details.",
+      type: "insufficient_quota"
+    } }.to_json)
+
+    expect { provider.identify(image: image, context: context) }
+      .to raise_error(ProviderHttp::Error) { |e|
+        expect(e.message).to match(/quota.*plan and billing/i)
+        expect(e.message).not_to include("sk-test")
+      }
+  end
+
   it "raises a clean status error even when the error body is not JSON" do
     stub_http(code: "502", body: "<html>Bad Gateway</html>")
 

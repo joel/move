@@ -23,6 +23,12 @@ en:
       needs_correction: "Needs review"
       auto_confirmed: "Auto-confirmed"
       pending_review: "Pending review"
+    recognition_errors:
+      quota: "Quota exceeded — check your plan and billing details."
+      rate_limit: "The AI service is busy right now. Please retry in a moment."
+      auth: "Recognition isn't configured correctly. Please contact support."
+      network: "Couldn't reach the AI service. Check your connection and retry."
+      generic: "Recognition couldn't be completed. Please retry."
     toast:
       success_title: "All set"
       error_title: "Action needed"

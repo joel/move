@@ -107,6 +107,28 @@ RSpec.describe "Captures" do
       expect(response.body).to include(%(href="#{move_item_path(move, item)}"))
       expect(response.body).to include("Espresso machine")
     end
+
+    it "surfaces a friendly reason for a known failure category (quota)" do
+      media = create(:media, move:, box:)
+      create(:recognition_run, :failed, move:, box:, media:,
+                                        error_message: "RecognitionProviders::Openai request failed (429): " \
+                                                       "You exceeded your current quota, please check your plan and billing details.")
+
+      get move_box_capture_session_path(move, box)
+
+      expect(response.body).to include(I18n.t("ui.recognition_errors.quota"))
+    end
+
+    it "falls back to the cleaned vendor detail for an unrecognized failure" do
+      media = create(:media, move:, box:)
+      create(:recognition_run, :failed, move:, box:, media:,
+                                        error_message: "RecognitionProviders::Openai request failed (500): The model glitched.")
+
+      get move_box_capture_session_path(move, box)
+
+      expect(response.body).to include("The model glitched.")
+      expect(response.body).not_to include("RecognitionProviders::Openai")
+    end
   end
 
   describe "POST capture/retry" do

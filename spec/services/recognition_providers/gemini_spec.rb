@@ -98,4 +98,17 @@ RSpec.describe RecognitionProviders::Gemini do
     expect { provider.identify(image: image, context: context) }
       .to raise_error(ProviderHttp::Error, /400.*API key not valid/)
   end
+
+  it "surfaces an exhausted-quota error (429 RESOURCE_EXHAUSTED) without the key" do
+    stub_http(code: "429", body: { error: {
+      status: "RESOURCE_EXHAUSTED",
+      message: "Quota exceeded for quota metric 'Generate requests'. Check your plan and billing details."
+    } }.to_json)
+
+    expect { provider.identify(image: image, context: context) }
+      .to raise_error(ProviderHttp::Error) { |e|
+        expect(e.message).to match(/quota exceeded.*plan and billing/i)
+        expect(e.message).not_to include("g-test")
+      }
+  end
 end
