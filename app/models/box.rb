@@ -6,6 +6,13 @@
 # guards persistence invariants. Item counts and recognition runs arrive in
 # later phases (D5/D4) — this model intentionally has neither yet.
 class Box < ApplicationRecord
+  # Soft delete (Domain §11). Deleting a Box cascades the discard to its Items
+  # under one batch; Boxes::Restore brings the same set back. `default_scope
+  # { kept }` keeps discarded boxes out of every ordinary query.
+  include Discardable
+
+  discard_cascade_to :items
+
   # Lifecycle per Domain Spec §5.2: packing -> sealed -> in_transit ->
   # unpacking -> unpacked. A sealed box can be unsealed; an unpacked box can be
   # re-opened back to unpacking (D10 celebration "Undo" / reopen — items are
@@ -28,6 +35,12 @@ class Box < ApplicationRecord
   has_many :media, dependent: :destroy
   has_many :recognition_runs, dependent: :destroy
   has_many :recognition_suggestions, dependent: :destroy
+  # `dependent: :destroy` is the hard-purge cascade. Boxes are normally *soft*
+  # deleted via Boxes::Delete (discard + cascade), so this fires only on a genuine
+  # hard destroy. Because Item carries `default_scope { kept }`, a raw `box.destroy`
+  # would skip already-discarded items — but the items.box_id FK then blocks the box
+  # delete (fails loud, never silently orphans). A future Move::Delete / purge job
+  # must `unscope` so it hard-destroys discarded items too.
   has_many :items, dependent: :destroy
 
   # Virtual: the new-box form lets you type a room by name; Boxes::Create

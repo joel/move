@@ -149,6 +149,12 @@ gem "dry-monads", "~> 1.10"
 # https://github.com/rails-on-services/apartment
 gem "ros-apartment", "~> 3.4", require: "apartment"
 
+# Soft delete for user-authored domain records (Technical Foundation §9, Domain
+# §11). Deletes set discarded_at instead of destroying; cascade restore is
+# expressed explicitly via Discards::Cascade(Restore) + a discard_batch_id trace
+# (callbacks alone cannot express the restore graph). https://github.com/jhawthorn/discard
+gem "discard", "~> 2.0"
+
 # D13 — MCP assistant surface. Official Model Context Protocol SDK; the MCP
 # server + tool definitions are wired into a Rails controller via the stateless
 # StreamableHTTP transport (per-Move integration tokens, shared domain actions).

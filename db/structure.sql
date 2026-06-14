@@ -126,7 +126,11 @@ CREATE TABLE public.boxes (
     weight_kg numeric(8,2),
     status character varying DEFAULT 'packing'::character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    discarded_at timestamp(6) without time zone,
+    discard_batch_id uuid,
+    discarded_by_parent_type character varying,
+    discarded_by_parent_id uuid
 );
 
 
@@ -139,7 +143,11 @@ CREATE TABLE public.categories (
     move_id uuid NOT NULL,
     name character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    discarded_at timestamp(6) without time zone,
+    discard_batch_id uuid,
+    discarded_by_parent_type character varying,
+    discarded_by_parent_id uuid
 );
 
 
@@ -193,7 +201,11 @@ CREATE TABLE public.items (
     presence_state character varying DEFAULT 'in_box'::character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    category_id uuid
+    category_id uuid,
+    discarded_at timestamp(6) without time zone,
+    discard_batch_id uuid,
+    discarded_by_parent_type character varying,
+    discarded_by_parent_id uuid
 );
 
 
@@ -209,7 +221,11 @@ CREATE TABLE public.media (
     captured_at timestamp(6) without time zone NOT NULL,
     captured_via character varying DEFAULT 'web'::character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    discarded_at timestamp(6) without time zone,
+    discard_batch_id uuid,
+    discarded_by_parent_type character varying,
+    discarded_by_parent_id uuid
 );
 
 
@@ -261,7 +277,11 @@ CREATE TABLE public.moves (
     created_by_id uuid NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    auto_confirm_threshold numeric(3,2) DEFAULT 0.8 NOT NULL
+    auto_confirm_threshold numeric(3,2) DEFAULT 0.8 NOT NULL,
+    discarded_at timestamp(6) without time zone,
+    discard_batch_id uuid,
+    discarded_by_parent_type character varying,
+    discarded_by_parent_id uuid
 );
 
 
@@ -359,7 +379,11 @@ CREATE TABLE public.rooms (
     move_id uuid NOT NULL,
     name character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    discarded_at timestamp(6) without time zone,
+    discard_batch_id uuid,
+    discarded_by_parent_type character varying,
+    discarded_by_parent_id uuid
 );
 
 
@@ -382,7 +406,11 @@ CREATE TABLE public.tags (
     name character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    applies_to character varying DEFAULT 'item'::character varying NOT NULL
+    applies_to character varying DEFAULT 'item'::character varying NOT NULL,
+    discarded_at timestamp(6) without time zone,
+    discard_batch_id uuid,
+    discarded_by_parent_type character varying,
+    discarded_by_parent_id uuid
 );
 
 
@@ -732,6 +760,20 @@ CREATE UNIQUE INDEX index_active_storage_variant_records_uniqueness ON public.ac
 
 
 --
+-- Name: index_boxes_on_discard_batch_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_boxes_on_discard_batch_id ON public.boxes USING btree (discard_batch_id);
+
+
+--
+-- Name: index_boxes_on_discarded_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_boxes_on_discarded_at ON public.boxes USING btree (discarded_at);
+
+
+--
 -- Name: index_boxes_on_move_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -764,6 +806,20 @@ CREATE INDEX index_boxes_on_room_id ON public.boxes USING btree (room_id);
 --
 
 CREATE INDEX index_boxes_on_status ON public.boxes USING btree (status);
+
+
+--
+-- Name: index_categories_on_discard_batch_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_categories_on_discard_batch_id ON public.categories USING btree (discard_batch_id);
+
+
+--
+-- Name: index_categories_on_discarded_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_categories_on_discarded_at ON public.categories USING btree (discarded_at);
 
 
 --
@@ -851,6 +907,20 @@ CREATE INDEX index_items_on_category_id ON public.items USING btree (category_id
 
 
 --
+-- Name: index_items_on_discard_batch_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_items_on_discard_batch_id ON public.items USING btree (discard_batch_id);
+
+
+--
+-- Name: index_items_on_discarded_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_items_on_discarded_at ON public.items USING btree (discarded_at);
+
+
+--
 -- Name: index_items_on_move_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -876,6 +946,20 @@ CREATE INDEX index_items_on_source_media_id ON public.items USING btree (source_
 --
 
 CREATE INDEX index_media_on_box_id ON public.media USING btree (box_id);
+
+
+--
+-- Name: index_media_on_discard_batch_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_media_on_discard_batch_id ON public.media USING btree (discard_batch_id);
+
+
+--
+-- Name: index_media_on_discarded_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_media_on_discarded_at ON public.media USING btree (discarded_at);
 
 
 --
@@ -932,6 +1016,20 @@ CREATE INDEX index_move_memberships_on_user_id ON public.move_memberships USING 
 --
 
 CREATE INDEX index_moves_on_created_by_id ON public.moves USING btree (created_by_id);
+
+
+--
+-- Name: index_moves_on_discard_batch_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_moves_on_discard_batch_id ON public.moves USING btree (discard_batch_id);
+
+
+--
+-- Name: index_moves_on_discarded_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_moves_on_discarded_at ON public.moves USING btree (discarded_at);
 
 
 --
@@ -1047,6 +1145,20 @@ CREATE INDEX index_recognition_suggestions_on_recognition_run_id ON public.recog
 
 
 --
+-- Name: index_rooms_on_discard_batch_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_rooms_on_discard_batch_id ON public.rooms USING btree (discard_batch_id);
+
+
+--
+-- Name: index_rooms_on_discarded_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_rooms_on_discarded_at ON public.rooms USING btree (discarded_at);
+
+
+--
 -- Name: index_rooms_on_move_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1058,6 +1170,20 @@ CREATE INDEX index_rooms_on_move_id ON public.rooms USING btree (move_id);
 --
 
 CREATE UNIQUE INDEX index_rooms_on_move_id_and_lower_name ON public.rooms USING btree (move_id, lower((name)::text));
+
+
+--
+-- Name: index_tags_on_discard_batch_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tags_on_discard_batch_id ON public.tags USING btree (discard_batch_id);
+
+
+--
+-- Name: index_tags_on_discarded_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tags_on_discarded_at ON public.tags USING btree (discarded_at);
 
 
 --
@@ -1398,6 +1524,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260614180616'),
 ('20260613120001'),
 ('20260609130001'),
 ('20260609120001'),
