@@ -1,0 +1,86 @@
+en:
+  activities:
+    index:
+      eyebrow: "Activity"
+      title: "What's happened"
+      empty_title: "Nothing's happened yet"
+      empty_body: "As you pack, edit, and move things, every change shows up here."
+      empty_cta: "Go to boxes"
+      load_older: "Load older"
+    relative_time: "%{time} ago"
+    day:
+      today: "Today"
+      yesterday: "Yesterday"
+    actor:
+      you: "You"
+      someone: "Someone"
+      assistant: "The assistant"
+      system: "Move"
+    source:
+      web: "Web"
+      mcp: "MCP"
+      system: "System"
+    restore:
+      action: "Restore"
+      with_children:
+        one: "and %{count} item inside"
+        other: "and %{count} items inside"
+      done: "Restored."
+      failed: "Couldn't restore that."
+    revert:
+      action: "Revert"
+      done: "Reverted the change."
+      failed: "Couldn't revert that."
+    subject:
+      box: "Box %{number}"
+      photo: "a photo"
+      move: "this move"
+      member: "a member"
+      unknown: "an item"
+    kind:
+      category: "category"
+      tag: "tag"
+      room: "room"
+    summary:
+      box:
+        created: "added %{subject}"
+        updated: "edited %{subject}"
+        status_changed: "updated %{subject}"
+        deleted: "deleted %{subject}"
+        restored: "restored %{subject}"
+      item:
+        created: "added %{subject}"
+        updated: "edited %{subject}"
+        moved: "moved %{subject} to %{target}"
+        removed: "took %{subject} out of its box"
+        restored: "put %{subject} back in its box"
+        deleted: "deleted %{subject}"
+        undeleted: "restored %{subject}"
+      media:
+        captured: "added %{subject}"
+      move:
+        created: "created %{subject}"
+        unit_system_changed: "switched units to %{unit_system}"
+        auto_confirm_threshold_changed: "changed the auto-confirm threshold"
+        summary_viewed: "viewed the summary"
+      move_membership:
+        added: "added %{subject}"
+        role_changed: "changed %{subject}'s role to %{role}"
+        removed: "removed %{subject}"
+      integration_token:
+        created: "created an assistant token (%{token_name})"
+        revoked: "revoked an assistant token (%{token_name})"
+      vocabulary:
+        created: "added the %{kind} \"%{subject}\""
+        updated: "renamed the %{kind} to \"%{subject}\""
+        removed: "removed the %{kind} \"%{subject}\""
+      manifest:
+        viewed: "viewed %{subject}'s manifest"
+      qr:
+        resolved: "scanned %{subject}"
+  menu:
+    show:
+      activity: "Activity"
+  ui:
+    nav:
+      activity: "Activity"

@@ -78,6 +78,12 @@ Rails.application.routes.draw do
     # unit-system toggle persists Move#unit_system (editors only, never archived).
     get "summary", to: "summaries#show", as: :summary
     patch "summary/unit_system", to: "summaries#update_unit_system", as: :summary_unit_system
+    # G1 — Activity feed (append-only audit journal). Any member reads; Restore
+    # (undelete) and Revert (undo the latest edit) are editor-only and dispatch to
+    # the domain actions, keyed by the activity row so the UI stays declarative.
+    get "activity", to: "activities#index", as: :activity
+    post "activity/:id/restore", to: "activities#restore", as: :activity_restore
+    post "activity/:id/revert", to: "activities#revert", as: :activity_revert
     # F3 — Menu hub + Settings/Assistant. The menu is the controls hub; settings
     # holds Move-level preferences (unit system, auto-confirm threshold — editors
     # only, never archived; theme is a client preference). Integration tokens are
