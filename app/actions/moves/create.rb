@@ -6,7 +6,7 @@ module Moves
   # elevator switches Apartment before this runs).
   class Create < BaseAction
     def call(params:, creator:)
-      move = yield persist(params, creator)
+      move = yield with_responsible(creator) { persist(params, creator) }
       yield emit_event(move)
       Success(move)
     end

@@ -7,6 +7,9 @@
 #
 # State transitions and membership creation belong in app/actions, not here.
 class Move < ApplicationRecord
+  # Field-level history (Logidze) over the editable settings (name, unit_system,
+  # auto_confirm_threshold) — powers the activity feed's revert (PR3).
+  has_logidze
   STATUSES = %w[planned started finished archived].freeze
   UNIT_SYSTEMS = %w[metric imperial].freeze
 

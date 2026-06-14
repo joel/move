@@ -13,7 +13,7 @@ module Items
       yield ensure_writable(item.move)
       category = yield resolve_category(item.move, params[:category_id])
       tags = yield resolve_tags(item.move, params[:tag_ids])
-      yield persist(item, params, category, tags)
+      yield with_responsible(editor) { persist(item, params, category, tags) }
       yield emit_event(item, editor)
       Success(item)
     end

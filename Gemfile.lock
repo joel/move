@@ -241,6 +241,9 @@ GEM
     language_server-protocol (3.17.0.5)
     lint_roller (1.1.0)
     logger (1.7.0)
+    logidze (1.4.1)
+      activerecord (>= 6.0)
+      railties (>= 6.0)
     loofah (2.25.1)
       crass (~> 1.0.2)
       nokogiri (>= 1.12.0)
@@ -646,6 +649,7 @@ DEPENDENCIES
   image_processing (~> 2.0)
   importmap-rails
   kamal
+  logidze (~> 1.4)
   mcp
   memory_profiler
   neighbor

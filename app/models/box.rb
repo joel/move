@@ -6,6 +6,10 @@
 # guards persistence invariants. Item counts and recognition runs arrive in
 # later phases (D5/D4) — this model intentionally has neither yet.
 class Box < ApplicationRecord
+  # Field-level history (Logidze) over the editable columns (number, room_id,
+  # dimensions, weight) — powers the activity feed's revert (PR3). Lifecycle
+  # `status` is excluded (it has its own box.status_changed events).
+  has_logidze
   # Soft delete (Domain §11). Deleting a Box cascades the discard to its Items
   # under one batch; Boxes::Restore brings the same set back. `default_scope
   # { kept }` keeps discarded boxes out of every ordinary query.

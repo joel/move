@@ -155,6 +155,12 @@ gem "ros-apartment", "~> 3.4", require: "apartment"
 # (callbacks alone cannot express the restore graph). https://github.com/jhawthorn/discard
 gem "discard", "~> 2.0"
 
+# Field-level versioning for user-authored records (Technical Foundation §6/§7;
+# replaces paper_trail). Postgres-trigger based (log_data jsonb per row); actions
+# attribute edits via Logidze.with_responsible. Powers the activity feed's revert.
+# https://github.com/palkan/logidze
+gem "logidze", "~> 1.4"
+
 # D13 — MCP assistant surface. Official Model Context Protocol SDK; the MCP
 # server + tool definitions are wired into a Rails controller via the stateless
 # StreamableHTTP transport (per-Move integration tokens, shared domain actions).

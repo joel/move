@@ -13,7 +13,7 @@ module Boxes
 
     def call(box:, params:, editor:)
       yield ensure_writable(box.move)
-      yield persist(box, params)
+      yield with_responsible(editor) { persist(box, params) }
       # Box number / room feed the items' search_text (Domain §7.3); the item rows
       # didn't change, so refresh their projections explicitly.
       reindex_items(box.items.ids) if box.saved_change_to_number? || box.saved_change_to_room_id?

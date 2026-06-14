@@ -49,7 +49,9 @@ Apartment.configure do |config|
   #   - citext      — the citext extension type
   #   - vector      — pgvector column type on item_search_documents (D8)
   #   - *_ops       — opclasses behind the trigram + HNSW search indexes (D8)
-  config.pg_excluded_names = %w[citext vector vector_cosine_ops gin_trgm_ops]
+  #   - hstore      — the hstore type/operators used inside Logidze's trigger
+  #                   functions (`hstore(NEW.*)`); the extension lives only in public
+  config.pg_excluded_names = %w[citext vector vector_cosine_ops gin_trgm_ops hstore]
 
   # Tenants are the Organization slugs. Guarded so db:create/db:migrate work on a
   # fresh database before the organizations table exists.

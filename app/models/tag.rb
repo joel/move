@@ -6,6 +6,9 @@
 # records can carry the tag — metadata for now; box-tagging is future). Lives in
 # the tenant schema.
 class Tag < ApplicationRecord
+  # Field-level history (Logidze) over `name` and `applies_to` — powers the
+  # activity feed's rename revert (PR3).
+  has_logidze
   APPLIES_TO = %w[item box both].freeze
 
   belongs_to :move
