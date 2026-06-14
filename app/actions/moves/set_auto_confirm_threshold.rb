@@ -11,7 +11,7 @@ module Moves
     def call(move:, threshold:, actor: nil)
       yield ensure_writable(move)
       value = yield coerce(threshold)
-      yield persist(move, value)
+      yield with_responsible(actor) { persist(move, value) }
       yield emit_event(move, actor, value)
       Success(move)
     end

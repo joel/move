@@ -8,7 +8,7 @@ module Vocabularies
   class Create < BaseAction
     def call(move:, vocabulary:, params:, actor:)
       yield ensure_writable(move)
-      record = yield persist(move, vocabulary, params)
+      record = yield with_responsible(actor) { persist(move, vocabulary, params) }
       yield emit_event(record, vocabulary, actor)
       Success(record)
     end

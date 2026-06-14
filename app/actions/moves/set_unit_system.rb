@@ -10,7 +10,7 @@ module Moves
     def call(move:, unit_system:, actor: nil)
       yield ensure_writable(move)
       yield validate(unit_system)
-      yield persist(move, unit_system)
+      yield with_responsible(actor) { persist(move, unit_system) }
       yield emit_event(move, actor, unit_system)
       Success(move)
     end

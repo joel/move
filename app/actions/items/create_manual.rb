@@ -13,7 +13,7 @@ module Items
       yield ensure_writable(box.move)
       category = yield resolve_category(box.move, params[:category_id])
       tags = yield resolve_tags(box.move, params[:tag_ids])
-      item = yield persist(box, params, category, tags, source_media)
+      item = yield with_responsible(creator) { persist(box, params, category, tags, source_media) }
       yield emit_event(item, creator)
       Success(item)
     end

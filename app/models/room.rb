@@ -4,6 +4,9 @@
 # vocabulary management (rename, merge, ordering) arrives in D7. Like every
 # Move-owned record, Rooms live inside the tenant schema — no organization_id.
 class Room < ApplicationRecord
+  # Field-level history (Logidze) over `name` — powers the activity feed's
+  # rename revert (PR3).
+  has_logidze
   belongs_to :move
   has_many :boxes, dependent: :nullify
 

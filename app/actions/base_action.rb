@@ -27,4 +27,20 @@ class BaseAction
 
     Success()
   end
+
+  # Attributes the Logidze version(s) created while `block` runs to `actor`
+  # (Technical Foundation §7.4) — stored in the version meta as `_r`, so the
+  # activity feed (PR3) can show who made an edit and offer an attributed revert.
+  # Returns the block's value (so callers `yield with_responsible(actor) { persist(...) }`).
+  # A nil actor (system/MCP/jobs without a user) records an unattributed change.
+  #
+  # `transactional: false` is deliberate: the default opens its own transaction,
+  # which would demote an action's `ActiveRecord::Base.transaction` to a *joined*
+  # one — so a `RecordInvalid` that persist rescues internally would let the outer
+  # transaction COMMIT partial writes (e.g. an orphan room on a failed box edit).
+  # The non-transactional path sets the responsible via a session GUC (reset in an
+  # ensure) without a transaction, so each action keeps its own rollback boundary.
+  def with_responsible(actor, &)
+    Logidze.with_responsible(actor&.id, transactional: false, &)
+  end
 end

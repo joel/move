@@ -17,7 +17,7 @@ module Vocabularies
     def call(record:, vocabulary:, params:, actor:)
       yield ensure_writable(record.move)
       affected = affected_item_ids(record) # before rename/detach
-      detached = yield persist(record, vocabulary, params)
+      detached = yield with_responsible(actor) { persist(record, vocabulary, params) }
       # A rename (or tag→box detach) changes the items' denormalized search_text.
       reindex_items(affected) if record.saved_change_to_name? || detached.positive?
       yield emit_event(record, vocabulary, actor, detached)

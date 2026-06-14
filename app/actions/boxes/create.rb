@@ -10,7 +10,7 @@ module Boxes
 
     def call(move:, params:, creator:)
       yield ensure_writable(move)
-      box = yield persist(move, params)
+      box = yield with_responsible(creator) { persist(move, params) }
       yield emit_event(box, creator)
       Success(box)
     end

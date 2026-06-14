@@ -5,6 +5,9 @@
 # offers only existing names. Full vocabulary management (create/rename/merge)
 # arrives in D7. Like every Move-owned record, lives in the tenant schema.
 class Category < ApplicationRecord
+  # Field-level history (Logidze) over `name` — powers the activity feed's
+  # rename revert (PR3).
+  has_logidze
   belongs_to :move
   has_many :items, dependent: :nullify
   # Recognition can propose a category before it's confirmed onto an item; detach

@@ -9,7 +9,7 @@ module Items
   class Rename < BaseAction
     def call(item:, name:, editor:)
       yield ensure_writable(item.move)
-      yield persist(item, name)
+      yield with_responsible(editor) { persist(item, name) }
       yield emit_event(item, editor)
       Success(item)
     end

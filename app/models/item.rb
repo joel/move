@@ -5,6 +5,10 @@
 # selection-only Move vocabularies (D5); their management UI lands in D7. No
 # value, bounding box, or crop fields. Edit/review UIs land in D5/D6.
 class Item < ApplicationRecord
+  # Field-level history (Logidze) over the editable columns (name, category_id,
+  # quantity, fragile) — powers the activity feed's revert (PR3). The whitelist
+  # trigger ignores discard/system columns, so deleting never churns a version.
+  has_logidze
   # Soft delete (Domain §11) — the *deletion* axis, orthogonal to the unpacking
   # `presence_state: removed` axis below. `default_scope { kept }` hides deleted
   # items from every query (counts, search, listings).
