@@ -18,6 +18,7 @@ module Moves
       ActiveRecord::Base.transaction do
         move = Move.create!(params.merge(created_by: creator))
         move.move_memberships.create!(user: creator, role: "admin")
+        Moves::DefaultVocabularies.apply(move)
       end
       Success(move)
     rescue ActiveRecord::RecordInvalid => e
