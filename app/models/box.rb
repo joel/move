@@ -35,6 +35,12 @@ class Box < ApplicationRecord
   has_many :media, dependent: :destroy
   has_many :recognition_runs, dependent: :destroy
   has_many :recognition_suggestions, dependent: :destroy
+  # `dependent: :destroy` is the hard-purge cascade. Boxes are normally *soft*
+  # deleted via Boxes::Delete (discard + cascade), so this fires only on a genuine
+  # hard destroy. Because Item carries `default_scope { kept }`, a raw `box.destroy`
+  # would skip already-discarded items — but the items.box_id FK then blocks the box
+  # delete (fails loud, never silently orphans). A future Move::Delete / purge job
+  # must `unscope` so it hard-destroys discarded items too.
   has_many :items, dependent: :destroy
 
   # Virtual: the new-box form lets you type a room by name; Boxes::Create
