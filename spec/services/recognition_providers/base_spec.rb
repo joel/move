@@ -15,18 +15,42 @@ RSpec.describe RecognitionProviders::Base do
       expect(text).to match(/fragile/i)
     end
 
-    it "does not offer item tags as category candidates" do
-      text = provider.send(:prompt, { room: nil, categories: ["Kitchenware"], tags: ["Heavy"] })
+    it "offers the move's item-applicable tag vocabulary as tag candidates" do
+      text = provider.send(:prompt, { room: nil, categories: ["Kitchenware"], tags: %w[Heavy Valuable] })
 
-      expect(text).to include("Kitchenware")
-      expect(text).not_to include("Heavy")
+      expect(text).to include("Prefer these existing tags")
+      expect(text).to include("Heavy")
+      expect(text).to include("Valuable")
     end
 
-    it "still asks for a category when the move has no vocabulary yet" do
-      text = provider.send(:prompt, { room: nil, categories: [] })
+    it "still asks for category and tags when the move has no vocabulary yet" do
+      text = provider.send(:prompt, { room: nil, categories: [], tags: [] })
 
       expect(text).to include("Classify each item with a concise category")
+      expect(text).to include("Add a short list of concise descriptive tags")
       expect(text).not_to include("The box is in")
+    end
+  end
+
+  describe "#normalize" do
+    it "parses the tags array, stripping blanks and de-duplicating" do
+      detected = provider.send(:normalize, [
+                                 { "label" => "Mug", "confidence" => 0.9, "count" => 1,
+                                   "category" => "Kitchenware", "fragile" => true,
+                                   "tags" => ["Heavy", " Heavy ", "", "Valuable"] }
+                               ])
+
+      expect(detected.size).to eq(1)
+      expect(detected.first.tags).to eq(%w[Heavy Valuable])
+    end
+
+    it "defaults tags to an empty array when the field is absent" do
+      detected = provider.send(:normalize, [
+                                 { "label" => "Mug", "confidence" => 0.9, "count" => 1,
+                                   "category" => "Kitchenware", "fragile" => false }
+                               ])
+
+      expect(detected.first.tags).to eq([])
     end
   end
 

@@ -44,12 +44,15 @@ module RecognitionRuns
       Rails.event.notify("recognition_run.processing", recognition_run_id: run.id)
     end
 
-    # Feed the move's category vocabulary to the provider so the model can fit
-    # each detection into an existing category rather than inventing near-dupes.
+    # Feed the move's category + item-applicable tag vocabularies to the provider
+    # so the model can fit each detection into existing values rather than
+    # inventing near-dupes. Box-only tags are excluded via for_items — they can't
+    # ride on an item.
     def context(run)
       {
         room: run.box.room&.name,
-        categories: run.move.categories.order(:name).pluck(:name)
+        categories: run.move.categories.order(:name).pluck(:name),
+        tags: run.move.tags.for_items.order(:name).pluck(:name)
       }
     end
 
@@ -82,6 +85,7 @@ module RecognitionRuns
         category: category, fragile: object.fragile,
         created_via: "recognition", review_state: auto ? "auto_confirmed" : "pending_review"
       )
+      item.tags = resolve_tags(run.move, object.tags)
       suggestion.update!(item: item)
       # Drives the D8 search projection (Search::IndexSubscriber).
       Rails.event.notify(
@@ -139,6 +143,44 @@ module RecognitionRuns
       category
     rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
       move.categories.where("LOWER(name) = ?", name.downcase).first || raise(e)
+    end
+
+    # Map the model's proposed tag names onto the Move's tag vocabulary, mirroring
+    # category resolution. Returns item-applicable Tag records to assign.
+    def resolve_tags(move, names)
+      Array(names).filter_map { |name| resolve_tag(move, name) }.uniq
+    end
+
+    # Reuse an existing item-applicable tag (case-insensitive), else grow the
+    # vocabulary with a new item tag. A name matching an existing *box-only* tag
+    # is skipped: it can't ride on an item, and we won't widen the user's facet
+    # (cf. #168) or duplicate the lower(name)-unique name.
+    def resolve_tag(move, name)
+      name = name.to_s.strip
+      return nil if name.blank?
+
+      existing = move.tags.where("LOWER(name) = ?", name.downcase).first
+      return existing if existing&.applies_to&.in?(%w[item both])
+      return nil if existing
+
+      create_tag(move, name)
+    end
+
+    # Insert the new tag in its OWN savepoint (same concurrent-race reasoning as
+    # create_category). New recognition tags default to applies_to "item". On the
+    # race, reuse the winner only if it is item-applicable; a box-only winner is
+    # skipped rather than mis-assigned.
+    def create_tag(move, name)
+      tag = ActiveRecord::Base.transaction(requires_new: true) do
+        move.tags.create!(name: name, applies_to: "item")
+      end
+      Rails.event.notify(
+        "vocabulary.created", kind: "tag", record_id: tag.id, move_id: move.id, actor_id: nil
+      )
+      tag
+    rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
+      winner = move.tags.where("LOWER(name) = ?", name.downcase).first || raise(e)
+      winner.applies_to.in?(%w[item both]) ? winner : nil
     end
 
     def finish(run, result)

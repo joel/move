@@ -161,6 +161,64 @@ RSpec.describe RecognitionRuns::Process do
     end
   end
 
+  describe "model-set tags" do
+    def stub_provider(*objects)
+      provider = instance_double(RecognitionProviders::Fake)
+      allow(provider).to receive(:identify).and_return(
+        RecognitionProviders::Result.new(provider: "fake", provider_model: "x", objects:)
+      )
+      provider
+    end
+
+    def detection(name, tags, confidence: 0.95)
+      RecognitionProviders::DetectedObject.new(
+        label: name, confidence:, count: 1, category: nil, fragile: false, tags:
+      )
+    end
+
+    it "reuses an existing item-applicable tag (case-insensitive)" do
+      heavy = create(:tag, move:, name: "Heavy", applies_to: "both")
+
+      described_class.new.call(run:, provider: stub_provider(detection("Anvil", ["heavy"])))
+
+      item = box.items.find_by(name: "Anvil")
+      expect(item.tags).to contain_exactly(heavy)
+      expect(move.tags.where("LOWER(name) = ?", "heavy").count).to eq(1)
+    end
+
+    it "creates a new item tag when the model proposes one that does not exist yet" do
+      allow(Rails.event).to receive(:notify).and_call_original
+
+      expect { described_class.new.call(run:, provider: stub_provider(detection("Vase", ["Glassware"]))) }
+        .to change { move.tags.where(name: "Glassware").count }.from(0).to(1)
+
+      tag = move.tags.find_by(name: "Glassware")
+      expect(tag.applies_to).to eq("item")
+      expect(box.items.find_by(name: "Vase").tags).to contain_exactly(tag)
+      expect(Rails.event).to have_received(:notify).with(
+        "vocabulary.created", hash_including(kind: "tag", record_id: tag.id)
+      )
+    end
+
+    it "drops a proposed tag whose name matches an existing box-only tag" do
+      create(:tag, move:, name: "Fragile", applies_to: "box")
+
+      described_class.new.call(run:, provider: stub_provider(detection("Mirror", ["Fragile"])))
+
+      expect(box.items.find_by(name: "Mirror").tags).to be_empty
+      # The box-only tag is neither widened nor duplicated.
+      expect(move.tags.where("LOWER(name) = ?", "fragile").pluck(:applies_to)).to eq(["box"])
+    end
+
+    it "applies tags to a pending_review item, not just auto-confirmed ones" do
+      described_class.new.call(run:, provider: stub_provider(detection("Teapot", ["Heavy"], confidence: 0.4)))
+
+      item = box.items.find_by(name: "Teapot")
+      expect(item.review_state).to eq("pending_review")
+      expect(item.tags.map(&:name)).to eq(["Heavy"])
+    end
+  end
+
   context "when the Move was archived after capture (#118)" do
     let(:move) { create(:move, :archived) }
 
