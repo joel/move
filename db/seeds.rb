@@ -106,9 +106,12 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   move.move_memberships.find_or_create_by!(user: member) { |mm| mm.role = "contributor" }
   move.move_memberships.find_or_create_by!(user: viewer) { |mm| mm.role = "viewer" }
 
-  rooms = ["Kitchen", "Living Room", "Bedroom", "Garage"].index_with do |name|
-    move.rooms.find_or_create_by!(name: name)
-  end
+  # Seed the curated default vocabularies (categories, tags, rooms) that every
+  # new Move now gets through Moves::Create. The shared module keeps the seed and
+  # the app in lockstep; the demo Move is built directly here (not via the action)
+  # so it must call apply itself.
+  Moves::DefaultVocabularies.apply(move)
+  rooms = move.rooms.index_by(&:name)
 
   # number => attributes. Covers every lifecycle state (packing/sealed/
   # in_transit/unpacking/unpacked), boxes with full / partial / no dimensions,
@@ -209,26 +212,16 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   end
 
   # --- D5/D7: managed vocabularies (categories, tags, rooms) ------------------
-  # Selection-only elsewhere; managed on the D7 surfaces. Each vocabulary keeps
-  # one *unused* value (Tools / Seasonal / Attic) so the non-in-use remove path
-  # is showcase-ready, plus in-use values to demo the remove-with-confirm path.
-  categories = %w[Kitchenware Books Electronics Clothing Tools].index_with do |name|
-    move.categories.find_or_create_by!(name: name)
-  end
-  # name => applies_to (item / box / both) — covers every facet the tag rows show.
-  {
-    "Heavy" => "both", "Everyday Use" => "item", "Liquid" => "item",
-    "Important" => "both", "Fragile" => "box", "Seasonal" => "item"
-  }.each do |name, applies_to|
-    # find_or_initialize + save (not a create-only block) so an existing tag
-    # seeded before D7 also gets its intended facet on re-seed.
-    tag = move.tags.find_or_initialize_by(name: name)
-    tag.applies_to = applies_to
-    tag.save!
-  end
+  # The curated defaults were seeded above via Moves::DefaultVocabularies and
+  # already leave several *unused* values (Tools / Seasonal / Attic / Decor / …)
+  # so the non-in-use remove path stays showcase-ready, alongside in-use values
+  # for the remove-with-confirm path. Add the demo-only "Everyday Use" tag the
+  # manual items below reference (it is not part of the curated default set).
+  everyday = move.tags.find_or_initialize_by(name: "Everyday Use")
+  everyday.applies_to = "item"
+  everyday.save!
+  categories = move.categories.index_by(&:name)
   tags = move.tags.index_by(&:name)
-  # Rooms already seeded above; add one unused room for the remove demo.
-  move.rooms.find_or_create_by!(name: "Attic")
 
   # Manual items spanning the review axis (confirmed / needs_correction) and the
   # presence axis (in_box / removed), some categorised and tagged. Keyed on name
