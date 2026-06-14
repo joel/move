@@ -25,6 +25,13 @@ module Views
           yield(:head) if content_for?(:head)
           link(rel: "icon", href: "/icon.png", type: "image/png")
           link(rel: "icon", href: "/icon.svg", type: "image/svg+xml")
+          # PWA: link the manifest + iOS/Android install metadata so the browser
+          # offers to install the app (service worker registered in application.js).
+          link(rel: "manifest", href: pwa_manifest_path(format: :json))
+          link(rel: "apple-touch-icon", href: "/icon.png")
+          meta(name: "apple-mobile-web-app-capable", content: "yes")
+          meta(name: "mobile-web-app-capable", content: "yes")
+          meta(name: "application-name", content: app_name)
           stylesheet_link_tag(:app, data: { turbo_track: "reload" })
           javascript_importmap_tags
         end

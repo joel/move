@@ -1,5 +1,12 @@
 {
-  "name": "Move",
+  "name": "<%= Rails.application.config.x.brand_name %>",
+  "short_name": "<%= Rails.application.config.x.brand_name %>",
+  "description": "Pack, label, and track your move.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#2a2822",
+  "background_color": "#2a2822",
   "icons": [
     {
       "src": "/icon.png",
@@ -12,11 +19,5 @@
       "sizes": "512x512",
       "purpose": "maskable"
     }
-  ],
-  "start_url": "/",
-  "display": "standalone",
-  "scope": "/",
-  "description": "Move.",
-  "theme_color": "red",
-  "background_color": "red"
+  ]
 }

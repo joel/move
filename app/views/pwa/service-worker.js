@@ -1,26 +1,15 @@
-// Add a service worker for processing Web Push notifications:
+// Minimal service worker so the browser treats the app as installable. Chrome
+// requires a registered service worker with a `fetch` handler before it offers
+// the install affordance (omnibox icon on desktop, Add to Home screen on mobile).
 //
-// self.addEventListener("push", async (event) => {
-//   const { title, options } = await event.data.json()
-//   event.waitUntil(self.registration.showNotification(title, options))
-// })
-//
-// self.addEventListener("notificationclick", function(event) {
-//   event.notification.close()
-//   event.waitUntil(
-//     clients.matchAll({ type: "window" }).then((clientList) => {
-//       for (let i = 0; i < clientList.length; i++) {
-//         let client = clientList[i]
-//         let clientPath = (new URL(client.url)).pathname
-//
-//         if (clientPath == event.notification.data.path && "focus" in client) {
-//           return client.focus()
-//         }
-//       }
-//
-//       if (clients.openWindow) {
-//         return clients.openWindow(event.notification.data.path)
-//       }
-//     })
-//   )
-// })
+// We intentionally do NOT cache anything yet: a no-op fetch handler lets every
+// request pass through to the network so assets never go stale across deploys or
+// tenants. Offline support / precaching is a deliberate follow-up.
+
+self.addEventListener("install", () => self.skipWaiting())
+
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()))
+
+// Required for installability. Pass-through: do not call event.respondWith, so
+// the browser handles each request normally.
+self.addEventListener("fetch", () => {})

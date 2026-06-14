@@ -105,9 +105,12 @@ Rails.application.routes.draw do
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
-  # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
-  # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
+  # Dynamic PWA files from app/views/pwa/*. Served at the root path level so the
+  # service worker's default scope is "/" (controls the whole app). The manifest
+  # is linked from the Phlex Views::Layouts::ChromeHead (the head every real app
+  # page uses) — NOT application.html.erb, which is unused.
+  get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
+  get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
   # Defines the root path route ("/")
   root "welcome#home"
