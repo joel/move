@@ -862,6 +862,26 @@ CREATE TABLE public.active_storage_variant_records (
 
 
 --
+-- Name: activities; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.activities (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    actor_id uuid,
+    action character varying NOT NULL,
+    subject_type character varying,
+    subject_id uuid,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    source integer DEFAULT 0 NOT NULL,
+    low_signal boolean DEFAULT false NOT NULL,
+    occurred_at timestamp(6) without time zone NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: ar_internal_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1294,6 +1314,14 @@ ALTER TABLE ONLY public.active_storage_variant_records
 
 
 --
+-- Name: activities activities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.activities
+    ADD CONSTRAINT activities_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: ar_internal_metadata ar_internal_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1526,6 +1554,27 @@ CREATE UNIQUE INDEX index_active_storage_blobs_on_key ON public.active_storage_b
 --
 
 CREATE UNIQUE INDEX index_active_storage_variant_records_uniqueness ON public.active_storage_variant_records USING btree (blob_id, variation_digest);
+
+
+--
+-- Name: index_activities_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_activities_on_move_id ON public.activities USING btree (move_id);
+
+
+--
+-- Name: index_activities_on_move_id_and_occurred_at_and_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_activities_on_move_id_and_occurred_at_and_id ON public.activities USING btree (move_id, occurred_at DESC, id DESC);
+
+
+--
+-- Name: index_activities_on_subject_type_and_subject_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_activities_on_subject_type_and_subject_id ON public.activities USING btree (subject_type, subject_id);
 
 
 --
@@ -2129,6 +2178,14 @@ ALTER TABLE ONLY public.items
 
 
 --
+-- Name: activities fk_rails_4378dca565; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.activities
+    ADD CONSTRAINT fk_rails_4378dca565 FOREIGN KEY (move_id) REFERENCES public.moves(id);
+
+
+--
 -- Name: media fk_rails_4e64a33103; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2335,6 +2392,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260614180625'),
 ('20260614180624'),
 ('20260614180623'),
 ('20260614180622'),
