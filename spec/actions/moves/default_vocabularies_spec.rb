@@ -25,4 +25,18 @@ RSpec.describe Moves::DefaultVocabularies do
       [move.rooms.count, move.categories.count, move.tags.count]
     end)
   end
+
+  it "reuses a value renamed to different casing instead of colliding" do
+    move.rooms.create!(name: "kitchen")
+    move.categories.create!(name: "ELECTRONICS")
+    move.tags.create!(name: "fragile", applies_to: "item")
+
+    expect { described_class.apply(move) }.not_to raise_error
+
+    expect(move.rooms.where("LOWER(name) = ?", "kitchen").count).to eq(1)
+    expect(move.categories.where("LOWER(name) = ?", "electronics").count).to eq(1)
+    # The existing tag is reused and its facet updated to the curated default.
+    expect(move.tags.where("LOWER(name) = ?", "fragile").count).to eq(1)
+    expect(move.tags.find_by("LOWER(name) = ?", "fragile").applies_to).to eq("box")
+  end
 end

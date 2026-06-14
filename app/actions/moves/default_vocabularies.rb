@@ -5,7 +5,8 @@ module Moves
   # and reused by db/seeds.rb. Idempotent: keyed on name via
   # find_or_create_by!/find_or_initialize_by (matching the case-insensitive
   # `move_id, lower(name)` unique indexes), so re-running over an existing Move
-  # never duplicates.
+  # never duplicates — even when a value was renamed to different casing
+  # (matching Boxes::RoomResolution's case-insensitive resolve).
   module DefaultVocabularies
     ROOMS = [
       "Kitchen", "Living Room", "Master Bedroom", "Bedroom", "Bathroom",
@@ -27,13 +28,25 @@ module Moves
     # Caller owns the transaction (Moves::Create wraps it with the Move + admin
     # membership; db/seeds.rb calls it standalone).
     def self.apply(move)
-      ROOMS.each { |name| move.rooms.find_or_create_by!(name: name) }
-      CATEGORIES.each { |name| move.categories.find_or_create_by!(name: name) }
+      ROOMS.each { |name| find_or_create(move.rooms, name) }
+      CATEGORIES.each { |name| find_or_create(move.categories, name) }
       TAGS.each do |name, applies_to|
-        tag = move.tags.find_or_initialize_by(name: name)
+        tag = existing(move.tags, name) || move.tags.new(name: name)
         tag.applies_to = applies_to
         tag.save!
       end
     end
+
+    # Case-insensitive lookup against the lower(name) unique index, so a value
+    # renamed to different casing is reused rather than colliding on insert.
+    def self.existing(relation, name)
+      relation.where("LOWER(name) = ?", name.downcase).first
+    end
+    private_class_method :existing
+
+    def self.find_or_create(relation, name)
+      existing(relation, name) || relation.create!(name: name)
+    end
+    private_class_method :find_or_create
   end
 end
