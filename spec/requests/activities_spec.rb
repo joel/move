@@ -29,8 +29,9 @@ RSpec.describe "Activities" do
       expect(response.body).to include("Desk lamp").and include(I18n.t("activities.revert.action"))
     end
 
-    it "labels the current user's action as 'You'" do
-      create(:box, move:)
+    it "labels the current user's own action as 'You'" do
+      item = create(:item, :manual, move:, name: "Lamp")
+      Items::Rename.new.call(item:, name: "Desk lamp", editor: user)
 
       get move_activity_path(move)
 
