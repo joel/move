@@ -4,22 +4,18 @@ module RecognitionProviders
   # Deterministic provider for tests and local development. Returns a fixed set of
   # detections spanning above- and below-threshold confidence so the auto-confirm
   # vs pending-review split is exercised without any external call. Each detection
-  # also carries a category + fragility so the materialization path (and
-  # /product-review) shows categorised, fragility-flagged items.
+  # also carries a category + fragility + tags so the materialization path (and
+  # /product-review) shows categorised, fragility-flagged, tagged items. Tags
+  # span the matched (an existing item-applicable default) and empty cases.
   class Fake < Base
     SAMPLE = [
-      ["Coffee maker",   0.97, 1, "Kitchenware",  false],
-      ["Stack of books", 0.88, 3, "Books",        false],
-      ["Set of mugs",    0.62, 1, "Kitchenware",  true]
+      { label: "Coffee maker",   confidence: 0.97, count: 1, category: "Kitchenware", fragile: false, tags: %w[Heavy] },
+      { label: "Stack of books", confidence: 0.88, count: 3, category: "Books",       fragile: false, tags: %w[Heavy] },
+      { label: "Set of mugs",    confidence: 0.62, count: 1, category: "Kitchenware", fragile: true,  tags: [] }
     ].freeze
 
     def identify(image:, context:) # rubocop:disable Lint/UnusedMethodArgument
-      objects = SAMPLE.map do |label, confidence, count, category, fragile|
-        DetectedObject.new(
-          label: label, confidence: confidence, count: count,
-          category: category, fragile: fragile
-        )
-      end
+      objects = SAMPLE.map { |attrs| DetectedObject.new(**attrs) }
       Result.new(provider: "fake", provider_model: "fake-1", objects: objects)
     end
   end

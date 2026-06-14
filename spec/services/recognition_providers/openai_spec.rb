@@ -54,7 +54,7 @@ RSpec.describe RecognitionProviders::Openai do
       expect(fmt["type"]).to eq("json_schema")
       expect(fmt.dig("json_schema", "strict")).to be(true)
       items = fmt.dig("json_schema", "schema", "properties", "objects", "items")
-      expect(items["required"]).to include("category", "fragile")
+      expect(items["required"]).to include("category", "fragile", "tags")
       expect(items.dig("properties", "fragile", "type")).to eq("boolean")
       content = body.dig("messages", 0, "content")
       expect(content.dig(0, "text")).to include("moving-box photo")

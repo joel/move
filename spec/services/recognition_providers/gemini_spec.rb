@@ -49,9 +49,10 @@ RSpec.describe RecognitionProviders::Gemini do
       gen = body["generationConfig"]
       expect(gen["responseMimeType"]).to eq("application/json")
       items = gen.dig("responseSchema", "properties", "objects", "items")
-      expect(items["required"]).to include("category", "fragile")
+      expect(items["required"]).to include("category", "fragile", "tags")
       # Gemini's schema dialect uses uppercase type enums.
       expect(items.dig("properties", "fragile", "type")).to eq("BOOLEAN")
+      expect(items.dig("properties", "tags", "type")).to eq("ARRAY")
       # Canonical camelCase proto json_name for the inline image part.
       inline = body.dig("contents", 0, "parts", 1, "inlineData")
       expect(inline).to include("mimeType" => "image/jpeg", "data" => Base64.strict_encode64("bytes"))

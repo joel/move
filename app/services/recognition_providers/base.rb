@@ -22,7 +22,8 @@ module RecognitionProviders
     # its own copy. Root is an object because OpenAI strict mode forbids a
     # top-level array, so every provider returns {"objects" => [...]}. Strict
     # mode also requires every property to be listed in `required`, so the model
-    # always returns its best category guess and a fragility call.
+    # always returns its best category guess, a fragility call, and a tag list
+    # (an empty array when nothing applies).
     OBJECTS_SCHEMA = {
       type: "object",
       additionalProperties: false,
@@ -33,13 +34,14 @@ module RecognitionProviders
           items: {
             type: "object",
             additionalProperties: false,
-            required: %w[label confidence count category fragile],
+            required: %w[label confidence count category fragile tags],
             properties: {
               label: { type: "string" },
               confidence: { type: "number" },
               count: { type: "integer" },
               category: { type: "string" },
-              fragile: { type: "boolean" }
+              fragile: { type: "boolean" },
+              tags: { type: "array", items: { type: "string" } }
             }
           }
         }
@@ -92,8 +94,9 @@ module RecognitionProviders
     # Coerce provider hashes into DetectedObjects, dropping anything without a
     # label and clamping confidence into range (the schemas pin types, not
     # numeric bounds). Accepts string or symbol keys. The model also classifies
-    # each item (category) and flags fragility; a blank category becomes nil so
-    # materialization leaves the item uncategorised rather than inventing one.
+    # each item (category), flags fragility, and proposes tags; a blank category
+    # becomes nil so materialization leaves the item uncategorised rather than
+    # inventing one, and tag names are stripped, blank-dropped and deduped.
     def normalize(raw_objects)
       Array(raw_objects).filter_map do |obj|
         label = fetch(obj, :label).to_s
@@ -104,7 +107,8 @@ module RecognitionProviders
           confidence: fetch(obj, :confidence)&.to_f&.clamp(0.0, 1.0),
           count: (fetch(obj, :count) || 1).to_i,
           category: fetch(obj, :category).to_s.strip.presence,
-          fragile: ActiveModel::Type::Boolean.new.cast(fetch(obj, :fragile)) || false
+          fragile: ActiveModel::Type::Boolean.new.cast(fetch(obj, :fragile)) || false,
+          tags: Array(fetch(obj, :tags)).map { it.to_s.strip }.compact_blank.uniq
         )
       end
     end
@@ -114,10 +118,10 @@ module RecognitionProviders
     end
 
     # Vocabulary-aware prompt shared by every adapter. context carries :room plus
-    # :categories (names from the move's category vocabulary) built in
-    # RecognitionRuns::Process#context. Only categories are offered as candidates —
-    # the structured output has a single `category` field that maps to a Category,
-    # so feeding item tags here would let the model return a tag as a category.
+    # :categories and :tags (names from the move's category and item-applicable
+    # tag vocabularies) built in RecognitionRuns::Process#context. `category` and
+    # `tags` are distinct structured-output fields mapping to distinct models, so
+    # both vocabularies are offered as candidates without conflating them.
     def prompt(context)
       lines = ["Identify the distinct physical objects in this moving-box photo."]
       lines << "The box is in the #{context[:room]}." if context[:room].present?
@@ -133,6 +137,17 @@ module RecognitionProviders
 
       lines << "Set fragile to true for items that can break or scratch easily — glass, " \
                "ceramics, electronics, screens, artwork, mirrors, bottles — and false otherwise."
+
+      tags = Array(context[:tags]).map(&:to_s).compact_blank.uniq
+      lines << if tags.any?
+                 "Add a short list of descriptive tags to each item (at most a few). Prefer " \
+                   "these existing tags when they fit (#{tags.join(", ")}); only introduce a new, " \
+                   "concise tag when it adds real signal. Use an empty list when none apply."
+               else
+                 "Add a short list of concise descriptive tags to each item (at most a few, " \
+                   "e.g. Heavy, Valuable, Seasonal), or an empty list when none apply."
+               end
+
       lines << "Give one entry per distinct item and collapse identical duplicates into a " \
                "single entry with a count. Ignore the box itself, packing materials " \
                "(paper, bubble wrap, tape) and anything in the background. Skip whatever is " \

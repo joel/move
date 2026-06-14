@@ -18,15 +18,16 @@ module RecognitionProviders
           type: "ARRAY",
           items: {
             type: "OBJECT",
-            required: %w[label confidence count category fragile],
+            required: %w[label confidence count category fragile tags],
             properties: {
               label: { type: "STRING" },
               confidence: { type: "NUMBER" },
               count: { type: "INTEGER" },
               category: { type: "STRING" },
-              fragile: { type: "BOOLEAN" }
+              fragile: { type: "BOOLEAN" },
+              tags: { type: "ARRAY", items: { type: "STRING" } }
             },
-            propertyOrdering: %w[label confidence count category fragile]
+            propertyOrdering: %w[label confidence count category fragile tags]
           }
         }
       }

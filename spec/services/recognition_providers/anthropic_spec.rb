@@ -49,7 +49,7 @@ RSpec.describe RecognitionProviders::Anthropic do
       tool = sent["tools"].first
       expect(tool["name"]).to eq("record_objects")
       expect(tool.dig("input_schema", "properties", "objects", "items", "required"))
-        .to include("category", "fragile")
+        .to include("category", "fragile", "tags")
       expect(sent.dig("messages", 0, "content", 1, "source"))
         .to eq("type" => "base64", "media_type" => "image/jpeg", "data" => Base64.strict_encode64("bytes"))
     end
