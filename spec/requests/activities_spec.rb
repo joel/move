@@ -29,6 +29,14 @@ RSpec.describe "Activities" do
       expect(response.body).to include("Desk lamp").and include(I18n.t("activities.revert.action"))
     end
 
+    it "labels the current user's action as 'You'" do
+      create(:box, move:)
+
+      get move_activity_path(move)
+
+      expect(response.body).to include(I18n.t("activities.actor.you"))
+    end
+
     it "renders a deleted box with a Restore affordance" do
       box = create(:box, move:, number: "7")
       Boxes::Delete.new.call(box:, actor: user)

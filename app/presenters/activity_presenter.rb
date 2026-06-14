@@ -54,7 +54,7 @@ class ActivityPresenter
   private
 
   def actor
-    @activity
+    actor_user
   end
 
   def actor_user
