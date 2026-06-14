@@ -1,0 +1,103 @@
+# frozen_string_literal: true
+
+# The Activity Feed Wall (G1). Any Move member can read the append-only feed;
+# Restore (undelete a discarded record) and Revert (undo the latest edit) are
+# editor-only writes that dispatch to the existing domain actions, so they are
+# audited and re-versioned like any other change. Thin: load → ActivityFeed read
+# model → render, or call the action and redirect.
+class ActivitiesController < MoveScopedController
+  PAGE = 40
+
+  before_action :require_writable_move!, only: %i[restore revert]
+
+  # GET /moves/:move_id/activity
+  def index
+    activities = @move.activities.high_signal.recent.before(cursor).limit(PAGE).to_a
+    feed = ActivityFeed.new(activities, current_user_id: current_user.id, editable: editable_move?)
+
+    render Views::Activities::Index.new(
+      move: @move, groups: feed.grouped,
+      restorable: feed.restorable_ids, revertable: feed.revertable_ids,
+      next_before: (activities.last.occurred_at if activities.size == PAGE)
+    )
+  end
+
+  # POST /moves/:move_id/activity/:id/restore
+  def restore
+    result = restore_subject(activities_scope.find(params.expect(:id)))
+    redirect_with(result, t(".done"), t(".failed"))
+  end
+
+  # POST /moves/:move_id/activity/:id/revert
+  def revert
+    result = revert_subject(activities_scope.find(params.expect(:id)))
+    redirect_with(result, t(".done"), t(".failed"))
+  end
+
+  private
+
+  def read_only_redirect_path
+    move_activity_path(@move)
+  end
+
+  def activities_scope
+    @move.activities
+  end
+
+  def cursor
+    Time.iso8601(params[:before]) if params[:before].present?
+  rescue ArgumentError
+    nil
+  end
+
+  def source
+    Current.source || :web
+  end
+
+  def restore_subject(activity)
+    case activity.subject_type
+    when "Box"
+      box = @move.boxes.with_discarded.find_by(id: activity.subject_id)
+      box && Boxes::Restore.new.call(box:, actor: current_user, source:)
+    when "Item"
+      item = @move.items.with_discarded.find_by(id: activity.subject_id)
+      item && Items::Restore.new.call(item:, actor: current_user, source:)
+    end
+  end
+
+  def revert_subject(activity)
+    record = revert_target(activity)
+    return nil if record.nil? || record.log_version.to_i < 2
+
+    prior = record.at(version: record.log_version - 1)
+    apply_revert(activity.subject_type, record, prior)
+  end
+
+  def revert_target(activity)
+    case activity.subject_type
+    when "Box" then @move.boxes.find_by(id: activity.subject_id)
+    when "Item" then @move.items.find_by(id: activity.subject_id)
+    end
+  end
+
+  def apply_revert(type, record, prior)
+    case type
+    when "Item"
+      Items::Update.new.call(item: record, editor: current_user, params: {
+                               name: prior.name, quantity: prior.quantity, fragile: prior.fragile,
+                               category_id: prior.category_id, tag_ids: record.tag_ids
+                             })
+    when "Box"
+      Boxes::Update.new.call(box: record, editor: current_user, params: {
+                               number: prior.number, length_cm: prior.length_cm, width_cm: prior.width_cm,
+                               height_cm: prior.height_cm, weight_kg: prior.weight_kg
+                             })
+    end
+  end
+
+  def redirect_with(result, ok_message, fail_message)
+    success = result.respond_to?(:success?) && result.success?
+    redirect_to move_activity_path(@move),
+                **(success ? { notice: ok_message } : { alert: fail_message })
+  end
+end

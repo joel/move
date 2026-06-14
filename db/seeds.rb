@@ -327,6 +327,30 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     t.revoked_at = 3.days.ago
   end
 
+  # G1 — Activity feed showcase. Replays a few real domain events (recorded by
+  # Activity::RecordSubscriber) so the feed has things to read, plus a Restore and
+  # a Revert affordance to play with. Idempotent: only when the feed is empty.
+  if move.activities.none?
+    renamed = move.items.in_box.first
+    Items::Rename.new.call(item: renamed, name: "#{renamed.name} (labelled)", editor: owner) if renamed
+    movable = move.items.in_box.where.not(id: renamed&.id).first
+    target = move.boxes.find_by(number: "9")
+    Items::Move.new.call(item: movable, target_box: target, mover: member) if movable && target
+    sealable = move.boxes.find_by(number: "2")
+    Boxes::TransitionStatus.new.call(box: sealable, to: "sealed", actor: member) if sealable&.packing?
+    # A deleted box with a cascaded item — restore it from the feed.
+    trash = move.boxes.find_or_create_by!(number: "99") do |b|
+      b.qr_token = SecureRandom.urlsafe_base64(16)
+      b.room = rooms["Garage"]
+      b.status = "packing"
+    end
+    if trash.items.none?
+      trash.items.create!(move: move, name: "Old cables", quantity: 1,
+                          created_via: "manual", review_state: "confirmed", presence_state: "in_box")
+    end
+    Boxes::Delete.new.call(box: trash, actor: owner)
+  end
+
   # D8: build the hybrid-search projection for every seeded item synchronously
   # (background workers don't run during db:seed). Fake embedder → deterministic,
   # no network. After this, search works immediately in /product-review.
