@@ -5,6 +5,11 @@
 # selection-only Move vocabularies (D5); their management UI lands in D7. No
 # value, bounding box, or crop fields. Edit/review UIs land in D5/D6.
 class Item < ApplicationRecord
+  # Soft delete (Domain §11) — the *deletion* axis, orthogonal to the unpacking
+  # `presence_state: removed` axis below. `default_scope { kept }` hides deleted
+  # items from every query (counts, search, listings).
+  include Discardable
+
   CREATED_VIA = %w[recognition manual mcp].freeze
   REVIEW_STATES = %w[pending_review auto_confirmed confirmed needs_correction].freeze
   PRESENCE_STATES = %w[in_box removed].freeze

@@ -6,6 +6,13 @@
 # guards persistence invariants. Item counts and recognition runs arrive in
 # later phases (D5/D4) — this model intentionally has neither yet.
 class Box < ApplicationRecord
+  # Soft delete (Domain §11). Deleting a Box cascades the discard to its Items
+  # under one batch; Boxes::Restore brings the same set back. `default_scope
+  # { kept }` keeps discarded boxes out of every ordinary query.
+  include Discardable
+
+  discard_cascade_to :items
+
   # Lifecycle per Domain Spec §5.2: packing -> sealed -> in_transit ->
   # unpacking -> unpacked. A sealed box can be unsealed; an unpacked box can be
   # re-opened back to unpacking (D10 celebration "Undo" / reopen — items are
