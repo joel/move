@@ -24,6 +24,22 @@ RSpec.describe Activity::RecordSubscriber do
     )
   end
 
+  it "records a recognition provider change, keeping the provider in metadata" do
+    expect { emit("move.recognition_provider_changed", move_id: move.id, actor_id: actor.id, provider: "openai") }
+      .to change(Activity, :count).by(1)
+
+    expect(Activity.last).to have_attributes(
+      action: "move.recognition_provider_changed", subject_type: "Move", subject_id: move.id, actor_id: actor.id
+    )
+    expect(Activity.last.metadata).to include("provider" => "openai")
+  end
+
+  it "records a recognition key removal" do
+    expect { emit("move.recognition_key_removed", move_id: move.id, actor_id: actor.id, provider: "gemini") }
+      .to change(Activity, :count).by(1)
+    expect(Activity.last.action).to eq("move.recognition_key_removed")
+  end
+
   it "skips events it does not map" do
     expect { emit("recognition_run.processing", recognition_run_id: SecureRandom.uuid) }
       .not_to change(Activity, :count)

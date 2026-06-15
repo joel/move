@@ -62,6 +62,8 @@ en:
         created: "created %{subject}"
         unit_system_changed: "switched units to %{unit_system}"
         auto_confirm_threshold_changed: "changed the auto-confirm threshold"
+        recognition_provider_changed: "switched the AI provider to %{provider}"
+        recognition_key_removed: "removed the %{provider} API key"
         summary_viewed: "viewed the summary"
       move_membership:
         added: "added %{subject}"
