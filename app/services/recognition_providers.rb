@@ -12,17 +12,31 @@ module RecognitionProviders
   # provider with a blank key still builds, but #identify then raises
   # Base::MissingApiKey (surfaced to the user as "add your key in Settings").
   def for_move(move)
-    resolve(move.recognition_provider, api_key: move.recognition_api_key_for(move.recognition_provider))
+    provider = move.recognition_provider
+    resolve(provider,
+            api_key: move.recognition_api_key_for(provider),
+            model: move.recognition_model_for(provider))
   end
 
   # Name → adapter instance. Vendor adapters carry the given key (nil is allowed
-  # here; #identify enforces presence). Unknown names fall back to Fake.
-  def resolve(name, api_key: nil)
+  # here; #identify enforces presence) and an optional model override (nil falls
+  # back to the adapter's DEFAULT_MODEL). Unknown names fall back to Fake.
+  def resolve(name, api_key: nil, model: nil)
     case name.to_s
-    when "openai" then Openai.new(api_key:)
-    when "anthropic" then Anthropic.new(api_key:)
-    when "gemini" then Gemini.new(api_key:)
+    when "openai" then Openai.new(api_key:, model:)
+    when "anthropic" then Anthropic.new(api_key:, model:)
+    when "gemini" then Gemini.new(api_key:, model:)
     else Fake.new
+    end
+  end
+
+  # The hardcoded DEFAULT_MODEL for a real provider (#187) — the value the UI
+  # shows as the default and persists nil against. Returns nil for fake/unknown.
+  def default_model(provider)
+    case provider.to_s
+    when "openai" then Openai::DEFAULT_MODEL
+    when "anthropic" then Anthropic::DEFAULT_MODEL
+    when "gemini" then Gemini::DEFAULT_MODEL
     end
   end
 end

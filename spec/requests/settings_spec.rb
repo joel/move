@@ -77,6 +77,27 @@ RSpec.describe "Settings" do
       expect(response.body).not_to include('name="move[api_key]"')
       expect(response.body).not_to include("sk-supersecret-1234")
     end
+
+    it "renders the editable model field for an admin (#187)" do
+      move.update!(recognition_provider: "openai", openai_api_key: "sk-live", openai_model: "gpt-5")
+
+      get move_settings_path(move)
+
+      expect(response.body).to include('name="move[model]"')
+      expect(response.body).to include("gpt-5") # the override is shown
+    end
+
+    it "shows the resolved model read-only for a contributor (no model input)" do
+      move.update!(recognition_provider: "openai", openai_api_key: "sk-live")
+      contributor = create(:user)
+      create(:move_membership, move:, user: contributor, role: "contributor")
+      stub_current_user(contributor)
+
+      get move_settings_path(move)
+
+      expect(response.body).to include(RecognitionProviders::Openai::DEFAULT_MODEL)
+      expect(response.body).not_to include('name="move[model]"')
+    end
   end
 
   describe "PATCH /moves/:move_id/settings/unit_system" do
@@ -133,6 +154,14 @@ RSpec.describe "Settings" do
       move.reload
       expect(move.recognition_provider).to eq("openai")
       expect(move.openai_api_key).to eq("sk-live")
+    end
+
+    it "persists a model override submitted alongside the provider (#187)" do
+      patch move_settings_recognition_provider_path(move),
+            params: { move: { recognition_provider: "openai", api_key: "sk-live", model: "gpt-5" } }
+
+      expect(response).to redirect_to(move_settings_path(move))
+      expect(move.reload.openai_model).to eq("gpt-5")
     end
 
     it "forbids a contributor (keys are admin-only)" do

@@ -14,6 +14,29 @@ RSpec.describe RecognitionProviders do
       expect(described_class.resolve("anthropic")).to be_a(RecognitionProviders::Anthropic)
       expect(described_class.resolve("gemini")).to be_a(RecognitionProviders::Gemini)
     end
+
+    it "forwards a model override to the adapter (#187)" do
+      adapter = described_class.resolve("openai", model: "gpt-5")
+      expect(adapter.send(:model)).to eq("gpt-5")
+    end
+
+    it "falls back to the adapter's DEFAULT_MODEL when no override is given" do
+      adapter = described_class.resolve("openai")
+      expect(adapter.send(:model)).to eq(RecognitionProviders::Openai::DEFAULT_MODEL)
+    end
+  end
+
+  describe ".default_model" do
+    it "returns each real provider's DEFAULT_MODEL constant" do
+      expect(described_class.default_model("openai")).to eq(RecognitionProviders::Openai::DEFAULT_MODEL)
+      expect(described_class.default_model("anthropic")).to eq(RecognitionProviders::Anthropic::DEFAULT_MODEL)
+      expect(described_class.default_model("gemini")).to eq(RecognitionProviders::Gemini::DEFAULT_MODEL)
+    end
+
+    it "returns nil for fake/unknown providers" do
+      expect(described_class.default_model("fake")).to be_nil
+      expect(described_class.default_model("nope")).to be_nil
+    end
   end
 
   describe ".for_move" do
@@ -24,6 +47,16 @@ RSpec.describe RecognitionProviders do
       expect(adapter).to be_a(RecognitionProviders::Openai)
       # The key is carried into the adapter (strict BYO) — #identify would use it.
       expect(adapter.send(:api_key!)).to eq("sk-move")
+    end
+
+    it "carries the Move's per-provider model override into the adapter (#187)" do
+      move = build(:move, recognition_provider: "openai", openai_api_key: "sk-move", openai_model: "gpt-5")
+      expect(described_class.for_move(move).send(:model)).to eq("gpt-5")
+    end
+
+    it "uses the adapter default when the Move set no model override" do
+      move = build(:move, recognition_provider: "openai", openai_api_key: "sk-move", openai_model: nil)
+      expect(described_class.for_move(move).send(:model)).to eq(RecognitionProviders::Openai::DEFAULT_MODEL)
     end
 
     it "returns the keyless Fake adapter for a fake Move" do

@@ -43,6 +43,11 @@ class Move < ApplicationRecord
   validates :auto_confirm_threshold,
             numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 1 }
   validates :recognition_provider, inclusion: { in: RECOGNITION_PROVIDERS }
+  # Free-text model overrides (#187): any string the provider accepts. Kept
+  # permissive so a brand-new model works the day it ships — the cap just guards
+  # against junk. Blank = use the adapter's DEFAULT_MODEL.
+  validates :openai_model, :anthropic_model, :gemini_model,
+            length: { maximum: 100 }, allow_blank: true
 
   # This Move's stored key for +provider+, or nil for fake/unknown (which need no
   # key). Used by RecognitionProviders.for_move to configure the adapter.
@@ -50,6 +55,14 @@ class Move < ApplicationRecord
     return nil unless REAL_RECOGNITION_PROVIDERS.include?(provider.to_s)
 
     public_send("#{provider}_api_key").presence
+  end
+
+  # This Move's stored model override for +provider+, or nil to fall back to the
+  # adapter's DEFAULT_MODEL. Used by RecognitionProviders.for_move (#187).
+  def recognition_model_for(provider)
+    return nil unless REAL_RECOGNITION_PROVIDERS.include?(provider.to_s)
+
+    public_send("#{provider}_model").presence
   end
 
   # Whether recognition can run as configured: fake always can; a real provider

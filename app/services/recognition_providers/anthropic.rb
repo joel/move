@@ -10,8 +10,8 @@ module RecognitionProviders
     ENDPOINT  = "https://api.anthropic.com/v1/messages"
     VERSION   = "2023-06-01"
     TOOL_NAME = "record_objects"
-    # Haiku 4.5 (dated snapshot) keeps cost near the OpenAI mini tier. Per-Move
-    # model choice is YAGNI.
+    # Haiku 4.5 (dated snapshot) keeps cost near the OpenAI mini tier. The default
+    # when a Move sets no override (#187 — Move#anthropic_model wins via Base#model).
     DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 
     def identify(image:, context:)

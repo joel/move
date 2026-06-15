@@ -58,6 +58,38 @@ RSpec.describe Moves::SetRecognitionProvider do
     expect(move.reload.openai_api_key).to eq("sk-keep")
   end
 
+  it "stores a per-provider model override (#187)" do
+    result = described_class.new.call(move:, provider: "openai", api_key: "sk-live", model: "gpt-5", actor:)
+
+    expect(result).to be_success
+    expect(move.reload.openai_model).to eq("gpt-5")
+  end
+
+  it "clears the override to nil when the model is blank or matches the default" do
+    move.update!(recognition_provider: "openai", openai_api_key: "sk-live", openai_model: "gpt-5")
+
+    described_class.new.call(move:, provider: "openai", api_key: "", model: "  ", actor:)
+    expect(move.reload.openai_model).to be_nil
+
+    move.update!(openai_model: "gpt-5")
+    described_class.new.call(
+      move:, provider: "openai", api_key: "", model: RecognitionProviders::Openai::DEFAULT_MODEL, actor:
+    )
+    expect(move.reload.openai_model).to be_nil
+  end
+
+  it "keeps each provider's own model when switching provider" do
+    move.update!(openai_model: "gpt-5", anthropic_api_key: "a-stored")
+
+    described_class.new.call(move:, provider: "anthropic", api_key: "", model: "claude-opus-4-8", actor:)
+
+    move.reload
+    expect(move.recognition_provider).to eq("anthropic")
+    expect(move.anthropic_model).to eq("claude-opus-4-8")
+    # The OpenAI override is untouched.
+    expect(move.openai_model).to eq("gpt-5")
+  end
+
   it "rejects an unknown provider" do
     result = described_class.new.call(move:, provider: "skynet", actor:)
 

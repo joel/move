@@ -7,19 +7,22 @@ module Moves
   # stored — so recognition never falls back to a shared deployment account.
   #
   # A blank api_key leaves the stored key untouched (the UI shows a mask, not the
-  # real value, so an empty field means "keep"). `fake` needs no key. Emits
+  # real value, so an empty field means "keep"). The model override (#187) is the
+  # opposite: it IS shown, so a blank or default-matching value clears the override
+  # and the adapter falls back to its DEFAULT_MODEL. `fake` needs neither. Emits
   # move.recognition_provider_changed for the audit trail — the key value is never
   # logged or emitted. The caller (controller) owns authorization (admin) and the
   # archived read-only guard.
   class SetRecognitionProvider < BaseAction
-    def call(move:, provider:, api_key: nil, actor: nil)
+    def call(move:, provider:, api_key: nil, model: nil, actor: nil)
       provider = provider.to_s
       api_key = api_key.to_s.strip
+      model = model.to_s.strip
 
       yield ensure_writable(move)
       yield validate(provider)
       yield ensure_key_present(move, provider, api_key)
-      yield with_responsible(actor) { persist(move, provider, api_key) }
+      yield with_responsible(actor) { persist(move, provider, api_key, model) }
       yield emit_event(move, actor, provider)
       Success(move)
     end
@@ -42,14 +45,27 @@ module Moves
     end
 
     # Only overwrite the key column when a new value was submitted; a blank field
-    # preserves the existing (masked) key.
-    def persist(move, provider, api_key)
+    # preserves the existing (masked) key. The model override, by contrast, is
+    # always written: blank or default-matching stores nil so the row keeps
+    # tracking the adapter's DEFAULT_MODEL as it evolves.
+    def persist(move, provider, api_key, model)
       attrs = { recognition_provider: provider }
-      attrs["#{provider}_api_key"] = api_key if Move::REAL_RECOGNITION_PROVIDERS.include?(provider) && api_key.present?
+      if Move::REAL_RECOGNITION_PROVIDERS.include?(provider)
+        attrs["#{provider}_api_key"] = api_key if api_key.present?
+        attrs["#{provider}_model"] = model_override(provider, model)
+      end
       move.update!(attrs)
       Success(move)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
+    end
+
+    # The value to store: nil when blank or equal to the provider's default (so the
+    # Move tracks future default changes), otherwise the submitted model.
+    def model_override(provider, model)
+      return nil if model.blank? || model == RecognitionProviders.default_model(provider)
+
+      model
     end
 
     def emit_event(move, actor, provider)
