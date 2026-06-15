@@ -45,6 +45,16 @@ RSpec.describe "Photo recovery" do
 
       expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
     end
+
+    it "treats a photo whose item was moved to another box as recovered (move-wide)" do
+      other_box = create(:box, move:, number: "9")
+      create(:recognition_run, :failed, move:, box:, media:)
+      create(:item, move:, box: other_box, source_media: media, name: "Lamp")
+
+      get move_box_recovery_photo_path(move, box, media)
+
+      expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
+    end
   end
 
   describe "GET .../recovery/photo/:media_id/state (poll fragment)" do

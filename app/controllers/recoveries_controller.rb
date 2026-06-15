@@ -43,8 +43,12 @@ class RecoveriesController < MoveScopedController
 
   private
 
+  # Move-wide, not box-scoped: an item recognized from this photo may have been
+  # moved to another box (Items::Move keeps source_media_id), but the photo is
+  # still recovered — never offer a duplicate manual add for it. Mirrors
+  # BoxesController#recoverable_media_ids.
   def recovered?
-    @box.items.exists?(source_media_id: @media.id)
+    @move.items.exists?(source_media_id: @media.id)
   end
 
   def latest_run

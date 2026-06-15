@@ -157,6 +157,20 @@ RSpec.describe "Boxes" do
       expect(response.body).to include(%(href="#{move_box_recovery_photo_path(move, box, media_id: failed.id)}"))
       expect(response.body).not_to include(move_box_recovery_photo_path(move, box, media_id: in_flight.id))
     end
+
+    it "does not mark a photo recoverable once its recognized item moved to another box" do
+      box = create(:box, move:, number: "1")
+      other = create(:box, move:, number: "9")
+      photo = create(:media, move:, box:)
+      create(:recognition_run, :failed, move:, box:, media: photo)
+      # Item recognized from this photo but now living in another box (source_media
+      # is stable across the move) — the photo is not orphaned.
+      create(:item, move:, box: other, source_media: photo, name: "Lamp")
+
+      get move_box_path(move, box)
+
+      expect(response.body).not_to include(move_box_recovery_photo_path(move, box, media_id: photo.id))
+    end
   end
 
   describe "GET /moves/:move_id/boxes/:id/edit" do

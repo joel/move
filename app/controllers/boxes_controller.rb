@@ -126,8 +126,12 @@ class BoxesController < MoveScopedController
   # Orphaned photos (no item) whose latest recognition attempt is settled: there
   # is a terminal run (failed / succeeded-empty) and none currently in flight.
   # These get a tappable recovery tile; still-processing photos stay plain (#162).
+  # The "produced an item" check is MOVE-wide, not box-scoped: Items::Move changes
+  # only box_id and leaves source_media_id pointing at the original photo, so a
+  # box-scoped check would re-flag a photo as orphaned once its item is moved away
+  # (and let the recovery flow add a duplicate). Mirrors RecoveriesController#recovered?.
   def recoverable_media_ids
-    item_media = @box.items.where.not(source_media_id: nil).select(:source_media_id)
+    item_media = @move.items.where.not(source_media_id: nil).select(:source_media_id)
     runs = RecognitionRun.where(box: @box)
     @box.media
         .where.not(id: item_media)
