@@ -26,6 +26,12 @@ Rails.application.routes.draw do
       patch "review/photo/:media_id/items/:id/rename", to: "reviews#rename_item", as: :review_rename_item
       patch "review/photo/:media_id/items/:id/remove", to: "reviews#remove_item", as: :review_remove_item
       post "review/photo/:media_id/items", to: "reviews#add_item", as: :review_add_item
+      # Recovery — a persistent entry point for an orphaned photo (recognition
+      # failed or found nothing, so no item). Re-run recognition or hand off to the
+      # manual add (B3). `state` is the polled status fragment.
+      get "recovery/photo/:media_id", to: "recoveries#show", as: :recovery_photo
+      get "recovery/photo/:media_id/state", to: "recoveries#state", as: :recovery_photo_state
+      post "recovery/photo/:media_id/retry", to: "recoveries#retry", as: :recovery_photo_retry
       # B2 — Capture image & recognition. `session` is the polled session panel.
       get "capture", to: "captures#show", as: :capture
       post "capture", to: "captures#create"

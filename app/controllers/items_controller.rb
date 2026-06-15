@@ -21,24 +21,30 @@ class ItemsController < MoveScopedController
   def new
     item = @box.items.new(move: @move)
     authorize! item, to: :create?, with: ItemPolicy
-    render Views::Items::New.new(move: @move, box: @box, item: item, **vocabulary)
+    render Views::Items::New.new(
+      move: @move, box: @box, item: item, source_media_id: source_media_id, **vocabulary
+    )
   end
 
   # POST /moves/:move_id/boxes/:box_id/items
   def create
     authorize! @box.items.new(move: @move), to: :create?, with: ItemPolicy
-    result = Items::CreateManual.new.call(box: @box, params: item_params, creator: current_user)
+    result = Items::CreateManual.new.call(
+      box: @box, params: item_params, creator: current_user, source_media: source_media
+    )
 
     case result
     in Dry::Monads::Success(item)
       redirect_to move_box_path(@move, @box), notice: t(".created", name: item.name)
     in Dry::Monads::Failure(Symbol => reason)
-      redirect_to new_move_box_item_path(@move, @box), alert: vocabulary_error(reason)
+      redirect_to new_move_box_item_path(@move, @box, source_media_id: source_media_id),
+                  alert: vocabulary_error(reason)
     in Dry::Monads::Failure(errors)
       item = @box.items.new(item_attributes.merge(move: @move))
       item.errors.merge!(errors) if errors.respond_to?(:each)
-      render Views::Items::New.new(move: @move, box: @box, item: item, **vocabulary),
-             status: :unprocessable_content
+      render Views::Items::New.new(
+        move: @move, box: @box, item: item, source_media_id: source_media_id, **vocabulary
+      ), status: :unprocessable_content
     end
   end
 
@@ -132,6 +138,27 @@ class ItemsController < MoveScopedController
     @box = authorized_scope(@move.boxes).find(params.expect(:box_id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
+  end
+
+  # Recovery flow: a manual add launched from an orphaned photo carries the photo
+  # id (query param on `new`, hidden field on `create`) so the item attaches to it.
+  def source_media_id
+    params.dig(:item, :source_media_id).presence || params[:source_media_id].presence
+  end
+
+  # Bind the new item to the source photo ONLY if that photo is still a settled
+  # orphan at POST time. A recovery Add-item form can go stale (the photo was
+  # retried/resolved, the id is replayed for a conflict-only photo, or recognition
+  # is still in flight and about to materialize items); binding then would attach a
+  # duplicate to a photo that already has — or is about to have — items. Re-validate
+  # here — if not, drop the binding (still create the item; the user wants it in the
+  # box, just not attributed to that photo). Mirrors Media#orphaned? + the gallery's
+  # settled (not-in-flight) check.
+  def source_media
+    return nil unless source_media_id
+
+    media = @box.media.find_by(id: source_media_id)
+    media if media&.orphaned? && !media.recognition_in_flight?
   end
 
   def set_item

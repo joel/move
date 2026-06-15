@@ -1,0 +1,25 @@
+# Photo recovery surface (orphaned photo: recognition failed or found nothing).
+en:
+  recoveries:
+    back: "Back to box"
+    badge: "Photo"
+    failed:
+      title: "Recognition didn't finish"
+    empty:
+      title: "No items found in this photo"
+      subtitle: "Recognition ran but didn't detect anything. Add the item yourself."
+    processing:
+      title: "Recognizing…"
+      subtitle: "Hang tight — this updates automatically."
+    recovered:
+      title: "All set"
+      subtitle: "Items were added from this photo."
+      view_items: "View items"
+    conflict:
+      title: "Already in this box"
+      subtitle: "Recognition matched items you already have here, so nothing was added."
+    actions:
+      retry: "Retry recognition"
+      add_item: "Add item manually"
+    retry:
+      retried: "Recognition restarted."

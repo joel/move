@@ -4,15 +4,17 @@ module Views
   module Boxes
     # B1 gallery — the box's captured photos (never cropped; Domain §4.9, TF §13).
     # A photo that produced at least one item links to its per-photo review walk
-    # (one photo → many items); photos with no items (failed / processing /
-    # zero-detection) are absent from that walk, so they render as plain
-    # thumbnails to avoid a "Photo 1 of 0" dead end (#162).
+    # (one photo → many items). A photo with no item but a *settled* recognition
+    # attempt (failed / zero-detection) links to the recovery screen so it isn't a
+    # dead end. Photos still queued/processing render as plain thumbnails — they're
+    # transient and never enter the review walk (the "Photo 1 of 0" guard, #162).
     class Gallery < Views::Base
-      def initialize(move:, box:, media:, reviewable_media_ids: [])
+      def initialize(move:, box:, media:, reviewable_media_ids: [], recoverable_media_ids: [])
         @move = move
         @box = box
         @media = media
         @reviewable_media_ids = reviewable_media_ids.to_set
+        @recoverable_media_ids = recoverable_media_ids.to_set
       end
 
       def view_template
@@ -36,7 +38,29 @@ module Views
       end
 
       def thumb(media)
-        @reviewable_media_ids.include?(media.id) ? review_link(media) : plain_thumb(media)
+        if @reviewable_media_ids.include?(media.id)
+          review_link(media)
+        elsif @recoverable_media_ids.include?(media.id)
+          recovery_link(media)
+        else
+          plain_thumb(media)
+        end
+      end
+
+      # An orphaned-but-settled photo: tappable, with a terracotta alert marker so
+      # the user can tell it needs attention. Goes to the recovery screen, NOT the
+      # review walk (respects #162 — it never produced an item to walk).
+      def recovery_link(media)
+        a(
+          href: move_box_recovery_photo_path(@move, @box, media_id: media.id),
+          class: "#{tile_classes} group relative ring-error/40 hover:ring-2"
+        ) do
+          image(media, hover: true)
+          span(class: "absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center " \
+                      "rounded-full bg-error/90 text-on-error") do
+            render Components::Icons::Alert.new(css: "h-3.5 w-3.5")
+          end
+        end
       end
 
       # turbo_prefetch:"false" (string — a boolean false is dropped by Phlex):

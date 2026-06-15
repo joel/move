@@ -89,7 +89,7 @@ module Views
           thumb(media)
           div(class: "flex flex-1 flex-col gap-1") do
             state_badge(run)
-            error_caption(run) if run&.failed?
+            render Components::Ui::RecognitionErrorCaption.new(run:) if run&.failed?
             retry_button(media) if run&.failed?
           end
         end
@@ -113,22 +113,6 @@ module Views
         return span(class: "text-label-caps uppercase text-muted") { I18n.t("ui.states.queued") } if run.nil?
 
         render Components::Ui::RecognitionState.new(state: RUN_TO_STATE.fetch(run.status, :queued))
-      end
-
-      # The failed run's reason, friendly for known categories (quota, rate limit,
-      # auth, network) and the cleaned vendor detail otherwise — so a user knows
-      # whether retrying will help or the AI plan needs attention.
-      def error_caption(run)
-        p(class: "text-body-md text-error") { recognition_error_text(run) }
-      end
-
-      def recognition_error_text(run)
-        text = if run.error_category == :generic
-                 run.error_detail
-               else
-                 I18n.t("ui.recognition_errors.#{run.error_category}")
-               end
-        text.presence || I18n.t("ui.recognition_errors.generic")
       end
 
       def retry_button(media)

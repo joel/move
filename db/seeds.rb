@@ -211,6 +211,43 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     end
   end
 
+  # Recovery demo: two orphaned photos in the demo box — one whose recognition
+  # FAILED (quota) and one that SUCCEEDED with zero detections. Both have no item,
+  # so the gallery shows tappable recovery tiles and the recovery screen is
+  # showcase-ready (Retry + Add item manually). Idempotent: the absence of any
+  # failed run gates the whole block.
+  if demo_box && demo_box.recognition_runs.where(status: "failed").none?
+    attach_demo_image = lambda do |media, label|
+      media.image.attach(
+        io: Rails.public_path.join("icon.png").open,
+        filename: "#{label.parameterize}.png", content_type: "image/png"
+      )
+      media.save!
+    end
+
+    failed_media = demo_box.media.new(
+      move: move, media_type: "image", captured_via: "web", captured_at: 30.seconds.ago
+    )
+    attach_demo_image.call(failed_media, "recovery-failed")
+    demo_box.recognition_runs.create!(
+      move: move, media: failed_media, provider: "openai", provider_model: "gpt-5-mini",
+      status: "failed", started_at: 1.minute.ago, completed_at: Time.current,
+      error_code: "ProviderHttp::Error",
+      error_message: "RecognitionProviders::Openai request failed (429): " \
+                     "You exceeded your current quota, please check your plan and billing details."
+    )
+
+    empty_media = demo_box.media.new(
+      move: move, media_type: "image", captured_via: "web", captured_at: 20.seconds.ago
+    )
+    attach_demo_image.call(empty_media, "recovery-empty")
+    demo_box.recognition_runs.create!(
+      move: move, media: empty_media, provider: "fake", provider_model: "fake-1",
+      status: "succeeded", started_at: 1.minute.ago, completed_at: Time.current,
+      metadata: { "item_count" => 0, "provider" => "fake" }
+    )
+  end
+
   # --- D5/D7: managed vocabularies (categories, tags, rooms) ------------------
   # The curated defaults were seeded above via Moves::DefaultVocabularies and
   # already leave several *unused* values (Tools / Seasonal / Attic / Decor / …)
