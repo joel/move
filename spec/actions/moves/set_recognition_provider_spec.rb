@@ -65,6 +65,31 @@ RSpec.describe Moves::SetRecognitionProvider do
     expect(move.reload.openai_model).to eq("gpt-5")
   end
 
+  it "emits recognition_model_changed (not provider_changed) when only the model changes (#187)" do
+    move.update!(recognition_provider: "openai", openai_api_key: "sk-live")
+    allow(Rails.event).to receive(:notify)
+
+    described_class.new.call(move:, provider: "openai", api_key: "", model: "gpt-5", actor:)
+
+    expect(Rails.event).to have_received(:notify).with(
+      "move.recognition_model_changed",
+      hash_including(move_id: move.id, actor_id: actor.id, provider: "openai", model: "gpt-5")
+    )
+    expect(Rails.event).not_to have_received(:notify).with("move.recognition_provider_changed", anything)
+  end
+
+  it "reports the effective default model when the override is cleared (#187)" do
+    move.update!(recognition_provider: "openai", openai_api_key: "sk-live", openai_model: "gpt-5")
+    allow(Rails.event).to receive(:notify)
+
+    described_class.new.call(move:, provider: "openai", api_key: "", model: "", actor:)
+
+    expect(Rails.event).to have_received(:notify).with(
+      "move.recognition_model_changed",
+      hash_including(provider: "openai", model: RecognitionProviders::Openai::DEFAULT_MODEL)
+    )
+  end
+
   it "clears the override to nil when the model is blank or matches the default" do
     move.update!(recognition_provider: "openai", openai_api_key: "sk-live", openai_model: "gpt-5")
 

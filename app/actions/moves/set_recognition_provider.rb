@@ -9,10 +9,12 @@ module Moves
   # A blank api_key leaves the stored key untouched (the UI shows a mask, not the
   # real value, so an empty field means "keep"). The model override (#187) is the
   # opposite: it IS shown, so a blank or default-matching value clears the override
-  # and the adapter falls back to its DEFAULT_MODEL. `fake` needs neither. Emits
-  # move.recognition_provider_changed for the audit trail — the key value is never
-  # logged or emitted. The caller (controller) owns authorization (admin) and the
-  # archived read-only guard.
+  # and the adapter falls back to its DEFAULT_MODEL. `fake` needs neither. Emits an
+  # event matching what changed — move.recognition_provider_changed on a provider
+  # switch, move.recognition_model_changed when only the model override changed —
+  # so the activity feed never reads a model edit as a provider switch (#187). The
+  # key value is never logged or emitted. The caller (controller) owns
+  # authorization (admin) and the archived read-only guard.
   class SetRecognitionProvider < BaseAction
     def call(move:, provider:, api_key: nil, model: nil, actor: nil)
       provider = provider.to_s
@@ -22,8 +24,9 @@ module Moves
       yield ensure_writable(move)
       yield validate(provider)
       yield ensure_key_present(move, provider, api_key)
+      before = { provider: move.recognition_provider, model: move.recognition_model_for(provider) }
       yield with_responsible(actor) { persist(move, provider, api_key, model) }
-      yield emit_event(move, actor, provider)
+      yield emit_event(move, actor, provider, before)
       Success(move)
     end
 
@@ -68,12 +71,32 @@ module Moves
       model
     end
 
-    def emit_event(move, actor, provider)
-      Rails.event.notify(
-        "move.recognition_provider_changed",
-        move_id: move.id, actor_id: actor&.id, provider: provider
-      )
+    # Emit the event that matches what actually changed, so the activity feed
+    # stays honest: a model-only edit must not read as "switched the AI provider".
+    # A provider switch (or a key-only/no-op re-save) emits provider_changed;
+    # otherwise a changed model override emits recognition_model_changed with the
+    # provider and the effective model (the override, or the adapter default when
+    # cleared).
+    def emit_event(move, actor, provider, before)
+      if before[:provider] != provider || !model_override_changed?(move, provider, before[:model])
+        notify("move.recognition_provider_changed", move, actor, provider: provider)
+      else
+        notify("move.recognition_model_changed", move, actor,
+               provider: provider, model: effective_model(move, provider))
+      end
       Success()
+    end
+
+    def model_override_changed?(move, provider, previous_model)
+      move.recognition_model_for(provider) != previous_model
+    end
+
+    def effective_model(move, provider)
+      move.recognition_model_for(provider) || RecognitionProviders.default_model(provider)
+    end
+
+    def notify(name, move, actor, **payload)
+      Rails.event.notify(name, move_id: move.id, actor_id: actor&.id, **payload)
     end
   end
 end
