@@ -32,7 +32,7 @@ class RecoveriesController < MoveScopedController
     # frame; without it each poll would nest the whole AppShell inside the card.
     render Views::Recoveries::State.new(
       move: @move, box: @box, media: @media, run: latest_run,
-      editable: editable_move?, recovered: recovered?
+      editable: editable_move?, recovered: recovered?, orphaned: orphaned?
     ), layout: false
   end
 

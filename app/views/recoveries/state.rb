@@ -10,19 +10,29 @@ module Views
     class State < Views::Base
       include Phlex::Rails::Helpers::ButtonTo
 
-      def initialize(move:, box:, media:, run:, editable: false, recovered: false)
+      def initialize(move:, box:, media:, run:, editable: false, recovered: false, orphaned: true)
         @move = move
         @box = box
         @media = media
         @run = run
         @editable = editable
         @recovered = recovered
+        @orphaned = orphaned
       end
 
       def view_template
         div(data: { pending: pending }) do
           render Components::Ui::Card.new(padding: "p-6") do
-            @recovered ? recovered_body : status_body
+            if @recovered
+              recovered_body
+            elsif !@orphaned
+              # A (re-)run produced a result other than an item — a conflict-only
+              # run (suggestions, no item, by no-overwrite). Never expose manual add
+              # here: it would recreate the duplicate the conflict path avoids.
+              resolved_body
+            else
+              status_body
+            end
           end
         end
       end
@@ -30,9 +40,9 @@ module Views
       private
 
       # While a (re-)run is queued/processing the poller keeps refreshing; any
-      # terminal/recovered state stops it.
+      # settled state (recovered / resolved-conflict / terminal) stops it.
       def pending
-        return 0 if @recovered
+        return 0 if @recovered || !@orphaned
 
         @run && %w[queued processing].include?(@run.status) ? 1 : 0
       end
@@ -78,6 +88,15 @@ module Views
           href: move_box_review_photo_path(@move, @box, @media), data: { turbo_prefetch: "false" },
           class: primary_classes
         ) { plain I18n.t("recoveries.recovered.view_items") }
+      end
+
+      # Conflict-only: recognition matched items already in the box, so nothing was
+      # added. No manual-add affordance — only a way back.
+      def resolved_body
+        render Components::Ui::RecognitionState.new(state: :succeeded)
+        heading(I18n.t("recoveries.conflict.title"))
+        subtitle(I18n.t("recoveries.conflict.subtitle"))
+        a(href: move_box_path(@move, @box), class: primary_classes) { plain I18n.t("recoveries.back") }
       end
 
       # Retry is offered only for a failed run (matches RecognitionRuns::Retry's

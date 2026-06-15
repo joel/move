@@ -15,6 +15,9 @@ en:
       title: "All set"
       subtitle: "Items were added from this photo."
       view_items: "View items"
+    conflict:
+      title: "Already in this box"
+      subtitle: "Recognition matched items you already have here, so nothing was added."
     actions:
       retry: "Retry recognition"
       add_item: "Add item manually"

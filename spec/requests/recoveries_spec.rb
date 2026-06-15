@@ -78,6 +78,16 @@ RSpec.describe "Photo recovery" do
       # the AppShell layout (brand tagline lives only in the chrome).
       expect(response.body).not_to include(I18n.t("ui.nav.brand_tagline"))
     end
+
+    it "shows a resolved state (no manual add) when a retry result is conflict-only" do
+      run = create(:recognition_run, :succeeded, move:, box:, media:)
+      create(:recognition_suggestion, :conflict, move:, box:, media:, recognition_run: run)
+
+      get move_box_recovery_photo_state_path(move, box, media)
+
+      expect(response.body).to include(I18n.t("recoveries.conflict.title"))
+      expect(response.body).not_to include(I18n.t("recoveries.actions.add_item"))
+    end
   end
 
   describe "POST .../recovery/photo/:media_id/retry" do
