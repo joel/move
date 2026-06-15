@@ -84,6 +84,18 @@ RSpec.describe RecognitionProviders::Anthropic do
       .to raise_error(ProviderHttp::Error, /401.*invalid x-api-key/)
   end
 
+  it "surfaces an exhausted-credit-balance error without the key" do
+    stub_http(code: "400", body: { error: {
+      message: "Your credit balance is too low to access the Anthropic API."
+    } }.to_json)
+
+    expect { provider.identify(image: image, context: context) }
+      .to raise_error(ProviderHttp::Error) { |e|
+        expect(e.message).to match(/credit balance is too low/i)
+        expect(e.message).not_to include("sk-ant-test")
+      }
+  end
+
   it "raises (not a phantom empty box) when the model answers in prose instead of the tool" do
     stub_http(code: "200", body: { content: [{ type: "text", text: "Sorry, I can't help." }] }.to_json)
 

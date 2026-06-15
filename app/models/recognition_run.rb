@@ -26,4 +26,35 @@ class RecognitionRun < ApplicationRecord
   def terminal?
     TERMINAL.include?(status)
   end
+
+  # Coarse classification of a failure for user-facing copy. Pure derivation from
+  # the already-sanitized error_message — no business logic, no side effects.
+  # Quota is checked before rate_limit because some vendors (OpenAI's
+  # `insufficient_quota`) report an exhausted plan as HTTP 429.
+  def error_category
+    msg = error_message.to_s
+    case msg
+    when /quota|billing|insufficient_quota|credit balance/i then :quota
+    when /rate.?limit|too many requests|\(429\)/i then :rate_limit
+    when /api key|unauthorized|\(401\)|invalid x-api-key|permission/i then :auth
+    when /timeout|timed out|connection|network|econnreset/i then :network
+    else :generic
+    end
+  end
+
+  # The vendor's human-readable detail, surfaced ONLY when the failure is a real
+  # transport error ("RecognitionProviders::Openai request failed (429): <vendor
+  # text>") — the prefix is stripped so a customer never sees adapter class names
+  # or status codes. Any other message (model-drift "… returned no objects
+  # array", a raw "OPENAI_API_KEY is not set", an ActiveRecord error) is internal
+  # and returns nil, so callers fall back to the generic localized line instead
+  # of leaking implementation detail.
+  TRANSPORT_PREFIX = /\A\S+ request failed \(\d+\): /
+
+  def error_detail
+    msg = error_message.to_s
+    return unless msg.match?(TRANSPORT_PREFIX)
+
+    msg.sub(TRANSPORT_PREFIX, "").presence
+  end
 end
