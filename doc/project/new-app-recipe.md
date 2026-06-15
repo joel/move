@@ -144,9 +144,13 @@ env:
 `production.rb`: `force_ssl = true` + `assume_ssl = true` (trusts the tunnel's
 `X-Forwarded-Proto`) + the `ssl_options`/`host_authorization` `/up` exclusions.
 
-**Secrets:** add each to Doppler `<app>/prd`; `.kamal/secrets` reads them from the
-env in CI (Doppler→GitHub sync) and falls back to the Doppler CLI locally. The
-Deploy workflow whitelists each secret in its `env:` block — add new ones there.
+**Secrets:** add each to Doppler `<app>/prd`; `.kamal/secrets` is gated on
+`KAMAL_SECRETS_FROM_ENV` (set in the Deploy workflow's `env:` block) — CI reads the
+synced env values, while a local deploy always reads from the Doppler CLI
+(never the ambient shell/`.env`, so a stale export can't shadow Doppler; local
+deploys need Doppler auth). The Deploy workflow whitelists each secret in its
+`env:` block — add new ones there, and remember a rotated secret only reaches the
+running container on the next `kamal deploy` (not `kamal app start/stop`).
 
 **SSH key for CI:** Doppler `SSH_PRIVATE_KEY` must be the **private key authorized
 for `deploy@<origin>`**. Verify by fingerprint, not by eyeballing the PEM

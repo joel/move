@@ -73,8 +73,11 @@ turns on genuine vision recognition and semantic search.
 1. **Add the secret to Doppler** (`move/prd`):
    `doppler secrets set OPENAI_API_KEY=sk-… --project move --config prd`.
    The Doppler→GitHub Actions integration syncs it into the Deploy workflow's
-   secrets; `.kamal/secrets` reads it from the environment (CI) or falls back to
-   the Doppler CLI (local deploys).
+   secrets. `.kamal/secrets` is gated on `KAMAL_SECRETS_FROM_ENV` (set by the
+   workflow): CI reads it from the synced env; a **local** deploy always reads it
+   from the Doppler CLI, never the ambient shell/`.env` — so a stale exported key
+   can't shadow Doppler. **Rotating the key requires a redeploy** (`kamal deploy`)
+   to recreate the container; `kamal app start/stop` keeps the old baked-in value.
 2. **It is already referenced in config** (this is committed):
    - `.kamal/secrets` resolves `OPENAI_API_KEY`.
    - `.github/workflows/deploy.yml` exports `OPENAI_API_KEY` into the runner env
