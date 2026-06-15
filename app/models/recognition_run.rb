@@ -42,10 +42,19 @@ class RecognitionRun < ApplicationRecord
     end
   end
 
-  # The vendor's human-readable detail, with the internal transport prefix
-  # ("RecognitionProviders::Openai request failed (429): ") stripped so a
-  # customer never sees adapter class names or status codes. nil when blank.
+  # The vendor's human-readable detail, surfaced ONLY when the failure is a real
+  # transport error ("RecognitionProviders::Openai request failed (429): <vendor
+  # text>") — the prefix is stripped so a customer never sees adapter class names
+  # or status codes. Any other message (model-drift "… returned no objects
+  # array", a raw "OPENAI_API_KEY is not set", an ActiveRecord error) is internal
+  # and returns nil, so callers fall back to the generic localized line instead
+  # of leaking implementation detail.
+  TRANSPORT_PREFIX = /\A\S+ request failed \(\d+\): /
+
   def error_detail
-    error_message.to_s.sub(/\A\S+ request failed \(\d+\): /, "").presence
+    msg = error_message.to_s
+    return unless msg.match?(TRANSPORT_PREFIX)
+
+    msg.sub(TRANSPORT_PREFIX, "").presence
   end
 end

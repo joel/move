@@ -129,6 +129,19 @@ RSpec.describe "Captures" do
       expect(response.body).to include("The model glitched.")
       expect(response.body).not_to include("RecognitionProviders::Openai")
     end
+
+    it "shows the generic line (never the class name) for an internal model-drift error" do
+      media = create(:media, move:, box:)
+      create(:recognition_run, :failed, move:, box:, media:,
+                                        error_message: "RecognitionProviders::Openai returned a 2xx with no objects array")
+
+      get move_box_capture_session_path(move, box)
+
+      # Apostrophe-free slice of ui.recognition_errors.generic (the rendered HTML
+      # escapes the "couldn't" apostrophe).
+      expect(response.body).to include("be completed. Please retry.")
+      expect(response.body).not_to include("RecognitionProviders::Openai")
+    end
   end
 
   describe "POST capture/retry" do

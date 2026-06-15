@@ -38,13 +38,21 @@ RSpec.describe RecognitionRun do
   end
 
   describe "#error_detail" do
-    it "strips the internal transport prefix" do
+    it "surfaces the vendor text from a transport error, stripping the internal prefix" do
       expect(run_with("RecognitionProviders::Openai request failed (500): The model glitched.")
         .error_detail).to eq("The model glitched.")
     end
 
-    it "returns the message unchanged when there is no prefix" do
-      expect(run_with("Provider unavailable").error_detail).to eq("Provider unavailable")
+    it "returns nil for an internal message (model drift) so it never leaks the class name" do
+      expect(run_with("RecognitionProviders::Openai returned a 2xx with no objects array")
+        .error_detail).to be_nil
+      expect(run_with("RecognitionProviders::Anthropic returned no record_objects tool_use block")
+        .error_detail).to be_nil
+    end
+
+    it "returns nil for a raw internal exception (missing key, AR error)" do
+      expect(run_with("OPENAI_API_KEY is not set").error_detail).to be_nil
+      expect(run_with("Provider unavailable").error_detail).to be_nil
     end
 
     it "returns nil when blank" do
