@@ -3,7 +3,7 @@
 require "rails_helper"
 
 RSpec.describe RecognitionProviders::Anthropic do
-  subject(:provider) { described_class.new }
+  subject(:provider) { described_class.new(api_key: "sk-ant-test") }
 
   let(:image) { instance_double(ActiveStorage::Blob, content_type: "image/jpeg", download: "bytes") }
   let(:context) { { room: nil, categories: [], tags: [] } }
@@ -23,14 +23,9 @@ RSpec.describe RecognitionProviders::Anthropic do
   def sent_request = captured.fetch(:request)
   def sent_body = JSON.parse(sent_request.body)
 
-  before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("sk-ant-test")
-  end
-
-  it "raises when the API key is absent" do
-    allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return(nil)
-    expect { provider.identify(image: image, context: context) }.to raise_error(/ANTHROPIC_API_KEY/)
+  it "raises a typed missing-key error (strict BYO) when built without a key" do
+    expect { described_class.new.identify(image: image, context: context) }
+      .to raise_error(RecognitionProviders::Base::MissingApiKey, /No API key set/)
   end
 
   it "sends a forced tool_use request with the auth/version headers, model, and base64 image" do

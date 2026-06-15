@@ -17,6 +17,19 @@ module RecognitionProviders
 
     MAX_IMAGE_EDGE = 1536
 
+    # Raised when a vendor adapter is asked to run without this Move's own key.
+    # Strict BYO: the adapter never reaches for a shared/ENV credential. Surfaced
+    # as RecognitionRun error_category :missing_key → "add your key in Settings".
+    class MissingApiKey < StandardError
+    end
+
+    # Adapters are built per Move with that Move's key (RecognitionProviders
+    # .for_move). `model` is optional — each adapter falls back to its DEFAULT_MODEL.
+    def initialize(api_key: nil, model: nil)
+      @api_key = api_key.presence
+      @model = model.presence
+    end
+
     # Shared envelope for the two JSON-Schema providers (OpenAI strict outputs +
     # Anthropic tool input_schema). Gemini speaks a different dialect and keeps
     # its own copy. Root is an object because OpenAI strict mode forbids a
@@ -56,6 +69,19 @@ module RecognitionProviders
     end
 
     protected
+
+    # The Move's key, or a typed failure (never a shared/ENV key). The provider
+    # label rides in the message for the error log only — it is never shown to the
+    # user (error_category maps it to localized copy; error_detail returns nil for
+    # non-transport messages).
+    def api_key!
+      @api_key or raise MissingApiKey, "No API key set for #{self.class.name.demodulize}"
+    end
+
+    # The configured model, or the adapter's DEFAULT_MODEL when none was injected.
+    def model
+      @model || self.class::DEFAULT_MODEL
+    end
 
     # Pull the objects array out of a structured payload. Accepts a parsed
     # Hash/Array (e.g. Anthropic tool_use.input) or a raw JSON string

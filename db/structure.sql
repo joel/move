@@ -1068,7 +1068,11 @@ CREATE TABLE public.moves (
     discard_batch_id uuid,
     discarded_by_parent_type character varying,
     discarded_by_parent_id uuid,
-    log_data jsonb
+    log_data jsonb,
+    recognition_provider character varying DEFAULT 'fake'::character varying NOT NULL,
+    openai_api_key text,
+    anthropic_api_key text,
+    gemini_api_key text
 );
 
 
@@ -2392,6 +2396,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260615120000'),
 ('20260614180625'),
 ('20260614180624'),
 ('20260614180623'),

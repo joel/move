@@ -44,6 +44,13 @@ class MovePolicy < ApplicationPolicy
     admin_of?(record)
   end
 
+  # Recognition provider API keys are secrets, so managing them is admin-only
+  # (#185), mirroring integration tokens. Viewers/contributors see the active
+  # provider read-only.
+  def manage_recognition_keys?
+    admin_of?(record)
+  end
+
   relation_scope do |relation|
     next relation.none if user.blank?
 

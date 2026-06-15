@@ -34,12 +34,36 @@ class SettingsController < MoveScopedController
     end
   end
 
+  # PATCH /moves/:move_id/settings/recognition_provider (admin-only — keys are
+  # secrets, mirroring integration tokens).
+  def update_recognition_provider
+    write_setting(
+      Moves::SetRecognitionProvider, policy: :manage_recognition_keys?,
+                                     provider: settings_param(:recognition_provider), api_key: settings_param(:api_key)
+    ) do |result|
+      if result.success? then t(".changed")
+      elsif result.failure == :api_key_required then t(".api_key_required")
+      else t(".invalid")
+      end
+    end
+  end
+
+  # DELETE /moves/:move_id/settings/recognition_provider/:provider (admin-only).
+  def remove_recognition_key
+    write_setting(
+      Moves::RemoveRecognitionKey, policy: :manage_recognition_keys?, provider: params[:provider]
+    ) do |result|
+      result.success? ? t(".key_removed") : t(".invalid")
+    end
+  end
+
   private
 
-  # Shared write path: editor-authorized, archived-guarded, action-driven, then
-  # redirect back to settings with a success/failure flash from the block.
-  def write_setting(action_class, **args)
-    authorize! @move, to: :edit_settings?, with: MovePolicy
+  # Shared write path: policy-authorized (editor by default), archived-guarded,
+  # action-driven, then redirect back to settings with a success/failure flash
+  # from the block. Secret-bearing writes pass policy: :manage_recognition_keys?.
+  def write_setting(action_class, policy: :edit_settings?, **args)
+    authorize! @move, to: policy, with: MovePolicy
     return redirect_to(move_settings_path(@move), alert: t(".read_only")) unless @move.writable?
 
     result = action_class.new.call(move: @move, actor: current_user, **args)

@@ -43,6 +43,20 @@ RSpec.describe RecognitionRuns::Process do
     expect(box.items.count).to eq(0)
   end
 
+  it "fails closed (no vendor call) when the Move's provider has no key, surfacing the missing-key state" do
+    move.update!(recognition_provider: "openai", openai_api_key: nil)
+    allow(Net::HTTP).to receive(:start).and_call_original # spy: strict BYO never hits it
+
+    result = described_class.new.call(run:) # provider resolved from the Move
+
+    expect(result).to be_failure
+    run.reload
+    expect(run.status).to eq("failed")
+    expect(run.error_category).to eq(:missing_key)
+    expect(box.items.count).to eq(0)
+    expect(Net::HTTP).not_to have_received(:start) # never reached the network
+  end
+
   it "stores only provider-independent metadata, never raw responses" do
     described_class.new.call(run:)
     expect(run.reload.metadata.keys).to contain_exactly("item_count", "provider")

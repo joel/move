@@ -12,6 +12,15 @@ class Move < ApplicationRecord
   has_logidze
   STATUSES = %w[planned started finished archived].freeze
   UNIT_SYSTEMS = %w[metric imperial].freeze
+  # Recognition is per-Move bring-your-own-key (#185). `fake` is the network-free
+  # default (no key, canned detections); the rest require this Move's own key.
+  RECOGNITION_PROVIDERS = %w[fake openai anthropic gemini].freeze
+  REAL_RECOGNITION_PROVIDERS = (RECOGNITION_PROVIDERS - %w[fake]).freeze
+
+  # Per-Move provider API keys, encrypted at rest (ActiveRecord::Encryption — keys
+  # in credentials.active_record_encryption). Never tracked by Logidze (its
+  # include-list excludes them), never rendered back (write-only in the UI).
+  encrypts :openai_api_key, :anthropic_api_key, :gemini_api_key
 
   belongs_to :created_by, class_name: "User"
   has_many :move_memberships, dependent: :destroy
@@ -33,6 +42,23 @@ class Move < ApplicationRecord
   validates :unit_system, inclusion: { in: UNIT_SYSTEMS }
   validates :auto_confirm_threshold,
             numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 1 }
+  validates :recognition_provider, inclusion: { in: RECOGNITION_PROVIDERS }
+
+  # This Move's stored key for +provider+, or nil for fake/unknown (which need no
+  # key). Used by RecognitionProviders.for_move to configure the adapter.
+  def recognition_api_key_for(provider)
+    return nil unless REAL_RECOGNITION_PROVIDERS.include?(provider.to_s)
+
+    public_send("#{provider}_api_key").presence
+  end
+
+  # Whether recognition can run as configured: fake always can; a real provider
+  # needs this Move's own key (strict BYO — never falls back to a shared key).
+  def recognition_ready?
+    return true if recognition_provider == "fake"
+
+    recognition_api_key_for(recognition_provider).present?
+  end
 
   def archived?
     status == "archived"

@@ -24,6 +24,7 @@ en:
       auto_confirmed: "Auto-confirmed"
       pending_review: "Pending review"
     recognition_errors:
+      missing_key: "Add this move's AI provider API key in Settings to enable recognition."
       quota: "Quota exceeded — check your plan and billing details."
       rate_limit: "The AI service is busy right now. Please retry in a moment."
       auth: "Recognition isn't configured correctly. Please contact support."

@@ -23,6 +23,10 @@ RSpec.describe RecognitionRun do
       expect(run_with("request failed (429): Rate limit reached").error_category).to eq(:rate_limit)
     end
 
+    it "classifies a missing-key message as :missing_key (before the generic :auth)" do
+      expect(run_with("No API key set for Openai").error_category).to eq(:missing_key)
+    end
+
     it "classifies an auth/key message as :auth" do
       expect(run_with("request failed (401): invalid x-api-key").error_category).to eq(:auth)
     end

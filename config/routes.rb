@@ -99,6 +99,11 @@ Rails.application.routes.draw do
     patch "settings/unit_system", to: "settings#update_unit_system", as: :settings_unit_system
     patch "settings/auto_confirm_threshold", to: "settings#update_auto_confirm_threshold",
                                              as: :settings_auto_confirm_threshold
+    # F3 / #185 — per-Move Recognition provider + BYO API keys (admin-only).
+    patch "settings/recognition_provider",
+          to: "settings#update_recognition_provider", as: :settings_recognition_provider
+    delete "settings/recognition_provider/:provider",
+           to: "settings#remove_recognition_key", as: :settings_remove_recognition_key
     resources :integration_tokens, only: %i[create destroy]
   end
   resources :posts

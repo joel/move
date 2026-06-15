@@ -34,6 +34,7 @@ class RecognitionRun < ApplicationRecord
   def error_category
     msg = error_message.to_s
     case msg
+    when /no api key set/i then :missing_key
     when /quota|billing|insufficient_quota|credit balance/i then :quota
     when /rate.?limit|too many requests|\(429\)/i then :rate_limit
     when /api key|unauthorized|\(401\)|invalid x-api-key|permission/i then :auth
