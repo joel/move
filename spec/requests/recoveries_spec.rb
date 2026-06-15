@@ -47,6 +47,20 @@ RSpec.describe "Photo recovery" do
     end
   end
 
+  describe "GET .../recovery/photo/:media_id/state (poll fragment)" do
+    it "renders only the status fragment, not the full app shell" do
+      create(:recognition_run, :failed, move:, box:, media:)
+
+      get move_box_recovery_photo_state_path(move, box, media)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("data-pending")
+      # The recognition poller injects this into a small frame — it must not carry
+      # the AppShell layout (brand tagline lives only in the chrome).
+      expect(response.body).not_to include(I18n.t("ui.nav.brand_tagline"))
+    end
+  end
+
   describe "POST .../recovery/photo/:media_id/retry" do
     it "enqueues a fresh run for a failed photo and redirects back" do
       create(:recognition_run, :failed, move:, box:, media:)

@@ -24,10 +24,12 @@ class RecoveriesController < MoveScopedController
   # GET .../recovery/photo/:media_id/state — polled status fragment (recognition
   # poller) so a re-run's progress updates in place without a manual refresh.
   def state
+    # layout: false — the recognition poller injects this straight into the panel
+    # frame; without it each poll would nest the whole AppShell inside the card.
     render Views::Recoveries::State.new(
       move: @move, box: @box, media: @media, run: latest_run,
       editable: editable_move?, recovered: recovered?
-    )
+    ), layout: false
   end
 
   # POST .../recovery/photo/:media_id/retry — re-run recognition on a failed photo.
