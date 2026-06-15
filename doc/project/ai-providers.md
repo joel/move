@@ -1,14 +1,51 @@
 # AI providers (recognition + embeddings)
 
 Move's AI layer is **provider-agnostic**: domain code talks to
-`RecognitionProviders` / `EmbeddingProviders`, never a vendor API. The active
-adapter is chosen by environment variable, defaulting to a deterministic,
-network-free **fake** so the app — and CI — run with **no API key and no cost**.
+`RecognitionProviders` / `EmbeddingProviders`, never a vendor API.
 
-| Capability | Module | Env selector | Adapters | Prod model (openai) |
+The two capabilities are scoped differently (#185):
+
+- **Recognition is per-Move, bring-your-own-key.** Each Move chooses its provider
+  and supplies its **own** API key in **Settings → Recognition & AI** (admin-only).
+  There is no shared app-wide recognition account — a Move never bills another
+  tenant's key. The default is the deterministic, network-free **`fake`** provider
+  (no key, no cost), so the app and CI run for free.
+- **Embeddings are still app-wide**, chosen by `EMBEDDING_PROVIDER` and the
+  deployment's `OPENAI_API_KEY`. Per-Move recognition keys do **not** feed
+  embeddings (out of scope for #185).
+
+| Capability | Module | Selector | Adapters | Default model (openai) |
 |---|---|---|---|---|
-| Image recognition | `app/services/recognition_providers/` | `RECOGNITION_PROVIDER` | `fake` (default), `openai`, `anthropic`, `gemini` | `gpt-5-mini` |
-| Text embeddings (D8 search) | `app/services/embedding_providers/` | `EMBEDDING_PROVIDER` | `fake` (default), `openai` | `text-embedding-3-small` @ 1536d |
+| Image recognition | `app/services/recognition_providers/` | **per Move** (`moves.recognition_provider` + encrypted `*_api_key`) | `fake` (default), `openai`, `anthropic`, `gemini` | `gpt-5-mini` |
+| Text embeddings (D8 search) | `app/services/embedding_providers/` | `EMBEDDING_PROVIDER` (env) | `fake` (default), `openai` | `text-embedding-3-small` @ 1536d |
+
+### How a recognition provider is resolved (per Move)
+
+`RecognitionRuns::Process` calls `RecognitionProviders.for_move(run.move)`, which
+reads `move.recognition_provider` and builds that adapter **with the Move's own
+key** (`move.recognition_api_key_for(provider)`). Keys live in encrypted columns
+on `moves` (`ActiveRecord::Encryption`; the encryption keys are in
+`credentials.active_record_encryption`, decrypted in every environment via
+`RAILS_MASTER_KEY`). Managed by `Moves::SetRecognitionProvider` /
+`Moves::RemoveRecognitionKey`, gated by `MovePolicy#manage_recognition_keys?`
+(admin). Keys are **write-only** in the UI — only `••••`+last-4 is ever rendered.
+
+**Strict BYO — no shared-key fallback.** A Move that selects a real provider with
+no key fails the run fast with `RecognitionProviders::Base::MissingApiKey`
+**before any network call** (→ `RecognitionRun#error_category == :missing_key` →
+the capture surface shows *"Add this move's AI provider API key in Settings"*).
+The deployment's environment is never consulted for a recognition key.
+
+```mermaid
+flowchart LR
+  P[RecognitionRuns::Process] --> F["RecognitionProviders.for_move(move)"]
+  F --> R{move.recognition_provider}
+  R -->|fake| K[Fake adapter — canned, no key]
+  R -->|openai/anthropic/gemini| A["vendor adapter(api_key: move.&ast;_api_key)"]
+  A --> H{key present?}
+  H -->|yes| V[POST to vendor → normalized Result]
+  H -->|no| M["raise Base::MissingApiKey<br/>(no network) → run failed,<br/>error_category :missing_key"]
+```
 
 ### Recognition detection contract
 
@@ -31,7 +68,8 @@ to a `Category`, so tags are not offered), then on materialization resolves
 `fragile` directly on the `Item`; both also ride on the `RecognitionSuggestion`
 (`proposed_category_id`, `proposed_fragile`) for the review queue. Before encoding, phone photos are
 EXIF-auto-oriented and down-scaled to ≤1536px (libvips) to cut image tokens and
-latency. Each model default is overridable via `*_RECOGNITION_MODEL`.
+latency. Each adapter pins a cost-matched `DEFAULT_MODEL` constant (per-Move model
+choice is intentionally not exposed — YAGNI).
 
 Both vendor adapters POST JSON over HTTPS through the shared
 [`app/services/provider_http.rb`](../../app/services/provider_http.rb), which
@@ -56,69 +94,55 @@ With the fakes (the default everywhere unless flipped):
   lexical proxy, **not** true semantic ranking. Search is effectively
   **lexical + trigram only**.
 
-Functional, but not the real product experience. Flipping to `openai` is what
-turns on genuine vision recognition and semantic search.
+Functional, but not the real product experience. A per-Move provider key turns on
+genuine vision recognition; `EMBEDDING_PROVIDER=openai` turns on semantic search.
 
-## Enabling OpenAI in production
+## Enabling real recognition (per Move — no deploy)
 
-> **Cost:** both providers are **pay-per-call**. Decide budget/timing before
-> flipping. Recognition runs once per uploaded photo; embeddings run once per
-> item (re)index.
+> **Cost:** vendor calls are **pay-per-call**, billed to **the key the Move owner
+> supplies**. Recognition runs once per uploaded photo.
 
-> **Ordering is load-bearing.** If `RECOGNITION_PROVIDER`/`EMBEDDING_PROVIDER`
-> are set to `openai` **before** `OPENAI_API_KEY` exists in the environment,
-> every recognition run fails and every embedding goes nil (the adapter raises
-> `OPENAI_API_KEY is not set`). **Add the key first.**
+Recognition is configured entirely in-app, with **no env var and no deploy**:
+
+1. Sign in as a **Move admin** and open **Settings → Recognition & AI**.
+2. Pick a provider (OpenAI / Anthropic / Gemini) and paste **that Move's** API key.
+   Save. The status chip turns **Active**; until a key is present it reads
+   **Key required** and recognition fails fast with the "add your key" caption.
+3. Capture a box photo on the org subdomain → confirm the run reaches `succeeded`
+   with real detections. Switch back to **Demo (no key)** any time to use the
+   network-free `fake` provider.
+
+Keys are stored encrypted per Move and can be rotated (paste a new value) or
+cleared (**Remove key**) from the same screen. No Doppler/Kamal change is involved
+for recognition — `RECOGNITION_PROVIDER` and `*_RECOGNITION_MODEL`/`*_API_KEY`
+env vars are **no longer used** for recognition (they were removed in #185).
+
+> Each adapter pins a cost-matched `DEFAULT_MODEL` (`gpt-5-mini`,
+> `claude-haiku-4-5-20251001`, `gemini-2.5-flash`). These are current-generation
+> defaults; changing them is a code change, not configuration.
+
+## Enabling OpenAI **embeddings** in production (env, deploy)
+
+Embeddings (D8 semantic search) remain app-wide and key-gated by env.
+
+> **Ordering is load-bearing.** If `EMBEDDING_PROVIDER=openai` is set **before**
+> `OPENAI_API_KEY` exists in the environment, every embedding goes nil. **Add the
+> key first.**
 
 1. **Add the secret to Doppler** (`move/prd`):
-   `doppler secrets set OPENAI_API_KEY=sk-… --project move --config prd`.
-   The Doppler→GitHub Actions integration syncs it into the Deploy workflow's
-   secrets. `.kamal/secrets` is gated on `KAMAL_SECRETS_FROM_ENV` (set by the
-   workflow): CI reads it from the synced env; a **local** deploy always reads it
-   from the Doppler CLI, never the ambient shell/`.env` — so a stale exported key
-   can't shadow Doppler. **Rotating the key requires a redeploy** (`kamal deploy`)
-   to recreate the container; `kamal app start/stop` keeps the old baked-in value.
-2. **It is already referenced in config** (this is committed):
-   - `.kamal/secrets` resolves `OPENAI_API_KEY`.
-   - `.github/workflows/deploy.yml` exports `OPENAI_API_KEY` into the runner env
-     (the runner has no Doppler CLI, so `.kamal/secrets`' Doppler fallback would
-     fail the deploy without this).
-   - `config/deploy.yml` `env.secret` includes `OPENAI_API_KEY`.
-   - `config/deploy.yml` `env.clear` sets `RECOGNITION_PROVIDER: openai` and
-     `EMBEDDING_PROVIDER: openai` (optional overrides:
-     `OPENAI_RECOGNITION_MODEL`, `OPENAI_EMBEDDING_MODEL`).
-3. **Deploy** (push to `main`). The app boots with the real adapters.
-4. **Backfill embeddings** — rows indexed under the fake hold fake/lexical-only
-   vectors. Regenerate real ones across every tenant:
+   `doppler secrets set OPENAI_API_KEY=sk-… --project move --config prd`. The
+   Doppler→GitHub Actions integration syncs it into the Deploy workflow secrets.
+   `.kamal/secrets` is gated on `KAMAL_SECRETS_FROM_ENV`: CI reads the synced env;
+   a **local** deploy reads from the Doppler CLI. Rotating requires a redeploy.
+2. **Already referenced in config** (committed): `.kamal/secrets` resolves
+   `OPENAI_API_KEY`; `.github/workflows/deploy.yml` exports it into the runner;
+   `config/deploy.yml` `env.secret` includes it and `env.clear` sets
+   `EMBEDDING_PROVIDER: openai` (optional `OPENAI_EMBEDDING_MODEL`).
+3. **Deploy** (push to `main`), then **backfill** real vectors across tenants:
    ```bash
    kamal app exec --reuse 'bin/rails search:reindex'
    ```
-5. **Smoke-test:** upload a box photo on an org subdomain → confirm the
-   recognition run reaches `succeeded` with real detections; run a semantic
-   search (synonym, not exact token) → confirm relevant hits.
-
-## Switching recognition to Google Gemini
-
-Same ordering rule as OpenAI — **add `GEMINI_API_KEY` first**, or every run fails
-with `GEMINI_API_KEY is not set`.
-
-1. **The secret is provisioned and wired (done).** `GEMINI_API_KEY` lives in
-   Doppler `move/prd`, is synced into GitHub Actions secrets, and is committed
-   into `.kamal/secrets`, `config/deploy.yml` `env.secret`, and the deploy
-   workflow's `env`. It is injected into the container but unused while
-   `RECOGNITION_PROVIDER` stays `openai`.
-   > Ordering reminder: these references were added only **after** the key
-   > existed in both Doppler and GitHub Actions — wiring a secret that isn't
-   > synced makes kamal's Doppler fallback fail the CI deploy (no Doppler CLI).
-2. **Flip the selector:** set `RECOGNITION_PROVIDER: gemini` in `config/deploy.yml`
-   `env.clear` (optional `GEMINI_RECOGNITION_MODEL` override) and deploy.
-3. **Smoke-test** as for OpenAI. Roll back by setting `RECOGNITION_PROVIDER` to
-   `openai`/`fake` and redeploying — no schema change.
-
-> The default model strings (`gpt-5-mini`, `claude-haiku-4-5-20251001`,
-> `gemini-2.5-flash`) are current-generation, cost-matched defaults. Override per
-> environment via `*_RECOGNITION_MODEL` (e.g. a full `gpt-5`/Sonnet for higher
-> recall) rather than relying on the in-code default drifting out of date.
+4. **Smoke-test:** run a semantic search (synonym, not exact token) → relevant hits.
 
 ## Accepted image formats
 
@@ -158,17 +182,25 @@ can't be regenerated locally (no HEVC encoder in the toolchain).
 
 ## Rolling back
 
-Set `RECOGNITION_PROVIDER`/`EMBEDDING_PROVIDER` back to `fake` (or unset) in
-`config/deploy.yml` and redeploy. Stored real embeddings stay valid; new items
-fall back to fake vectors. No schema change either way.
+- **Recognition:** switch the Move's provider to **Demo (no key)** in Settings
+  (or **Remove key**). Per-Move, instant, no deploy.
+- **Embeddings:** set `EMBEDDING_PROVIDER` back to `fake` (or unset) in
+  `config/deploy.yml` and redeploy. Stored real vectors stay valid; new items
+  fall back to fake vectors. No schema change.
 
 ## Local development
 
-Defaults to the fakes — no key needed. To exercise a real adapter locally, set
-`OPENAI_API_KEY` + `RECOGNITION_PROVIDER=openai` (and/or `EMBEDDING_PROVIDER`)
-in the app environment, then `bin/cli app restart`.
+Recognition defaults to `fake` for every Move — no key needed. To exercise a real
+recognition adapter locally, open **Settings → Recognition & AI** on a Move, pick a
+provider and paste a key (no restart). Embeddings still default to the env `fake`;
+set `OPENAI_API_KEY` + `EMBEDDING_PROVIDER=openai` and `bin/cli app restart` to
+exercise real embeddings.
+
+> The app's first `ActiveRecord::Encryption` setup landed with #185 — the three
+> encryption keys live in `config/credentials.yml.enc`
+> (`active_record_encryption.{primary_key,deterministic_key,key_derivation_salt}`),
+> decrypted everywhere via `RAILS_MASTER_KEY`. See `new-app-recipe.md`.
 
 ---
 
-_Last updated: 2026-06-13, structured-output adapters + Gemini + model-set
-category/fragility (#160)._
+_Last updated: 2026-06-15, per-Move BYO recognition keys + AR encryption (#185)._

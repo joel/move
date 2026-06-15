@@ -30,6 +30,7 @@ en:
           api_key_placeholder: "Paste this move's API key"
           api_key_help: "Used only for this move. Stored encrypted."
           remove_key: "Remove key"
+          save: "Save provider"
           status_active: "Active"
           status_key_required: "Key required"
           admin_only: "Only move admins can change the AI provider and keys."

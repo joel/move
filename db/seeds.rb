@@ -99,6 +99,10 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     m.status = "started"
     m.unit_system = "metric"
     m.created_by = owner
+    # #185 — recognition is per-Move BYO. The demo uses the network-free `fake`
+    # provider (no key) so it works offline and shows the Settings "Recognition &
+    # AI" panel in its ready state; an admin can switch to a real provider + key.
+    m.recognition_provider = "fake"
   end
   # F1 — all three D11 roles represented on the demo Move. `invitee` is
   # deliberately left off so the "Add member" form has a candidate to show.

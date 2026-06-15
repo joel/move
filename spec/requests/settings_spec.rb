@@ -54,6 +54,29 @@ RSpec.describe "Settings" do
 
       expect(response).to have_http_status(:not_found)
     end
+
+    it "renders the recognition provider panel masked, never leaking the raw key, for an admin" do
+      move.update!(recognition_provider: "openai", openai_api_key: "sk-supersecret-1234")
+
+      get move_settings_path(move)
+
+      expect(response.body).to include(I18n.t("settings.show.recognition.providers.subtitle"))
+      expect(response.body).to include("••••••••1234") # last4 only
+      expect(response.body).not_to include("sk-supersecret-1234")
+    end
+
+    it "shows the active provider read-only (no key field) for a contributor" do
+      move.update!(recognition_provider: "openai", openai_api_key: "sk-supersecret-1234")
+      contributor = create(:user)
+      create(:move_membership, move:, user: contributor, role: "contributor")
+      stub_current_user(contributor)
+
+      get move_settings_path(move)
+
+      expect(response.body).to include(I18n.t("settings.show.recognition.providers.options.openai"))
+      expect(response.body).not_to include('name="move[api_key]"')
+      expect(response.body).not_to include("sk-supersecret-1234")
+    end
   end
 
   describe "PATCH /moves/:move_id/settings/unit_system" do
