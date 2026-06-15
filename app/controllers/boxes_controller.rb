@@ -123,18 +123,22 @@ class BoxesController < MoveScopedController
          .where(source_media_id: @box.media.select(:id)).count
   end
 
-  # Orphaned photos (no item) whose latest recognition attempt is settled: there
-  # is a terminal run (failed / succeeded-empty) and none currently in flight.
-  # These get a tappable recovery tile; still-processing photos stay plain (#162).
-  # The "produced an item" check is MOVE-wide, not box-scoped: Items::Move changes
-  # only box_id and leaves source_media_id pointing at the original photo, so a
-  # box-scoped check would re-flag a photo as orphaned once its item is moved away
-  # (and let the recovery flow add a duplicate). Mirrors RecoveriesController#recovered?.
+  # Orphaned photos whose latest recognition attempt is settled: a terminal run
+  # (failed / true zero-detection), none in flight, and nothing to act on. Three
+  # exclusions, all mirrored by RecoveriesController#orphaned?/#recovered?:
+  #  - MOVE-wide item check (not box-scoped): Items::Move keeps source_media_id, so
+  #    a box-scoped check would re-flag a photo once its item moves to another box.
+  #  - has a suggestion → recognition produced a result. A conflict-only run records
+  #    suggestions but creates no item (no-overwrite); offering manual add there
+  #    would recreate the very duplicate the conflict path avoids.
+  #  - still queued/processing → transient, stays a plain thumbnail (#162).
   def recoverable_media_ids
     item_media = @move.items.where.not(source_media_id: nil).select(:source_media_id)
+    suggestion_media = RecognitionSuggestion.where(box: @box).select(:media_id)
     runs = RecognitionRun.where(box: @box)
     @box.media
         .where.not(id: item_media)
+        .where.not(id: suggestion_media)
         .where(id: runs.where(status: RecognitionRun::TERMINAL).select(:media_id))
         .where.not(id: runs.where(status: %w[queued processing]).select(:media_id))
         .pluck(:id)

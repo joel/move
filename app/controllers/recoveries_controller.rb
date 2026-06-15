@@ -15,6 +15,10 @@ class RecoveriesController < MoveScopedController
     # A resolved photo (it now has an item) is no longer orphaned — send it to the
     # per-photo review walk instead of a dead recovery screen.
     return redirect_to(move_box_review_photo_path(@move, @box, @media)) if recovered?
+    # A photo whose recognition produced a result other than an item (e.g. a
+    # conflict-only run — suggestions but no item, by the no-overwrite rule) is not
+    # orphaned; offering manual add would recreate the avoided duplicate.
+    return redirect_to(move_box_path(@move, @box)) unless orphaned?
 
     render Views::Recoveries::Show.new(
       move: @move, box: @box, media: @media, run: latest_run, editable: editable_move?
@@ -49,6 +53,13 @@ class RecoveriesController < MoveScopedController
   # BoxesController#recoverable_media_ids.
   def recovered?
     @move.items.exists?(source_media_id: @media.id)
+  end
+
+  # Genuinely orphaned: recognition produced nothing to act on (failed or true
+  # zero-detection). Any suggestion — including a conflict-only run that creates
+  # no item — means there is a result, so the photo isn't a recovery candidate.
+  def orphaned?
+    !@media.recognition_suggestions.exists?
   end
 
   def latest_run

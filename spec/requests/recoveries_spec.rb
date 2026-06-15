@@ -55,6 +55,15 @@ RSpec.describe "Photo recovery" do
 
       expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
     end
+
+    it "redirects a conflict-only photo (suggestions but no item) — not orphaned" do
+      run = create(:recognition_run, :succeeded, move:, box:, media:)
+      create(:recognition_suggestion, :conflict, move:, box:, media:, recognition_run: run)
+
+      get move_box_recovery_photo_path(move, box, media)
+
+      expect(response).to redirect_to(move_box_path(move, box))
+    end
   end
 
   describe "GET .../recovery/photo/:media_id/state (poll fragment)" do

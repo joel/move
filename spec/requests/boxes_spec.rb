@@ -171,6 +171,17 @@ RSpec.describe "Boxes" do
 
       expect(response.body).not_to include(move_box_recovery_photo_path(move, box, media_id: photo.id))
     end
+
+    it "does not mark a conflict-only photo (suggestions, no item) as recoverable" do
+      box = create(:box, move:, number: "1")
+      photo = create(:media, move:, box:)
+      run = create(:recognition_run, :succeeded, move:, box:, media: photo)
+      create(:recognition_suggestion, :conflict, move:, box:, media: photo, recognition_run: run)
+
+      get move_box_path(move, box)
+
+      expect(response.body).not_to include(move_box_recovery_photo_path(move, box, media_id: photo.id))
+    end
   end
 
   describe "GET /moves/:move_id/boxes/:id/edit" do
