@@ -3,7 +3,7 @@
 require "rails_helper"
 
 RSpec.describe RecognitionProviders::Gemini do
-  subject(:provider) { described_class.new }
+  subject(:provider) { described_class.new(api_key: "g-test") }
 
   let(:image) { instance_double(ActiveStorage::Blob, content_type: "image/jpeg", download: "bytes") }
   let(:context) { { room: "Garage", categories: ["Tools"], tags: [] } }
@@ -27,14 +27,9 @@ RSpec.describe RecognitionProviders::Gemini do
     { candidates: [{ content: { parts: [{ text: content }] } }] }.to_json
   end
 
-  before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("GEMINI_API_KEY").and_return("g-test")
-  end
-
-  it "raises when the API key is absent" do
-    allow(ENV).to receive(:[]).with("GEMINI_API_KEY").and_return(nil)
-    expect { provider.identify(image: image, context: context) }.to raise_error(/GEMINI_API_KEY/)
+  it "raises a typed missing-key error (strict BYO) when built without a key" do
+    expect { described_class.new.identify(image: image, context: context) }
+      .to raise_error(RecognitionProviders::Base::MissingApiKey, /No API key set/)
   end
 
   it "sends a responseSchema request with the model in the URL, key header, and inline image" do

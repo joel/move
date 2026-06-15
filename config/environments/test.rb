@@ -64,4 +64,12 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true
+
+  # ActiveRecord::Encryption keys for the test suite (#185). CI has no
+  # RAILS_MASTER_KEY, so it can't read the keys from credentials the way dev/prod
+  # do — pin static, non-secret dummy keys here. Test data is ephemeral, so these
+  # never protect anything real; they just let `encrypts` round-trip in CI.
+  config.active_record.encryption.primary_key = "test_primary_key_000000000000000"
+  config.active_record.encryption.deterministic_key = "test_deterministic_key_0000000000"
+  config.active_record.encryption.key_derivation_salt = "test_key_derivation_salt_00000000"
 end

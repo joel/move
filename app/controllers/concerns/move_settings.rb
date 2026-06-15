@@ -13,6 +13,10 @@ module MoveSettings
   # token to display exactly once, right after creation (nil otherwise).
   def settings_view(revealed_token: nil)
     manage_tokens = allowed_to?(:manage_integration_tokens?, @move, with: MovePolicy)
+    # Recognition keys are admin-only and only editable on a writable Move; a
+    # non-admin sees the active provider read-only (and never the key fields).
+    manage_recognition =
+      @move.writable? && allowed_to?(:manage_recognition_keys?, @move, with: MovePolicy)
     Views::Settings::Show.new(
       move: @move,
       tokens: @move.integration_tokens.includes(:created_by).order(created_at: :desc),
@@ -20,6 +24,7 @@ module MoveSettings
       manage_tokens: manage_tokens,
       # Creating a token is blocked on an archived Move (revoke stays available).
       can_create_tokens: manage_tokens && @move.writable?,
+      manage_recognition: manage_recognition,
       revealed_token: revealed_token
     )
   end

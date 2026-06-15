@@ -22,6 +22,23 @@ en:
           lower values are more hands-free but may need corrections later.
         more_review: "More review"
         more_handsfree: "More hands-free"
+        providers:
+          title: "Recognition & AI"
+          subtitle: "Choose your AI vision provider and manage your API keys."
+          provider_label: "Provider"
+          api_key_label: "API Key"
+          api_key_placeholder: "Paste this move's API key"
+          api_key_help: "Used only for this move. Stored encrypted."
+          remove_key: "Remove key"
+          save: "Save provider"
+          status_active: "Active"
+          status_key_required: "Key required"
+          admin_only: "Only move admins can change the AI provider and keys."
+          options:
+            fake: "Demo (no key)"
+            openai: "OpenAI"
+            anthropic: "Anthropic"
+            gemini: "Gemini"
       account:
         title: "Account"
         manage: "Account Settings"
@@ -35,4 +52,13 @@ en:
     update_auto_confirm_threshold:
       threshold_changed: "Auto-confirm threshold updated."
       threshold_invalid: "Choose a confidence between 0 and 1."
+      read_only: "This move is archived and can't be changed."
+    update_recognition_provider:
+      changed: "Recognition provider updated."
+      api_key_required: "Add an API key for that provider first."
+      invalid: "That provider is not available."
+      read_only: "This move is archived and can't be changed."
+    remove_recognition_key:
+      key_removed: "API key removed."
+      invalid: "That provider is not available."
       read_only: "This move is archived and can't be changed."

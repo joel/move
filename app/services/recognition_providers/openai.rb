@@ -8,12 +8,12 @@ module RecognitionProviders
   # response upward.
   class Openai < Base
     ENDPOINT = "https://api.openai.com/v1/chat/completions"
+    # GPT-5 mini: flagship-family vision + strict structured outputs at mini-tier
+    # cost. (gpt-4o-mini was prev-gen.) Per-Move model choice is YAGNI.
+    DEFAULT_MODEL = "gpt-5-mini"
 
     def identify(image:, context:)
-      key = ENV["OPENAI_API_KEY"].presence or raise "OPENAI_API_KEY is not set"
-      # GPT-5 mini: flagship-family vision + strict structured outputs at mini-tier
-      # cost. Overridable via OPENAI_RECOGNITION_MODEL. (gpt-4o-mini was prev-gen.)
-      model = ENV.fetch("OPENAI_RECOGNITION_MODEL", "gpt-5-mini")
+      key = api_key!
       json = post_json(
         ENDPOINT,
         headers: { "Authorization" => "Bearer #{key}" },

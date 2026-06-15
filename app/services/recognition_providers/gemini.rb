@@ -9,6 +9,9 @@ module RecognitionProviders
   # raw response upward.
   class Gemini < Base
     HOST = "https://generativelanguage.googleapis.com/v1beta"
+    # TODO: confirm the production Flash string before pinning (placeholder; newer
+    # Flash models are usually the better default). Per-Move model choice is YAGNI.
+    DEFAULT_MODEL = "gemini-2.5-flash"
 
     GEMINI_SCHEMA = {
       type: "OBJECT",
@@ -34,10 +37,7 @@ module RecognitionProviders
     }.freeze
 
     def identify(image:, context:)
-      key = ENV["GEMINI_API_KEY"].presence or raise "GEMINI_API_KEY is not set"
-      # TODO: confirm the production Flash string before pinning (placeholder;
-      # newer Flash models are usually the better default here).
-      model = ENV.fetch("GEMINI_RECOGNITION_MODEL", "gemini-2.5-flash")
+      key = api_key!
       json = post_json(
         "#{HOST}/models/#{model}:generateContent",
         headers: { "x-goog-api-key" => key },

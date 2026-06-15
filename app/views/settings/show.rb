@@ -15,12 +15,14 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::Routes
 
-      def initialize(move:, tokens:, editable:, manage_tokens:, can_create_tokens:, revealed_token: nil)
+      def initialize(move:, tokens:, editable:, manage_tokens:, can_create_tokens:,
+                     manage_recognition:, revealed_token: nil)
         @move = move
         @tokens = tokens
         @editable = editable
         @manage_tokens = manage_tokens
         @can_create_tokens = can_create_tokens
+        @manage_recognition = manage_recognition
         @revealed_token = revealed_token
       end
 
@@ -110,15 +112,20 @@ module Views
         end
       end
 
-      # --- AI recognition: auto-confirm confidence threshold slider ---
+      # --- AI recognition: BYO provider + keys (#185), then auto-confirm threshold ---
       def recognition_section
         setting_card(I18n.t("settings.show.recognition.title")) do
-          div(class: "flex flex-col gap-3") do
-            span(class: "text-headline-md text-text-warm") { I18n.t("settings.show.recognition.threshold") }
-            @editable ? threshold_slider : resolved_value(format_threshold(@move.auto_confirm_threshold))
-            p(class: "text-body-md text-on-surface-variant") do
-              I18n.t("settings.show.recognition.threshold_caption")
-            end
+          render Views::Settings::RecognitionProviderPanel.new(move: @move, manage: @manage_recognition)
+          threshold_block
+        end
+      end
+
+      def threshold_block
+        div(class: "flex flex-col gap-3") do
+          span(class: "text-headline-md text-text-warm") { I18n.t("settings.show.recognition.threshold") }
+          @editable ? threshold_slider : resolved_value(format_threshold(@move.auto_confirm_threshold))
+          p(class: "text-body-md text-on-surface-variant") do
+            I18n.t("settings.show.recognition.threshold_caption")
           end
         end
       end

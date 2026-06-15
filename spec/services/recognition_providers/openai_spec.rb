@@ -3,7 +3,7 @@
 require "rails_helper"
 
 RSpec.describe RecognitionProviders::Openai do
-  subject(:provider) { described_class.new }
+  subject(:provider) { described_class.new(api_key: "sk-test") }
 
   let(:image) { instance_double(ActiveStorage::Blob, content_type: "image/jpeg", download: "bytes") }
   let(:context) { { room: "Kitchen", categories: ["Lighting"], tags: [] } }
@@ -30,14 +30,9 @@ RSpec.describe RecognitionProviders::Openai do
     { choices: [{ message: { content: content } }] }.to_json
   end
 
-  before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OPENAI_API_KEY").and_return("sk-test")
-  end
-
-  it "raises when the API key is absent" do
-    allow(ENV).to receive(:[]).with("OPENAI_API_KEY").and_return(nil)
-    expect { provider.identify(image: image, context: context) }.to raise_error(/OPENAI_API_KEY/)
+  it "raises a typed missing-key error (strict BYO) when built without a key" do
+    expect { described_class.new.identify(image: image, context: context) }
+      .to raise_error(RecognitionProviders::Base::MissingApiKey, /No API key set/)
   end
 
   it "sends a strict json_schema request with the auth header, model, and data-URL image" do

@@ -10,12 +10,12 @@ module RecognitionProviders
     ENDPOINT  = "https://api.anthropic.com/v1/messages"
     VERSION   = "2023-06-01"
     TOOL_NAME = "record_objects"
+    # Haiku 4.5 (dated snapshot) keeps cost near the OpenAI mini tier. Per-Move
+    # model choice is YAGNI.
+    DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 
     def identify(image:, context:)
-      key = ENV["ANTHROPIC_API_KEY"].presence or raise "ANTHROPIC_API_KEY is not set"
-      # Haiku 4.5 (dated snapshot) keeps cost near the OpenAI mini tier; bump to a
-      # current Sonnet via ANTHROPIC_RECOGNITION_MODEL for higher recall.
-      model = ENV.fetch("ANTHROPIC_RECOGNITION_MODEL", "claude-haiku-4-5-20251001")
+      key = api_key!
       json = post_json(
         ENDPOINT,
         headers: { "x-api-key" => key, "anthropic-version" => VERSION },

@@ -54,6 +54,29 @@ RSpec.describe "Settings" do
 
       expect(response).to have_http_status(:not_found)
     end
+
+    it "renders the recognition provider panel masked, never leaking the raw key, for an admin" do
+      move.update!(recognition_provider: "openai", openai_api_key: "sk-supersecret-1234")
+
+      get move_settings_path(move)
+
+      expect(response.body).to include(I18n.t("settings.show.recognition.providers.subtitle"))
+      expect(response.body).to include("••••••••1234") # last4 only
+      expect(response.body).not_to include("sk-supersecret-1234")
+    end
+
+    it "shows the active provider read-only (no key field) for a contributor" do
+      move.update!(recognition_provider: "openai", openai_api_key: "sk-supersecret-1234")
+      contributor = create(:user)
+      create(:move_membership, move:, user: contributor, role: "contributor")
+      stub_current_user(contributor)
+
+      get move_settings_path(move)
+
+      expect(response.body).to include(I18n.t("settings.show.recognition.providers.options.openai"))
+      expect(response.body).not_to include('name="move[api_key]"')
+      expect(response.body).not_to include("sk-supersecret-1234")
+    end
   end
 
   describe "PATCH /moves/:move_id/settings/unit_system" do
@@ -98,6 +121,61 @@ RSpec.describe "Settings" do
 
       expect(response).to redirect_to(move_settings_path(move))
       expect(move.reload.auto_confirm_threshold).to eq(0.8)
+    end
+  end
+
+  describe "PATCH /moves/:move_id/settings/recognition_provider" do
+    it "sets the provider and stores the key for an admin" do
+      patch move_settings_recognition_provider_path(move),
+            params: { move: { recognition_provider: "openai", api_key: "sk-live" } }
+
+      expect(response).to redirect_to(move_settings_path(move))
+      move.reload
+      expect(move.recognition_provider).to eq("openai")
+      expect(move.openai_api_key).to eq("sk-live")
+    end
+
+    it "forbids a contributor (keys are admin-only)" do
+      contributor = create(:user)
+      create(:move_membership, move:, user: contributor, role: "contributor")
+      stub_current_user(contributor)
+
+      patch move_settings_recognition_provider_path(move),
+            params: { move: { recognition_provider: "openai", api_key: "sk-live" } }
+
+      expect(response).to have_http_status(:forbidden)
+      expect(move.reload.recognition_provider).to eq("fake")
+    end
+
+    it "redirects with an error when a real provider is selected without a key" do
+      patch move_settings_recognition_provider_path(move),
+            params: { move: { recognition_provider: "gemini", api_key: "" } }
+
+      expect(response).to redirect_to(move_settings_path(move))
+      expect(move.reload.recognition_provider).to eq("fake")
+    end
+  end
+
+  describe "DELETE /moves/:move_id/settings/recognition_provider/:provider" do
+    it "removes the stored key for an admin" do
+      move.update!(recognition_provider: "openai", openai_api_key: "sk-live")
+
+      delete move_settings_remove_recognition_key_path(move, provider: "openai")
+
+      expect(response).to redirect_to(move_settings_path(move))
+      expect(move.reload.openai_api_key).to be_nil
+    end
+
+    it "forbids a contributor" do
+      move.update!(openai_api_key: "sk-live")
+      contributor = create(:user)
+      create(:move_membership, move:, user: contributor, role: "contributor")
+      stub_current_user(contributor)
+
+      delete move_settings_remove_recognition_key_path(move, provider: "openai")
+
+      expect(response).to have_http_status(:forbidden)
+      expect(move.reload.openai_api_key).to eq("sk-live")
     end
   end
 end

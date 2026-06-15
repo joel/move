@@ -66,6 +66,7 @@ Every Design-Spec screen (`Move - Design Specification v0.2.md §4`) maps to exa
 | F1 | Members & roles | D11 | `Members & Roles (Dark) - Responsive` `screens/b909f3a2e65c4ae09dbf77f615e81c86` / `… - Mobile` `screens/4ba298fa96a143279cad534328165807` |
 | F2 | Volume & weight summary | D12 | `Summary & Volume (Dark) - Responsive` `screens/9c53bc10b02f4dd7864af8f3248abb02` / `… - Mobile` `screens/1bab812966eb41ca80cc7c2cbc7535b4` |
 | F3 | Settings / menu (+ Assistant/MCP token) | D13 | `Menu Hub - Mobile View` `screens/6f780b58de254181b2fc400cbdc65a2c` · `Settings & Assistant - Mobile View` `screens/11d53a1166d9495db360705b06bb780c` · `Settings & Assistant - Responsive View` `screens/02012642fd9444788cb7a8090d007884` |
+| F3 (Recognition & AI) | Per-Move recognition provider + BYO API keys (#185) | D13 | `Settings & Assistant - AI Configuration (Mobile)` `screens/f5d276c670364d758a0d5da723ed4f7b` · `Settings & Assistant - AI Configuration (Desktop)` `screens/4587e39878b248b1a8370254a12af767` |
 
 **Design references (not screens):**
 - Design system token sheet — embedded in `projects/13869765800416404511` `designTheme.designMd` (mirrored in Phase D0).

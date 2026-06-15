@@ -5,7 +5,10 @@ module RecognitionRuns
   # capturing the active tenant so the job can restore it across the enqueue
   # boundary. Returns the run.
   class Enqueue < BaseAction
-    def call(media:, provider: RecognitionProviders.configured_name)
+    def call(media:, provider: nil)
+      # Record the Move's active provider on the run for audit (#185). Processing
+      # re-resolves from the Move, so this is the provider as of enqueue time.
+      provider ||= media.move.recognition_provider
       run = yield create_run(media, provider)
       ProcessJob.perform_later(run.id, tenant: Apartment::Tenant.current)
       yield emit_event(run)

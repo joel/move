@@ -7,7 +7,13 @@ module RecognitionRuns
   # data or bounding boxes are stored. Provider/persistence errors end the run
   # `failed` (never stuck in processing) and return Failure — they never raise up.
   class Process < BaseAction
-    def call(run:, provider: RecognitionProviders.resolve)
+    def call(run:, provider: nil)
+      # Per-Move provider (#185): the active provider + key come from the Move, not
+      # a global ENV setting. A real provider with no key fails fast in #identify
+      # (Base::MissingApiKey) — the shared deployment key is never used. Injectable
+      # for specs.
+      provider ||= RecognitionProviders.for_move(run.move)
+
       # Drop in-flight recognition when the Move was archived after capture: an
       # archived Move is read-only, so don't process or persist anything. The run
       # is left `queued` (never enters `processing`) and the job no-ops. Plain

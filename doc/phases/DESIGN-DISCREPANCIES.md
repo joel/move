@@ -90,6 +90,10 @@
   - `Settings & Assistant - Responsive View` → `screens/02012642fd9444788cb7a8090d007884`
 - Recorded in `README.md` §2; Phase **D13** design status flipped 🚫 → ✅. The D0/D1 "Menu" nav slot now has a real target.
 - **Follow-up (non-blocking):** during D13 build, confirm the Settings screen includes the dark-mode-default toggle, metric/imperial unit toggle, the auto-confirm slider (0.8) with the "more review ↔ more hands-free" caption, and the Assistant panel's **shown-once raw-token reveal + active-token list with revoke**; refine in Stitch if any are absent.
+- **Extension (2026-06-15, #185):** added a **"Recognition & AI"** card to the Settings screen for per-Move recognition provider selection + bring-your-own API keys (admin-only, write-only masked keys, strict-BYO "Key required" state). Product owner created two screens on the canonical dark design system:
+  - `Settings & Assistant - AI Configuration (Mobile)` → `screens/f5d276c670364d758a0d5da723ed4f7b`
+  - `Settings & Assistant - AI Configuration (Desktop)` → `screens/4587e39878b248b1a8370254a12af767`
+  - Recorded in `README.md` §2. Built with `Views::Settings::RecognitionProviderPanel` + the `recognition-provider` Stimulus controller, against Phase D0 tokens.
 
 ---
 

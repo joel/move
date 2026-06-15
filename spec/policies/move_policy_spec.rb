@@ -45,6 +45,25 @@ RSpec.describe MovePolicy do
     end
   end
 
+  describe "manage_recognition_keys? (admin-only)" do
+    it "permits an admin" do
+      move = create(:move, created_by: user)
+      expect(described_class.new(move, user:).apply(:manage_recognition_keys?)).to be(true)
+    end
+
+    it "denies a contributor" do
+      move = create(:move)
+      create(:move_membership, move:, user:, role: "contributor")
+      expect(described_class.new(move, user:).apply(:manage_recognition_keys?)).to be(false)
+    end
+
+    it "denies a viewer" do
+      move = create(:move)
+      create(:move_membership, move:, user:, role: "viewer")
+      expect(described_class.new(move, user:).apply(:manage_recognition_keys?)).to be(false)
+    end
+  end
+
   describe "relation_scope" do
     it "returns only the moves the user belongs to" do
       mine = create(:move)
