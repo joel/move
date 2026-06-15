@@ -37,7 +37,10 @@ class BoxesController < MoveScopedController
       editable: editable_move?, pending_count: reviewable_count(items),
       # Photos that produced an item (in-box OR removed) — the per-photo review
       # walk's membership; only these gallery photos link into review.
-      reviewable_media_ids: @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
+      reviewable_media_ids: @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id),
+      # Orphaned photos worth a recovery affordance (failed / zero-detection) —
+      # these link to the recovery screen instead of being dead-end thumbnails.
+      recoverable_media_ids: recoverable_media_ids
     )
   end
 
@@ -118,6 +121,19 @@ class BoxesController < MoveScopedController
   def reviewable_count(items)
     items.where(review_state: %w[pending_review needs_correction])
          .where(source_media_id: @box.media.select(:id)).count
+  end
+
+  # Orphaned photos (no item) whose latest recognition attempt is settled: there
+  # is a terminal run (failed / succeeded-empty) and none currently in flight.
+  # These get a tappable recovery tile; still-processing photos stay plain (#162).
+  def recoverable_media_ids
+    item_media = @box.items.where.not(source_media_id: nil).select(:source_media_id)
+    runs = RecognitionRun.where(box: @box)
+    @box.media
+        .where.not(id: item_media)
+        .where(id: runs.where(status: RecognitionRun::TERMINAL).select(:media_id))
+        .where.not(id: runs.where(status: %w[queued processing]).select(:media_id))
+        .pluck(:id)
   end
 
   def set_box

@@ -10,13 +10,17 @@ module Components
   class ItemForm < Components::Base
     include Phlex::Rails::Helpers::FormWith
 
-    def initialize(models:, item:, categories:, tags:, submit_label: nil, cancel_href: nil, autosave: false)
+    def initialize(models:, item:, categories:, tags:, submit_label: nil, cancel_href: nil,
+                   autosave: false, source_media_id: nil)
       @models = models
       @item = item
       @categories = categories
       @tags = tags
       @submit_label = submit_label
       @cancel_href = cancel_href
+      # When present, binds the new item to a captured photo (recovery flow): the
+      # manual add resolves an orphaned photo by attaching it as source_media.
+      @source_media_id = source_media_id
       # C3 auto-saves: every field change submits the whole form (the form-level
       # `change->auto-submit#submit` action), so there is no submit button. B3
       # (manual add) keeps the button — a not-yet-created record can't auto-save.
@@ -25,6 +29,7 @@ module Components
 
     def view_template
       form_with(model: @models, class: "flex flex-col gap-6", **form_attrs) do |form|
+        input(type: "hidden", name: "item[source_media_id]", value: @source_media_id) if @source_media_id
         render_errors if @item.errors.any?
         name_field
         category_and_quantity

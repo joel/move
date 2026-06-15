@@ -144,6 +144,19 @@ RSpec.describe "Boxes" do
       expect(response.body).to include('data-turbo-prefetch="false"')
       expect(response.body).not_to include(move_box_review_photo_path(move, box, media_id: empty_photo.id))
     end
+
+    it "links a settled orphaned photo (failed) to recovery, but not one still in flight" do
+      box = create(:box, move:, number: "1")
+      failed = create(:media, move:, box:)
+      create(:recognition_run, :failed, move:, box:, media: failed)
+      in_flight = create(:media, move:, box:)
+      create(:recognition_run, :processing, move:, box:, media: in_flight)
+
+      get move_box_path(move, box)
+
+      expect(response.body).to include(%(href="#{move_box_recovery_photo_path(move, box, media_id: failed.id)}"))
+      expect(response.body).not_to include(move_box_recovery_photo_path(move, box, media_id: in_flight.id))
+    end
   end
 
   describe "GET /moves/:move_id/boxes/:id/edit" do

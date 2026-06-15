@@ -16,7 +16,7 @@ module Views
       }.freeze
 
       def initialize(move:, box:, items: [], media: [], editable: false, pending_count: 0,
-                     reviewable_media_ids: [])
+                     reviewable_media_ids: [], recoverable_media_ids: [])
         @move = move
         @box = box
         @items = items
@@ -28,6 +28,8 @@ module Views
         # Media that produced an item (the per-photo review walk) — only these
         # gallery photos link into review; the rest render as plain thumbnails.
         @reviewable_media_ids = reviewable_media_ids
+        # Orphaned-but-settled photos that link to the recovery screen.
+        @recoverable_media_ids = recoverable_media_ids
         @measurements = BoxMeasurements.new(box, unit_system: move.unit_system)
       end
 
@@ -190,7 +192,9 @@ module Views
         div(class: "grid grid-cols-1 gap-stack-gap lg:grid-cols-12") do
           items_section
           render Views::Boxes::Gallery.new(
-            move: @move, box: @box, media: @media, reviewable_media_ids: @reviewable_media_ids
+            move: @move, box: @box, media: @media,
+            reviewable_media_ids: @reviewable_media_ids,
+            recoverable_media_ids: @recoverable_media_ids
           )
         end
       end

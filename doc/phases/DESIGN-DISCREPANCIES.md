@@ -309,5 +309,6 @@ E1 (`ea5a8a69…` + mobile) and the four E2 state screens were implemented in D9
 | AUTH | ⚠️ | D0 | ✅ decided | re-skin Rodauth/welcome |
 | VARIANTS | ⚠️ | all | watch | fill light/missing variants on demand |
 | RELEASE-TAGS | ⚠️ | all | ✅ resolved | domain-named SemVer `vX.Y.Z-<slug>` (PR #20 review) |
+| RECOVERY | ⚠️ | post-D | ✅ decided | photo-recovery screen (orphaned/failed photo) ships as a state-variant of the designed C2 review/photo layout — same split (image left, action card right) + the shipped recognition-error caption; no new Stitch screen generated (#181) |
 
 *Update this file whenever a discrepancy is found or closed. A 🚫 row must be ✅ before its phase leaves "Ready".*
