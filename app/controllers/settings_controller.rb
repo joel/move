@@ -39,7 +39,8 @@ class SettingsController < MoveScopedController
   def update_recognition_provider
     write_setting(
       Moves::SetRecognitionProvider, policy: :manage_recognition_keys?,
-                                     provider: settings_param(:recognition_provider), api_key: settings_param(:api_key)
+                                     provider: settings_param(:recognition_provider),
+                                     api_key: settings_param(:api_key), model: settings_param(:model)
     ) do |result|
       if result.success? then t(".changed")
       elsif result.failure == :api_key_required then t(".api_key_required")

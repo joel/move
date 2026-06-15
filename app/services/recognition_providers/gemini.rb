@@ -10,7 +10,8 @@ module RecognitionProviders
   class Gemini < Base
     HOST = "https://generativelanguage.googleapis.com/v1beta"
     # TODO: confirm the production Flash string before pinning (placeholder; newer
-    # Flash models are usually the better default). Per-Move model choice is YAGNI.
+    # Flash models are usually the better default). The default when a Move sets no
+    # override (#187 — Move#gemini_model wins via Base#model).
     DEFAULT_MODEL = "gemini-2.5-flash"
 
     GEMINI_SCHEMA = {

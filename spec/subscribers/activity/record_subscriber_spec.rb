@@ -34,6 +34,15 @@ RSpec.describe Activity::RecordSubscriber do
     expect(Activity.last.metadata).to include("provider" => "openai")
   end
 
+  it "records a recognition model change, keeping the provider and model in metadata (#187)" do
+    expect do
+      emit("move.recognition_model_changed", move_id: move.id, actor_id: actor.id, provider: "openai", model: "gpt-5")
+    end.to change(Activity, :count).by(1)
+
+    expect(Activity.last.action).to eq("move.recognition_model_changed")
+    expect(Activity.last.metadata).to include("provider" => "openai", "model" => "gpt-5")
+  end
+
   it "records a recognition key removal" do
     expect { emit("move.recognition_key_removed", move_id: move.id, actor_id: actor.id, provider: "gemini") }
       .to change(Activity, :count).by(1)

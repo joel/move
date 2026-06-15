@@ -9,7 +9,8 @@ module RecognitionProviders
   class Openai < Base
     ENDPOINT = "https://api.openai.com/v1/chat/completions"
     # GPT-5 mini: flagship-family vision + strict structured outputs at mini-tier
-    # cost. (gpt-4o-mini was prev-gen.) Per-Move model choice is YAGNI.
+    # cost. (gpt-4o-mini was prev-gen.) The default when a Move sets no override
+    # (#187 — Move#openai_model wins over this via Base#model).
     DEFAULT_MODEL = "gpt-5-mini"
 
     def identify(image:, context:)

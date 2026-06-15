@@ -62,5 +62,15 @@ RSpec.describe Move do
         expect(build(:move, recognition_provider: "openai", openai_api_key: "sk")).to be_recognition_ready
       end
     end
+
+    describe "#recognition_model_for (#187)" do
+      it "returns the stored override for a real provider, nil for blank/fake/unknown" do
+        move = build(:move, anthropic_model: "claude-opus-4-8")
+        expect(move.recognition_model_for("anthropic")).to eq("claude-opus-4-8")
+        expect(move.recognition_model_for("openai")).to be_nil
+        expect(move.recognition_model_for("fake")).to be_nil
+        expect(move.recognition_model_for("nope")).to be_nil
+      end
+    end
   end
 end

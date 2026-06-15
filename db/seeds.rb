@@ -104,6 +104,11 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     # AI" panel in its ready state; an admin can switch to a real provider + key.
     m.recognition_provider = "fake"
   end
+  # #187 — showcase a per-provider model override. The demo keeps `fake` active
+  # (offline), but OpenAI is pinned to a custom model: switching the provider pill
+  # in the Settings "Recognition & AI" panel reveals "gpt-5" pre-filled in the
+  # editable Model field.
+  move.update!(openai_model: "gpt-5") unless move.openai_model == "gpt-5"
   # F1 — all three D11 roles represented on the demo Move. `invitee` is
   # deliberately left off so the "Add member" form has a candidate to show.
   move.move_memberships.find_or_create_by!(user: owner) { |mm| mm.role = "admin" }

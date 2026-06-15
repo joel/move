@@ -65,7 +65,8 @@ class ActivityPresenter
     {
       subject: subject_label, target: target_label,
       role: activity.metadata["role"], unit_system: activity.metadata["unit_system"],
-      token_name: activity.metadata["token_name"], kind: kind_label
+      token_name: activity.metadata["token_name"], kind: kind_label,
+      provider: activity.metadata["provider"], model: activity.metadata["model"]
     }
   end
 
