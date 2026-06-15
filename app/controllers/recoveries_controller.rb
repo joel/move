@@ -40,6 +40,12 @@ class RecoveriesController < MoveScopedController
   # RecognitionRuns::Retry guards failed-only + writable, so a stale double-submit
   # is a harmless no-op (replayable POST).
   def retry
+    # The page may be stale: the photo could have been resolved (manual add) or
+    # conflict-matched since it loaded, with the run still `failed`. Don't re-run
+    # recognition on a no-longer-orphaned photo — bounce to #show, which redirects
+    # to the item / box as appropriate.
+    return redirect_to(move_box_recovery_photo_path(@move, @box, @media)) unless @media.orphaned?
+
     result = RecognitionRuns::Retry.new.call(run: latest_run)
     redirect_to move_box_recovery_photo_path(@move, @box, @media),
                 notice: (t(".retried") if result.success?)

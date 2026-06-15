@@ -146,18 +146,19 @@ class ItemsController < MoveScopedController
     params.dig(:item, :source_media_id).presence || params[:source_media_id].presence
   end
 
-  # Bind the new item to the source photo ONLY if that photo is still orphaned at
-  # POST time. A recovery Add-item form can go stale (the photo was retried/resolved,
-  # or the hidden id is replayed for a conflict-only photo); binding then would
-  # attach a duplicate to an already-resolved photo, bypassing the recovery guards.
-  # Re-validate here — if it's no longer orphaned, drop the binding (still create
-  # the item; the user clearly wants it in the box, just not attributed to a
-  # resolved photo). Mirrors Media#orphaned?.
+  # Bind the new item to the source photo ONLY if that photo is still a settled
+  # orphan at POST time. A recovery Add-item form can go stale (the photo was
+  # retried/resolved, the id is replayed for a conflict-only photo, or recognition
+  # is still in flight and about to materialize items); binding then would attach a
+  # duplicate to a photo that already has — or is about to have — items. Re-validate
+  # here — if not, drop the binding (still create the item; the user wants it in the
+  # box, just not attributed to that photo). Mirrors Media#orphaned? + the gallery's
+  # settled (not-in-flight) check.
   def source_media
     return nil unless source_media_id
 
     media = @box.media.find_by(id: source_media_id)
-    media if media&.orphaned?
+    media if media&.orphaned? && !media.recognition_in_flight?
   end
 
   def set_item

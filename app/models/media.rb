@@ -81,4 +81,10 @@ class Media < ApplicationRecord
   def orphaned?
     !sourced_item? && !recognition_suggestions.exists?
   end
+
+  # A run is queued or processing — recognition may still materialize items, so
+  # recovery mutations (re-run, manual-add binding) must wait until it settles.
+  def recognition_in_flight?
+    recognition_runs.exists?(status: %w[queued processing])
+  end
 end

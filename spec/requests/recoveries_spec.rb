@@ -108,6 +108,17 @@ RSpec.describe "Photo recovery" do
         post move_box_recovery_photo_retry_path(move, box, media)
       end.not_to change(media.recognition_runs, :count)
     end
+
+    it "does not re-run a photo resolved since the page loaded (stale retry)" do
+      create(:recognition_run, :failed, move:, box:, media:)
+      create(:item, move:, box:, source_media: media, name: "Lamp") # resolved meanwhile
+
+      expect do
+        post move_box_recovery_photo_retry_path(move, box, media)
+      end.not_to change(media.recognition_runs, :count)
+
+      expect(response).to redirect_to(move_box_recovery_photo_path(move, box, media))
+    end
   end
 
   describe "manual add bound to the photo" do
@@ -124,6 +135,17 @@ RSpec.describe "Photo recovery" do
     it "drops the binding (still creates the item) when the photo is no longer orphaned" do
       run = create(:recognition_run, :succeeded, move:, box:, media:)
       create(:recognition_suggestion, :conflict, move:, box:, media:, recognition_run: run)
+
+      post move_box_items_path(move, box),
+           params: { item: { name: "Desk lamp", quantity: "1", source_media_id: media.id } }
+
+      item = box.items.find_by(name: "Desk lamp")
+      expect(item).to be_present
+      expect(item.source_media_id).to be_nil
+    end
+
+    it "does not bind to a photo whose recognition is still in flight" do
+      create(:recognition_run, :processing, move:, box:, media:)
 
       post move_box_items_path(move, box),
            params: { item: { name: "Desk lamp", quantity: "1", source_media_id: media.id } }
