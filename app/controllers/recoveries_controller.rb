@@ -12,13 +12,13 @@ class RecoveriesController < MoveScopedController
 
   # GET /moves/:move_id/boxes/:box_id/recovery/photo/:media_id
   def show
-    # A resolved photo (it now has an item) is no longer orphaned — send it to the
-    # per-photo review walk instead of a dead recovery screen.
-    return redirect_to(move_box_review_photo_path(@move, @box, @media)) if recovered?
+    # A resolved photo (it now has an item) is no longer orphaned — send it to that
+    # item, not a dead recovery screen.
+    return redirect_to(recovered_redirect_path) if @media.sourced_item?
     # A photo whose recognition produced a result other than an item (e.g. a
     # conflict-only run — suggestions but no item, by the no-overwrite rule) is not
     # orphaned; offering manual add would recreate the avoided duplicate.
-    return redirect_to(move_box_path(@move, @box)) unless orphaned?
+    return redirect_to(move_box_path(@move, @box)) unless @media.orphaned?
 
     render Views::Recoveries::Show.new(
       move: @move, box: @box, media: @media, run: latest_run, editable: editable_move?
@@ -32,7 +32,7 @@ class RecoveriesController < MoveScopedController
     # frame; without it each poll would nest the whole AppShell inside the card.
     render Views::Recoveries::State.new(
       move: @move, box: @box, media: @media, run: latest_run,
-      editable: editable_move?, recovered: recovered?, orphaned: orphaned?
+      editable: editable_move?, recovered: @media.sourced_item?, orphaned: @media.orphaned?
     ), layout: false
   end
 
@@ -47,19 +47,12 @@ class RecoveriesController < MoveScopedController
 
   private
 
-  # Move-wide, not box-scoped: an item recognized from this photo may have been
-  # moved to another box (Items::Move keeps source_media_id), but the photo is
-  # still recovered — never offer a duplicate manual add for it. Mirrors
-  # BoxesController#recoverable_media_ids.
-  def recovered?
-    @move.items.exists?(source_media_id: @media.id)
-  end
-
-  # Genuinely orphaned: recognition produced nothing to act on (failed or true
-  # zero-detection). Any suggestion — including a conflict-only run that creates
-  # no item — means there is a result, so the photo isn't a recovery candidate.
-  def orphaned?
-    !@media.recognition_suggestions.exists?
+  # A recovered photo's item may live in another box (Items::Move), so the
+  # original box's review walk (box-scoped) wouldn't contain it — sending there
+  # renders an empty "Photo 1 of 0". Go to the item itself instead.
+  def recovered_redirect_path
+    item = @move.items.find_by(source_media_id: @media.id)
+    item ? move_item_path(@move, item) : move_box_path(@move, @box)
   end
 
   def latest_run

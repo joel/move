@@ -64,4 +64,21 @@ class Media < ApplicationRecord
   def recognition_state
     recognition_runs.order(created_at: :desc).first&.status
   end
+
+  # Has this photo produced an item? MOVE-wide, not box-scoped: Items::Move keeps
+  # source_media_id when an item moves to another box, so the photo is still
+  # "recognized" even though no item lives in its original box.
+  def sourced_item?
+    move.items.exists?(source_media_id: id)
+  end
+
+  # Single source of truth for "this photo needs recovery": recognition produced
+  # nothing to act on — no item references it AND it has no suggestions (a
+  # conflict-only run records suggestions but no item, by the no-overwrite rule, so
+  # offering a manual add would recreate that avoided duplicate). Used by the
+  # recovery surface (RecoveriesController, ItemsController#create) and mirrored by
+  # the bulk BoxesController#recoverable_media_ids query.
+  def orphaned?
+    !sourced_item? && !recognition_suggestions.exists?
+  end
 end

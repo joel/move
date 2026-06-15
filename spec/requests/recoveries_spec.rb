@@ -37,23 +37,23 @@ RSpec.describe "Photo recovery" do
       expect(response.body).not_to include(I18n.t("recoveries.actions.retry"))
     end
 
-    it "redirects a resolved photo (now has an item) to the review walk" do
+    it "redirects a resolved photo (now has an item) to that item" do
       create(:recognition_run, :failed, move:, box:, media:)
-      create(:item, move:, box:, source_media: media, name: "Lamp")
+      item = create(:item, move:, box:, source_media: media, name: "Lamp")
 
       get move_box_recovery_photo_path(move, box, media)
 
-      expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
+      expect(response).to redirect_to(move_item_path(move, item))
     end
 
-    it "treats a photo whose item was moved to another box as recovered (move-wide)" do
+    it "redirects a moved-item photo to the item, not the original box's empty walk" do
       other_box = create(:box, move:, number: "9")
       create(:recognition_run, :failed, move:, box:, media:)
-      create(:item, move:, box: other_box, source_media: media, name: "Lamp")
+      item = create(:item, move:, box: other_box, source_media: media, name: "Lamp")
 
       get move_box_recovery_photo_path(move, box, media)
 
-      expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
+      expect(response).to redirect_to(move_item_path(move, item))
     end
 
     it "redirects a conflict-only photo (suggestions but no item) — not orphaned" do
@@ -119,6 +119,18 @@ RSpec.describe "Photo recovery" do
 
       item = box.items.find_by(name: "Desk lamp")
       expect(item.source_media_id).to eq(media.id)
+    end
+
+    it "drops the binding (still creates the item) when the photo is no longer orphaned" do
+      run = create(:recognition_run, :succeeded, move:, box:, media:)
+      create(:recognition_suggestion, :conflict, move:, box:, media:, recognition_run: run)
+
+      post move_box_items_path(move, box),
+           params: { item: { name: "Desk lamp", quantity: "1", source_media_id: media.id } }
+
+      item = box.items.find_by(name: "Desk lamp")
+      expect(item).to be_present
+      expect(item.source_media_id).to be_nil
     end
   end
 end

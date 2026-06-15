@@ -132,6 +132,8 @@ class BoxesController < MoveScopedController
   #    suggestions but creates no item (no-overwrite); offering manual add there
   #    would recreate the very duplicate the conflict path avoids.
   #  - still queued/processing → transient, stays a plain thumbnail (#162).
+  # The per-record equivalent is Media#orphaned? (used by the recovery flow); this
+  # is the set-based form for the gallery, with the in-flight/terminal filter added.
   def recoverable_media_ids
     item_media = @move.items.where.not(source_media_id: nil).select(:source_media_id)
     suggestion_media = RecognitionSuggestion.where(box: @box).select(:media_id)
