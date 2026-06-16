@@ -96,7 +96,8 @@ class ActivitiesController < MoveScopedController
     when "Box"
       Boxes::Update.new.call(box: record, editor: current_user, params: {
                                number: prior.number, length_cm: prior.length_cm, width_cm: prior.width_cm,
-                               height_cm: prior.height_cm, weight_kg: prior.weight_kg
+                               height_cm: prior.height_cm, weight_kg: prior.weight_kg,
+                               description: prior.description
                              })
     end
   end

@@ -96,6 +96,16 @@ RSpec.describe "Activities" do
 
       expect(item.reload.name).to eq("Lamp")
     end
+
+    it "reverts a box description edit to the prior value" do
+      box = create(:box, move:, number: "7", description: "Old summary")
+      Boxes::Update.new.call(box:, editor: user, params: { description: "New summary" })
+      activity = move.activities.where(action: "box.updated").last
+
+      post move_activity_revert_path(move, activity.id)
+
+      expect(box.reload.description).to eq("Old summary")
+    end
   end
 
   describe "authorization" do
