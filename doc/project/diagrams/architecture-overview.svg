@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 600" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <style>
+    .bg{fill:#2A2822}
+    .card{fill:#34312A;stroke:#ffffff14;stroke-width:1}
+    .accent{fill:#34312A;stroke:#9FB089;stroke-width:1.6}
+    .rails{fill:#2e2c26;stroke:#9FB089;stroke-width:1.6}
+    .step{fill:#2b2924;stroke:#ffffff12;stroke-width:1}
+    .data{fill:#2f3a2a;stroke:#9FB089;stroke-width:1.4}
+    .t{fill:#ECE7DC}
+    .sub{fill:#aeb2a6}
+    .sage{fill:#9FB089}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .edge{stroke:#9FB089;stroke-width:2;fill:none}
+    .dash{stroke:#9FB089;stroke-width:1.6;fill:none;stroke-dasharray:6 5}
+  </style>
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#9FB089"/></marker>
+  </defs>
+
+  <rect class="bg" width="1180" height="600"/>
+  <text class="t" x="36" y="42" font-size="22" font-weight="700">How it fits together</text>
+  <text class="sub" x="36" y="66" font-size="13">Multi-tenant Rails 8.1 — subdomain → tenant schema, thin controllers → actions → events, behind Cloudflare Tunnel.</text>
+
+  <!-- clients -->
+  <rect class="card" x="30" y="170" width="132" height="56" rx="12"/>
+  <text class="t" x="96" y="203" font-size="13" font-weight="700" text-anchor="middle">Browser</text>
+  <rect class="card" x="30" y="252" width="132" height="56" rx="12"/>
+  <text class="t" x="96" y="279" font-size="12.5" font-weight="700" text-anchor="middle">MCP client</text>
+  <text class="sub mono" x="96" y="296" font-size="10" text-anchor="middle">Bearer mcp_…</text>
+
+  <!-- edge -->
+  <rect class="card" x="190" y="170" width="176" height="138" rx="12"/>
+  <text class="t" x="278" y="200" font-size="13" font-weight="700" text-anchor="middle">Cloudflare Tunnel</text>
+  <text class="sub" x="278" y="222" font-size="11" text-anchor="middle">→ kamal-proxy (HTTP)</text>
+  <text class="sub" x="278" y="244" font-size="11" text-anchor="middle">no open ports on the</text>
+  <text class="sub" x="278" y="260" font-size="11" text-anchor="middle">origin (outbound only)</text>
+  <text class="sub" x="278" y="288" font-size="10.5" text-anchor="middle">TLS · WAF at the edge</text>
+
+  <!-- Rails container -->
+  <rect class="rails" x="394" y="110" width="448" height="430" rx="16"/>
+  <text class="sage" x="414" y="138" font-size="14" font-weight="700">Rails 8.1 · Puma  <tspan class="sub" font-weight="400">(Phlex · Hotwire · Tailwind)</tspan></text>
+
+  <rect class="step" x="414" y="152" width="408" height="46" rx="10"/>
+  <text class="t" x="430" y="172" font-size="12.5" font-weight="600">MoveTenantElevator</text>
+  <text class="sub" x="430" y="189" font-size="10.5">subdomain → Apartment tenant schema (apex → 404)</text>
+
+  <rect class="step" x="414" y="212" width="190" height="56" rx="10"/>
+  <text class="t" x="509" y="236" font-size="12.5" font-weight="600" text-anchor="middle">Controller (thin)</text>
+  <text class="sub" x="509" y="253" font-size="10" text-anchor="middle">authorize → call → render</text>
+
+  <rect class="accent" x="414" y="288" width="190" height="64" rx="10"/>
+  <text class="sage" x="509" y="312" font-size="12.5" font-weight="700" text-anchor="middle">app/actions</text>
+  <text class="sub" x="509" y="330" font-size="10" text-anchor="middle">Dry::Monads railway</text>
+  <text class="sub" x="509" y="344" font-size="10" text-anchor="middle">Success / Failure</text>
+
+  <rect class="step" x="414" y="372" width="190" height="42" rx="10"/>
+  <text class="sage mono" x="509" y="397" font-size="11.5" text-anchor="middle">Rails.event</text>
+
+  <rect class="step" x="414" y="434" width="408" height="86" rx="10"/>
+  <text class="t" x="430" y="456" font-size="12" font-weight="600">subscribers</text>
+  <text class="sub" x="430" y="475" font-size="10.5">activity feed (append-only + revert)</text>
+  <text class="sub" x="430" y="492" font-size="10.5">search reindex → background job</text>
+  <text class="sub" x="430" y="509" font-size="10.5">manifest / MCP audit</text>
+
+  <!-- Active Storage inside -->
+  <rect class="step" x="624" y="288" width="198" height="64" rx="10"/>
+  <text class="t" x="723" y="312" font-size="12" font-weight="600" text-anchor="middle">Active Storage</text>
+  <text class="sub" x="723" y="330" font-size="10" text-anchor="middle">images · variants (libvips)</text>
+  <text class="sub" x="723" y="344" font-size="10" text-anchor="middle">recognition pipeline</text>
+
+  <!-- data column -->
+  <rect class="data" x="888" y="206" width="262" height="92" rx="12"/>
+  <text class="sage" x="908" y="234" font-size="13" font-weight="700">PostgreSQL 18</text>
+  <text class="sub" x="908" y="256" font-size="10.5">schema-per-tenant (Apartment)</text>
+  <text class="sub" x="908" y="273" font-size="10.5">pgvector — hybrid search</text>
+  <text class="sub" x="908" y="290" font-size="10.5">Solid Cache / Cable</text>
+
+  <rect class="data" x="888" y="306" width="262" height="46" rx="12"/>
+  <text class="t" x="1019" y="334" font-size="12" font-weight="700" text-anchor="middle">SeaweedFS (S3)</text>
+
+  <rect class="data" x="888" y="452" width="262" height="50" rx="12"/>
+  <text class="t" x="1019" y="473" font-size="12" font-weight="700" text-anchor="middle">Solid Queue</text>
+  <text class="sub" x="1019" y="490" font-size="10" text-anchor="middle">background jobs</text>
+
+  <!-- edges -->
+  <path class="edge" d="M162,222 C176,222 178,238 188,238" marker-end="url(#a)"/>
+  <path class="edge" d="M366,238 H392" marker-end="url(#a)"/>
+  <path class="edge" d="M509,198 V210" marker-end="url(#a)"/>
+  <path class="edge" d="M509,268 V286" marker-end="url(#a)"/>
+  <path class="edge" d="M604,320 H622" marker-end="url(#a)"/>
+  <path class="edge" d="M509,352 V370" marker-end="url(#a)"/>
+  <path class="edge" d="M509,414 V432" marker-end="url(#a)"/>
+  <!-- action → PG -->
+  <path class="edge" d="M604,316 C700,316 760,252 886,252" marker-end="url(#a)"/>
+  <!-- storage → seaweed -->
+  <path class="edge" d="M822,326 H886" marker-end="url(#a)"/>
+  <!-- subscribers → solid queue -->
+  <path class="edge" d="M822,477 H886" marker-end="url(#a)"/>
+  <!-- MCP reuse -->
+  <path class="dash" d="M96,308 C96,460 380,470 412,360" marker-end="url(#a)"/>
+  <text class="sage" x="150" y="430" font-size="11" font-weight="600">POST /mcp — reuses the same actions</text>
+
+  <text class="sub" x="36" y="576" font-size="11.5">Deep dives: <tspan class="mono" fill="#ECE7DC">app/actions/README.md</tspan> · <tspan class="mono" fill="#ECE7DC">app/mcp/README.md</tspan> · <tspan class="mono" fill="#ECE7DC">doc/project/architecture.md</tspan>. Auth: passwordless Rodauth + passkeys. Ships via Kamal.</text>
+</svg>
