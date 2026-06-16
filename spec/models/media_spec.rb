@@ -60,4 +60,20 @@ RSpec.describe Media do
       expect(media.recognition_state).to eq("succeeded")
     end
   end
+
+  describe "#sourced_item? / #orphaned?" do
+    # #198 — a soft-deleted item still sources its photo, so discarding it must not
+    # re-flag the photo as orphaned (which would offer recovery and let it
+    # re-source a duplicate, then leave two items on restore).
+    it "still counts a discarded item as sourcing the photo" do
+      media = create(:media)
+      item = create(:item, :manual, move: media.move, box: media.box, source_media: media)
+      item.discard!
+
+      aggregate_failures do
+        expect(media.reload.sourced_item?).to be(true)
+        expect(media.orphaned?).to be(false)
+      end
+    end
+  end
 end

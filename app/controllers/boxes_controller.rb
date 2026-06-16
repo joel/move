@@ -128,6 +128,8 @@ class BoxesController < MoveScopedController
   # exclusions, all mirrored by RecoveriesController#orphaned?/#recovered?:
   #  - MOVE-wide item check (not box-scoped): Items::Move keeps source_media_id, so
   #    a box-scoped check would re-flag a photo once its item moves to another box.
+  #    `with_discarded`: a soft-deleted item still counts, so deleting it doesn't
+  #    re-surface a recovery tile that could re-source a duplicate (#198).
   #  - has a suggestion → recognition produced a result. A conflict-only run records
   #    suggestions but creates no item (no-overwrite); offering manual add there
   #    would recreate the very duplicate the conflict path avoids.
@@ -135,7 +137,7 @@ class BoxesController < MoveScopedController
   # The per-record equivalent is Media#orphaned? (used by the recovery flow); this
   # is the set-based form for the gallery, with the in-flight/terminal filter added.
   def recoverable_media_ids
-    item_media = @move.items.where.not(source_media_id: nil).select(:source_media_id)
+    item_media = @move.items.with_discarded.where.not(source_media_id: nil).select(:source_media_id)
     suggestion_media = RecognitionSuggestion.where(box: @box).select(:media_id)
     runs = RecognitionRun.where(box: @box)
     @box.media
