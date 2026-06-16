@@ -61,11 +61,29 @@ module RecognitionProviders
       }
     }.freeze
 
+    # Structured-output envelope for the contents-summary call (Boxes::SuggestDescription).
+    # A plain object with one string — the OpenAI strict / Anthropic tool dialects share
+    # this; Gemini keeps its own uppercase copy. Forces a clean string back, not prose.
+    DESCRIPTION_SCHEMA = {
+      type: "object",
+      additionalProperties: false,
+      required: %w[description],
+      properties: { description: { type: "string" } }
+    }.freeze
+
     # @param image [ActiveStorage::Attached::One] the Media image attachment
     # @param context [Hash] move vocabulary + box context (category/tag names, room)
     # @return [RecognitionProviders::Result]
     def identify(image:, context:)
       raise NotImplementedError, "#{self.class} must implement #identify"
+    end
+
+    # Summarise a box's items into one short contents description string. Text-only
+    # (no image), so it reuses the same key/model/transport as #identify. `items` is
+    # an Array<Hash> of { label:, category:, count: } built by Boxes::SuggestDescription.
+    # @return [String]
+    def summarize_contents(items:)
+      raise NotImplementedError, "#{self.class} must implement #summarize_contents"
     end
 
     protected
@@ -180,6 +198,40 @@ module RecognitionProviders
                "too occluded or blurry to identify rather than guessing. Treat confidence as " \
                "your rough certainty from 0 to 1."
       lines.join(" ")
+    end
+
+    # Text prompt for the contents-summary call. Lists the box's items and asks for
+    # one short, comma-separated description of the main things it carries — no
+    # sentence, no trailing period — so the result reads like "Clothes, Electronics,
+    # Books". `items` is an Array<Hash> of { label:, category:, count: }.
+    def summarize_prompt(items)
+      lines = Array(items).filter_map do |entry|
+        label = entry[:label].to_s.strip
+        next if label.blank?
+
+        count = entry[:count].to_i
+        category = entry[:category].to_s.strip
+        prefix = count > 1 ? "#{count}× " : ""
+        suffix = category.present? ? " (#{category})" : ""
+        "#{prefix}#{label}#{suffix}"
+      end
+
+      "Summarise the contents of this moving box into one short, human-readable line " \
+        "naming the main things it carries — a few comma-separated groups or categories " \
+        "(e.g. \"Clothes, Electronics, Books\"). Keep it under about ten words, no full " \
+        "sentence and no trailing period. Items in the box: #{lines.join("; ")}."
+    end
+
+    # Pull the description string out of a structured payload — a parsed Hash
+    # (Anthropic tool_use.input) or a raw JSON string (OpenAI/Gemini content). A
+    # missing/blank/non-string description raises so model drift fails loudly
+    # instead of becoming an empty suggestion.
+    def extract_description(payload)
+      data = payload.is_a?(String) ? parse_structured(payload) : payload
+      value = data.is_a?(Hash) ? (data["description"] || data[:description]) : nil
+      return value.strip if value.is_a?(String) && value.strip.present?
+
+      raise ProviderHttp::Error, "#{self.class.name} returned a 2xx with no description"
     end
 
     # Down-scaled, EXIF-oriented JPEG for the vision call: { base64:, media_type: }.

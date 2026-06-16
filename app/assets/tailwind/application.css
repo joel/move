@@ -510,6 +510,24 @@
     border-radius: 9999px;
     background: color-mix(in srgb, currentColor 15%, transparent);
   }
+
+  /* Native <dialog> modal (B1 seal flow) — card surface, hairline edge, dimmed
+   * blurred backdrop. showModal() centres it; margin:auto keeps it centred. */
+  .ha-modal {
+    width: calc(100% - 2.5rem);
+    max-width: 400px;
+    margin: auto;
+    padding: 1.5rem;
+    border: 1px solid var(--c-card-border);
+    border-radius: var(--radius-card);
+    background: var(--c-card);
+    color: var(--c-text-warm);
+  }
+
+  .ha-modal::backdrop {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(2px);
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────────

@@ -5,8 +5,13 @@
 # subdomain elevator switches Apartment first) and is scoped to one Move. Thin:
 # authorize, call the action, pattern-match, render.
 class BoxesController < MoveScopedController
-  before_action :set_box, only: %i[show edit update transition]
-  before_action :require_writable_move!, only: %i[new create edit update transition]
+  before_action :set_box, only: %i[show edit update transition seal description_suggestion]
+  # `seal` and `description_suggestion` can spend the Move's AI quota (they call
+  # the configured vendor provider), so they need the same editing-role + writable
+  # guard as the mutating actions — not just `set_box` — to keep viewers and
+  # archived Moves out (defense in depth behind the already-hidden UI controls).
+  before_action :require_writable_move!,
+                only: %i[new create edit update transition seal description_suggestion]
 
   # GET /moves/:move_id/boxes
   def index
@@ -99,7 +104,9 @@ class BoxesController < MoveScopedController
 
   # PATCH /moves/:move_id/boxes/:id/transition
   def transition
-    result = Boxes::TransitionStatus.new.call(box: @box, to: params[:to], actor: current_user)
+    result = Boxes::TransitionStatus.new.call(
+      box: @box, to: params[:to], actor: current_user, description: seal_description
+    )
 
     case result
     in Dry::Monads::Success(box)
@@ -110,7 +117,36 @@ class BoxesController < MoveScopedController
     end
   end
 
+  # GET /moves/:move_id/boxes/:id/seal
+  # The "describe before sealing" modal frame, with the contents description
+  # auto-proposed (AI when configured, deterministic otherwise). Lazy-loaded by
+  # the box-detail dialog so the suggestion only runs when the modal opens.
+  def seal
+    # Mirror Boxes::TransitionStatus#validate: a roomless box can't be sealed, so
+    # don't render the modal or spend AI quota suggesting for a seal that'd fail.
+    return head :unprocessable_content unless @box.packing? && @box.can_transition_to?("sealed") &&
+                                              @box.room_id.present?
+
+    render Views::Boxes::Seal.new(move: @move, box: @box, suggestion: suggest_description)
+  end
+
+  # GET /moves/:move_id/boxes/:id/description_suggestion
+  # JSON { description: "…" } for the edit-form ✨ button (Stimulus fetch).
+  def description_suggestion
+    render json: { description: suggest_description }
+  end
+
   private
+
+  def suggest_description
+    Boxes::SuggestDescription.new.call(box: @box).value_or("")
+  end
+
+  # Only the seal modal posts a description alongside the transition; other
+  # transitions (and a stale UI) send none, leaving any existing value untouched.
+  def seal_description
+    params.dig(:box, :description) if params[:to].to_s == "sealed"
+  end
 
   # Items the C2 review walk can act on: unreviewed (pending_review or
   # needs_correction) AND backed by a photo *in this box*. The walk (review_media)
@@ -184,6 +220,6 @@ class BoxesController < MoveScopedController
   end
 
   def box_params
-    params.expect(box: %i[number room_name length_cm width_cm height_cm weight_kg])
+    params.expect(box: %i[number room_name length_cm width_cm height_cm weight_kg description])
   end
 end

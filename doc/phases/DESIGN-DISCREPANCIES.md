@@ -294,6 +294,15 @@ E1 (`ea5a8a69…` + mobile) and the four E2 state screens were implemented in D9
 
 ---
 
+## ⚠️ §B1-CONTENTS — Box "Contents description" + AI suggest (#210) — non-blocking decisions
+
+- **Observation:** Five new Stitch screens cover the contents-description surfaces (box detail panel, edit-form ✨ field with loading state, seal modal with generating/suggested/error states — desktop + mobile). The detail panel in the Stitch mock labels the description **"AI Suggested Contents"**.
+- **Decision:** The shipped detail panel labels it **"Contents"** (sparkle icon retained), not "AI Suggested Contents" — the field is a plain, user-editable description that *may* have been AI-suggested or hand-typed or auto-generated deterministically, so a permanent "AI Suggested" label would misrepresent a hand-written value. The ✨ AI affordance lives on the **edit form and the seal modal** (where suggesting actually happens), per the agreed scope; the detail page shows a quiet "Add a description" link (→ edit) when empty rather than an inline suggest button.
+- **Risk:** Cosmetic only.
+- **Remediation:** None needed. **Status: ⚠️ decided.**
+
+---
+
 ## Resolution tracker
 
 | ID | Blocking? | Phase | Status | Action |
@@ -314,5 +323,6 @@ E1 (`ea5a8a69…` + mobile) and the four E2 state screens were implemented in D9
 | VARIANTS | ⚠️ | all | watch | fill light/missing variants on demand |
 | RELEASE-TAGS | ⚠️ | all | ✅ resolved | domain-named SemVer `vX.Y.Z-<slug>` (PR #20 review) |
 | RECOVERY | ⚠️ | post-D | ✅ decided | photo-recovery screen (orphaned/failed photo) ships as a state-variant of the designed C2 review/photo layout — same split (image left, action card right) + the shipped recognition-error caption; no new Stitch screen generated (#181) |
+| B1-CONTENTS | ⚠️ | post-D | ✅ decided | 5 Stitch screens created (`c3adef35…`, `dce2995c…`, `78ec0a5f…`, `0b3ebf18…`, `e5dcff39…`); detail panel labelled "Contents" not "AI Suggested Contents"; ✨ on edit form + seal modal only (#210) |
 
 *Update this file whenever a discrepancy is found or closed. A 🚫 row must be ✅ before its phase leaves "Ready".*

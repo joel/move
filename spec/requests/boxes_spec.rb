@@ -106,6 +106,12 @@ RSpec.describe "Boxes" do
       expect(response).to have_http_status(:unprocessable_content)
     end
 
+    it "persists a description submitted with the form" do
+      post move_boxes_path(move), params: { box: { room_name: "Kitchen", description: "Pots and pans" } }
+
+      expect(move.boxes.last.description).to eq("Pots and pans")
+    end
+
     it "refuses to create on an archived move" do
       archived = create(:move, :archived, created_by: user)
 
@@ -216,6 +222,14 @@ RSpec.describe "Boxes" do
       expect(response).to have_http_status(:unprocessable_content)
       expect(box.reload.number).to eq("1")
     end
+
+    it "updates the description" do
+      box = create(:box, move:, number: "1", description: "Old")
+
+      patch move_box_path(move, box), params: { box: { description: "New summary" } }
+
+      expect(box.reload.description).to eq("New summary")
+    end
   end
 
   describe "PATCH /moves/:move_id/boxes/:id/transition" do
@@ -256,6 +270,69 @@ RSpec.describe "Boxes" do
       expect(response).to redirect_to(move_boxes_path(archived))
       expect(box.reload.status).to eq("packing")
     end
+
+    it "persists a description supplied at seal time (one transaction)" do
+      box = create(:box, :with_room, move:, number: "1", status: "packing")
+
+      patch transition_move_box_path(move, box),
+            params: { to: "sealed", box: { description: "Clothes, Books" } }
+
+      expect(box.reload.status).to eq("sealed")
+      expect(box.description).to eq("Clothes, Books")
+    end
+
+    it "leaves the description untouched on a non-seal transition" do
+      box = create(:box, :with_room, move:, number: "1", status: "sealed", description: "Kept")
+
+      patch transition_move_box_path(move, box), params: { to: "in_transit", box: { description: "x" } }
+
+      expect(box.reload.description).to eq("Kept")
+    end
+  end
+
+  describe "GET /moves/:move_id/boxes/:id/seal" do
+    it "renders the seal-modal frame with an auto-suggested description" do
+      box = create(:box, :with_room, move:, number: "1", status: "packing")
+      cat = create(:category, move:, name: "Kitchenware")
+      create(:item, move:, box:, name: "Mug", category: cat)
+
+      get seal_move_box_path(move, box)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(I18n.t("boxes.seal.title"))
+      expect(response.body).to include("Kitchenware") # deterministic suggestion (fake provider)
+      # Regenerate opts out of Turbo prefetch so a hover can't spend AI quota.
+      expect(response.body).to include('data-turbo-prefetch="false"')
+    end
+
+    it "is unprocessable for a box that cannot be sealed" do
+      box = create(:box, :with_room, move:, number: "1", status: "in_transit")
+
+      get seal_move_box_path(move, box)
+
+      expect(response).to have_http_status(:unprocessable_content)
+    end
+
+    it "is unprocessable (no AI spend) for a roomless box — the seal would fail room_required" do
+      box = create(:box, move:, number: "1", status: "packing", room: nil)
+
+      get seal_move_box_path(move, box)
+
+      expect(response).to have_http_status(:unprocessable_content)
+    end
+  end
+
+  describe "GET /moves/:move_id/boxes/:id/description_suggestion" do
+    it "returns the suggested description as JSON" do
+      box = create(:box, :with_room, move:, number: "1", status: "packing")
+      cat = create(:category, move:, name: "Books")
+      create(:item, move:, box:, name: "Novel", category: cat)
+
+      get description_suggestion_move_box_path(move, box)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["description"]).to eq("Books")
+    end
   end
 
   describe "without a tenant (apex/public)" do
@@ -291,6 +368,21 @@ RSpec.describe "Boxes" do
       expect do
         post move_boxes_path(move), params: { box: { number: "9" } }
       end.to change(move.boxes, :count).by(1)
+    end
+
+    # The AI-suggestion endpoints can spend the Move's vendor quota, so a viewer
+    # must not be able to trigger them even by hitting the URL directly.
+    it "forbids a viewer from the AI suggestion endpoints (403)" do
+      box = create(:box, :with_room, move:, number: "1", status: "packing")
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+
+      get description_suggestion_move_box_path(move, box)
+      expect(response).to have_http_status(:forbidden)
+
+      get seal_move_box_path(move, box)
+      expect(response).to have_http_status(:forbidden)
     end
   end
 end

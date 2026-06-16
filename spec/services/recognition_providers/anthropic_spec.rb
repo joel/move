@@ -97,4 +97,38 @@ RSpec.describe RecognitionProviders::Anthropic do
     expect { provider.identify(image: image, context: context) }
       .to raise_error(ProviderHttp::Error, /no record_objects tool_use block/)
   end
+
+  describe "#summarize_contents" do
+    let(:items) { [{ label: "Mugs", category: "Kitchenware", count: 4 }, { label: "Books", category: "Books", count: 1 }] }
+
+    it "sends a forced description-tool request (no image) and returns the description" do
+      body = { content: [{ type: "tool_use", name: "record_description",
+                           input: { description: "Kitchenware, Books" } }] }.to_json
+      stub_http(code: "200", body: body)
+
+      result = provider.summarize_contents(items: items)
+
+      sent = sent_body
+      aggregate_failures do
+        expect(result).to eq("Kitchenware, Books")
+        expect(sent.dig("tool_choice", "name")).to eq("record_description")
+        expect(sent.dig("tools", 0, "input_schema", "required")).to eq(%w[description])
+        # Text-only: a single text block, no image source.
+        expect(sent.dig("messages", 0, "content").pluck("type")).to eq(%w[text])
+        expect(sent.dig("messages", 0, "content", 0, "text")).to include("Mugs", "Kitchenware")
+      end
+    end
+
+    it "raises a typed missing-key error (strict BYO) when built without a key" do
+      expect { described_class.new.summarize_contents(items: items) }
+        .to raise_error(RecognitionProviders::Base::MissingApiKey)
+    end
+
+    it "raises when the model answers in prose instead of the tool" do
+      stub_http(code: "200", body: { content: [{ type: "text", text: "Box of stuff" }] }.to_json)
+
+      expect { provider.summarize_contents(items: items) }
+        .to raise_error(ProviderHttp::Error, /no record_description tool_use block/)
+    end
+  end
 end

@@ -15,6 +15,41 @@ RSpec.describe Boxes::TransitionStatus do
     expect(box.reload.status).to eq("sealed")
   end
 
+  it "persists a description passed alongside the seal" do
+    box = create(:box, :with_room, move:, status: "packing")
+
+    described_class.new.call(box:, to: "sealed", actor:, description: "Clothes, Books")
+
+    expect(box.reload).to have_attributes(status: "sealed", description: "Clothes, Books")
+  end
+
+  it "leaves an existing description untouched when none is passed" do
+    box = create(:box, :with_room, move:, status: "packing", description: "Kept")
+
+    transition(box, "sealed")
+
+    expect(box.reload.description).to eq("Kept")
+  end
+
+  it "also emits box.updated when the seal stores a description (keeps the feed revertable)" do
+    box = create(:box, :with_room, move:, status: "packing")
+    allow(Rails.event).to receive(:notify)
+
+    described_class.new.call(box:, to: "sealed", actor:, description: "Clothes")
+
+    expect(Rails.event).to have_received(:notify).with("box.status_changed", hash_including(to: "sealed"))
+    expect(Rails.event).to have_received(:notify).with("box.updated", hash_including(box_id: box.id))
+  end
+
+  it "does not emit box.updated when sealing without a description change" do
+    box = create(:box, :with_room, move:, status: "packing")
+    allow(Rails.event).to receive(:notify)
+
+    transition(box, "sealed")
+
+    expect(Rails.event).not_to have_received(:notify).with("box.updated", anything)
+  end
+
   it "refuses to seal a box without a room" do
     box = create(:box, move:, status: "packing", room: nil)
 

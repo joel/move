@@ -24,6 +24,24 @@ module RecognitionProviders
       Result.new(provider: "openai", provider_model: model, objects: normalize(extract_objects(content)))
     end
 
+    # Text-only contents summary via strict Structured Outputs (DESCRIPTION_SCHEMA).
+    def summarize_contents(items:)
+      key = api_key!
+      json = post_json(
+        ENDPOINT,
+        headers: { "Authorization" => "Bearer #{key}" },
+        body: {
+          model: model,
+          messages: [{ role: "user", content: summarize_prompt(items) }],
+          response_format: {
+            type: "json_schema",
+            json_schema: { name: "box_description", strict: true, schema: DESCRIPTION_SCHEMA }
+          }
+        }
+      )
+      extract_description(json.dig("choices", 0, "message", "content").to_s)
+    end
+
     private
 
     def body(model, image, context)

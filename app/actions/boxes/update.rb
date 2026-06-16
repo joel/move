@@ -9,7 +9,7 @@ module Boxes
     include Boxes::RoomResolution
     include Search::Reindexing
 
-    ATTRS = %i[number length_cm width_cm height_cm weight_kg].freeze
+    ATTRS = %i[number length_cm width_cm height_cm weight_kg description].freeze
 
     def call(box:, params:, editor:)
       yield ensure_writable(box.move)

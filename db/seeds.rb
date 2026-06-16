@@ -127,30 +127,44 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   # and a roomless box (to demo the seal-requires-room guard). Sizes repeat on
   # purpose so the Add Box form's "Reuse dimensions" chips have something to
   # offer: 40×30×25 appears 3× (a stack of identical boxes) and 60×40×40 twice.
+  # `desc` exercises the contents-description surface: sealed boxes carry one
+  # (shown on the detail card); packing boxes 2 and 9 deliberately have none so
+  # the ✨ AI-suggest field and the seal-time "describe before sealing" modal are
+  # demoable (box 2 also has items, so a real suggestion can be generated).
   boxes = {
-    "1" => { room: "Kitchen",     status: "sealed",     dims: [40, 30, 25, 8] },
+    "1" => { room: "Kitchen",     status: "sealed",     dims: [40, 30, 25, 8],
+             desc: "Cookware, small appliances, heavy utensils. Keep upright." },
     "2" => { room: "Kitchen",     status: "packing",    dims: [] },
-    "3" => { room: "Living Room", status: "sealed",     dims: [60, 40, 40, 15] },
+    "3" => { room: "Living Room", status: "sealed",     dims: [60, 40, 40, 15],
+             desc: "Books, framed photos, throw blankets." },
     "4" => { room: "Bedroom",     status: "packing",    dims: [50, 40, nil, 6] },
-    "5" => { room: "Garage",      status: "in_transit", dims: [80, 60, 50, 22] },
+    "5" => { room: "Garage",      status: "in_transit", dims: [80, 60, 50, 22],
+             desc: "Power tools, extension cords, hardware." },
     "6" => { room: nil,           status: "packing",    dims: [] },
     "7" => { room: "Bedroom",     status: "unpacking",  dims: [55, 45, 35, 12] },
     "8" => { room: "Living Room", status: "unpacked",   dims: [60, 40, 40, 14] },
     "9" => { room: "Kitchen",     status: "packing",    dims: [40, 30, 25, 7] },
-    "10" => { room: "Kitchen", status: "sealed", dims: [40, 30, 25, 9] }
+    "10" => { room: "Kitchen", status: "sealed", dims: [40, 30, 25, 9],
+              desc: "Clothes, Electronics, Books" }
   }
 
   boxes.each do |number, attrs|
     length, width, height, weight = attrs[:dims]
-    move.boxes.find_or_create_by!(number: number) do |b|
+    box = move.boxes.find_or_create_by!(number: number) do |b|
       b.qr_token = SecureRandom.urlsafe_base64(16)
       b.room = attrs[:room] && rooms[attrs[:room]]
       b.status = attrs[:status]
+      b.description = attrs[:desc]
       b.length_cm = length
       b.width_cm = width
       b.height_cm = height
       b.weight_kg = weight
     end
+    # Backfill the showcase description onto a box seeded before this feature
+    # existed, so an already-seeded demo tenant shows it after a plain re-seed
+    # (the create block runs only on first insert). Only fills a blank, so a
+    # developer's own edits and the box's lifecycle state are left untouched.
+    box.update!(description: attrs[:desc]) if attrs[:desc].present? && box.description.blank?
   end
 
   # Box 1 is the review showcase: several photos, each with a handful of detections

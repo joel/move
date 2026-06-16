@@ -35,6 +35,32 @@ RSpec.describe RecognitionProviders::Openai do
       .to raise_error(RecognitionProviders::Base::MissingApiKey, /No API key set/)
   end
 
+  describe "#summarize_contents" do
+    let(:items) { [{ label: "Lamp", category: "Lighting", count: 2 }] }
+
+    it "sends a strict json_schema description request (no image) and returns the string" do
+      stub_http(code: "200", body: content_response({ description: "Lighting" }.to_json))
+
+      result = provider.summarize_contents(items: items)
+
+      sent = sent_body
+      aggregate_failures do
+        expect(result).to eq("Lighting")
+        expect(sent.dig("response_format", "json_schema", "name")).to eq("box_description")
+        expect(sent.dig("response_format", "json_schema", "schema", "required")).to eq(%w[description])
+        # Text-only content (a plain string, not the image multi-part array).
+        expect(sent.dig("messages", 0, "content")).to be_a(String).and include("Lamp", "Lighting")
+      end
+    end
+
+    it "raises on a missing description in a 2xx body" do
+      stub_http(code: "200", body: content_response({ description: "" }.to_json))
+
+      expect { provider.summarize_contents(items: items) }
+        .to raise_error(ProviderHttp::Error, /no description/)
+    end
+  end
+
   it "sends a strict json_schema request with the auth header, model, and data-URL image" do
     stub_http(code: "200", body: content_response({ objects: [] }.to_json))
 
