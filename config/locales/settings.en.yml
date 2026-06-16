@@ -43,6 +43,16 @@ en:
             openai: "OpenAI"
             anthropic: "Anthropic"
             gemini: "Gemini"
+        embeddings:
+          title: "Semantic search"
+          subtitle: "Rank search results by meaning, not just keywords. Uses your OpenAI key above."
+          status_active: "On"
+          status_key_required: "Key required"
+          status_off: "Off"
+          label_off: "Off"
+          label_on: "On"
+          key_required_help: "Add your OpenAI key above, then turn this on."
+          reindex_note: "Turning this on re-embeds every item — results improve once it finishes."
       account:
         title: "Account"
         manage: "Account Settings"
@@ -65,4 +75,8 @@ en:
     remove_recognition_key:
       key_removed: "API key removed."
       invalid: "That provider is not available."
+      read_only: "This move is archived and can't be changed."
+    update_embedding_provider:
+      changed: "Semantic search updated. Re-embedding your items now."
+      invalid: "That option is not available."
       read_only: "This move is archived and can't be changed."
