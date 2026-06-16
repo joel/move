@@ -49,6 +49,26 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
     steps:
+      # Fail fast on a missing/empty secret before kamal runs. With
+      # KAMAL_SECRETS_FROM_ENV=1, `.kamal/secrets` reads these straight from the
+      # environment, so a broken Doppler->GitHub sync (renamed/removed key) would
+      # otherwise resolve to an empty string and silently deploy a blank
+      # RAILS_MASTER_KEY / POSTGRES_PASSWORD / ... (#200). Guard here, not in the
+      # dotenv-parsed secrets file, where a standalone check can't live safely.
+      - name: Verify required deploy secrets are present
+        run: |
+          missing=()
+          for s in KAMAL_REGISTRY_PASSWORD RAILS_MASTER_KEY POSTGRES_PASSWORD \
+                   NOTIF_MAIL_USERNAME NOTIF_MAIL_PASSWORD STORAGE_ACCESS_KEY_ID \
+                   STORAGE_SECRET_ACCESS_KEY OPENAI_API_KEY GEMINI_API_KEY; do
+            [ -n "${!s}" ] || missing+=("$s")
+          done
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing or empty deploy secrets: ${missing[*]}. Check the Doppler -> GitHub Actions sync (move/prd)."
+            exit 1
+          fi
+          echo "All required deploy secrets are present."
+
       - name: Checkout code
         uses: actions/checkout@v6
 
