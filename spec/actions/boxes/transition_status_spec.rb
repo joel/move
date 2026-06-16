@@ -15,6 +15,22 @@ RSpec.describe Boxes::TransitionStatus do
     expect(box.reload.status).to eq("sealed")
   end
 
+  it "persists a description passed alongside the seal" do
+    box = create(:box, :with_room, move:, status: "packing")
+
+    described_class.new.call(box:, to: "sealed", actor:, description: "Clothes, Books")
+
+    expect(box.reload).to have_attributes(status: "sealed", description: "Clothes, Books")
+  end
+
+  it "leaves an existing description untouched when none is passed" do
+    box = create(:box, :with_room, move:, status: "packing", description: "Kept")
+
+    transition(box, "sealed")
+
+    expect(box.reload.description).to eq("Kept")
+  end
+
   it "refuses to seal a box without a room" do
     box = create(:box, move:, status: "packing", room: nil)
 

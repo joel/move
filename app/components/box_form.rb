@@ -27,6 +27,7 @@ module Components
         room_field(form)
         reuse_dimensions
         dimensions(form)
+        description_field(form)
 
         div(class: "mt-2 flex flex-wrap gap-3") do
           form.submit @submit_label, class: "ha-button ha-button-primary"
@@ -104,6 +105,46 @@ module Components
         number_field(form, :height_cm, I18n.t("boxes.form.height_cm"), target: "height")
         number_field(form, :weight_kg, I18n.t("boxes.form.weight_kg"))
       end
+    end
+
+    # Optional contents description. A ✨ "Suggest with AI" button (wired to the
+    # ai-suggest Stimulus controller) appears only once the box exists and holds
+    # items — there's nothing to summarise on a brand-new, empty box.
+    def description_field(form)
+      attrs = suggestable? ? { controller: "ai-suggest", ai_suggest_url_value: suggest_url } : {}
+      div(class: "flex flex-col gap-2", data: attrs) do
+        div(class: "flex items-end justify-between gap-3") do
+          form.label :description, label_text(I18n.t("boxes.form.description"), optional: true),
+                     class: "text-label-caps uppercase text-muted"
+          suggest_button if suggestable?
+        end
+        form.text_area :description, rows: 3, placeholder: I18n.t("boxes.form.description_placeholder"),
+                                     class: "ha-input resize-none",
+                                     data: (suggestable? ? { ai_suggest_target: "field" } : {})
+      end
+    end
+
+    def suggest_button
+      button(
+        type: "button",
+        class: "inline-flex items-center gap-1.5 rounded-full bg-accent-sage/10 px-3 py-1.5 " \
+               "text-sm font-semibold text-accent-sage transition hover:bg-accent-sage/20 " \
+               "disabled:opacity-50 disabled:pointer-events-none",
+        data: { action: "ai-suggest#suggest", ai_suggest_target: "button" }
+      ) do
+        render Components::Icons::Sparkles.new(css: "h-[18px] w-[18px]")
+        span(data: { ai_suggest_target: "buttonLabel", loading: I18n.t("boxes.form.generating") }) do
+          I18n.t("boxes.form.suggest")
+        end
+      end
+    end
+
+    def suggestable?
+      @box.persisted? && @box.item_count.positive?
+    end
+
+    def suggest_url
+      description_suggestion_move_box_path(@move, @box)
     end
 
     def field(form, name, text, optional: false, placeholder: nil)

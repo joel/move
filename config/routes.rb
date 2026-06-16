@@ -14,7 +14,14 @@ Rails.application.routes.draw do
   resources :moves, only: %i[index new create] do
     # B1 — Box detail & lifecycle.
     resources :boxes, only: %i[index new create show edit update] do
-      member { patch :transition }
+      member do
+        patch :transition
+        # B1 — seal-time "describe before sealing" modal frame (auto-suggests a
+        # contents description). `description_suggestion` is the JSON the edit-form
+        # ✨ button fetches to fill the field.
+        get :seal
+        get :description_suggestion
+      end
       # B3 — Manual add item (scoped to the box it lands in).
       resources :items, only: %i[new create]
       # C2 — Per-photo review: walk the box's photos; each screen lists every item

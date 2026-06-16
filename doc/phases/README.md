@@ -67,6 +67,7 @@ Every Design-Spec screen (`Move - Design Specification v0.2.md §4`) maps to exa
 | F2 | Volume & weight summary | D12 | `Summary & Volume (Dark) - Responsive` `screens/9c53bc10b02f4dd7864af8f3248abb02` / `… - Mobile` `screens/1bab812966eb41ca80cc7c2cbc7535b4` |
 | F3 | Settings / menu (+ Assistant/MCP token) | D13 | `Menu Hub - Mobile View` `screens/6f780b58de254181b2fc400cbdc65a2c` · `Settings & Assistant - Mobile View` `screens/11d53a1166d9495db360705b06bb780c` · `Settings & Assistant - Responsive View` `screens/02012642fd9444788cb7a8090d007884` |
 | F3 (Recognition & AI) | Per-Move recognition provider + BYO API keys (#185) | D13 | `Settings & Assistant - AI Configuration (Mobile)` `screens/f5d276c670364d758a0d5da723ed4f7b` · `Settings & Assistant - AI Configuration (Desktop)` `screens/4587e39878b248b1a8370254a12af767` |
+| B1 (Contents description + AI) | Box description field, ✨ AI suggest, seal-time "describe before sealing" modal (#210) | — | `Box Detail (Dark) - Mobile AI Summary` `screens/c3adef353d1d4291859a813121ee2b9e` · `Edit Box - Description AI Field` (desktop) `screens/dce2995cc1484ad2aa9f23a02fe06f8e` / `Edit Box - Mobile AI Field` `screens/78ec0a5f4bf84e5a8877a60586df51d7` · `Seal-time Modal - AI Description Flow` (desktop, 3 states) `screens/0b3ebf18866047f894edfe229ae68d8b` / `Seal Box Modal - Mobile AI Suggest` `screens/e5dcff394c324f24904bef482cb6b805` |
 
 **Design references (not screens):**
 - Design system token sheet — embedded in `projects/13869765800416404511` `designTheme.designMd` (mirrored in Phase D0).

@@ -51,6 +51,10 @@ en:
       reuse_dimensions: "Reuse dimensions"
       dimension_format: "%{length} × %{width} × %{height} cm"
       optional: "Optional"
+      description: "Contents description"
+      description_placeholder: "e.g. Clothes, Electronics, Clutter…"
+      suggest: "Suggest with AI"
+      generating: "Generating…"
       submit: "Add box"
       errors:
         one: "1 error prevented this box from being saved:"
@@ -74,6 +78,8 @@ en:
       archived: "This move is archived — boxes are read-only."
       view_only: "You have view-only access — boxes are read-only."
       items: "Items"
+      contents: "Contents"
+      add_description: "Add a description"
       pending_review:
         one: "1 pending review"
         other: "%{count} pending review"
@@ -107,3 +113,11 @@ en:
       room_required: "Assign a room before sealing this box."
       invalid: "That status change isn't allowed."
       failed: "Could not update the box status."
+    seal:
+      title: "Describe before sealing"
+      subtitle: "Add a quick summary of what's inside"
+      placeholder: "Enter a short contents description…"
+      confirm: "Seal box"
+      skip: "Seal without a description"
+      regenerate: "Regenerate"
+      close: "Close"

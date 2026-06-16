@@ -68,6 +68,30 @@ module Views
             edit_link if @editable
           end
           measurements_row
+          contents_row
+        end
+      end
+
+      # Contents description (B1). Shown as a sage-tinted panel when present;
+      # otherwise a quiet "add a description" link to the edit form (where the ✨
+      # AI-suggest lives), for an editable Move only.
+      def contents_row
+        if @box.description.present?
+          div(class: "mt-4 rounded-xl border border-accent-sage/20 bg-accent-sage/5 p-4") do
+            div(class: "mb-2 flex items-center gap-2") do
+              render Components::Icons::Sparkles.new(css: "h-[18px] w-[18px] text-accent-sage")
+              span(class: "text-label-caps uppercase text-accent-sage") { I18n.t("boxes.show.contents") }
+            end
+            p(class: "text-body-md leading-relaxed text-on-surface-variant") { @box.description }
+          end
+        elsif @editable
+          a(
+            href: edit_move_box_path(@move, @box),
+            class: "mt-4 inline-flex items-center gap-1.5 text-body-md text-accent-sage transition hover:opacity-80"
+          ) do
+            render Components::Icons::Sparkles.new(css: "h-[18px] w-[18px]")
+            plain I18n.t("boxes.show.add_description")
+          end
         end
       end
 
@@ -168,14 +192,25 @@ module Views
 
       def lifecycle_actions
         @box.available_transitions.each do |target|
-          button_to(
-            I18n.t("boxes.actions.#{ACTION_KEYS.fetch(target)}"),
-            transition_move_box_path(@move, @box),
-            method: :patch,
-            params: { to: target },
-            class: transition_button_classes(target)
-          )
+          if target == "sealed" && seal_needs_description?
+            render Components::BoxSealTrigger.new(move: @move, box: @box)
+          else
+            button_to(
+              I18n.t("boxes.actions.#{ACTION_KEYS.fetch(target)}"),
+              transition_move_box_path(@move, @box),
+              method: :patch,
+              params: { to: target },
+              class: transition_button_classes(target)
+            )
+          end
         end
+      end
+
+      # Intercept the seal with the describe-before-sealing modal only when there's
+      # something to describe and no description yet — otherwise sealing stays a
+      # one-click button_to.
+      def seal_needs_description?
+        @box.description.blank? && @box.item_count.positive?
       end
 
       def transition_button_classes(target)
