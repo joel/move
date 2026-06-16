@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <style>
+    .bg{fill:#2A2822}
+    .card{fill:#34312A;stroke:#ffffff14;stroke-width:1}
+    .accent{fill:#34312A;stroke:#9FB089;stroke-width:1.6}
+    .fail{fill:#3a2a26;stroke:#ffb59b;stroke-width:1.5}
+    .t{fill:#ECE7DC}
+    .sub{fill:#aeb2a6}
+    .sage{fill:#9FB089}
+    .terra{fill:#ffb59b}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .edge{stroke:#9FB089;stroke-width:2;fill:none}
+    .ret{stroke:#9FB089;stroke-width:1.6;fill:none;stroke-dasharray:6 5}
+    .off{stroke:#ffb59b;stroke-width:1.6;fill:none;stroke-dasharray:6 5}
+  </style>
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#9FB089"/></marker>
+    <marker id="r" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#ffb59b"/></marker>
+  </defs>
+
+  <rect class="bg" width="1200" height="520"/>
+  <text class="t" x="36" y="42" font-size="22" font-weight="700">MCP request lifecycle</text>
+  <text class="sub" x="36" y="66" font-size="13">A stateless <tspan class="mono">POST /mcp</tspan> — subdomain resolves the tenant, the Bearer token resolves the Move, the tool calls a shared action.</text>
+
+  <!-- Client -->
+  <rect class="card" x="24" y="196" width="152" height="92" rx="12"/>
+  <text class="t" x="100" y="226" font-size="13" font-weight="700" text-anchor="middle">MCP client</text>
+  <text class="sub mono" x="100" y="246" font-size="10.5" text-anchor="middle">POST /mcp</text>
+  <text class="sub mono" x="100" y="262" font-size="10.5" text-anchor="middle">Bearer mcp_…</text>
+
+  <!-- Elevator -->
+  <rect class="card" x="198" y="186" width="184" height="112" rx="12"/>
+  <text class="t" x="290" y="214" font-size="13" font-weight="700" text-anchor="middle">Apartment elevator</text>
+  <text class="sub" x="290" y="236" font-size="11" text-anchor="middle">subdomain → org schema</text>
+  <text class="sub" x="290" y="254" font-size="11" text-anchor="middle">(already in the tenant)</text>
+  <text class="terra" x="290" y="276" font-size="11" text-anchor="middle">apex → 404</text>
+
+  <!-- Controller -->
+  <rect class="accent" x="404" y="166" width="196" height="152" rx="12"/>
+  <text class="sage" x="422" y="192" font-size="13" font-weight="700">McpController</text>
+  <text class="t mono" x="422" y="214" font-size="10.5">authenticate(bearer)</text>
+  <text class="sub" x="422" y="230" font-size="10.5">— in the tenant schema</text>
+  <text class="terra" x="422" y="252" font-size="10.5">401 if absent / revoked</text>
+  <text class="t mono" x="422" y="276" font-size="10.5">Current.move</text>
+  <text class="t mono" x="422" y="292" font-size="10.5">source = :mcp</text>
+  <text class="sub" x="422" y="308" font-size="10">touch last_used_at</text>
+
+  <!-- Server -->
+  <rect class="accent" x="622" y="166" width="200" height="152" rx="12"/>
+  <text class="sage" x="640" y="192" font-size="13" font-weight="700">ServerBuilder</text>
+  <text class="sub" x="640" y="212" font-size="10.5">per-request MCP::Server</text>
+  <text class="sub" x="640" y="228" font-size="10.5">(stateless, JSON-RPC)</text>
+  <text class="t" x="640" y="252" font-size="11" font-weight="600">server_context</text>
+  <text class="sub mono" x="640" y="270" font-size="10">{ move, token,</text>
+  <text class="sub mono" x="640" y="285" font-size="10">  actor, base_url }</text>
+
+  <!-- Tool -->
+  <rect class="card" x="844" y="196" width="140" height="92" rx="12"/>
+  <text class="t" x="914" y="230" font-size="13" font-weight="700" text-anchor="middle">Tool</text>
+  <text class="sub" x="914" y="250" font-size="10.5" text-anchor="middle">Move-scoped</text>
+  <text class="sub" x="914" y="265" font-size="10.5" text-anchor="middle">lookup + dispatch</text>
+
+  <!-- Action -->
+  <rect class="accent" x="1006" y="196" width="170" height="92" rx="12"/>
+  <text class="sage" x="1091" y="226" font-size="13" font-weight="700" text-anchor="middle">app/actions</text>
+  <text class="sub" x="1091" y="246" font-size="10.5" text-anchor="middle">shared with the web UI</text>
+  <text class="sub" x="1091" y="262" font-size="10.5" text-anchor="middle">auth · tenancy · audit</text>
+
+  <!-- forward edges -->
+  <path class="edge" d="M176,242 H196" marker-end="url(#a)"/>
+  <path class="edge" d="M382,242 H402" marker-end="url(#a)"/>
+  <path class="edge" d="M600,242 H620" marker-end="url(#a)"/>
+  <path class="edge" d="M822,242 H842" marker-end="url(#a)"/>
+  <path class="edge" d="M984,242 H1004" marker-end="url(#a)"/>
+
+  <!-- 401 off-ramp -->
+  <rect class="fail" x="404" y="356" width="196" height="40" rx="10"/>
+  <text class="terra" x="502" y="381" font-size="11.5" font-weight="600" text-anchor="middle">401 invalid / revoked token</text>
+  <path class="off" d="M502,318 V354" marker-end="url(#r)"/>
+
+  <!-- return edge -->
+  <path class="ret" d="M1091,288 C1091,430 100,430 100,290" marker-end="url(#a)"/>
+  <text class="sage" x="560" y="424" font-size="12" font-weight="600">JSON-RPC result  (Success → data · Failure → friendly tool error)</text>
+
+  <text class="sub" x="36" y="486" font-size="11.5">Tenancy = subdomain (the elevator); the token binds a Move *within* that tenant. The token is the credential — no session, no CSRF (ActionController::API).</text>
+</svg>

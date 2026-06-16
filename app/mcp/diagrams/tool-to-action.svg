@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 480" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <style>
+    .bg{fill:#2A2822}
+    .card{fill:#34312A;stroke:#ffffff14;stroke-width:1}
+    .accent{fill:#34312A;stroke:#9FB089;stroke-width:1.6}
+    .fail{fill:#3a2a26;stroke:#ffb59b;stroke-width:1.6}
+    .ok{fill:#2f3a2a;stroke:#9FB089;stroke-width:1.6}
+    .t{fill:#ECE7DC}
+    .sub{fill:#aeb2a6}
+    .sage{fill:#9FB089}
+    .terra{fill:#ffb59b}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .step{fill:#2b2924;stroke:#ffffff10;stroke-width:1}
+    .edge{stroke:#9FB089;stroke-width:2;fill:none}
+    .efail{stroke:#ffb59b;stroke-width:2;fill:none}
+  </style>
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#9FB089"/></marker>
+    <marker id="r" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#ffb59b"/></marker>
+  </defs>
+
+  <rect class="bg" width="1080" height="480"/>
+  <text class="t" x="36" y="42" font-size="22" font-weight="700">A tool is a thin adapter over a shared action</text>
+  <text class="sub" x="36" y="66" font-size="13">Every mutation goes through the same <tspan class="mono">app/actions</tspan> as the web UI — auth, tenancy and audit can't be bypassed.</text>
+
+  <!-- Tool -->
+  <rect class="accent" x="36" y="104" width="300" height="300" rx="14"/>
+  <text class="sage mono" x="54" y="132" font-size="14" font-weight="700">Tools::AddItemToBox</text>
+  <text class="sub" x="54" y="151" font-size="11">&lt; MoveMcp::Tools::Base &lt; MCP::Tool</text>
+
+  <rect class="step" x="54" y="166" width="264" height="58" rx="10"/>
+  <text class="t mono" x="68" y="187" font-size="11.5">① find_box(ctx, box_number)</text>
+  <text class="sub" x="68" y="205" font-size="10.5">Move-scoped — nil ⇒ error_response</text>
+
+  <rect class="step" x="54" y="232" width="264" height="58" rx="10"/>
+  <text class="t mono" x="68" y="253" font-size="11.5">② Items::CreateManual.call(</text>
+  <text class="sub mono" x="68" y="271" font-size="10.5">   box:, params:, creator: actor(ctx))</text>
+
+  <rect class="step" x="54" y="298" width="264" height="46" rx="10"/>
+  <text class="t mono" x="68" y="326" font-size="11.5">③ result.failure? → branch</text>
+
+  <text class="sub" x="54" y="372" font-size="10.5">actor = token.created_by · audit names the token</text>
+
+  <!-- Shared action -->
+  <rect class="ok" x="392" y="172" width="244" height="136" rx="14"/>
+  <text class="sage" x="410" y="200" font-size="13" font-weight="700">Items::CreateManual</text>
+  <text class="sub" x="410" y="220" font-size="10.5">the same action the web form calls</text>
+  <text class="t mono" x="410" y="244" font-size="10.5">ensure_writable(move)</text>
+  <text class="t mono" x="410" y="262" font-size="10.5">resolve vocab · persist (txn)</text>
+  <text class="t mono" x="410" y="280" font-size="10.5">notify("item.created")</text>
+  <text class="sub" x="410" y="300" font-size="10">→ Success(item) | Failure(:reason)</text>
+
+  <!-- Failure outcome -->
+  <rect class="fail" x="690" y="110" width="354" height="118" rx="12"/>
+  <text class="terra mono" x="708" y="136" font-size="13" font-weight="700">failure_response(failure)</text>
+  <text class="sub" x="708" y="158" font-size="10.5">maps the action's Failure to friendly copy:</text>
+  <text class="t mono" x="708" y="178" font-size="10.5">:move_archived → "…archived and read-only"</text>
+  <text class="t mono" x="708" y="196" font-size="10.5">:not_capturable → "unseal the box first"</text>
+  <text class="t mono" x="708" y="214" font-size="10.5">:unsupported_image → "use JPEG/PNG/…"</text>
+
+  <!-- Success outcome -->
+  <rect class="ok" x="690" y="262" width="354" height="118" rx="12"/>
+  <text class="sage mono" x="708" y="288" font-size="13" font-weight="700">audit + data_response</text>
+  <text class="t mono" x="708" y="310" font-size="10.5">audit(ctx, box_number:, item_id:)</text>
+  <text class="sub" x="708" y="328" font-size="10.5">→ Rails.event.notify("mcp.tool_called")</text>
+  <text class="t mono" x="708" y="350" font-size="10.5">data_response(item: item_json(item))</text>
+  <text class="sub" x="708" y="368" font-size="10.5">→ text + structured_content for the model</text>
+
+  <!-- edges -->
+  <path class="edge" d="M336,254 H388" marker-end="url(#a)"/>
+  <path class="efail" d="M636,210 C662,210 666,170 688,170" marker-end="url(#r)"/>
+  <path class="edge" d="M636,270 C662,270 666,320 688,320" marker-end="url(#a)"/>
+  <text class="terra" x="650" y="186" font-size="11" font-weight="600">Failure</text>
+  <text class="sage" x="648" y="300" font-size="11" font-weight="600">Success</text>
+</svg>
