@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1140 660" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <style>
+    .bg{fill:#2A2822}
+    .card{fill:#34312A;stroke:#ffffff14;stroke-width:1}
+    .accent{fill:#34312A;stroke:#9FB089;stroke-width:1.5}
+    .bus{fill:#2f3a2a;stroke:#9FB089;stroke-width:1.5}
+    .t{fill:#ECE7DC}
+    .sub{fill:#aeb2a6}
+    .sage{fill:#9FB089}
+    .terra{fill:#ffb59b}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .edge{stroke:#9FB089;stroke-width:2;fill:none}
+    .ret{stroke:#ffb59b;stroke-width:1.6;fill:none;stroke-dasharray:6 5}
+    .step{fill:#2b2924;stroke:#ffffff10;stroke-width:1}
+  </style>
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#9FB089"/></marker>
+    <marker id="r" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#ffb59b"/></marker>
+  </defs>
+
+  <rect class="bg" width="1140" height="660"/>
+  <text class="t" x="36" y="42" font-size="22" font-weight="700">How a request flows through an action</text>
+  <text class="sub" x="36" y="66" font-size="13">Thin controller → action on the Dry::Monads railway → <tspan class="mono">Rails.event</tspan> → subscribers → side effects</text>
+
+  <!-- Request -->
+  <rect class="card" x="36" y="250" width="120" height="60" rx="12"/>
+  <text class="t" x="96" y="278" font-size="13" font-weight="600" text-anchor="middle">HTTP</text>
+  <text class="sub" x="96" y="296" font-size="12" text-anchor="middle">request</text>
+
+  <!-- Controller -->
+  <rect class="card" x="190" y="240" width="150" height="80" rx="12"/>
+  <text class="t" x="265" y="270" font-size="14" font-weight="700" text-anchor="middle">Controller</text>
+  <text class="sub" x="265" y="290" font-size="11" text-anchor="middle">authorize → call</text>
+  <text class="sub" x="265" y="305" font-size="11" text-anchor="middle">pattern-match → render</text>
+
+  <!-- Action -->
+  <rect class="accent" x="378" y="120" width="300" height="320" rx="14"/>
+  <text class="sage" x="398" y="150" font-size="15" font-weight="700">Action  ·  <tspan class="mono" fill="#ECE7DC">Domain::Verb &lt; BaseAction</tspan></text>
+  <text class="sub" x="398" y="170" font-size="11">each step <tspan class="mono" fill="#9FB089">yield</tspan>s — a Failure short-circuits</text>
+
+  <rect class="step" x="398" y="186" width="260" height="48" rx="10"/>
+  <text class="t" x="414" y="206" font-size="12.5" font-weight="600">① ensure_writable(move)</text>
+  <text class="sub" x="414" y="223" font-size="11">archived Move ⇒ read-only guard</text>
+
+  <rect class="step" x="398" y="242" width="260" height="48" rx="10"/>
+  <text class="t" x="414" y="262" font-size="12.5" font-weight="600">② validate</text>
+  <text class="sub" x="414" y="279" font-size="11">business rules (e.g. seal needs a room)</text>
+
+  <rect class="step" x="398" y="298" width="260" height="48" rx="10"/>
+  <text class="t" x="414" y="318" font-size="12.5" font-weight="600">③ persist</text>
+  <text class="sub" x="414" y="335" font-size="11">DB transaction · with_responsible (Logidze)</text>
+
+  <rect class="step" x="398" y="354" width="260" height="56" rx="10"/>
+  <text class="t" x="414" y="374" font-size="12.5" font-weight="600">④ emit_event</text>
+  <text class="sage mono" x="414" y="393" font-size="11.5">Rails.event.notify("domain.verb")</text>
+
+  <!-- Bus -->
+  <rect class="bus" x="722" y="120" width="86" height="320" rx="14"/>
+  <text class="sage" x="765" y="275" font-size="15" font-weight="700" text-anchor="middle" transform="rotate(-90 765 275)">Rails.event bus</text>
+
+  <!-- Subscribers -->
+  <g font-size="13">
+    <rect class="card" x="850" y="118" width="254" height="68" rx="12"/>
+    <text class="t" x="868" y="144" font-weight="700">Activity::RecordSubscriber</text>
+    <text class="sub" x="868" y="164" font-size="11">→ append-only activity-feed row</text>
+
+    <rect class="card" x="850" y="200" width="254" height="68" rx="12"/>
+    <text class="t" x="868" y="226" font-weight="700">Search::IndexSubscriber</text>
+    <text class="sub" x="868" y="246" font-size="11">→ RefreshDocumentJob (Solid Queue)</text>
+
+    <rect class="card" x="850" y="282" width="254" height="68" rx="12"/>
+    <text class="t" x="868" y="308" font-weight="700">Manifests::AuditSubscriber</text>
+    <text class="sub" x="868" y="328" font-size="11">→ sensitive-read audit log</text>
+
+    <rect class="card" x="850" y="364" width="254" height="68" rx="12"/>
+    <text class="t" x="868" y="390" font-weight="700">MoveMcp::AuditSubscriber</text>
+    <text class="sub" x="868" y="410" font-size="11">→ MCP / token audit trail</text>
+  </g>
+
+  <!-- edges -->
+  <path class="edge" d="M156,280 H186" marker-end="url(#a)"/>
+  <path class="edge" d="M340,280 H374" marker-end="url(#a)"/>
+  <path class="edge" d="M678,382 H718" marker-end="url(#a)"/>
+  <path class="edge" d="M808,200 C828,200 832,152 846,152" marker-end="url(#a)"/>
+  <path class="edge" d="M808,250 C828,250 832,234 846,234" marker-end="url(#a)"/>
+  <path class="edge" d="M808,290 C828,290 832,316 846,316" marker-end="url(#a)"/>
+  <path class="edge" d="M808,330 C828,330 832,398 846,398" marker-end="url(#a)"/>
+
+  <!-- return edge -->
+  <path class="ret" d="M528,440 C528,500 265,500 265,324" marker-end="url(#r)"/>
+  <text class="terra" x="396" y="494" font-size="12" font-weight="600">returns Success(record) | Failure(:reason | errors)</text>
+
+  <text class="sub" x="36" y="612" font-size="11.5">Subscribers run synchronously in the emitting request (tenant context preserved); heavy work is handed to a background job.</text>
+  <text class="sub" x="36" y="630" font-size="11.5">Subscribe filters: Activity ← <tspan class="mono">Builder.records?</tspan> · Search ← <tspan class="mono">item.*</tspan> · Manifest ← <tspan class="mono">manifest.*</tspan> · MCP ← <tspan class="mono">integration_token. / mcp.</tspan></text>
+</svg>
