@@ -46,6 +46,29 @@ RSpec.describe "Activities" do
 
       expect(response.body).to include("Box 7").and include(I18n.t("activities.restore.action"))
     end
+
+    # #194 — the keyset cursor must survive the round-trip through the load-older
+    # link at sub-second precision: occurred_at is timestamp(6), so a whole-second
+    # cursor would skip every row inside the boundary second. Seed one PAGE worth
+    # plus one extra, all within a single second, and follow the real link: the
+    # extra row must still appear on page 2 (a truncated cursor would empty it).
+    it "pages past a sub-second boundary without dropping a row" do
+      base = Time.utc(2026, 1, 1, 12, 0, 0)
+      (ActivitiesController::PAGE + 1).times do |i|
+        Activity.create!(
+          move:, action: "box.created", source: :web, subject_type: "Box",
+          subject_id: SecureRandom.uuid, occurred_at: base + ((i + 1) * 0.001) # 1ms apart, same second
+        )
+      end
+
+      get move_activity_path(move)
+      href = CGI.unescapeHTML(response.body[/href="([^"]*activity\?[^"]*before=[^"]*)"/, 1].to_s)
+      expect(href).to be_present
+      get href
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include(I18n.t("activities.index.empty_body"))
+    end
   end
 
   describe "POST /moves/:move_id/activity/:id/restore" do

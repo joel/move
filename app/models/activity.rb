@@ -20,7 +20,16 @@ class Activity < ApplicationRecord
   # The default feed hides low-signal reads (manifest views, QR scans, summary
   # views); they remain queryable for an "everything" toggle.
   scope :high_signal, -> { where(low_signal: false) }
-  scope :before, ->(time) { where(occurred_at: ...time) if time }
+  # Keyset cursor matching `recent`'s (occurred_at DESC, id DESC) ordering. The
+  # `id` half is essential: cascade ops emit several events with the same
+  # occurred_at, so a time-only cursor (`occurred_at < t`) would drop every row
+  # sharing the page-boundary timestamp (#194). The tuple comparison advances past
+  # exactly the last row seen. `id` is cast to uuid so the bound string compares.
+  scope :before, lambda { |time, id = nil|
+    next self if time.nil?
+
+    where("(occurred_at, id) < (?, ?::uuid)", time, id)
+  }
 
   # Immutable: the log is append-only.
   def readonly?
