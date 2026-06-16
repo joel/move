@@ -16,6 +16,8 @@ module Moves
   # key value is never logged or emitted. The caller (controller) owns
   # authorization (admin) and the archived read-only guard.
   class SetRecognitionProvider < BaseAction
+    include Search::Reindexing
+
     def call(move:, provider:, api_key: nil, model: nil, actor: nil)
       provider = provider.to_s
       api_key = api_key.to_s.strip
@@ -25,7 +27,9 @@ module Moves
       yield validate(provider)
       yield ensure_key_present(move, provider, api_key)
       before = { provider: move.recognition_provider, model: move.recognition_model_for(provider) }
+      embedding_ready_before = move.embedding_provider_ready?
       yield with_responsible(actor) { persist(move, provider, api_key, model) }
+      reembed_if_embedding_space_flipped(move, embedding_ready_before)
       yield emit_event(move, actor, provider, before)
       Success(move)
     end
@@ -97,6 +101,16 @@ module Moves
 
     def notify(name, move, actor, **payload)
       Rails.event.notify(name, move_id: move.id, actor_id: actor&.id, **payload)
+    end
+
+    # Embeddings reuse this Move's openai_api_key (#232). Setting that key here
+    # can flip the Move from "fake" embeddings to real OpenAI ones while the
+    # stored item vectors are still in the old (fake) space — so when readiness
+    # actually changes, null and re-embed the Move (synchronously-null +
+    # background refill). A key rotation (present→present) keeps the same space
+    # for a fixed model, so readiness is unchanged and nothing is re-embedded.
+    def reembed_if_embedding_space_flipped(move, was_ready)
+      reembed_move(move) if move.embedding_provider_ready? != was_ready
     end
   end
 end

@@ -130,4 +130,37 @@ RSpec.describe Moves::SetRecognitionProvider do
     expect(result).to be_failure
     expect(result.failure).to eq(:move_archived)
   end
+
+  describe "re-embedding when the reused OpenAI key flips embedding readiness (#232)" do
+    before { allow(Search::RefreshDocumentJob).to receive(:perform_later) }
+
+    it "re-embeds the Move when the openai key is added while embedding_provider is openai" do
+      move.update!(embedding_provider: "openai")
+      item = create(:item, move:)
+      doc = item.create_search_document!(move:, search_text: "x", embedding: Array.new(1536, 0.1),
+                                         embedding_model: "fake-embed-1", embedded_at: Time.current)
+
+      described_class.new.call(move:, provider: "openai", api_key: "sk-live", actor:)
+
+      expect(doc.reload.embedding).to be_nil
+      expect(Search::RefreshDocumentJob).to have_received(:perform_later).with(item.id, hash_including(:tenant))
+    end
+
+    it "does not re-embed on a key rotation (same vector space)" do
+      move.update!(embedding_provider: "openai", openai_api_key: "sk-old")
+      create(:item, move:)
+
+      described_class.new.call(move:, provider: "openai", api_key: "sk-new", actor:)
+
+      expect(Search::RefreshDocumentJob).not_to have_received(:perform_later)
+    end
+
+    it "does not re-embed when embedding stays fake" do
+      create(:item, move:)
+
+      described_class.new.call(move:, provider: "openai", api_key: "sk-live", actor:)
+
+      expect(Search::RefreshDocumentJob).not_to have_received(:perform_later)
+    end
+  end
 end

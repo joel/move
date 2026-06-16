@@ -25,7 +25,7 @@ module Moves
       return Success(move) if before == provider
 
       yield persist(move, provider)
-      reindex_items(move.items.ids)
+      reembed_move(move)
       yield emit_event(move, actor, provider)
       Success(move)
     end

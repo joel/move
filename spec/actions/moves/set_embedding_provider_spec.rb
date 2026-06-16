@@ -8,14 +8,20 @@ RSpec.describe Moves::SetEmbeddingProvider do
 
   before { allow(Search::RefreshDocumentJob).to receive(:perform_later) }
 
-  it "switches the provider, enqueues a reindex per item, and emits an event" do
+  it "switches the provider, nulls stale vectors synchronously, enqueues a reindex, and emits an event" do
     items = create_list(:item, 2, move: move)
+    doc = items.first.create_search_document!(
+      move:, search_text: "x", embedding: Array.new(1536, 0.1),
+      embedding_model: "fake-embed-1", embedded_at: Time.current
+    )
     allow(Rails.event).to receive(:notify)
 
     result = described_class.new.call(move:, provider: "openai", actor:)
 
     expect(result).to be_success
     expect(move.reload.embedding_provider).to eq("openai")
+    # Stale vector cleared in-band so the pending window stays lexical-only.
+    expect(doc.reload.embedding).to be_nil
     items.each do |item|
       expect(Search::RefreshDocumentJob).to have_received(:perform_later)
         .with(item.id, hash_including(:tenant))

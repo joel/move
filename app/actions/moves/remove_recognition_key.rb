@@ -8,12 +8,18 @@ module Moves
   # move.recognition_key_removed (provider only, never a key value). The caller
   # owns authorization (admin) and the archived read-only guard.
   class RemoveRecognitionKey < BaseAction
+    include Search::Reindexing
+
     def call(move:, provider:, actor: nil)
       provider = provider.to_s
 
       yield ensure_writable(move)
       yield validate(provider)
+      embedding_ready_before = move.embedding_provider_ready?
       yield with_responsible(actor) { persist(move, provider) }
+      # Removing the reused openai key (#232) flips a semantic-search Move back to
+      # Fake; null + re-embed so queries don't score against stale OpenAI vectors.
+      reembed_move(move) if move.embedding_provider_ready? != embedding_ready_before
       yield emit_event(move, actor, provider)
       Success(move)
     end
