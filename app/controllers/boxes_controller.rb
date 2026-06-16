@@ -6,7 +6,12 @@
 # authorize, call the action, pattern-match, render.
 class BoxesController < MoveScopedController
   before_action :set_box, only: %i[show edit update transition seal description_suggestion]
-  before_action :require_writable_move!, only: %i[new create edit update transition]
+  # `seal` and `description_suggestion` can spend the Move's AI quota (they call
+  # the configured vendor provider), so they need the same editing-role + writable
+  # guard as the mutating actions — not just `set_box` — to keep viewers and
+  # archived Moves out (defense in depth behind the already-hidden UI controls).
+  before_action :require_writable_move!,
+                only: %i[new create edit update transition seal description_suggestion]
 
   # GET /moves/:move_id/boxes
   def index

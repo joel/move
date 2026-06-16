@@ -106,6 +106,12 @@ RSpec.describe "Boxes" do
       expect(response).to have_http_status(:unprocessable_content)
     end
 
+    it "persists a description submitted with the form" do
+      post move_boxes_path(move), params: { box: { room_name: "Kitchen", description: "Pots and pans" } }
+
+      expect(move.boxes.last.description).to eq("Pots and pans")
+    end
+
     it "refuses to create on an archived move" do
       archived = create(:move, :archived, created_by: user)
 
@@ -215,6 +221,14 @@ RSpec.describe "Boxes" do
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(box.reload.number).to eq("1")
+    end
+
+    it "updates the description" do
+      box = create(:box, move:, number: "1", description: "Old")
+
+      patch move_box_path(move, box), params: { box: { description: "New summary" } }
+
+      expect(box.reload.description).to eq("New summary")
     end
   end
 
@@ -344,6 +358,21 @@ RSpec.describe "Boxes" do
       expect do
         post move_boxes_path(move), params: { box: { number: "9" } }
       end.to change(move.boxes, :count).by(1)
+    end
+
+    # The AI-suggestion endpoints can spend the Move's vendor quota, so a viewer
+    # must not be able to trigger them even by hitting the URL directly.
+    it "forbids a viewer from the AI suggestion endpoints (403)" do
+      box = create(:box, :with_room, move:, number: "1", status: "packing")
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+
+      get description_suggestion_move_box_path(move, box)
+      expect(response).to have_http_status(:forbidden)
+
+      get seal_move_box_path(move, box)
+      expect(response).to have_http_status(:forbidden)
     end
   end
 end

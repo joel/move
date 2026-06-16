@@ -27,6 +27,7 @@ module Boxes
           number: params[:number].presence || next_number(move),
           qr_token: SecureRandom.urlsafe_base64(16),
           room: room,
+          description: params[:description],
           **dimensions(params)
         )
       end
