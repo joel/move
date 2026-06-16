@@ -9,6 +9,9 @@ en:
     finish: "Finish box"
     add_item: "Add item manually"
     sealed: "This box is sealed — unseal it before capturing."
+    # Shown when the Move's recognition provider is `fake` (the post-cutover
+    # default): detections are canned sample data, not real recognition (#199).
+    demo_banner: "Demo recognition is on — detected items are sample data, not your photo. Add an API key in Settings for real recognition."
     session:
       title: "Items"
       count:
