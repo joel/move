@@ -35,8 +35,23 @@ RSpec.describe Moves::DefaultVocabularies do
 
     expect(move.rooms.where("LOWER(name) = ?", "kitchen").count).to eq(1)
     expect(move.categories.where("LOWER(name) = ?", "electronics").count).to eq(1)
-    # The existing tag is reused and its facet updated to the curated default.
+    # The existing tag is reused (no duplicate); its user-chosen facet is preserved,
+    # not overwritten with the curated default (#168).
     expect(move.tags.where("LOWER(name) = ?", "fragile").count).to eq(1)
-    expect(move.tags.find_by("LOWER(name) = ?", "fragile").applies_to).to eq("box")
+    expect(move.tags.find_by("LOWER(name) = ?", "fragile").applies_to).to eq("item")
+  end
+
+  # #168 — applying defaults over an existing Move must not narrow a user's tag
+  # facet (e.g. Fragile item -> box), which would orphan item<->tag links without
+  # the detach/reindex Vocabularies::Update runs. Apply only fills gaps.
+  it "preserves an existing tag's facet and its item links" do
+    fragile = move.tags.create!(name: "Fragile", applies_to: "item")
+    item = create(:item, :manual, move:)
+    item.tags << fragile
+
+    described_class.apply(move)
+
+    expect(fragile.reload.applies_to).to eq("item")
+    expect(item.reload.tag_ids).to include(fragile.id)
   end
 end
