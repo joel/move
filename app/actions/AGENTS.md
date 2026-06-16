@@ -1,5 +1,10 @@
 # Actions Pattern (business logic layer)
 
+> **Visual overview + onboarding:** [`README.md`](README.md) — diagrams of the
+> request → action → event → subscriber flow, the Success/Failure railway, the
+> worked example, and the **full event catalog** (which subscriber consumes each
+> event). This file is the terse template/convention reference.
+
 **All domain/business logic lives here — never in models or controllers.** Models
 stay persistence-focused (associations, validations, scopes); controllers stay
 thin (authorize → call action → pattern-match → render). This mirrors the
