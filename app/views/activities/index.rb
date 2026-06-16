@@ -138,7 +138,9 @@ module Views
       def load_older
         div(class: "flex justify-center pt-2") do
           a(
-            href: move_activity_path(@move, before: @next_before.iso8601, before_id: @next_before_id),
+            # iso8601(6): occurred_at is timestamp(6); whole-second precision would
+            # move the cursor off the real boundary and skip rows again (#194).
+            href: move_activity_path(@move, before: @next_before.iso8601(6), before_id: @next_before_id),
             class: "text-body-md font-semibold text-on-surface-variant transition hover:text-text-warm"
           ) { I18n.t("activities.index.load_older") }
         end
