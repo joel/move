@@ -67,9 +67,11 @@ class Media < ApplicationRecord
 
   # Has this photo produced an item? MOVE-wide, not box-scoped: Items::Move keeps
   # source_media_id when an item moves to another box, so the photo is still
-  # "recognized" even though no item lives in its original box.
+  # "recognized" even though no item lives in its original box. `with_discarded`:
+  # a soft-deleted item still counts, so discarding it never re-flags the photo as
+  # orphaned (which would offer recovery and let it re-source a duplicate — #198).
   def sourced_item?
-    move.items.exists?(source_media_id: id)
+    move.items.with_discarded.exists?(source_media_id: id)
   end
 
   # Single source of truth for "this photo needs recovery": recognition produced
