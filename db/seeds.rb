@@ -150,7 +150,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
 
   boxes.each do |number, attrs|
     length, width, height, weight = attrs[:dims]
-    move.boxes.find_or_create_by!(number: number) do |b|
+    box = move.boxes.find_or_create_by!(number: number) do |b|
       b.qr_token = SecureRandom.urlsafe_base64(16)
       b.room = attrs[:room] && rooms[attrs[:room]]
       b.status = attrs[:status]
@@ -160,6 +160,11 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
       b.height_cm = height
       b.weight_kg = weight
     end
+    # Backfill the showcase description onto a box seeded before this feature
+    # existed, so an already-seeded demo tenant shows it after a plain re-seed
+    # (the create block runs only on first insert). Only fills a blank, so a
+    # developer's own edits and the box's lifecycle state are left untouched.
+    box.update!(description: attrs[:desc]) if attrs[:desc].present? && box.description.blank?
   end
 
   # Box 1 is the review showcase: several photos, each with a handful of detections

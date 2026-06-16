@@ -109,5 +109,16 @@ RSpec.describe Boxes::SuggestDescription do
 
       expect(suggest(box).value!).to eq("Books")
     end
+
+    it "clamps a verbose suggestion to the Box description limit (stays valid)" do
+      box = create(:box, move:)
+      create(:item, move:, box:, name: "Mug")
+      allow(provider).to receive(:summarize_contents).and_return("Stuff, " * 200)
+
+      result = suggest(box).value!
+
+      expect(result.length).to be <= Box::DESCRIPTION_MAX_LENGTH
+      expect(box.tap { it.description = result }).to be_valid
+    end
   end
 end

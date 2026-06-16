@@ -65,7 +65,10 @@ class Box < ApplicationRecord
   validates :status, inclusion: { in: STATUSES }
   # Optional free-text summary of the contents ("Clothes, Electronics, Books").
   # Capped so a runaway paste can't bloat the row / label PDF; blank is allowed.
-  validates :description, length: { maximum: 500 }, allow_blank: true
+  # The constant is shared with Boxes::SuggestDescription, which clamps a generated
+  # suggestion to this length so it never pre-fills an invalid (rejected) value.
+  DESCRIPTION_MAX_LENGTH = 500
+  validates :description, length: { maximum: DESCRIPTION_MAX_LENGTH }, allow_blank: true
 
   scope :ordered, -> { order(Arel.sql("number::bigint")) }
 
