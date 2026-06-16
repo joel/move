@@ -25,6 +25,25 @@ RSpec.describe Move do
     it "rejects unknown recognition providers" do
       expect(build(:move, recognition_provider: "skynet")).not_to be_valid
     end
+
+    it "defaults the embedding provider to fake" do
+      expect(create(:move).embedding_provider).to eq("fake")
+    end
+
+    it "rejects unknown embedding providers (#232)" do
+      expect(build(:move, embedding_provider: "word2vec")).not_to be_valid
+    end
+  end
+
+  describe "#embedding_provider_ready? (#232)" do
+    it "is false for fake" do
+      expect(build(:move, embedding_provider: "fake")).not_to be_embedding_provider_ready
+    end
+
+    it "is true only for openai with the Move's own key" do
+      expect(build(:move, embedding_provider: "openai", openai_api_key: nil)).not_to be_embedding_provider_ready
+      expect(build(:move, embedding_provider: "openai", openai_api_key: "sk")).to be_embedding_provider_ready
+    end
   end
 
   describe "#writable?" do

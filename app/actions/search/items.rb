@@ -18,9 +18,15 @@ module Search
     SEMANTIC_MAX_DISTANCE = 0.55  # max cosine distance to qualify semantically
     WEIGHTS = { lexical: 1.0, trigram: 0.6, name: 1.0, semantic: 0.8, exact: 2.0 }.freeze
 
-    def call(move:, query:, include_hidden: false, embedder: EmbeddingProviders.resolve)
+    def call(move:, query:, include_hidden: false, embedder: nil)
       q = query.to_s.strip
       return Success([]) if q.blank?
+
+      # Embed the query with this Move's own provider (#232) so the query vector
+      # lives in the same space as the stored item vectors. A fake/keyless Move
+      # yields the Fake embedder; the semantic leg is dropped only when the vector
+      # is nil (blank query / provider failure).
+      embedder ||= EmbeddingProviders.for_move(move)
 
       vector = safe_query_vector(embedder, q)
       rows = run(move, q, vector, include_hidden)

@@ -16,6 +16,11 @@ class Move < ApplicationRecord
   # default (no key, canned detections); the rest require this Move's own key.
   RECOGNITION_PROVIDERS = %w[fake openai anthropic gemini].freeze
   REAL_RECOGNITION_PROVIDERS = (RECOGNITION_PROVIDERS - %w[fake]).freeze
+  # Search embeddings are per-Move bring-your-own-key too (#232). `fake` is the
+  # network-free default (token-hashed pseudo-vectors); `openai` reuses this
+  # Move's own openai_api_key (text-embedding-3-small @ 1536d). No separate key
+  # column — OpenAI is the only real embedding provider the 1536-d column allows.
+  EMBEDDING_PROVIDERS = %w[fake openai].freeze
 
   # Per-Move provider API keys, encrypted at rest (ActiveRecord::Encryption — keys
   # in credentials.active_record_encryption). Never tracked by Logidze (its
@@ -43,6 +48,7 @@ class Move < ApplicationRecord
   validates :auto_confirm_threshold,
             numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 1 }
   validates :recognition_provider, inclusion: { in: RECOGNITION_PROVIDERS }
+  validates :embedding_provider, inclusion: { in: EMBEDDING_PROVIDERS }
   # Free-text model overrides (#187): any string the provider accepts. Kept
   # permissive so a brand-new model works the day it ships — the cap just guards
   # against junk. Blank = use the adapter's DEFAULT_MODEL.
@@ -71,6 +77,14 @@ class Move < ApplicationRecord
     return true if recognition_provider == "fake"
 
     recognition_api_key_for(recognition_provider).present?
+  end
+
+  # Whether semantic search can run as configured: only when openai is selected
+  # AND this Move has its own openai_api_key (strict BYO — never a shared key).
+  # Otherwise EmbeddingProviders.for_move hands back the network-free Fake
+  # embedder and search degrades gracefully to lexical + trigram (#232).
+  def embedding_provider_ready?
+    embedding_provider == "openai" && openai_api_key.present?
   end
 
   def archived?

@@ -8,7 +8,12 @@ module Search
   # the embedding from that text only — never the image (Domain §7.5). A nil
   # embedding is fine: lexical/trigram search still works (graceful degradation).
   class RefreshDocument < BaseAction
-    def call(item:, embedder: EmbeddingProviders.resolve)
+    # The embedder defaults to the item's Move's own provider (#232 — per-Move
+    # BYO): a Move on openai with a key embeds with its key, every other Move
+    # gets the network-free Fake. Stored item vectors therefore always share the
+    # Move's current vector space, matching the query vector Search::Items builds.
+    def call(item:, embedder: nil)
+      embedder ||= EmbeddingProviders.for_move(item.move)
       doc = yield persist(item, embedder)
       Success(doc)
     end

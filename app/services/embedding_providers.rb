@@ -7,18 +7,18 @@
 module EmbeddingProviders
   module_function
 
-  # `EMBEDDING_PROVIDER` (or the config.x default) selects fake/openai; unknown
-  # falls back to the deterministic, network-free fake.
-  def resolve(name = configured_name)
-    case name.to_s
-    when "openai" then Openai.new
-    else Fake.new
+  # Build the embedder for a Move's configured search-embedding provider, using
+  # *that Move's* own API key (#232 — per-Move bring-your-own-key, mirroring
+  # RecognitionProviders.for_move; no shared/ENV key). Only a Move that selected
+  # "openai" AND stored its own openai_api_key gets the real adapter; everything
+  # else (fake, or openai without a key) falls back to the network-free Fake
+  # embedder, so search degrades gracefully to lexical + trigram rather than
+  # erroring or mixing vector spaces.
+  def for_move(move)
+    if move&.embedding_provider_ready?
+      Openai.new(api_key: move.openai_api_key)
+    else
+      Fake.new
     end
-  end
-
-  def configured_name
-    ENV["EMBEDDING_PROVIDER"].presence ||
-      Rails.application.config.x.embedding_provider.presence ||
-      "fake"
   end
 end
