@@ -2400,6 +2400,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260616160000'),
 ('20260616120000'),
 ('20260616090000'),
 ('20260615120000'),
