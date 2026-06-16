@@ -107,7 +107,7 @@ Prefix Ruby commands with `mise x --`. Run these and ensure they pass before com
 
 The project uses `overcommit`. Commits will fail if the following hooks are not satisfied:
 
-- **Pre-commit:** trailing whitespace, `FIXME` tokens, **RuboCop**, **ErbLint**, **BundleCheck**, **LocalPathsInGemfile**, and **RailsSchemaUpToDate** (the committed `db/schema.rb` must match the migrations).
+- **Pre-commit:** trailing whitespace, `FIXME` tokens, **RuboCop**, **ErbLint**, **BundleCheck**, **LocalPathsInGemfile**, and **RailsSchemaUpToDate** (the committed `db/structure.sql` must match the migrations — this project is `schema_format :sql`, so there is no `db/schema.rb`).
 
 - **Commit-msg:** capitalized subject, no trailing period, single-line subject, and a line-width limit.
 
@@ -159,7 +159,7 @@ When a PR receives code review comments (human **or** Codex):
 
 ### Deployment
 
-- `.github/workflows/deploy.yml` deploys to production (`move.workeverywhere.app`) via **Kamal** on **every push to `main`** (i.e. every merge).
+- `.github/workflows/deploy.yml` deploys to production (`move-easy.org`) via **Kamal** on **every push to `main`** (i.e. every merge).
 - Secrets come from **Doppler** (`move/prd`), synced into GitHub Actions secrets. `.kamal/secrets` is gated on `KAMAL_SECRETS_FROM_ENV` (set in the Deploy workflow): **CI** reads the synced env values; a **local** deploy ignores the ambient shell/`.env` and always reads from the Doppler CLI / `config/master.key` — so a stale exported secret can't shadow Doppler (local deploys therefore need Doppler auth). Force a rotated value live with a redeploy (`kamal deploy`); a `kamal app start/stop` only restarts the existing container with its baked-in env.
 - Skip a deploy for a given commit with `[skip deploy]` in the commit **subject**. **Beware:** a squash-merge whose body quotes the literal `[skip deploy]` (for example, by referencing this document) will skip the deploy unintentionally.
 - **Never use `[skip ci]` / `[ci skip]` / `[no ci]` / `[skip actions]` in commit messages.** GitHub treats them anywhere in the message as a platform-level skip that suppresses **all** workflow runs for the push — including the deploy — and it **cannot** be overridden in workflow YAML. Docs are excluded from CI via `paths-ignore` in `ci.yml`, never via a marker. A `commit-msg` overcommit hook (`ForbidSkipMarkers`) rejects these locally.
@@ -221,7 +221,7 @@ docker exec <db-container> psql -U move -d move_production -c 'select version();
 kamal app exec --reuse 'bin/rails db:prepare'
 ```
 
-Then smoke-test the live auth journey at `https://move.workeverywhere.app` and
+Then smoke-test the live auth journey at `https://move-easy.org` and
 create a Move on an org subdomain. Order: merge → accessory cutover → `db:prepare`
 → smoke test.
 
@@ -308,6 +308,13 @@ After all code changes are committed and tests pass, perform a live runtime veri
 > (rack_test system specs ignore `turbo_confirm` and submit directly, so this only
 > bites live browser verification.) Set a mobile viewport with
 > `agent-browser set viewport 393 852` (not `resize`).
+
+> **`agent-browser wait --load networkidle` hangs in dev.** The dev app keeps a
+> long-lived connection open (rack-mini-profiler / Turbo), so "network idle" never
+> fires and the wait burns the full 25s timeout after every `open`/`click`. Wait on
+> something concrete instead — `wait <selector>`, `wait --text "…"`, or a fixed
+> `wait 1500` — then `snapshot -i`. (Also: `screenshot --screenshot-dir` may not
+> land where you expect; the bare `screenshot` prints the real saved path.)
 
 ### Runtime Verification Scripts
 
