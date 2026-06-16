@@ -22,6 +22,21 @@ RSpec.describe Boxes::Create do
     expect(box.number).to eq("3")
   end
 
+  # #192 — a discarded box keeps its number reserved (the uniqueness validator
+  # ignores default_scope, so it sees every row). Numbering must skip it, or a
+  # plain "Add box" after deleting the highest box dead-ends on validation.
+  it "skips a discarded box's number when auto-assigning" do
+    create(:box, move:, number: "1")
+    create(:box, move:, number: "2")
+    top = create(:box, move:, number: "3")
+    Boxes::Delete.new.call(box: top, actor: creator)
+
+    result = described_class.new.call(move:, params: {}, creator:)
+
+    expect(result).to be_success
+    expect(result.value!.number).to eq("4")
+  end
+
   it "honours an explicit number override" do
     box = described_class.new.call(move:, params: { number: "7" }, creator:).value!
     expect(box.number).to eq("7")

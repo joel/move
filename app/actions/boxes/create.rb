@@ -35,8 +35,13 @@ module Boxes
       Failure(e.record.errors)
     end
 
+    # Span discarded boxes too: a box's number stays reserved while soft-deleted
+    # (the uniqueness validator ignores default_scope, so it checks every row), and
+    # restoring it must be lossless. Numbering off the kept-only max would re-pick a
+    # discarded box's number, and the plain "Add box" would then fail validation
+    # with "Number has already been taken" (#192).
     def next_number(move)
-      ((move.boxes.pluck(:number).map(&:to_i).max || 0) + 1).to_s
+      ((move.boxes.with_discarded.pluck(:number).map(&:to_i).max || 0) + 1).to_s
     end
 
     def dimensions(params)
