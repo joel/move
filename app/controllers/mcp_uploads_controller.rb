@@ -20,8 +20,18 @@ class McpUploadsController < ActionController::API
     return head :content_too_large if body.bytesize > Media::MAX_IMAGE_BYTES
     return head :unprocessable_content if body.empty?
 
+    # Sniff the actual bytes (magic numbers, not the client-declared name) and
+    # reject anything that isn't an image BEFORE a blob is created (#139) — so junk
+    # uploads can't leave orphaned blobs. Stay broad (any image/*, not just the
+    # recognition-native jpeg/png/webp): add_media_to_box transcodes non-native
+    # images (e.g. TIFF) to JPEG and does the final supported-type check on attach,
+    # so narrowing here would reject images the pipeline can actually handle.
+    content_type = Marcel::MimeType.for(StringIO.new(body))
+    return head :unsupported_media_type unless content_type.to_s.start_with?("image/")
+
     blob = ActiveStorage::Blob.create_and_upload!(
-      io: StringIO.new(body), filename: params[:filename].presence || "upload", identify: false
+      io: StringIO.new(body), filename: params[:filename].presence || "upload",
+      content_type: content_type, identify: false
     )
     render json: { signed_id: blob.signed_id(purpose: Captures::Create.signed_id_purpose(@token.move)) },
            status: :created

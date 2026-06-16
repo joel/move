@@ -303,13 +303,17 @@ RSpec.describe "MCP endpoint" do
         expect(box.media.last.image.content_type).to eq("image/jpeg")
       end
 
-      it "rejects a non-image blob by sniffing the bytes (not the declared type)" do
-        signed = upload("this is not an image")
+      it "rejects non-image bytes at upload by sniffing them (not the declared name)" do
+        # Even with an image-y filename, the byte sniff rejects non-image content
+        # at the upload step (#139), so no orphaned blob is stored and it never
+        # reaches add_media_to_box.
+        url = structured(tool_call("create_media_upload", {}))["url"]
 
-        body = tool_call("add_media_to_box", { box_number: 9, signed_id: signed })
-
+        expect do
+          post "#{url}?filename=a.png", params: "this is not an image", headers: auth_headers
+        end.not_to change(ActiveStorage::Blob, :count)
+        expect(response).to have_http_status(:unsupported_media_type)
         expect(box.media.count).to eq(0)
-        expect(body.to_json).to match(/supported image/i)
       end
 
       it "rejects an unknown/invalid signed_id" do
