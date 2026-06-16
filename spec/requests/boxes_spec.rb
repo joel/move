@@ -301,6 +301,8 @@ RSpec.describe "Boxes" do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(I18n.t("boxes.seal.title"))
       expect(response.body).to include("Kitchenware") # deterministic suggestion (fake provider)
+      # Regenerate opts out of Turbo prefetch so a hover can't spend AI quota.
+      expect(response.body).to include('data-turbo-prefetch="false"')
     end
 
     it "is unprocessable for a box that cannot be sealed" do

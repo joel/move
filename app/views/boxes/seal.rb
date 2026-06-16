@@ -67,8 +67,11 @@ module Views
       def regenerate
         div(class: "flex justify-end") do
           a(
+            # turbo_prefetch "false" (string — Phlex drops a boolean false attr) so
+            # hovering Regenerate can't fire a quota-spending AI suggestion before
+            # the click, then again on click.
             href: seal_move_box_path(@move, @box, regenerate: 1),
-            data: { turbo_frame: "seal_box" },
+            data: { turbo_frame: "seal_box", turbo_prefetch: "false" },
             class: "inline-flex items-center gap-1 text-body-md text-accent-sage " \
                    "transition hover:opacity-80"
           ) do

@@ -35,7 +35,9 @@ module Boxes
 
     def persist(box, to, description)
       ActiveRecord::Base.transaction do
-        box.description = description unless description.nil?
+        # `.presence` so a cleared field (blank) is stored as NULL, not "" — and so
+        # a no-op seal doesn't register a spurious description change below.
+        box.description = description.presence unless description.nil?
         box.update!(status: to)
         cascade_unpacked(box) if to == "unpacked"
       end
@@ -56,6 +58,16 @@ module Boxes
       Rails.event.notify(
         "box.status_changed", box_id: box.id, move_id: box.move_id, to: to, actor_id: actor&.id
       )
+      # A seal that also stored a description changed a Logidze-tracked column, so
+      # it advanced the box's version. The activity feed only marks `box.updated`
+      # rows revertable and reverts to the *latest* tracked version, so emit
+      # `box.updated` too — otherwise that version has no revertable row and the
+      # feed's revert target drifts off the displayed edit (Codex review).
+      if box.saved_change_to_description?
+        Rails.event.notify(
+          "box.updated", box_id: box.id, move_id: box.move_id, editor_id: actor&.id
+        )
+      end
       Success()
     end
   end
