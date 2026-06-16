@@ -48,14 +48,12 @@ env:
     # move-app S3 identity on the shared SeaweedFS, scoped to the `move` bucket.
     - STORAGE_ACCESS_KEY_ID
     - STORAGE_SECRET_ACCESS_KEY
-    # OpenAI key for recognition + embedding adapters (providers flipped to
-    # openai below). MUST be in Doppler move/prd before deploy — see
+    # OpenAI key for the *embedding* adapter only (D8 hybrid search;
+    # EMBEDDING_PROVIDER: openai below). Recognition is per-Move bring-your-own-key
+    # (#185) — each Move supplies its own encrypted key, so no shared recognition
+    # key lives here. MUST be in Doppler move/prd before deploy — see
     # doc/project/ai-providers.md.
     - OPENAI_API_KEY
-    # Google Gemini key for the recognition adapter. In Doppler move/prd + synced
-    # to GitHub Actions. Injected but unused while RECOGNITION_PROVIDER stays
-    # openai; flip below to enable. See doc/project/ai-providers.md.
-    - GEMINI_API_KEY
   clear:
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
     # When you start using multiple servers, you should split out job processing to a dedicated machine.
@@ -90,15 +88,14 @@ env:
     # specific subdomain, so a passkey works on the apex and every org subdomain.
     WEBAUTHN_RP_ID: move-easy.org
 
-    # Real AI: OpenAI vision recognition + text embeddings (default elsewhere is
-    # the network-free `fake`). Requires OPENAI_API_KEY (env.secret above) to be
-    # set BEFORE this takes effect, else every recognition run fails and every
-    # embedding goes nil. After enabling, backfill real vectors with
-    # `kamal app exec --reuse 'bin/rails search:reindex'`. Both are pay-per-call.
-    # Full runbook + rollback: doc/project/ai-providers.md. To switch image
-    # recognition to Google Gemini, set GEMINI_API_KEY (env.secret above) then
-    # change RECOGNITION_PROVIDER to `gemini`.
-    RECOGNITION_PROVIDER: openai
+    # D8 hybrid search uses OpenAI text embeddings (default elsewhere is the
+    # network-free `fake`). Requires OPENAI_API_KEY (env.secret above), else every
+    # embedding goes nil; backfill real vectors with
+    # `kamal app exec --reuse 'bin/rails search:reindex'`. Pay-per-call. Full
+    # runbook + rollback: doc/project/ai-providers.md.
+    # NB: image *recognition* is per-Move bring-your-own-key (#185) — set in
+    # Settings → Recognition & AI, NOT here. There is no app-wide
+    # RECOGNITION_PROVIDER / recognition key any more.
     EMBEDDING_PROVIDER: openai
 
     # Log everything from Rails
