@@ -12,13 +12,14 @@ class ActivitiesController < MoveScopedController
 
   # GET /moves/:move_id/activity
   def index
-    activities = @move.activities.high_signal.recent.before(cursor).limit(PAGE).to_a
+    activities = @move.activities.high_signal.recent.before(*cursor).limit(PAGE).to_a
     feed = ActivityFeed.new(activities, current_user_id: current_user.id, editable: editable_move?)
+    last = (activities.last if activities.size == PAGE)
 
     render Views::Activities::Index.new(
       move: @move, groups: feed.grouped,
       restorable: feed.restorable_ids, revertable: feed.revertable_ids,
-      next_before: (activities.last.occurred_at if activities.size == PAGE)
+      next_before: last&.occurred_at, next_before_id: last&.id
     )
   end
 
@@ -44,10 +45,15 @@ class ActivitiesController < MoveScopedController
     @move.activities
   end
 
+  # Keyset cursor [time, id] for the next (older) page. Both halves come from the
+  # last row of the previous page; id disambiguates rows sharing occurred_at
+  # (#194). A malformed/partial cursor yields [nil] → the unfiltered first page.
   def cursor
-    Time.iso8601(params[:before]) if params[:before].present?
+    return [nil] if params[:before].blank? || params[:before_id].blank?
+
+    [Time.iso8601(params[:before]), params[:before_id]]
   rescue ArgumentError
-    nil
+    [nil]
   end
 
   def source

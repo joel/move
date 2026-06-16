@@ -11,12 +11,13 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::Routes
 
-      def initialize(move:, groups:, restorable:, revertable:, next_before: nil)
+      def initialize(move:, groups:, restorable:, revertable:, next_before: nil, next_before_id: nil)
         @move = move
         @groups = groups
         @restorable = restorable
         @revertable = revertable
         @next_before = next_before
+        @next_before_id = next_before_id
       end
 
       def view_template
@@ -137,7 +138,7 @@ module Views
       def load_older
         div(class: "flex justify-center pt-2") do
           a(
-            href: move_activity_path(@move, before: @next_before.iso8601),
+            href: move_activity_path(@move, before: @next_before.iso8601, before_id: @next_before_id),
             class: "text-body-md font-semibold text-on-surface-variant transition hover:text-text-warm"
           ) { I18n.t("activities.index.load_older") }
         end
