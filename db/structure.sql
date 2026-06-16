@@ -1076,7 +1076,8 @@ CREATE TABLE public.moves (
     gemini_api_key text,
     openai_model character varying,
     anthropic_model character varying,
-    gemini_model character varying
+    gemini_model character varying,
+    embedding_provider character varying DEFAULT 'fake'::character varying NOT NULL
 );
 
 
@@ -2400,6 +2401,8 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260616170001'),
+('20260616170000'),
 ('20260616160000'),
 ('20260616120000'),
 ('20260616090000'),
