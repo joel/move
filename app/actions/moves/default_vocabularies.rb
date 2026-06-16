@@ -30,10 +30,16 @@ module Moves
     def self.apply(move)
       ROOMS.each { |name| find_or_create(move.rooms, name) }
       CATEGORIES.each { |name| find_or_create(move.categories, name) }
+      # Additive only, like rooms/categories: create a missing tag with its default
+      # facet, but never overwrite an existing tag's `applies_to`. On a backfill over
+      # an existing Move that would silently narrow e.g. a user's item-scoped
+      # `Fragile` to box-only, skipping the detach/reindex that Vocabularies::Update
+      # performs and orphaning item<->tag links (#168). Defaults fill gaps; the user's
+      # facet choices win.
       TAGS.each do |name, applies_to|
-        tag = existing(move.tags, name) || move.tags.new(name: name)
-        tag.applies_to = applies_to
-        tag.save!
+        next if existing(move.tags, name)
+
+        move.tags.create!(name: name, applies_to: applies_to)
       end
     end
 
