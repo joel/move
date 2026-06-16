@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1140 560" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <style>
+    .bg{fill:#2A2822}
+    .card{fill:#34312A;stroke:#ffffff14;stroke-width:1}
+    .t{fill:#ECE7DC}
+    .sub{fill:#aeb2a6}
+    .sage{fill:#9FB089}
+    .terra{fill:#ffb59b}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .hd{fill:#9FB089;font-weight:700}
+    .nm{fill:#d7d2c7}
+  </style>
+  <rect class="bg" width="1140" height="560"/>
+  <text class="t" x="36" y="42" font-size="22" font-weight="700">Tool catalog — the 9 MCP tools</text>
+  <text class="sub" x="36" y="66" font-size="13">Registered in <tspan class="mono">ServerBuilder::TOOLS</tspan>. Mutations <tspan class="sage" font-weight="700">●</tspan> emit <tspan class="mono">mcp.tool_called</tspan>; queries don't. Every one is Move-scoped.</text>
+
+  <!-- Queries -->
+  <rect class="card" x="36" y="100" width="536" height="300" rx="12"/>
+  <text class="hd" x="56" y="128" font-size="14">QUERIES  ·  read-only</text>
+  <g font-size="12.5">
+    <text class="nm mono" x="56" y="160" font-size="12.5">list_boxes()</text>
+    <text class="sub" x="56" y="178" font-size="11">→ every box: number, status, room, item_count</text>
+    <text class="nm mono" x="56" y="212" font-size="12.5">get_box_contents(box_number)</text>
+    <text class="sub" x="56" y="230" font-size="11">→ the box + its in-box items</text>
+    <text class="nm mono" x="56" y="264" font-size="12.5">search_items(query)</text>
+    <text class="sub" x="56" y="282" font-size="11">→ <tspan class="mono">Search::Items</tspan> (hybrid search) + box numbers</text>
+    <text class="nm mono" x="56" y="316" font-size="12.5">get_volume_summary()</text>
+    <text class="sub" x="56" y="334" font-size="11">→ <tspan class="mono">Moves::VolumeSummary</tspan> (volume/weight/rooms)</text>
+  </g>
+
+  <!-- Mutations -->
+  <rect class="card" x="592" y="100" width="512" height="300" rx="12"/>
+  <text class="hd" x="612" y="128" font-size="14">MUTATIONS  ·  <tspan class="sage">●</tspan> audited</text>
+  <g font-size="12.5">
+    <text class="sage" x="612" y="160" font-size="13" font-weight="700">●</text>
+    <text class="nm mono" x="628" y="160" font-size="12.5">add_item_to_box(box_number, name, quantity?)</text>
+    <text class="sub" x="628" y="178" font-size="11">→ <tspan class="mono">Items::CreateManual</tspan></text>
+    <text class="sage" x="612" y="212" font-size="13" font-weight="700">●</text>
+    <text class="nm mono" x="628" y="212" font-size="12.5">add_media_to_box(box_number, signed_id)</text>
+    <text class="sub" x="628" y="230" font-size="11">→ <tspan class="mono">Captures::Create</tspan> (queues recognition)</text>
+    <text class="sage" x="612" y="264" font-size="13" font-weight="700">●</text>
+    <text class="nm mono" x="628" y="264" font-size="12.5">move_item(item_id, to_box_number)</text>
+    <text class="sub" x="628" y="282" font-size="11">→ <tspan class="mono">Items::Move</tspan> (same-Move only)</text>
+    <text class="sage" x="612" y="316" font-size="13" font-weight="700">●</text>
+    <text class="nm mono" x="628" y="316" font-size="12.5">mark_unpacked(item_id)</text>
+    <text class="sub" x="628" y="334" font-size="11">→ <tspan class="mono">Items::MarkRemoved</tspan></text>
+  </g>
+
+  <!-- Upload -->
+  <rect class="card" x="36" y="424" width="1068" height="100" rx="12"/>
+  <text class="hd" x="56" y="452" font-size="14">UPLOAD  ·  leg 1 of the Direct Upload handshake</text>
+  <text class="nm mono" x="56" y="482" font-size="12.5">create_media_upload(byte_size?)</text>
+  <text class="sub" x="56" y="500" font-size="11">→ no action — returns the app-hosted upload URL + instructions; the client then POSTs bytes to <tspan class="mono">/mcp/uploads</tspan> and calls <tspan class="mono">add_media_to_box</tspan> with the returned <tspan class="mono">signed_id</tspan>.</text>
+</svg>
