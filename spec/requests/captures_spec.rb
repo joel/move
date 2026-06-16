@@ -30,6 +30,22 @@ RSpec.describe "Captures" do
 
       expect(response).to redirect_to(move_box_path(move, sealed))
     end
+
+    # #199 — the `fake` provider returns canned sample detections; warn the user
+    # so a fabricated result is never mistaken for real recognition.
+    it "shows the demo-mode banner when the provider is fake" do
+      get move_box_capture_path(move, box)
+
+      expect(response.body).to include(I18n.t("captures.demo_banner"))
+    end
+
+    it "hides the demo-mode banner for a real provider" do
+      move.update!(recognition_provider: "openai", openai_api_key: "sk-test")
+
+      get move_box_capture_path(move, box)
+
+      expect(response.body).not_to include(I18n.t("captures.demo_banner"))
+    end
   end
 
   describe "POST capture" do

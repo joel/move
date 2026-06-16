@@ -17,6 +17,7 @@ module Views
 
       def view_template
         header
+        demo_banner
         div(class: "grid grid-cols-1 gap-section-gap lg:grid-cols-3") do
           capture_area
           session_region
@@ -24,6 +25,23 @@ module Views
       end
 
       private
+
+      # #199 — when recognition runs on the `fake` provider (the post-cutover
+      # default), detections are canned sample data, not real recognition. Warn
+      # the user so a fabricated result is never mistaken for a real one. Reuses
+      # the attention-state tokens the recognition status chip already uses.
+      def demo_banner
+        return unless @move.recognition_provider == "fake"
+
+        div(
+          class: "mt-section-gap flex items-start gap-3 rounded-card border border-secondary/30 " \
+                 "bg-secondary/15 px-4 py-3 text-body-md text-secondary",
+          role: "status"
+        ) do
+          render Components::Icons::Alert.new(css: "mt-0.5 h-5 w-5 shrink-0")
+          span { I18n.t("captures.demo_banner") }
+        end
+      end
 
       def header
         div(class: "flex flex-wrap items-center justify-between gap-4") do
