@@ -90,6 +90,17 @@ RSpec.describe Boxes::SuggestDescription do
       )
     end
 
+    # Raw Net::HTTP / TLS failures aren't wrapped by ProviderHttp — the broad
+    # rescue around the vendor call must still degrade rather than 500.
+    it "falls back when the provider raises a raw transport error (TLS / connection reset)" do
+      box = create(:box, move:)
+      cat = create(:category, move:, name: "Books")
+      create(:item, move:, box:, name: "Novel", category: cat)
+      allow(provider).to receive(:summarize_contents).and_raise(OpenSSL::SSL::SSLError, "reset")
+
+      expect(suggest(box).value!).to eq("Books")
+    end
+
     it "falls back to deterministic when the AI returns a blank string" do
       box = create(:box, move:)
       cat = create(:category, move:, name: "Books")

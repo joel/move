@@ -310,6 +310,14 @@ RSpec.describe "Boxes" do
 
       expect(response).to have_http_status(:unprocessable_content)
     end
+
+    it "is unprocessable (no AI spend) for a roomless box — the seal would fail room_required" do
+      box = create(:box, move:, number: "1", status: "packing", room: nil)
+
+      get seal_move_box_path(move, box)
+
+      expect(response).to have_http_status(:unprocessable_content)
+    end
   end
 
   describe "GET /moves/:move_id/boxes/:id/description_suggestion" do

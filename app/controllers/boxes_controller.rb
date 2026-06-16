@@ -122,7 +122,10 @@ class BoxesController < MoveScopedController
   # auto-proposed (AI when configured, deterministic otherwise). Lazy-loaded by
   # the box-detail dialog so the suggestion only runs when the modal opens.
   def seal
-    return head :unprocessable_content unless @box.packing? && @box.can_transition_to?("sealed")
+    # Mirror Boxes::TransitionStatus#validate: a roomless box can't be sealed, so
+    # don't render the modal or spend AI quota suggesting for a seal that'd fail.
+    return head :unprocessable_content unless @box.packing? && @box.can_transition_to?("sealed") &&
+                                              @box.room_id.present?
 
     render Views::Boxes::Seal.new(move: @move, box: @box, suggestion: suggest_description)
   end

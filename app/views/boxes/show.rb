@@ -206,11 +206,13 @@ module Views
         end
       end
 
-      # Intercept the seal with the describe-before-sealing modal only when there's
-      # something to describe and no description yet — otherwise sealing stays a
-      # one-click button_to.
+      # Intercept the seal with the describe-before-sealing modal only when the seal
+      # can actually succeed (a room is assigned — TransitionStatus rejects a
+      # roomless seal with :room_required) and there's something to describe with no
+      # description yet. Otherwise sealing stays a one-click button_to (which surfaces
+      # the room_required alert for a roomless box without spending AI quota).
       def seal_needs_description?
-        @box.description.blank? && @box.item_count.positive?
+        @box.room_id.present? && @box.description.blank? && @box.item_count.positive?
       end
 
       def transition_button_classes(target)

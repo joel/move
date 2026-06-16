@@ -9,11 +9,6 @@ module Boxes
   # caller renders it into an editable field; nothing is persisted here.
   class SuggestDescription < BaseAction
     MAX_TERMS = 6
-    # Transport failures the vendor call can raise — all fall back to deterministic.
-    TRANSPORT_ERRORS = [
-      RecognitionProviders::Base::MissingApiKey, ProviderHttp::Error,
-      Timeout::Error, SocketError
-    ].freeze
 
     def call(box:)
       items = digest_for(box)
@@ -24,12 +19,19 @@ module Boxes
         return Success(deterministic(items))
       end
 
-      text = RecognitionProviders.for_move(box.move).summarize_contents(items: items)
-      emit(box, "ai")
-      Success(text.presence || deterministic(items))
-    rescue *TRANSPORT_ERRORS
-      emit(box, "fallback")
-      Success(deterministic(items))
+      begin
+        text = RecognitionProviders.for_move(box.move).summarize_contents(items: items)
+        emit(box, "ai")
+        Success(text.presence || deterministic(items))
+      rescue StandardError
+        # Missing key, non-2xx, malformed body, or any raw Net::HTTP / TLS / DNS
+        # transport failure (EOFError, Errno::ECONNRESET, OpenSSL::SSL::SSLError, a
+        # timeout, …) degrades to the deterministic summary. The scope is just the
+        # vendor call, so a bug in our own digest/fallback still surfaces. A
+        # suggestion is advisory: it must never 500 or block the box page.
+        emit(box, "fallback")
+        Success(deterministic(items))
+      end
     end
 
     private
