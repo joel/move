@@ -7,8 +7,8 @@
 # later phases (D5/D4) — this model intentionally has neither yet.
 class Box < ApplicationRecord
   # Field-level history (Logidze) over the editable columns (number, room_id,
-  # dimensions, weight) — powers the activity feed's revert (PR3). Lifecycle
-  # `status` is excluded (it has its own box.status_changed events).
+  # dimensions, weight, description) — powers the activity feed's revert (PR3).
+  # Lifecycle `status` is excluded (it has its own box.status_changed events).
   has_logidze
   # Soft delete (Domain §11). Deleting a Box cascades the discard to its Items
   # under one batch; Boxes::Restore brings the same set back. `default_scope
@@ -63,6 +63,9 @@ class Box < ApplicationRecord
             allow_blank: true
   validates :qr_token, presence: true, uniqueness: true
   validates :status, inclusion: { in: STATUSES }
+  # Optional free-text summary of the contents ("Clothes, Electronics, Books").
+  # Capped so a runaway paste can't bloat the row / label PDF; blank is allowed.
+  validates :description, length: { maximum: 500 }, allow_blank: true
 
   scope :ordered, -> { order(Arel.sql("number::bigint")) }
 

@@ -914,7 +914,8 @@ CREATE TABLE public.boxes (
     discard_batch_id uuid,
     discarded_by_parent_type character varying,
     discarded_by_parent_id uuid,
-    log_data jsonb
+    log_data jsonb,
+    description text
 );
 
 
@@ -2050,7 +2051,7 @@ CREATE UNIQUE INDEX index_users_on_email ON public.users USING btree (email) WHE
 -- Name: boxes logidze_on_boxes; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER logidze_on_boxes BEFORE INSERT OR UPDATE ON public.boxes FOR EACH ROW WHEN ((COALESCE(current_setting('logidze.disabled'::text, true), ''::text) <> 'on'::text)) EXECUTE FUNCTION public.logidze_logger('null', 'updated_at', '{number, room_id, length_cm, width_cm, height_cm, weight_kg}', 'true');
+CREATE TRIGGER logidze_on_boxes BEFORE INSERT OR UPDATE ON public.boxes FOR EACH ROW WHEN ((COALESCE(current_setting('logidze.disabled'::text, true), ''::text) <> 'on'::text)) EXECUTE FUNCTION public.logidze_logger('null', 'updated_at', '{number, room_id, length_cm, width_cm, height_cm, weight_kg, description}', 'true');
 
 
 --
@@ -2399,6 +2400,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260616120000'),
 ('20260616090000'),
 ('20260615120000'),
 ('20260614180625'),

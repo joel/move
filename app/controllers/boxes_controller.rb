@@ -184,6 +184,6 @@ class BoxesController < MoveScopedController
   end
 
   def box_params
-    params.expect(box: %i[number room_name length_cm width_cm height_cm weight_kg])
+    params.expect(box: %i[number room_name length_cm width_cm height_cm weight_kg description])
   end
 end

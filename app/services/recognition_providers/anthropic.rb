@@ -10,6 +10,7 @@ module RecognitionProviders
     ENDPOINT  = "https://api.anthropic.com/v1/messages"
     VERSION   = "2023-06-01"
     TOOL_NAME = "record_objects"
+    SUMMARY_TOOL = "record_description"
     # Haiku 4.5 (dated snapshot) keeps cost near the OpenAI mini tier. The default
     # when a Move sets no override (#187 — Move#anthropic_model wins via Base#model).
     DEFAULT_MODEL = "claude-haiku-4-5-20251001"
@@ -25,6 +26,29 @@ module RecognitionProviders
         provider: "anthropic", provider_model: model,
         objects: normalize(extract_objects(tool_input(json)))
       )
+    end
+
+    # Text-only contents summary: a forced tool whose input_schema is
+    # DESCRIPTION_SCHEMA, so the description arrives as native tool_use input.
+    def summarize_contents(items:)
+      key = api_key!
+      json = post_json(
+        ENDPOINT,
+        headers: { "x-api-key" => key, "anthropic-version" => VERSION },
+        body: {
+          model: model, max_tokens: 256,
+          tool_choice: { type: "tool", name: SUMMARY_TOOL },
+          tools: [{ name: SUMMARY_TOOL,
+                    description: "Record a short description of the box's contents.",
+                    input_schema: DESCRIPTION_SCHEMA }],
+          messages: [{ role: "user", content: [{ type: "text", text: summarize_prompt(items) }] }]
+        }
+      )
+      input = Array(json["content"])
+              .find { |b| b["type"] == "tool_use" && b["name"] == SUMMARY_TOOL }&.dig("input")
+      raise ProviderHttp::Error, "#{self.class.name} returned no #{SUMMARY_TOOL} tool_use block" if input.nil?
+
+      extract_description(input)
     end
 
     private

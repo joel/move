@@ -37,6 +37,13 @@ module RecognitionProviders
       }
     }.freeze
 
+    # Gemini's uppercase-dialect copy of DESCRIPTION_SCHEMA.
+    GEMINI_DESCRIPTION_SCHEMA = {
+      type: "OBJECT",
+      required: %w[description],
+      properties: { description: { type: "STRING" } }
+    }.freeze
+
     def identify(image:, context:)
       key = api_key!
       json = post_json(
@@ -46,6 +53,22 @@ module RecognitionProviders
       )
       content = json.dig("candidates", 0, "content", "parts", 0, "text").to_s
       Result.new(provider: "gemini", provider_model: model, objects: normalize(extract_objects(content)))
+    end
+
+    # Text-only contents summary via responseSchema (GEMINI_DESCRIPTION_SCHEMA).
+    def summarize_contents(items:)
+      key = api_key!
+      json = post_json(
+        "#{HOST}/models/#{model}:generateContent",
+        headers: { "x-goog-api-key" => key },
+        body: {
+          contents: [{ role: "user", parts: [{ text: summarize_prompt(items) }] }],
+          generationConfig: {
+            responseMimeType: "application/json", responseSchema: GEMINI_DESCRIPTION_SCHEMA
+          }
+        }
+      )
+      extract_description(json.dig("candidates", 0, "content", "parts", 0, "text").to_s)
     end
 
     private

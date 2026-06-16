@@ -32,6 +32,25 @@ RSpec.describe RecognitionProviders::Gemini do
       .to raise_error(RecognitionProviders::Base::MissingApiKey, /No API key set/)
   end
 
+  describe "#summarize_contents" do
+    let(:items) { [{ label: "Drill", category: "Tools", count: 1 }] }
+
+    it "sends a responseSchema description request (no image) and returns the string" do
+      stub_http(code: "200", body: content_response({ description: "Tools" }.to_json))
+
+      result = provider.summarize_contents(items: items)
+
+      body = sent_body
+      aggregate_failures do
+        expect(result).to eq("Tools")
+        expect(body.dig("generationConfig", "responseSchema", "required")).to eq(%w[description])
+        parts = body.dig("contents", 0, "parts")
+        expect(parts.map(&:keys).flatten).to eq(%w[text]) # text-only, no inlineData
+        expect(parts.dig(0, "text")).to include("Drill", "Tools")
+      end
+    end
+  end
+
   it "sends a responseSchema request with the model in the URL, key header, and inline image" do
     stub_http(code: "200", body: content_response({ objects: [] }.to_json))
 
