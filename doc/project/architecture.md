@@ -255,10 +255,12 @@ flowchart LR
 
 Embeddings come from **textual metadata only** (never images) and are
 (re)generated async; lexical/trigram is always correct. Providers mirror
-`RecognitionProviders` (env `EMBEDDING_PROVIDER`: fake default, openai
-`text-embedding-3-small`). A provider error degrades to a nil vector
-(`Search::RefreshDocument` rescue) so search stays lexical-correct. Enabling
-openai + backfilling (`bin/rails search:reindex`): [`ai-providers.md`](ai-providers.md).
+`RecognitionProviders` and are **per-Move bring-your-own-key** (#232):
+`EmbeddingProviders.for_move(move)` picks the Move's own openai adapter
+(`text-embedding-3-small`, keyed by `moves.openai_api_key`) when it opted in, else
+the network-free `fake` — no app-wide env key. A provider error degrades to a nil
+vector (`Search::RefreshDocument` rescue) so search stays lexical-correct. Enabling
+openai per Move + backfilling (`bin/rails search:reindex`): [`ai-providers.md`](ai-providers.md).
 
 **Infra:** Postgres image is `pgvector/pgvector:pg18` (stock 18 lacks pgvector;
 pg_trgm is contrib). The `vector` type + `*_ops` opclasses live in `public` and

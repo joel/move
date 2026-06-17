@@ -39,11 +39,10 @@ jobs:
       # move-app S3 identity for the shared SeaweedFS (Active Storage).
       STORAGE_ACCESS_KEY_ID: ${{ secrets.STORAGE_ACCESS_KEY_ID }}
       STORAGE_SECRET_ACCESS_KEY: ${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
-      # OpenAI key for the *embedding* adapter (D8 hybrid search; EMBEDDING_PROVIDER
-      # = openai). Recognition is per-Move BYO (#185) and reads no shared key.
-      # Exported here too: the runner has no Doppler CLI, so .kamal/secrets'
-      # Doppler fallback would fail the deploy if this weren't in the environment.
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # No OPENAI_API_KEY here: embeddings (#232) and recognition (#185) are both
+      # per-Move BYO, so the deploy injects no shared AI key (and it is no longer
+      # in Doppler). Its only consumer is the Release Bug Scan workflow, which
+      # reads a distinctly named CI-only repo secret (CODEX_OPENAI_API_KEY).
 
     steps:
       # Fail fast on a missing/empty secret before kamal runs. With
@@ -57,7 +56,7 @@ jobs:
           missing=()
           for s in KAMAL_REGISTRY_PASSWORD RAILS_MASTER_KEY POSTGRES_PASSWORD \
                    NOTIF_MAIL_USERNAME NOTIF_MAIL_PASSWORD STORAGE_ACCESS_KEY_ID \
-                   STORAGE_SECRET_ACCESS_KEY OPENAI_API_KEY; do
+                   STORAGE_SECRET_ACCESS_KEY; do
             [ -n "${!s}" ] || missing+=("$s")
           done
           if [ ${#missing[@]} -ne 0 ]; then

@@ -1,7 +1,13 @@
 # Plan — migrate search embeddings to per-Move BYO (drop the last AI ENV key)
 
-> Status: **planned, not started.** Written at the end of a session for a future one to
-> execute. Uncommitted draft — review, then commit (or move under `doc/ai/`).
+> Status: **shipped.** Steps 1–6 + 8 landed in #232 (PR #233, v0.35.0); step 7
+> (drop the deploy-path env vars) landed in #234. **Correction to step 7:**
+> `OPENAI_API_KEY` is **removed from Doppler / the app secrets / the deploy**, but
+> **not** retired entirely — its one remaining consumer, the Release Bug Scan
+> workflow (`.github/workflows/release-bug-scan.yml`), is a **CI concern**, so it
+> becomes a **distinctly named** GitHub Actions repo secret `CODEX_OPENAI_API_KEY`
+> set directly in repo settings (a different name from the Doppler-managed
+> `OPENAI_API_KEY`, so the Doppler removal can't clobber it). See `ai-providers.md`.
 
 ## Context
 
@@ -82,7 +88,11 @@ in the same space** (same provider + model) for cosine ranking to mean anything.
    - `.github/workflows/deploy.yml`: remove `OPENAI_API_KEY` from the env + required-secrets
      check.
    - `.kamal/secrets`: remove the `OPENAI_API_KEY` line.
-   - Delete the `OPENAI_API_KEY` Doppler/GitHub secret.
+   - Remove `OPENAI_API_KEY` from **Doppler `move/prd`** (it is no longer an app
+     secret). For `release-bug-scan.yml`, use a **distinctly named** CI secret
+     `CODEX_OPENAI_API_KEY` set directly in GitHub repo settings — NOT the same name
+     (the Doppler→GitHub sync propagates removals, so reusing `OPENAI_API_KEY` would
+     let the Doppler deletion clobber the scan's secret). See `ai-providers.md`.
    - `app/services/embedding_providers/openai.rb`: remove the `ENV["OPENAI_API_KEY"]` read.
    - Update `doc/project/ai-providers.md` (embeddings are now per-Move too).
 8. **Seeds** — set the demo Move's `embedding_provider` (probably `fake`, key-free) so

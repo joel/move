@@ -48,12 +48,11 @@ env:
     # move-app S3 identity on the shared SeaweedFS, scoped to the `move` bucket.
     - STORAGE_ACCESS_KEY_ID
     - STORAGE_SECRET_ACCESS_KEY
-    # OpenAI key for the *embedding* adapter only (D8 hybrid search;
-    # EMBEDDING_PROVIDER: openai below). Recognition is per-Move bring-your-own-key
-    # (#185) — each Move supplies its own encrypted key, so no shared recognition
-    # key lives here. MUST be in Doppler move/prd before deploy — see
-    # doc/project/ai-providers.md.
-    - OPENAI_API_KEY
+    # No shared AI key here: both recognition (#185) and embeddings (#232) are
+    # per-Move bring-your-own-key — each Move supplies its own encrypted key.
+    # OPENAI_API_KEY is no longer an app secret (removed from Doppler too); the
+    # only consumer left is the Release Bug Scan workflow, which uses a CI-only,
+    # distinctly named GitHub Actions repo secret (CODEX_OPENAI_API_KEY).
   clear:
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
     # When you start using multiple servers, you should split out job processing to a dedicated machine.
@@ -88,15 +87,10 @@ env:
     # specific subdomain, so a passkey works on the apex and every org subdomain.
     WEBAUTHN_RP_ID: move-easy.org
 
-    # D8 hybrid search uses OpenAI text embeddings (default elsewhere is the
-    # network-free `fake`). Requires OPENAI_API_KEY (env.secret above), else every
-    # embedding goes nil; backfill real vectors with
-    # `kamal app exec --reuse 'bin/rails search:reindex'`. Pay-per-call. Full
-    # runbook + rollback: doc/project/ai-providers.md.
-    # NB: image *recognition* is per-Move bring-your-own-key (#185) — set in
-    # Settings → Recognition & AI, NOT here. There is no app-wide
-    # RECOGNITION_PROVIDER / recognition key any more.
-    EMBEDDING_PROVIDER: openai
+    # No app-wide AI provider config: D8 search embeddings are per-Move
+    # bring-your-own-key (#232), chosen in Settings → Semantic search and keyed by
+    # the Move's own openai_api_key. Image recognition is likewise per-Move (#185).
+    # There is no EMBEDDING_PROVIDER / RECOGNITION_PROVIDER / shared key here.
 
     # Log everything from Rails
     # RAILS_LOG_LEVEL: debug

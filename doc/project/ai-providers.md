@@ -19,15 +19,22 @@ embeddings #232) — there is **no app-wide AI key**:
   recognition, embeddings **degrade gracefully**: openai-without-a-key falls back
   to `fake` rather than erroring.
 
-> The app-wide `OPENAI_API_KEY` / `EMBEDDING_PROVIDER` env vars are **no longer
-> read by the code** as of #232, but the deploy **still requires them**:
-> `config/deploy.yml`, `.github/workflows/deploy.yml` (export **and** the
-> required-secrets check), and `.kamal/secrets` all still reference
-> `OPENAI_API_KEY`. **Do not delete the Doppler secret yet** — the deploy's
-> required-secret check would fail before Kamal runs. Removing the references and
-> the secret together is a tracked follow-up (#234 / step 7 of
-> `embeddings-byo-migration-plan.md`): drop the workflow check first, then the
-> Doppler secret.
+> There is **no app-wide AI key** any more. The `OPENAI_API_KEY` /
+> `EMBEDDING_PROVIDER` env vars were removed from the deploy path in #234 —
+> `config/deploy.yml`, `.github/workflows/deploy.yml` (export + required-secrets
+> check), and `.kamal/secrets` no longer reference them, so the app container
+> carries no shared AI credential, and **`OPENAI_API_KEY` is not an app secret**:
+> remove it from Doppler `move/prd`.
+>
+> The one remaining consumer — the **Release Bug Scan** workflow
+> (`.github/workflows/release-bug-scan.yml`, the Codex action on `v*` tags) — is a
+> **CI concern, not an application one**. It uses a **distinctly named** repo secret
+> **`CODEX_OPENAI_API_KEY`**, set directly in GitHub (Settings → Secrets and
+> variables → Actions). The name deliberately differs from `OPENAI_API_KEY` because
+> the Doppler→GitHub integration propagates Doppler *removals* to GitHub: reusing
+> the same name would let removing the app's Doppler key delete the scan's secret.
+> A distinct name keeps the CI credential outside the Doppler-managed set, so the
+> app key can be removed from Doppler with no effect on CI.
 
 | Capability | Module | Selector | Adapters | Default model (openai) |
 |---|---|---|---|---|
