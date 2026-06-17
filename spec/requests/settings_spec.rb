@@ -98,6 +98,26 @@ RSpec.describe "Settings" do
       expect(response.body).to include(RecognitionProviders::Openai::DEFAULT_MODEL)
       expect(response.body).not_to include('name="move[model]"')
     end
+
+    it "subscribes to the Move's indexing stream and renders the live control for an admin (#239)" do
+      get move_settings_path(move)
+
+      # Signed Turbo Stream source (ActionCable) + the broadcast-target region.
+      expect(response.body).to include("<turbo-cable-stream-source")
+      expect(response.body).to include('id="ai-embedding-control"')
+    end
+
+    it "locks the embedding selector while a run is in progress (#239)" do
+      create(:indexing_run, :processing, move:, total_count: 4, completed_count: 1)
+
+      get move_settings_path(move)
+
+      expect(response.body).to include(
+        I18n.t("settings.show.recognition.embeddings.indexing.in_progress", done: 1, total: 4)
+      )
+      # Locked note shown (apostrophe renders HTML-escaped, so match the phrase).
+      expect(response.body).to include("change the provider while indexing is running")
+    end
   end
 
   describe "PATCH /moves/:move_id/settings/unit_system" do

@@ -86,13 +86,14 @@ Rails.application.configure do
   # Annotate rendered view with file names.
   config.action_view.annotate_rendered_view_with_filenames = true
 
-  # Allow the local HTTPS dev host (bin/cli serves the app at
-  # move.workeverywhere.docker) to open the Action Cable WebSocket — the indexing
-  # progress stream (#239). Without this, ActionCable rejects the WS handshake as
-  # a cross-origin request and the progress bar never updates live.
+  # Allow the local dev hosts to open the Action Cable WebSocket — the indexing
+  # progress stream (#239). The settings page lives on an *org subdomain*
+  # (<slug>.workeverywhere.docker), so allow any subdomain of the dev zone, plus
+  # localhost subdomains for the directly-exposed Puma. Without this, ActionCable
+  # rejects the WS handshake as cross-origin and the progress bar never updates.
   config.action_cable.allowed_request_origins = [
-    %r{https?://move\.workeverywhere\.docker},
-    %r{https?://localhost(:\d+)?}
+    %r{\Ahttps?://([a-z0-9-]+\.)*workeverywhere\.docker(:\d+)?\z},
+    %r{\Ahttps?://([a-z0-9-]+\.)*localhost(:\d+)?\z}
   ]
 
   # Raise error when a before_action's only/except options reference missing actions.
