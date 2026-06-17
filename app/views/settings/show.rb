@@ -203,9 +203,10 @@ module Views
       end
 
       # A card whose contents supply their own header (the feature panels render a
-      # title + status chip), so no duplicate h2.
+      # title + status chip), so no duplicate h2. Forward the block to render (not
+      # Card.new) so the intent is unambiguous.
       def panel_card(&)
-        render Components::Ui::Card.new(padding: "p-6", &)
+        render(Components::Ui::Card.new(padding: "p-6"), &)
       end
 
       def setting_row(label, &)

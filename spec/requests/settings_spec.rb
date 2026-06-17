@@ -92,6 +92,14 @@ RSpec.describe "Settings" do
       expect(response.body).to include(I18n.t("settings.show.recognition.providers.needs_key"))
     end
 
+    it "renders the panel_card bodies (recognition selector, threshold, search control), not empty cards (#242)" do
+      get move_settings_path(move)
+
+      expect(response.body).to include(I18n.t("settings.show.recognition.providers.provider_label")) # recognition selector
+      expect(response.body).to include(I18n.t("settings.show.recognition.threshold")) # threshold block
+      expect(response.body).to include('id="ai-embedding-control"') # search control
+    end
+
     it "carries a provider's stored model override in its switch pill, so switching preserves it (#242)" do
       # OpenAI keyed with a saved override, but fake is active → the OpenAI pill is
       # a switch form that must resubmit gpt-5 (else switching clears the override).
