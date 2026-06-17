@@ -63,6 +63,28 @@ These are non-negotiable for all domain work. Do not reinvent these wheels.
    verify-before-login, forms dropping query params, remember-me) live in
    [`app/misc/AGENTS.md`](app/misc/AGENTS.md).
 
+4. **Live updates → ActionCable / Turbo Streams. JS polling is FORBIDDEN.** Never
+   poll the server from the client (`setInterval` + `fetch`, a Stimulus poller, a
+   refresh meta tag, etc.) to reflect server-side progress or state. Push it over
+   **ActionCable** using turbo-rails Turbo Stream broadcasting — the Rails-default
+   mechanism (Solid Cable in prod; `async` in dev). Reference impl: the search
+   indexing progress (#239) and the capture session panel (#241) — an action/job
+   emits a `Rails.event`, a subscriber re-renders the Phlex view via
+   `ApplicationController.render(view, layout: false)` and
+   `Turbo::StreamsChannel.broadcast_replace_to([record, :scope], target:, html:)`,
+   and the page subscribes with `turbo_stream_from`. Conventions/gotchas:
+   - **Signed stream names are the auth boundary** — derive the stream from a
+     tenant-unique record (a uuid); no per-user channel auth is needed. Set
+     `config.action_cable.allowed_request_origins` for the dev **org-subdomain**
+     host and the prod `*.move-easy.org` hosts, or the WS handshake is rejected.
+   - **A broadcast must never break its emitter.** A `Rails.event` subscriber runs
+     synchronously inside the emitting action, so wrap render/broadcast in a
+     `rescue` (or enqueue a job) — a broadcast failure must not fail the action.
+   - turbo-rails' `turbo.min.js` already bundles `@rails/actioncable`; add
+     `ApplicationCable::Connection`/`Channel` (Turbo::StreamsChannel needs them).
+   - The one remaining JS poller (`recognition_poller_controller.js`, recovery
+     surface) is being migrated to cable (#244) — do not add new ones.
+
 ---
 
 ## 2. CLI Operations (`bin/cli`)

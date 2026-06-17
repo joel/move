@@ -144,6 +144,8 @@ Write code, following project conventions. If your Ruby version manager needs ac
 
 **For any UI work** (new views, components, forms, layouts, styling changes), use the `/ui-designer` skill. It provides access to the Tailwind CSS reference library and ensures consistency with the project design system (the `ha-*` CSS design-token system). Always check the library before building new components from scratch.
 
+**Live updates → ActionCable, never JS polling.** To reflect server-side progress or state in the UI, push it over ActionCable / turbo-rails Turbo Stream broadcasting — `setInterval`+`fetch`, Stimulus pollers, and refresh meta tags are **forbidden**. See `AGENTS.md` §1 convention #4 (signed stream from a tenant-unique record; subscriber re-renders via `ApplicationController.render(view, layout: false)` + `Turbo::StreamsChannel.broadcast_replace_to`; wrap the broadcast in a `rescue` so it can't fail the emitting action). Reference impls: #239 (indexing progress), #241 (capture panel).
+
 ### Step 5b: Seed data (Mandatory for any new user-facing surface)
 
 Extend `db/seeds.rb` so that after `bin/rails db:seed` a developer can sign in and **immediately showcase and play with** the surface this phase adds — no manual record-building. See the project's `AGENTS.md` §8 for the full rule. In short:
