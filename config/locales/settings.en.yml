@@ -53,6 +53,11 @@ en:
           label_on: "On"
           key_required_help: "Add your OpenAI key above, then turn this on."
           reindex_note: "Turning this on re-embeds every item — results improve once it finishes."
+          indexing:
+            progress_label: "Indexing"
+            in_progress: "Indexing %{done} of %{total} items…"
+            locked_note: "You can't change the provider while indexing is running."
+            up_to_date: "Search index up to date."
       account:
         title: "Account"
         manage: "Account Settings"
