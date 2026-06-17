@@ -7,6 +7,7 @@ module Views
     # live recognition state. Renders in the AppShellLayout.
     class Show < Views::Base
       include Phlex::Rails::Helpers::FormWith
+      include Phlex::Rails::Helpers::TurboStreamFrom
 
       def initialize(move:, box:, media:, items_by_media: {})
         @move = move
@@ -95,19 +96,13 @@ module Views
               I18n.t("captures.session.count", count: @media.size)
             end
           end
-          div(
-            data: {
-              controller: "recognition-poller",
-              recognition_poller_url_value: move_box_capture_session_path(@move, @box),
-              recognition_poller_interval_value: 2500
-            }
-          ) do
-            div(data: { recognition_poller_target: "frame" }) do
-              render Views::Captures::SessionPanel.new(
-                box: @box, media: @media, items_by_media: @items_by_media
-              )
-            end
-          end
+          # Live recognition state arrives over ActionCable as each run advances —
+          # no polling (#241). The signed stream binds to this tenant-unique Box;
+          # the subscriber replaces the panel by its stable id.
+          turbo_stream_from(@box, :recognition)
+          render Views::Captures::SessionPanel.new(
+            box: @box, media: @media, items_by_media: @items_by_media
+          )
           render Components::Ui::Button.new(
             label: I18n.t("captures.finish"), variant: :secondary, full_width: true,
             href: move_box_path(@move, @box)

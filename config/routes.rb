@@ -39,10 +39,10 @@ Rails.application.routes.draw do
       get "recovery/photo/:media_id", to: "recoveries#show", as: :recovery_photo
       get "recovery/photo/:media_id/state", to: "recoveries#state", as: :recovery_photo_state
       post "recovery/photo/:media_id/retry", to: "recoveries#retry", as: :recovery_photo_retry
-      # B2 — Capture image & recognition. `session` is the polled session panel.
+      # B2 — Capture image & recognition. The session panel updates live over
+      # ActionCable (#241); there is no polled fragment endpoint any more.
       get "capture", to: "captures#show", as: :capture
       post "capture", to: "captures#create"
-      get "capture/session", to: "captures#session_panel", as: :capture_session
       post "capture/retry", to: "captures#retry_recognition", as: :capture_retry
       # E1 — Box label (A7, opaque) and authenticated manifest (A4) as inline PDFs.
       get "label", to: "labels#show", as: :label
