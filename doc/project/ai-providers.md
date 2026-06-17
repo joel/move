@@ -19,15 +19,17 @@ embeddings #232) — there is **no app-wide AI key**:
   recognition, embeddings **degrade gracefully**: openai-without-a-key falls back
   to `fake` rather than erroring.
 
-> The app-wide `OPENAI_API_KEY` / `EMBEDDING_PROVIDER` env vars are **no longer
-> read by the code** as of #232, but the deploy **still requires them**:
-> `config/deploy.yml`, `.github/workflows/deploy.yml` (export **and** the
-> required-secrets check), and `.kamal/secrets` all still reference
-> `OPENAI_API_KEY`. **Do not delete the Doppler secret yet** — the deploy's
-> required-secret check would fail before Kamal runs. Removing the references and
-> the secret together is a tracked follow-up (#234 / step 7 of
-> `embeddings-byo-migration-plan.md`): drop the workflow check first, then the
-> Doppler secret.
+> There is **no app-wide AI key** any more. The `OPENAI_API_KEY` /
+> `EMBEDDING_PROVIDER` env vars were removed from the deploy path in #234 —
+> `config/deploy.yml`, `.github/workflows/deploy.yml` (export + required-secrets
+> check), and `.kamal/secrets` no longer reference them, so the app container
+> carries no shared AI credential.
+>
+> The `OPENAI_API_KEY` **repository secret is intentionally retained** — it is
+> still consumed by the **Release Bug Scan** workflow
+> (`.github/workflows/release-bug-scan.yml`, the Codex action on `v*` tags), which
+> is independent of the deploy. Do **not** delete it from Doppler/GitHub unless you
+> also retire that workflow.
 
 | Capability | Module | Selector | Adapters | Default model (openai) |
 |---|---|---|---|---|

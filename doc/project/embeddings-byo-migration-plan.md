@@ -1,7 +1,10 @@
 # Plan — migrate search embeddings to per-Move BYO (drop the last AI ENV key)
 
-> Status: **planned, not started.** Written at the end of a session for a future one to
-> execute. Uncommitted draft — review, then commit (or move under `doc/ai/`).
+> Status: **shipped.** Steps 1–6 + 8 landed in #232 (PR #233, v0.35.0); step 7
+> (drop the deploy-path env vars) landed in #234. **Correction to step 7:** the
+> `OPENAI_API_KEY` repository secret is **retained**, not deleted — it is still
+> required by the Release Bug Scan workflow (`.github/workflows/release-bug-scan.yml`).
+> Only the deploy/app-container references were removed. See `ai-providers.md`.
 
 ## Context
 
