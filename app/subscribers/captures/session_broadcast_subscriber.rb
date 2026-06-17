@@ -23,11 +23,24 @@ module Captures
       run = RecognitionRun.includes(box: :move).find_by(id: run_id)
       return if run.nil?
 
+      broadcast(run.box)
+    end
+
+    private
+
+    # This runs synchronously inside RecognitionRuns::Process (it emits the events),
+    # so a render/broadcast failure must NEVER propagate — Process would rescue it
+    # and mark the run failed, turning a cosmetic panel glitch into a lost
+    # recognition. Isolate it: the worst case is a missed live update, and the next
+    # event (or a reload) re-renders the panel.
+    def broadcast(box)
       Turbo::StreamsChannel.broadcast_replace_to(
-        run.box, :recognition,
+        box, :recognition,
         target: Views::Captures::SessionPanel::ID,
-        html: ApplicationController.render(Captures::SessionContent.new(run.box).panel, layout: false)
+        html: ApplicationController.render(Captures::SessionContent.new(box).panel, layout: false)
       )
+    rescue StandardError => e
+      Rails.logger.warn("[captures] session panel broadcast failed: #{e.class}: #{e.message}")
     end
   end
 end

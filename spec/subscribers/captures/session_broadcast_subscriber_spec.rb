@@ -40,6 +40,12 @@ RSpec.describe Captures::SessionBroadcastSubscriber do
     expect(Turbo::StreamsChannel).not_to have_received(:broadcast_replace_to)
   end
 
+  it "never lets a broadcast error propagate (recognition runs synchronously emit these)" do
+    allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to).and_raise(StandardError, "cable down")
+
+    expect { emit("recognition_run.succeeded", recognition_run_id: run.id) }.not_to raise_error
+  end
+
   it "no-ops when the run no longer exists" do
     allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
 
