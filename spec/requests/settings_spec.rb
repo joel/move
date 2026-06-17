@@ -140,6 +140,14 @@ RSpec.describe "Settings" do
       expect(response.body).to include('id="ai-embedding-control"')
     end
 
+    it "labels the Semantic Search default 'Keyword only', not 'Off' (#248)" do
+      get move_settings_path(move) # move defaults to embedding_provider fake
+
+      expect(response.body).to include(I18n.t("settings.show.recognition.embeddings.options.fake"))
+      expect(I18n.t("settings.show.recognition.embeddings.options.fake")).to eq("Keyword only")
+      expect(response.body).to include("Keyword search is always on")
+    end
+
     it "locks the embedding selector while a run is in progress (#239)" do
       create(:indexing_run, :processing, move:, total_count: 4, completed_count: 1)
 
@@ -272,7 +280,7 @@ RSpec.describe "Settings" do
   describe "PATCH /moves/:move_id/settings/embedding_provider (#232)" do
     before { allow(Search::RefreshDocumentJob).to receive(:perform_later) }
 
-    it "turns semantic search on for an admin and enqueues a reindex" do
+    it "turns semantic search on for an admin and enqueues a reindex (html fallback redirects)" do
       item = create(:item, move:)
 
       patch move_settings_embedding_provider_path(move), params: { move: { embedding_provider: "openai" } }
@@ -280,6 +288,18 @@ RSpec.describe "Settings" do
       expect(response).to redirect_to(move_settings_path(move))
       expect(move.reload.embedding_provider).to eq("openai")
       expect(Search::RefreshDocumentJob).to have_received(:perform_later).with(item.id, hash_including(:tenant))
+    end
+
+    it "responds with a scoped Turbo Stream (no full-page reload) for a Turbo request (#247)" do
+      patch move_settings_embedding_provider_path(move),
+            params: { move: { embedding_provider: "openai" } }, as: :turbo_stream
+
+      expect(response).to have_http_status(:ok)
+      expect(response.media_type).to eq("text/vnd.turbo-stream.html")
+      # Replaces only the panel body, not a navigation.
+      expect(response.body).to include(%(target="#{Views::Settings::EmbeddingPanelBody::ID}"))
+      expect(response.body).to include('action="replace"')
+      expect(move.reload.embedding_provider).to eq("openai")
     end
 
     it "forbids a contributor (semantic search is admin-only)" do
