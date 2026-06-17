@@ -5,10 +5,13 @@ RSpec.describe Search::Items do
   let(:room) { create(:room, move:, name: "Bathroom") }
   let(:box) { create(:box, move:, number: "3", room:) }
 
-  # Transactional specs: Item#after_commit is dormant, so index explicitly.
-  def index(item, embedding: nil)
+  # Transactional specs: Item#after_commit is dormant, so index explicitly. The
+  # stored vector is stamped with +model+; the semantic leg only trusts vectors
+  # whose embedding_model matches the query embedder's model (#251), so the two
+  # default to the same "test" model.
+  def index(item, embedding: nil, model: "test")
     Search::RefreshDocument.new.call(item: item)
-    item.search_document.update!(embedding: embedding, embedding_model: "test", embedded_at: Time.current) if embedding
+    item.search_document.update!(embedding:, embedding_model: model, embedded_at: Time.current) if embedding
     item
   end
 
@@ -16,9 +19,9 @@ RSpec.describe Search::Items do
     create(:item, :confirmed, move:, box:, name:, **attrs)
   end
 
-  def vector_embedder(vec)
+  def vector_embedder(vec, model: "test")
     instance_double(EmbeddingProviders::Fake,
-                    embed: EmbeddingProviders::Result.new(provider: "t", model: "t", vector: vec))
+                    embed: EmbeddingProviders::Result.new(provider: "t", model:, vector: vec))
   end
 
   it "returns empty for a blank query" do
@@ -57,6 +60,24 @@ RSpec.describe Search::Items do
 
       expect(results).to include(near)
       expect(results).not_to include(far)
+    end
+
+    # #251 — a whole-Move re-embed can race a provider/key change, leaving a row
+    # with a vector from the previous (stale) space. The query embedder pins the
+    # semantic leg to its own model, so a mismatched-model vector is ignored
+    # rather than mis-ranked against a query vector from a different space.
+    it "ignores a stored vector whose embedding_model differs from the query's" do
+      # Cosine-near to the query vector, but stamped with a stale model + no
+      # lexical/trigram overlap with the query, so only the semantic leg could
+      # surface it — and that leg must skip it.
+      stale = index(confirmed("Chesterfield"),
+                    embedding: Array.new(1536) { 0.1 }, model: "stale-space-model")
+
+      results = described_class.new
+                               .call(move:, query: "sofa", embedder: vector_embedder(Array.new(1536) { 0.1 }))
+                               .value!.map(&:item)
+
+      expect(results).not_to include(stale)
     end
   end
 

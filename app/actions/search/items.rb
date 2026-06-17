@@ -28,29 +28,32 @@ module Search
       # is nil (blank query / provider failure).
       embedder ||= EmbeddingProviders.for_move(move)
 
-      vector = safe_query_vector(embedder, q)
-      rows = run(move, q, vector, include_hidden)
+      vector, model = safe_query_embedding(embedder, q)
+      rows = run(move, q, vector, model, include_hidden)
       Success(rows.map { |r| to_result(r) })
     end
 
     private
 
     # A query-embedding failure must not 500 the search — drop the semantic leg
-    # and serve lexical/trigram results (Domain §7.3 graceful fallback).
-    def safe_query_vector(embedder, query)
-      embedder.embed(query).vector
+    # and serve lexical/trigram results (Domain §7.3 graceful fallback). Returns
+    # [vector, model] so the semantic leg can be pinned to the current provider's
+    # model (#251); [nil, nil] drops the leg entirely.
+    def safe_query_embedding(embedder, query)
+      result = embedder.embed(query)
+      result.vector ? [result.vector, result.model] : [nil, nil]
     rescue StandardError => e
       Rails.logger.warn("[search] query embedding failed: #{e.class}: #{e.message}")
-      nil
+      [nil, nil]
     end
 
-    def run(move, query, vector, include_hidden)
+    def run(move, query, vector, model, include_hidden)
       scope = include_hidden ? move.items : move.items.searchable
       scope
         .joins(:search_document, :box)
         .joins("LEFT JOIN rooms ON rooms.id = boxes.room_id")
-        .select(Arel.sql(sanitize(select_sql(vector), query, vector)))
-        .where(match_sql(vector), **binds(query, vector))
+        .select(Arel.sql(sanitize(select_sql(vector), query, vector, model)))
+        .where(match_sql(vector), **binds(query, vector, model))
         .order(Arel.sql("score DESC"))
         .limit(LIMIT)
     end
@@ -58,8 +61,8 @@ module Search
     # AR's `.select` does not bind params (only `.where` does), so the SELECT is
     # sanitized here. `CAST(:vec AS vector)` is used instead of `::vector` because
     # `::` collides with Rails' `:name` placeholder parsing.
-    def sanitize(sql, query, vector)
-      ActiveRecord::Base.sanitize_sql_array([sql, binds(query, vector)])
+    def sanitize(sql, query, vector, model)
+      ActiveRecord::Base.sanitize_sql_array([sql, binds(query, vector, model)])
     end
 
     def select_sql(vector)
@@ -96,19 +99,31 @@ module Search
       "(#{conditions.join(" OR ")})"
     end
 
+    # Only trust a stored vector embedded with the SAME model as the current query
+    # (#251). A whole-Move re-embed can race a provider/key change so a row keeps a
+    # stale-space vector; pinning to embedding_model = :model ignores it (the row
+    # degrades to lexical/trigram) instead of mis-ranking it against a query vector
+    # from a different space.
+    def semantic_match_clause
+      "item_search_documents.embedding IS NOT NULL AND item_search_documents.embedding_model = :model"
+    end
+
     def semantic_score_sql
-      "(CASE WHEN item_search_documents.embedding IS NOT NULL " \
+      "(CASE WHEN #{semantic_match_clause} " \
         "THEN 1 - (item_search_documents.embedding <=> CAST(:vec AS vector)) ELSE 0 END)"
     end
 
     def semantic_match_sql
-      "(item_search_documents.embedding IS NOT NULL " \
+      "(#{semantic_match_clause} " \
         "AND (item_search_documents.embedding <=> CAST(:vec AS vector)) <= #{SEMANTIC_MAX_DISTANCE})"
     end
 
-    def binds(query, vector)
+    def binds(query, vector, model)
       h = { q: query, exact: "%#{ActiveRecord::Base.sanitize_sql_like(query)}%" }
-      h[:vec] = "[#{vector.map { |f| f.to_f.round(8) }.join(",")}]" if vector
+      if vector
+        h[:vec] = "[#{vector.map { |f| f.to_f.round(8) }.join(",")}]"
+        h[:model] = model
+      end
       h
     end
 
