@@ -77,6 +77,12 @@ Rails.application.configure do
   config.x.tenant_zone = "move-easy.org"
   config.x.cookie_domain = ".move-easy.org"
 
+  # Action Cable (#239): the settings page lives on an org subdomain, so the live
+  # indexing-progress WebSocket opens from https://<slug>.move-easy.org. Allow the
+  # apex and any org subdomain (behind Cloudflare → kamal-proxy, which both pass
+  # the WS upgrade); reject everything else.
+  config.action_cable.allowed_request_origins = [%r{\Ahttps://([a-z0-9-]+\.)?move-easy\.org\z}]
+
   # TODO: Find a better way to handle Docker build time vs runtime env vars
   notif_mail_username = if ENV["SECRET_KEY_BASE_DUMMY"]
                           ENV.fetch("NOTIF_MAIL_USERNAME", nil) # For Docker build time

@@ -8,10 +8,10 @@ module Search
   module Reindexing
     private
 
-    def reindex_items(item_ids)
+    def reindex_items(item_ids, indexing_run: nil)
       tenant = Apartment::Tenant.current
       Array(item_ids).uniq.each do |id|
-        Search::RefreshDocumentJob.perform_later(id, tenant: tenant)
+        Search::RefreshDocumentJob.perform_later(id, tenant: tenant, indexing_run_id: indexing_run&.id)
       end
     end
 
@@ -22,12 +22,15 @@ module Search
     # backlogged/failed job) searches see nil embeddings and fall back to
     # lexical+trigram, instead of scoring the new query vector against stale
     # vectors from the old space. The jobs refill them in the Move's new space.
-    def reembed_move(move)
+    def reembed_move(move, run: nil, item_ids: nil)
       # Bulk-clear the denormalized projection's vectors; validations are
       # irrelevant to a search projection (same rationale as the #232 migration).
       ItemSearchDocument.where(move_id: move.id)
                         .update_all(embedding: nil, embedding_model: nil, embedded_at: nil) # rubocop:disable Rails/SkipsModelValidations
-      reindex_items(move.items.ids)
+      # When a run is supplied (#239), each refill job carries its id and reports
+      # progress; the caller passes the same id snapshot it used for total_count so
+      # the two can't disagree. Without a run (vocab edits) the jobs refill quietly.
+      reindex_items(item_ids || move.items.ids, indexing_run: run)
     end
 
     # Item ids whose search_text embeds this vocabulary value.

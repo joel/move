@@ -16,8 +16,6 @@ module Moves
   # key value is never logged or emitted. The caller (controller) owns
   # authorization (admin) and the archived read-only guard.
   class SetRecognitionProvider < BaseAction
-    include Search::Reindexing
-
     def call(move:, provider:, api_key: nil, model: nil, actor: nil)
       provider = provider.to_s
       api_key = api_key.to_s.strip
@@ -110,7 +108,9 @@ module Moves
     # background refill). A key rotation (present→present) keeps the same space
     # for a fixed model, so readiness is unchanged and nothing is re-embedded.
     def reembed_if_embedding_space_flipped(move, was_ready)
-      reembed_move(move) if move.embedding_provider_ready? != was_ready
+      return if move.embedding_provider_ready? == was_ready
+
+      IndexingRuns::Start.new.call(move: move, provider: move.embedding_provider)
     end
   end
 end

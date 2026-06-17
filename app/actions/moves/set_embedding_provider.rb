@@ -14,8 +14,6 @@ module Moves
   # (same provider) skips the reindex and the event. The caller (controller) owns
   # authorization (admin) and the archived read-only guard.
   class SetEmbeddingProvider < BaseAction
-    include Search::Reindexing
-
     def call(move:, provider:, actor: nil)
       provider = provider.to_s
 
@@ -25,7 +23,9 @@ module Moves
       return Success(move) if before == provider
 
       yield persist(move, provider)
-      reembed_move(move)
+      # Re-embed the whole Move in the new space, tracked so the panel shows live
+      # progress and locks the selector until it finishes (#239).
+      IndexingRuns::Start.new.call(move: move, provider: provider)
       yield emit_event(move, actor, provider)
       Success(move)
     end

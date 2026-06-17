@@ -938,6 +938,25 @@ CREATE TABLE public.categories (
 
 
 --
+-- Name: indexing_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.indexing_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    provider character varying NOT NULL,
+    status character varying DEFAULT 'queued'::character varying NOT NULL,
+    total_count integer DEFAULT 0 NOT NULL,
+    completed_count integer DEFAULT 0 NOT NULL,
+    failed_count integer DEFAULT 0 NOT NULL,
+    started_at timestamp(6) without time zone,
+    finished_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: item_search_documents; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1356,6 +1375,14 @@ ALTER TABLE ONLY public.categories
 
 
 --
+-- Name: indexing_runs indexing_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.indexing_runs
+    ADD CONSTRAINT indexing_runs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: item_search_documents item_search_documents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1662,6 +1689,20 @@ CREATE INDEX index_categories_on_move_id ON public.categories USING btree (move_
 --
 
 CREATE UNIQUE INDEX index_categories_on_move_id_and_lower_name ON public.categories USING btree (move_id, lower((name)::text));
+
+
+--
+-- Name: index_indexing_runs_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_indexing_runs_on_move_id ON public.indexing_runs USING btree (move_id);
+
+
+--
+-- Name: index_indexing_runs_on_move_id_and_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_indexing_runs_on_move_id_and_status ON public.indexing_runs USING btree (move_id, status);
 
 
 --
@@ -2324,6 +2365,14 @@ ALTER TABLE ONLY public.user_webauthn_keys
 
 
 --
+-- Name: indexing_runs fk_rails_ad76a40776; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.indexing_runs
+    ADD CONSTRAINT fk_rails_ad76a40776 FOREIGN KEY (move_id) REFERENCES public.moves(id);
+
+
+--
 -- Name: item_search_documents fk_rails_b44f0ebef7; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2402,6 +2451,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260617130000'),
 ('20260617120000'),
 ('20260616170001'),
 ('20260616170000'),
