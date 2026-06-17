@@ -3,12 +3,15 @@
 module Views
   module Captures
     # The "Items" panel: this box's recent captures with live recognition state.
-    # Re-rendered by the polled `captures#session` endpoint; the root carries
-    # `data-pending` so the Stimulus poller knows when to stop. Once a photo's run
-    # succeeds it expands into one tappable row per recognised item (→ Item
-    # Detail); photos still queued/processing/failed render as a single status row.
+    # Broadcast over ActionCable as each run advances (#241 — Captures::
+    # SessionBroadcastSubscriber); the stable root id is the Turbo Stream replace
+    # target. Once a photo's run succeeds it expands into one tappable row per
+    # recognised item (→ Item Detail); photos still queued/processing/failed render
+    # as a single status row.
     class SessionPanel < Views::Base
       include Phlex::Rails::Helpers::ButtonTo
+
+      ID = "capture-session-panel"
 
       RUN_TO_STATE = {
         "queued" => :queued, "processing" => :processing,
@@ -22,16 +25,12 @@ module Views
       end
 
       def view_template
-        div(data: { pending: pending_count }, class: "flex flex-col gap-4") do
+        div(id: ID, class: "flex flex-col gap-4") do
           @media.any? ? list : empty_state
         end
       end
 
       private
-
-      def pending_count
-        @box.recognition_runs.where(status: %w[queued processing]).count
-      end
 
       def list
         @media.each { |media| rows(media) }

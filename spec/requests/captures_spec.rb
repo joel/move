@@ -102,15 +102,18 @@ RSpec.describe "Captures" do
     end
   end
 
-  describe "GET capture/session" do
-    it "renders the session panel with recognition state" do
+  # #241 — the panel now lives inline on the capture page and updates live over
+  # ActionCable (Captures::SessionBroadcastSubscriber); there is no polled endpoint.
+  describe "GET capture (session panel renders inline)" do
+    it "subscribes to the Box's recognition stream and renders the panel" do
       media = create(:media, move:, box:)
       create(:recognition_run, :succeeded, move:, box:, media:)
 
-      get move_box_capture_session_path(move, box)
+      get move_box_capture_path(move, box)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include('data-pending="0"')
+      expect(response.body).to include("<turbo-cable-stream-source")
+      expect(response.body).to include(%(id="#{Views::Captures::SessionPanel::ID}"))
     end
 
     it "renders recognised items as tappable links to Item Detail once a run succeeds" do
@@ -118,7 +121,7 @@ RSpec.describe "Captures" do
       create(:recognition_run, :succeeded, move:, box:, media:)
       item = create(:item, move:, box:, name: "Espresso machine", source_media: media)
 
-      get move_box_capture_session_path(move, box)
+      get move_box_capture_path(move, box)
 
       expect(response.body).to include(%(href="#{move_item_path(move, item)}"))
       expect(response.body).to include("Espresso machine")
@@ -130,7 +133,7 @@ RSpec.describe "Captures" do
                                         error_message: "RecognitionProviders::Openai request failed (429): " \
                                                        "You exceeded your current quota, please check your plan and billing details.")
 
-      get move_box_capture_session_path(move, box)
+      get move_box_capture_path(move, box)
 
       expect(response.body).to include(I18n.t("ui.recognition_errors.quota"))
     end
@@ -140,7 +143,7 @@ RSpec.describe "Captures" do
       create(:recognition_run, :failed, move:, box:, media:,
                                         error_message: "RecognitionProviders::Openai request failed (500): The model glitched.")
 
-      get move_box_capture_session_path(move, box)
+      get move_box_capture_path(move, box)
 
       expect(response.body).to include("The model glitched.")
       expect(response.body).not_to include("RecognitionProviders::Openai")
@@ -151,7 +154,7 @@ RSpec.describe "Captures" do
       create(:recognition_run, :failed, move:, box:, media:,
                                         error_message: "RecognitionProviders::Openai returned a 2xx with no objects array")
 
-      get move_box_capture_session_path(move, box)
+      get move_box_capture_path(move, box)
 
       # Apostrophe-free slice of ui.recognition_errors.generic (the rendered HTML
       # escapes the "couldn't" apostrophe).
