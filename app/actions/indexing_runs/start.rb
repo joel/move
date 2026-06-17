@@ -15,15 +15,20 @@ module IndexingRuns
     def call(move:, provider: nil)
       provider = (provider || move.embedding_provider).to_s
       supersede_active(move)
+      # Snapshot the item ids once: total_count and the enqueued jobs MUST agree.
+      # If an item were deleted between a count() and a separate ids() query, the
+      # run would expect more completions than there are jobs and stay processing
+      # forever — locking the selector. The same list feeds reembed_move.
+      item_ids = move.items.ids
       run = move.indexing_runs.create!(
-        provider: provider, total_count: move.items.count, status: "queued", started_at: Time.current
+        provider: provider, total_count: item_ids.size, status: "queued", started_at: Time.current
       )
 
-      if run.total_count.zero?
+      if item_ids.empty?
         run.update!(status: "completed", finished_at: Time.current)
       else
         run.update!(status: "processing")
-        reembed_move(move, run: run)
+        reembed_move(move, run: run, item_ids: item_ids)
       end
 
       broadcast_control(move)
