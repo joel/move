@@ -30,6 +30,7 @@ module Views
             Move::EMBEDDING_PROVIDERS.each { |provider| option(provider) }
           end
           needs_key_hint
+          span(class: "text-body-sm text-muted") { t("keyword_note") }
           span(class: "text-body-md text-on-surface-variant") { t("reindex_note") }
           render Components::Ui::AiIndexingStatus.new(run: @run)
         end
