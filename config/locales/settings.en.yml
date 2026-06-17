@@ -14,6 +14,25 @@ en:
         units: "Measurement Units"
         metric: "Metric"
         imperial: "Imperial"
+      ai_capability:
+        title: "AI Capability"
+        subtitle: >-
+          Add a key once, then pick where to use it below. Keys are stored
+          encrypted for this move and never shown in full.
+        admin_only: "Only move admins can manage AI keys."
+        status_set: "Key set"
+        status_unset: "Not set"
+        save: "Save key"
+        remove: "Remove"
+        api_key_placeholder: "Paste %{provider} API key"
+        powers:
+          recognition: "Recognition"
+          search: "Search"
+        providers:
+          openai: "OpenAI"
+          anthropic: "Anthropic"
+          gemini: "Gemini"
+          voyage: "Voyage"
       recognition:
         title: "AI Recognition"
         threshold: "Auto-confirm Confidence"
@@ -24,19 +43,16 @@ en:
         more_handsfree: "More hands-free"
         providers:
           title: "Recognition & AI"
-          subtitle: "Choose your AI vision provider and manage your API keys."
+          subtitle: "Choose your AI vision provider. Add its key in AI Capability above."
           provider_label: "Provider"
           model_label: "Model"
           model_change: "Change"
           model_default_prefix: "Default:"
           model_help: "Optional. Leave blank to use the recommended default."
-          api_key_label: "API Key"
-          api_key_placeholder: "Paste this move's API key"
-          api_key_help: "Used only for this move. Stored encrypted."
-          remove_key: "Remove key"
-          save: "Save provider"
+          save: "Save model"
           status_active: "Active"
           status_key_required: "Key required"
+          needs_key: "Add a key in AI Capability"
           admin_only: "Only move admins can change the AI provider and keys."
           options:
             fake: "Demo (no key)"
@@ -45,14 +61,17 @@ en:
             gemini: "Gemini"
         embeddings:
           title: "Semantic search"
-          subtitle: "Rank search results by meaning, not just keywords. Uses your OpenAI key above."
+          subtitle: "Rank search results by meaning, not just keywords. Pick a provider keyed in AI Capability above."
           status_active: "On"
           status_key_required: "Key required"
           status_off: "Off"
-          label_off: "Off"
-          label_on: "On"
-          key_required_help: "Add your OpenAI key above, then turn this on."
-          reindex_note: "Turning this on re-embeds every item — results improve once it finishes."
+          needs_key: "Add a key in AI Capability"
+          reindex_note: "Switching the provider re-embeds every item — results improve once it finishes."
+          options:
+            fake: "Off"
+            openai: "OpenAI"
+            gemini: "Gemini"
+            voyage: "Voyage"
           indexing:
             progress_label: "Indexing"
             in_progress: "Indexing %{done} of %{total} items…"
@@ -72,13 +91,18 @@ en:
       threshold_changed: "Auto-confirm threshold updated."
       threshold_invalid: "Choose a confidence between 0 and 1."
       read_only: "This move is archived and can't be changed."
-    update_recognition_provider:
-      changed: "Recognition provider updated."
-      api_key_required: "Add an API key for that provider first."
+    update_provider_key:
+      key_saved: "API key saved."
+      api_key_required: "Paste an API key first."
       invalid: "That provider is not available."
       read_only: "This move is archived and can't be changed."
-    remove_recognition_key:
+    remove_provider_key:
       key_removed: "API key removed."
+      invalid: "That provider is not available."
+      read_only: "This move is archived and can't be changed."
+    update_recognition_provider:
+      changed: "Recognition provider updated."
+      api_key_required: "Add a key for that provider in AI Capability first."
       invalid: "That provider is not available."
       read_only: "This move is archived and can't be changed."
     update_embedding_provider:

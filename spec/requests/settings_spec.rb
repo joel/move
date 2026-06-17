@@ -55,17 +55,19 @@ RSpec.describe "Settings" do
       expect(response).to have_http_status(:not_found)
     end
 
-    it "renders the recognition provider panel masked, never leaking the raw key, for an admin" do
-      move.update!(recognition_provider: "openai", openai_api_key: "sk-supersecret-1234")
+    it "renders the AI Capability keys masked, never leaking the raw key, for an admin (#242)" do
+      move.update!(openai_api_key: "sk-supersecret-1234")
 
       get move_settings_path(move)
 
-      expect(response.body).to include(I18n.t("settings.show.recognition.providers.subtitle"))
-      expect(response.body).to include("••••••••1234") # last4 only
+      expect(response.body).to include(I18n.t("settings.show.ai_capability.title"))
+      expect(response.body).to include("••••1234") # last4 only
       expect(response.body).not_to include("sk-supersecret-1234")
+      # Every key-holding vendor has a row.
+      expect(response.body).to include(I18n.t("settings.show.ai_capability.providers.voyage"))
     end
 
-    it "shows the active provider read-only (no key field) for a contributor" do
+    it "shows the active provider read-only (no key field, no AI Capability) for a contributor" do
       move.update!(recognition_provider: "openai", openai_api_key: "sk-supersecret-1234")
       contributor = create(:user)
       create(:move_membership, move:, user: contributor, role: "contributor")
@@ -75,7 +77,38 @@ RSpec.describe "Settings" do
 
       expect(response.body).to include(I18n.t("settings.show.recognition.providers.options.openai"))
       expect(response.body).not_to include('name="move[api_key]"')
+      # No AI Capability write surface for a contributor.
+      expect(response.body).not_to include(move_settings_provider_key_path(move))
       expect(response.body).not_to include("sk-supersecret-1234")
+    end
+
+    it "disables a keyless real provider in the selector and enables a keyed one (#242)" do
+      move.update!(openai_api_key: "sk-live") # OpenAI keyed; Gemini/Anthropic not
+
+      get move_settings_path(move)
+
+      # Keyed → a real switch form; keyless → a disabled chip with the needs-key hint.
+      expect(response.body).to include("action=\"#{move_settings_recognition_provider_path(move)}\"")
+      expect(response.body).to include(I18n.t("settings.show.recognition.providers.needs_key"))
+    end
+
+    it "renders the panel_card bodies (recognition selector, threshold, search control), not empty cards (#242)" do
+      get move_settings_path(move)
+
+      expect(response.body).to include(I18n.t("settings.show.recognition.providers.provider_label")) # recognition selector
+      expect(response.body).to include(I18n.t("settings.show.recognition.threshold")) # threshold block
+      expect(response.body).to include('id="ai-embedding-control"') # search control
+    end
+
+    it "carries a provider's stored model override in its switch pill, so switching preserves it (#242)" do
+      # OpenAI keyed with a saved override, but fake is active → the OpenAI pill is
+      # a switch form that must resubmit gpt-5 (else switching clears the override).
+      move.update!(recognition_provider: "fake", openai_api_key: "sk-live", openai_model: "gpt-5")
+
+      get move_settings_path(move)
+
+      expect(response.body).to include('name="move[model]"')
+      expect(response.body).to include('value="gpt-5"')
     end
 
     it "renders the editable model field for an admin (#187)" do
@@ -165,23 +198,12 @@ RSpec.describe "Settings" do
     end
   end
 
-  describe "PATCH /moves/:move_id/settings/recognition_provider" do
-    it "sets the provider and stores the key for an admin" do
-      patch move_settings_recognition_provider_path(move),
-            params: { move: { recognition_provider: "openai", api_key: "sk-live" } }
+  describe "PATCH /moves/:move_id/settings/provider_key (#242)" do
+    it "stores a vendor key for an admin" do
+      patch move_settings_provider_key_path(move), params: { move: { provider: "anthropic", api_key: "a-live" } }
 
       expect(response).to redirect_to(move_settings_path(move))
-      move.reload
-      expect(move.recognition_provider).to eq("openai")
-      expect(move.openai_api_key).to eq("sk-live")
-    end
-
-    it "persists a model override submitted alongside the provider (#187)" do
-      patch move_settings_recognition_provider_path(move),
-            params: { move: { recognition_provider: "openai", api_key: "sk-live", model: "gpt-5" } }
-
-      expect(response).to redirect_to(move_settings_path(move))
-      expect(move.reload.openai_model).to eq("gpt-5")
+      expect(move.reload.anthropic_api_key).to eq("a-live")
     end
 
     it "forbids a contributor (keys are admin-only)" do
@@ -189,27 +211,18 @@ RSpec.describe "Settings" do
       create(:move_membership, move:, user: contributor, role: "contributor")
       stub_current_user(contributor)
 
-      patch move_settings_recognition_provider_path(move),
-            params: { move: { recognition_provider: "openai", api_key: "sk-live" } }
+      patch move_settings_provider_key_path(move), params: { move: { provider: "openai", api_key: "sk-live" } }
 
       expect(response).to have_http_status(:forbidden)
-      expect(move.reload.recognition_provider).to eq("fake")
-    end
-
-    it "redirects with an error when a real provider is selected without a key" do
-      patch move_settings_recognition_provider_path(move),
-            params: { move: { recognition_provider: "gemini", api_key: "" } }
-
-      expect(response).to redirect_to(move_settings_path(move))
-      expect(move.reload.recognition_provider).to eq("fake")
+      expect(move.reload.openai_api_key).to be_nil
     end
   end
 
-  describe "DELETE /moves/:move_id/settings/recognition_provider/:provider" do
+  describe "DELETE /moves/:move_id/settings/provider_key/:provider (#242)" do
     it "removes the stored key for an admin" do
-      move.update!(recognition_provider: "openai", openai_api_key: "sk-live")
+      move.update!(openai_api_key: "sk-live")
 
-      delete move_settings_remove_recognition_key_path(move, provider: "openai")
+      delete move_settings_remove_provider_key_path(move, provider: "openai")
 
       expect(response).to redirect_to(move_settings_path(move))
       expect(move.reload.openai_api_key).to be_nil
@@ -221,10 +234,38 @@ RSpec.describe "Settings" do
       create(:move_membership, move:, user: contributor, role: "contributor")
       stub_current_user(contributor)
 
-      delete move_settings_remove_recognition_key_path(move, provider: "openai")
+      delete move_settings_remove_provider_key_path(move, provider: "openai")
 
       expect(response).to have_http_status(:forbidden)
       expect(move.reload.openai_api_key).to eq("sk-live")
+    end
+  end
+
+  describe "PATCH /moves/:move_id/settings/recognition_provider" do
+    it "switches the provider for an admin (key already stored)" do
+      move.update!(openai_api_key: "sk-live")
+
+      patch move_settings_recognition_provider_path(move), params: { move: { recognition_provider: "openai" } }
+
+      expect(response).to redirect_to(move_settings_path(move))
+      expect(move.reload.recognition_provider).to eq("openai")
+    end
+
+    it "persists a model override alongside the provider (#187)" do
+      move.update!(openai_api_key: "sk-live")
+
+      patch move_settings_recognition_provider_path(move),
+            params: { move: { recognition_provider: "openai", model: "gpt-5" } }
+
+      expect(response).to redirect_to(move_settings_path(move))
+      expect(move.reload.openai_model).to eq("gpt-5")
+    end
+
+    it "redirects with an error when a real provider is selected without a stored key" do
+      patch move_settings_recognition_provider_path(move), params: { move: { recognition_provider: "gemini" } }
+
+      expect(response).to redirect_to(move_settings_path(move))
+      expect(move.reload.recognition_provider).to eq("fake")
     end
   end
 

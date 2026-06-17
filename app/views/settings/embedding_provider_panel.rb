@@ -2,11 +2,11 @@
 
 module Views
   module Settings
-    # #232 — per-Move semantic-search (embedding) provider. A plain Off/On toggle
-    # (fake/openai) that reuses the Move's OpenAI key from the recognition panel
-    # above — there is no separate key field. Admins get the toggle; everyone else
-    # sees the active state read-only. Turning it on enqueues a per-Move reindex.
-    # Rendered inside the Settings recognition card, below the recognition panel.
+    # #232 / #242 — per-Move semantic-search (embedding) provider selector
+    # (fake/openai/gemini/voyage). Keys are managed in the shared AI Capability
+    # panel; this is a pure chooser. Admins get the interactive selector (with the
+    # live #239 indexing status); everyone else sees the active provider read-only.
+    # Its own card in the Settings AI region.
     class EmbeddingProviderPanel < Views::Base
       include Phlex::Rails::Helpers::Routes
       include Phlex::Rails::Helpers::TurboStreamFrom
@@ -17,7 +17,7 @@ module Views
       end
 
       def view_template
-        div(class: "flex flex-col gap-4 border-b border-card-border pb-6") do
+        div(class: "flex flex-col gap-4") do
           # Subscribe to this Move's indexing stream so re-embedding progress (and
           # the selector unlocking on completion) arrives live over ActionCable —
           # no polling (#239). The signed name binds to the tenant-unique Move.
@@ -38,7 +38,7 @@ module Views
       def status_chip
         if @move.embedding_provider_ready?
           chip(t("status_active"), "bg-accent-sage/20 text-accent-sage")
-        elsif @move.embedding_provider == "openai"
+        elsif Move::REAL_EMBEDDING_PROVIDERS.include?(@move.embedding_provider)
           chip(t("status_key_required"), "bg-secondary/20 text-secondary")
         else
           chip(t("status_off"), "bg-surface-container-high text-on-surface-variant")
@@ -50,8 +50,9 @@ module Views
       end
 
       def readonly
-        label = @move.embedding_provider == "openai" ? t("label_on") : t("label_off")
-        span(class: "self-start rounded-full bg-surface-container-high px-4 py-2 text-body-md text-text-warm") { label }
+        span(class: "self-start rounded-full bg-surface-container-high px-4 py-2 text-body-md text-text-warm") do
+          t("options.#{@move.embedding_provider}")
+        end
       end
 
       def t(key)

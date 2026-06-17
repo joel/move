@@ -34,13 +34,37 @@ class SettingsController < MoveScopedController
     end
   end
 
-  # PATCH /moves/:move_id/settings/recognition_provider (admin-only — keys are
-  # secrets, mirroring integration tokens).
+  # PATCH /moves/:move_id/settings/provider_key (admin-only — keys are secrets,
+  # mirroring integration tokens). Sets one vendor's key in the shared AI
+  # Capability panel (#242).
+  def update_provider_key
+    write_setting(
+      Moves::SetProviderKey, policy: :manage_recognition_keys?,
+                             provider: settings_param(:provider), api_key: settings_param(:api_key)
+    ) do |result|
+      if result.success? then t(".key_saved")
+      elsif result.failure == :api_key_required then t(".api_key_required")
+      else t(".invalid")
+      end
+    end
+  end
+
+  # DELETE /moves/:move_id/settings/provider_key/:provider (admin-only).
+  def remove_provider_key
+    write_setting(
+      Moves::RemoveProviderKey, policy: :manage_recognition_keys?, provider: params[:provider]
+    ) do |result|
+      result.success? ? t(".key_removed") : t(".invalid")
+    end
+  end
+
+  # PATCH /moves/:move_id/settings/recognition_provider (admin-only). Selector +
+  # model only; the key is managed via update_provider_key (#242).
   def update_recognition_provider
     write_setting(
       Moves::SetRecognitionProvider, policy: :manage_recognition_keys?,
                                      provider: settings_param(:recognition_provider),
-                                     api_key: settings_param(:api_key), model: settings_param(:model)
+                                     model: settings_param(:model)
     ) do |result|
       if result.success? then t(".changed")
       elsif result.failure == :api_key_required then t(".api_key_required")
@@ -49,23 +73,13 @@ class SettingsController < MoveScopedController
     end
   end
 
-  # PATCH /moves/:move_id/settings/embedding_provider (admin-only — reuses the
-  # Move's OpenAI key and bills against it, like the recognition provider).
+  # PATCH /moves/:move_id/settings/embedding_provider (admin-only).
   def update_embedding_provider
     write_setting(
       Moves::SetEmbeddingProvider, policy: :manage_recognition_keys?,
                                    provider: settings_param(:embedding_provider)
     ) do |result|
       result.success? ? t(".changed") : t(".invalid")
-    end
-  end
-
-  # DELETE /moves/:move_id/settings/recognition_provider/:provider (admin-only).
-  def remove_recognition_key
-    write_setting(
-      Moves::RemoveRecognitionKey, policy: :manage_recognition_keys?, provider: params[:provider]
-    ) do |result|
-      result.success? ? t(".key_removed") : t(".invalid")
     end
   end
 

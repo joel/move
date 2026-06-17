@@ -43,10 +43,17 @@ RSpec.describe Activity::RecordSubscriber do
     expect(Activity.last.metadata).to include("provider" => "openai", "model" => "gpt-5")
   end
 
-  it "records a recognition key removal" do
-    expect { emit("move.recognition_key_removed", move_id: move.id, actor_id: actor.id, provider: "gemini") }
+  it "records an AI Capability key being set, keeping the provider in metadata (#242)" do
+    expect { emit("move.provider_key_set", move_id: move.id, actor_id: actor.id, provider: "voyage") }
       .to change(Activity, :count).by(1)
-    expect(Activity.last.action).to eq("move.recognition_key_removed")
+    expect(Activity.last.action).to eq("move.provider_key_set")
+    expect(Activity.last.metadata).to include("provider" => "voyage")
+  end
+
+  it "records an AI Capability key removal (#242)" do
+    expect { emit("move.provider_key_removed", move_id: move.id, actor_id: actor.id, provider: "gemini") }
+      .to change(Activity, :count).by(1)
+    expect(Activity.last.action).to eq("move.provider_key_removed")
   end
 
   it "skips events it does not map" do

@@ -1,33 +1,28 @@
 # frozen_string_literal: true
 
 module Moves
-  # Sets a Move's active Recognition provider and, optionally, that provider's own
-  # API key (#185 — per-Move bring-your-own-key). Strict BYO: selecting a real
-  # provider (openai/anthropic/gemini) requires a key — newly submitted or already
-  # stored — so recognition never falls back to a shared deployment account.
-  #
-  # A blank api_key leaves the stored key untouched (the UI shows a mask, not the
-  # real value, so an empty field means "keep"). The model override (#187) is the
-  # opposite: it IS shown, so a blank or default-matching value clears the override
-  # and the adapter falls back to its DEFAULT_MODEL. `fake` needs neither. Emits an
-  # event matching what changed — move.recognition_provider_changed on a provider
-  # switch, move.recognition_model_changed when only the model override changed —
-  # so the activity feed never reads a model edit as a provider switch (#187). The
-  # key value is never logged or emitted. The caller (controller) owns
-  # authorization (admin) and the archived read-only guard.
+  # Sets a Move's active Recognition provider and (for a real provider) its model
+  # override. The key itself is managed separately in the shared AI Capability
+  # panel (Moves::SetProviderKey, #242), so this action no longer takes one. Strict
+  # BYO still holds: a real provider can only be selected once its key is stored
+  # (the UI also disables keyless options), so recognition never falls back to a
+  # shared account. The model override (#187) IS shown, so a blank or
+  # default-matching value clears it and the adapter falls back to DEFAULT_MODEL.
+  # `fake` needs neither. Emits an event matching what changed —
+  # move.recognition_provider_changed on a switch, move.recognition_model_changed
+  # when only the model override changed — so the feed never reads a model edit as
+  # a provider switch (#187). The caller owns authorization (admin) and the
+  # archived read-only guard.
   class SetRecognitionProvider < BaseAction
-    def call(move:, provider:, api_key: nil, model: nil, actor: nil)
+    def call(move:, provider:, model: nil, actor: nil)
       provider = provider.to_s
-      api_key = api_key.to_s.strip
       model = model.to_s.strip
 
       yield ensure_writable(move)
       yield validate(provider)
-      yield ensure_key_present(move, provider, api_key)
+      yield ensure_key_present(move, provider)
       before = { provider: move.recognition_provider, model: move.recognition_model_for(provider) }
-      embedding_ready_before = move.embedding_provider_ready?
-      yield with_responsible(actor) { persist(move, provider, api_key, model) }
-      reembed_if_embedding_space_flipped(move, embedding_ready_before)
+      yield with_responsible(actor) { persist(move, provider, model) }
       yield emit_event(move, actor, provider, before)
       Success(move)
     end
@@ -40,25 +35,20 @@ module Moves
       Success(provider)
     end
 
-    # Real provider must end up with a key: the one just submitted, or one already
-    # stored for that provider. fake needs none.
-    def ensure_key_present(move, provider, api_key)
+    # Strict BYO: a real provider can only be selected once its key is stored (set
+    # in the AI Capability panel). fake needs none.
+    def ensure_key_present(move, provider)
       return Success() unless Move::REAL_RECOGNITION_PROVIDERS.include?(provider)
-      return Success() if api_key.present? || move.recognition_api_key_for(provider).present?
+      return Success() if move.recognition_api_key_for(provider).present?
 
       Failure(:api_key_required)
     end
 
-    # Only overwrite the key column when a new value was submitted; a blank field
-    # preserves the existing (masked) key. The model override, by contrast, is
-    # always written: blank or default-matching stores nil so the row keeps
-    # tracking the adapter's DEFAULT_MODEL as it evolves.
-    def persist(move, provider, api_key, model)
+    # The model override is always written: blank or default-matching stores nil so
+    # the row keeps tracking the adapter's DEFAULT_MODEL as it evolves.
+    def persist(move, provider, model)
       attrs = { recognition_provider: provider }
-      if Move::REAL_RECOGNITION_PROVIDERS.include?(provider)
-        attrs["#{provider}_api_key"] = api_key if api_key.present?
-        attrs["#{provider}_model"] = model_override(provider, model)
-      end
+      attrs["#{provider}_model"] = model_override(provider, model) if Move::REAL_RECOGNITION_PROVIDERS.include?(provider)
       move.update!(attrs)
       Success(move)
     rescue ActiveRecord::RecordInvalid => e
@@ -99,18 +89,6 @@ module Moves
 
     def notify(name, move, actor, **payload)
       Rails.event.notify(name, move_id: move.id, actor_id: actor&.id, **payload)
-    end
-
-    # Embeddings reuse this Move's openai_api_key (#232). Setting that key here
-    # can flip the Move from "fake" embeddings to real OpenAI ones while the
-    # stored item vectors are still in the old (fake) space — so when readiness
-    # actually changes, null and re-embed the Move (synchronously-null +
-    # background refill). A key rotation (present→present) keeps the same space
-    # for a fixed model, so readiness is unchanged and nothing is re-embedded.
-    def reembed_if_embedding_space_flipped(move, was_ready)
-      return if move.embedding_provider_ready? == was_ready
-
-      IndexingRuns::Start.new.call(move: move, provider: move.embedding_provider)
     end
   end
 end

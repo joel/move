@@ -173,7 +173,7 @@ action emits and returns; it **never** calls a subscriber directly.
 | `box` | `description_suggested` | `box_id, source` | — (advisory) |
 | `item` | `created` `updated` `moved` `removed` `deleted` `restored` `undeleted` | `item_id, box_id, move_id` (+ `created_via`, `to_box_id`, `batch_id`) | A; **S** for `created`/`updated`/`moved` |
 | `media` | `captured` | `media_id, box_id, move_id` | A |
-| `move` | `created` `unit_system_changed` `auto_confirm_threshold_changed` `recognition_provider_changed` `recognition_model_changed` `recognition_key_removed` `summary_viewed` | `move_id` (+ changed value) | A (`summary_viewed` low-signal) |
+| `move` | `created` `unit_system_changed` `auto_confirm_threshold_changed` `recognition_provider_changed` `recognition_model_changed` `provider_key_set` `provider_key_removed` `embedding_provider_changed` `summary_viewed` | `move_id` (+ changed value / `provider`) | A (`summary_viewed` low-signal) |
 | `move_membership` | `added` `role_changed` `removed` | `move_id, user_id, role` | A |
 | `integration_token` | `created` `revoked` | `move_id, token_id` | A, **X** |
 | `vocabulary` | `created` `updated` `removed` | `move_id, kind, record_id` | A |
@@ -236,7 +236,8 @@ app/actions/
 ├── manifests/      generate
 ├── move_integration_tokens/   create · revoke
 ├── move_memberships/          add · change_role · remove · admin_guard
-├── moves/          create · set_unit_system · set_auto_confirm_threshold · set_recognition_provider · remove_recognition_key · volume_summary · default_vocabularies
+├── indexing_runs/  start · record_progress
+├── moves/          create · set_unit_system · set_auto_confirm_threshold · set_recognition_provider · set_embedding_provider · set_provider_key · remove_provider_key · volume_summary · default_vocabularies
 ├── organizations/  create
 ├── qr/             resolve
 ├── recognition_runs/   enqueue · process · retry

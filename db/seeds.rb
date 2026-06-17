@@ -114,6 +114,16 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   # in the Settings "Recognition & AI" panel reveals "gpt-5" pre-filled in the
   # editable Model field.
   move.update!(openai_model: "gpt-5") unless move.openai_model == "gpt-5"
+  # #242 — showcase the shared "AI Capability" panel. Placeholder keys (never
+  # real) for three vendors so the panel renders "Key set ••••" rows and the
+  # Recognition/Semantic Search selectors light up their keyed options; Anthropic
+  # is left unset so a "Not set" row + a disabled "needs key" pill also show. The
+  # active providers stay `fake` (offline), so no real API call is ever made.
+  move.update!(
+    openai_api_key: move.openai_api_key.presence || "demo-openai-key-0001",
+    gemini_api_key: move.gemini_api_key.presence || "demo-gemini-key-0002",
+    voyage_api_key: move.voyage_api_key.presence || "demo-voyage-key-0003"
+  )
   # F1 — all three D11 roles represented on the demo Move. `invitee` is
   # deliberately left off so the "Add member" form has a candidate to show.
   move.move_memberships.find_or_create_by!(user: owner) { |mm| mm.role = "admin" }

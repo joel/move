@@ -23,6 +23,10 @@ class Move < ApplicationRecord
   # key — Anthropic has no embeddings API, so Anthropic stays recognition-only).
   EMBEDDING_PROVIDERS = %w[fake openai gemini voyage].freeze
   REAL_EMBEDDING_PROVIDERS = (EMBEDDING_PROVIDERS - %w[fake]).freeze
+  # Every provider that holds an encrypted key — the union of the real recognition
+  # and embedding providers. The shared "AI Capability" panel manages exactly these
+  # (#242); a key entered once powers whichever features list that provider.
+  PROVIDER_KEYS = (REAL_RECOGNITION_PROVIDERS | REAL_EMBEDDING_PROVIDERS).freeze
 
   # Per-Move provider API keys, encrypted at rest (ActiveRecord::Encryption — keys
   # in credentials.active_record_encryption). Never tracked by Logidze (its
@@ -81,6 +85,23 @@ class Move < ApplicationRecord
     return true if recognition_provider == "fake"
 
     recognition_api_key_for(recognition_provider).present?
+  end
+
+  # This Move's stored key for any key-holding +provider+ (recognition or
+  # embedding), or nil for an unknown/keyless one. Used by the shared AI Capability
+  # panel + its key actions (#242), which are vendor- rather than feature-scoped.
+  def api_key_for(provider)
+    return nil unless PROVIDER_KEYS.include?(provider.to_s)
+
+    public_send("#{provider}_api_key").presence
+  end
+
+  # The features a stored +provider+ key powers, for the AI Capability badges.
+  def provider_powers(provider)
+    powers = []
+    powers << :recognition if REAL_RECOGNITION_PROVIDERS.include?(provider.to_s)
+    powers << :search if REAL_EMBEDDING_PROVIDERS.include?(provider.to_s)
+    powers
   end
 
   # This Move's stored key for the search-embedding +provider+, or nil for

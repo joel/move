@@ -64,6 +64,10 @@ en:
         auto_confirm_threshold_changed: "changed the auto-confirm threshold"
         recognition_provider_changed: "switched the AI provider to %{provider}"
         recognition_model_changed: "set the %{provider} model to %{model}"
+        provider_key_set: "added the %{provider} API key"
+        provider_key_removed: "removed the %{provider} API key"
+        # Legacy (#242 renamed the event) — kept so historical activity rows
+        # recorded under the old action still render in the append-only feed.
         recognition_key_removed: "removed the %{provider} API key"
         embedding_provider_changed: "switched semantic search to %{provider}"
         summary_viewed: "viewed the summary"
