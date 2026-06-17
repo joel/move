@@ -111,6 +111,10 @@ Rails.application.routes.draw do
           to: "settings#update_recognition_provider", as: :settings_recognition_provider
     delete "settings/recognition_provider/:provider",
            to: "settings#remove_recognition_key", as: :settings_remove_recognition_key
+    # #232 — per-Move semantic-search (embedding) provider (admin-only). Reuses the
+    # Move's OpenAI key; switching it re-embeds every item.
+    patch "settings/embedding_provider",
+          to: "settings#update_embedding_provider", as: :settings_embedding_provider
     resources :integration_tokens, only: %i[create destroy]
   end
   resources :posts

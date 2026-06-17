@@ -116,6 +116,7 @@ module Views
       def recognition_section
         setting_card(I18n.t("settings.show.recognition.title")) do
           render Views::Settings::RecognitionProviderPanel.new(move: @move, manage: @manage_recognition)
+          render Views::Settings::EmbeddingProviderPanel.new(move: @move, manage: @manage_recognition)
           threshold_block
         end
       end

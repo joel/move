@@ -1,23 +1,38 @@
 # AI providers (recognition + embeddings)
 
+<!-- Both recognition (#185) and embeddings (#232) are per-Move bring-your-own-key. -->
+
+
 Move's AI layer is **provider-agnostic**: domain code talks to
 `RecognitionProviders` / `EmbeddingProviders`, never a vendor API.
 
-The two capabilities are scoped differently (#185):
+**Both capabilities are now per-Move, bring-your-own-key** (recognition #185,
+embeddings #232) — there is **no app-wide AI key**:
 
-- **Recognition is per-Move, bring-your-own-key.** Each Move chooses its provider
-  and supplies its **own** API key in **Settings → Recognition & AI** (admin-only).
-  There is no shared app-wide recognition account — a Move never bills another
-  tenant's key. The default is the deterministic, network-free **`fake`** provider
-  (no key, no cost), so the app and CI run for free.
-- **Embeddings are still app-wide**, chosen by `EMBEDDING_PROVIDER` and the
-  deployment's `OPENAI_API_KEY`. Per-Move recognition keys do **not** feed
-  embeddings (out of scope for #185).
+- **Recognition is per-Move BYO.** Each Move chooses its provider and supplies its
+  **own** API key in **Settings → Recognition & AI** (admin-only). The default is
+  the deterministic, network-free **`fake`** provider (no key, no cost).
+- **Embeddings are per-Move BYO too** (#232). A Move opts into semantic search in
+  **Settings → Semantic search** (admin-only); it **reuses that Move's existing
+  encrypted `openai_api_key`** — there is no separate embedding key column. The
+  default is **`fake`** (token-hashed pseudo-vectors, lexical-proxy only). Unlike
+  recognition, embeddings **degrade gracefully**: openai-without-a-key falls back
+  to `fake` rather than erroring.
+
+> The app-wide `OPENAI_API_KEY` / `EMBEDDING_PROVIDER` env vars are **no longer
+> read by the code** as of #232, but the deploy **still requires them**:
+> `config/deploy.yml`, `.github/workflows/deploy.yml` (export **and** the
+> required-secrets check), and `.kamal/secrets` all still reference
+> `OPENAI_API_KEY`. **Do not delete the Doppler secret yet** — the deploy's
+> required-secret check would fail before Kamal runs. Removing the references and
+> the secret together is a tracked follow-up (#234 / step 7 of
+> `embeddings-byo-migration-plan.md`): drop the workflow check first, then the
+> Doppler secret.
 
 | Capability | Module | Selector | Adapters | Default model (openai) |
 |---|---|---|---|---|
 | Image recognition | `app/services/recognition_providers/` | **per Move** (`moves.recognition_provider` + encrypted `*_api_key`) | `fake` (default), `openai`, `anthropic`, `gemini` | `gpt-5-mini` |
-| Text embeddings (D8 search) | `app/services/embedding_providers/` | `EMBEDDING_PROVIDER` (env) | `fake` (default), `openai` | `text-embedding-3-small` @ 1536d |
+| Text embeddings (D8 search) | `app/services/embedding_providers/` | **per Move** (`moves.embedding_provider`, reuses encrypted `openai_api_key`) | `fake` (default), `openai` | `text-embedding-3-small` @ 1536d |
 
 ### How a recognition provider is resolved (per Move)
 
@@ -46,6 +61,44 @@ flowchart LR
   H -->|yes| V[POST to vendor → normalized Result]
   H -->|no| M["raise Base::MissingApiKey<br/>(no network) → run failed,<br/>error_category :missing_key"]
 ```
+
+### How an embedding provider is resolved (per Move)
+
+Both the indexing path (`Search::RefreshDocument`, run per item by
+`Search::RefreshDocumentJob`) and the query path (`Search::Items`) call
+`EmbeddingProviders.for_move(move)`. It returns the **OpenAI adapter built with
+the Move's own `openai_api_key`** only when the Move is *embedding-ready*
+(`embedding_provider == "openai"` **and** a key is stored); otherwise it returns
+the network-free **`Fake`** embedder. Because the same resolver feeds both stored
+item vectors and the query vector, the two always live in the **same vector
+space** — the precondition for cosine ranking to mean anything.
+
+```mermaid
+flowchart LR
+  subgraph index[Index path]
+    RD["Search::RefreshDocument"]
+  end
+  subgraph query[Query path]
+    SI["Search::Items"]
+  end
+  RD --> F["EmbeddingProviders.for_move(move)"]
+  SI --> F
+  F --> G{embedding_provider_ready?<br/>openai && openai_api_key}
+  G -->|yes| O["Openai.new(api_key: move.openai_api_key)<br/>text-embedding-3-small @ 1536d"]
+  G -->|no| K[Fake embedder — token-hashed, no key]
+```
+
+**Switching the provider re-embeds the Move.** `Moves::SetEmbeddingProvider`
+persists the flag and enqueues one `Search::RefreshDocumentJob` per item, so the
+stored vectors move into the new space. Switching is admin-only
+(`MovePolicy#manage_recognition_keys?`) and emits `move.embedding_provider_changed`.
+
+> **Why orphaned vectors were nulled (#232 migration).** The pre-existing prod
+> vectors were computed under the old app-wide key (openai space). After the
+> cutover every Move defaults to `fake` (a different space), so a one-off data
+> migration nulls every `item_search_documents.embedding`. Search falls back to
+> lexical+trigram until a Move opts into openai (which reindexes with its key) or
+> an item is next edited (reindexed in the Move's current space).
 
 ### Recognition detection contract
 
@@ -95,7 +148,8 @@ With the fakes (the default everywhere unless flipped):
   **lexical + trigram only**.
 
 Functional, but not the real product experience. A per-Move provider key turns on
-genuine vision recognition; `EMBEDDING_PROVIDER=openai` turns on semantic search.
+genuine vision recognition; flipping **Settings → Semantic search** to On (with the
+Move's OpenAI key set) turns on real semantic search.
 
 ## Enabling real recognition (per Move — no deploy)
 
@@ -121,28 +175,26 @@ env vars are **no longer used** for recognition (they were removed in #185).
 > `claude-haiku-4-5-20251001`, `gemini-2.5-flash`). These are current-generation
 > defaults; changing them is a code change, not configuration.
 
-## Enabling OpenAI **embeddings** in production (env, deploy)
+## Enabling OpenAI **embeddings** (per Move — no deploy)
 
-Embeddings (D8 semantic search) remain app-wide and key-gated by env.
+Like recognition, semantic search is configured entirely in-app, with **no env var
+and no deploy** (#232):
 
-> **Ordering is load-bearing.** If `EMBEDDING_PROVIDER=openai` is set **before**
-> `OPENAI_API_KEY` exists in the environment, every embedding goes nil. **Add the
-> key first.**
+> **Cost:** OpenAI embedding calls are **pay-per-call**, billed to **the key the
+> Move owner supplies** (the same `openai_api_key` recognition uses). Turning it on
+> re-embeds every item in the Move (a burst of calls), then one call per item edit.
 
-1. **Add the secret to Doppler** (`move/prd`):
-   `doppler secrets set OPENAI_API_KEY=sk-… --project move --config prd`. The
-   Doppler→GitHub Actions integration syncs it into the Deploy workflow secrets.
-   `.kamal/secrets` is gated on `KAMAL_SECRETS_FROM_ENV`: CI reads the synced env;
-   a **local** deploy reads from the Doppler CLI. Rotating requires a redeploy.
-2. **Already referenced in config** (committed): `.kamal/secrets` resolves
-   `OPENAI_API_KEY`; `.github/workflows/deploy.yml` exports it into the runner;
-   `config/deploy.yml` `env.secret` includes it and `env.clear` sets
-   `EMBEDDING_PROVIDER: openai` (optional `OPENAI_EMBEDDING_MODEL`).
-3. **Deploy** (push to `main`), then **backfill** real vectors across tenants:
-   ```bash
-   kamal app exec --reuse 'bin/rails search:reindex'
-   ```
-4. **Smoke-test:** run a semantic search (synonym, not exact token) → relevant hits.
+1. Sign in as a **Move admin** and open **Settings → Recognition & AI**. Make sure
+   the Move's **OpenAI key** is set (it is shared with recognition).
+2. Flip **Semantic search** to **On**. The status chip turns **On**; if no key is
+   present yet it reads **Key required** and search silently stays lexical+trigram.
+3. The switch enqueues a per-Move reindex (`Search::RefreshDocumentJob` per item)
+   that recomputes vectors with the Move's key. Once it drains, run a semantic
+   search (a synonym, not an exact token) → relevant hits.
+
+Switch back to **Off** any time to drop to the network-free `fake` embedder (a
+reindex moves the stored vectors back into the fake space). To reindex every tenant
+from the CLI (e.g. after a bulk change): `kamal app exec --reuse 'bin/rails search:reindex'`.
 
 ## Accepted image formats
 
@@ -184,17 +236,17 @@ can't be regenerated locally (no HEVC encoder in the toolchain).
 
 - **Recognition:** switch the Move's provider to **Demo (no key)** in Settings
   (or **Remove key**). Per-Move, instant, no deploy.
-- **Embeddings:** set `EMBEDDING_PROVIDER` back to `fake` (or unset) in
-  `config/deploy.yml` and redeploy. Stored real vectors stay valid; new items
-  fall back to fake vectors. No schema change.
+- **Embeddings:** flip the Move's **Settings → Semantic search** to **Off**
+  (or **Remove key** in Recognition & AI). Per-Move, no deploy; the off-switch
+  reindexes the Move's items back into the fake space.
 
 ## Local development
 
 Recognition defaults to `fake` for every Move — no key needed. To exercise a real
 recognition adapter locally, open **Settings → Recognition & AI** on a Move, pick a
-provider and paste a key (no restart). Embeddings still default to the env `fake`;
-set `OPENAI_API_KEY` + `EMBEDDING_PROVIDER=openai` and `bin/cli app restart` to
-exercise real embeddings.
+provider and paste a key (no restart). Embeddings work the same way: paste an OpenAI
+key, flip **Settings → Semantic search** to On, and the per-Move reindex computes
+real vectors (no env var, no restart).
 
 > The app's first `ActiveRecord::Encryption` setup landed with #185 — the three
 > encryption keys live in `config/credentials.yml.enc`
@@ -203,4 +255,4 @@ exercise real embeddings.
 
 ---
 
-_Last updated: 2026-06-15, per-Move BYO recognition keys + AR encryption (#185)._
+_Last updated: 2026-06-16, per-Move BYO embeddings reusing the Move's OpenAI key (#232)._

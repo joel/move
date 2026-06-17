@@ -49,6 +49,17 @@ class SettingsController < MoveScopedController
     end
   end
 
+  # PATCH /moves/:move_id/settings/embedding_provider (admin-only — reuses the
+  # Move's OpenAI key and bills against it, like the recognition provider).
+  def update_embedding_provider
+    write_setting(
+      Moves::SetEmbeddingProvider, policy: :manage_recognition_keys?,
+                                   provider: settings_param(:embedding_provider)
+    ) do |result|
+      result.success? ? t(".changed") : t(".invalid")
+    end
+  end
+
   # DELETE /moves/:move_id/settings/recognition_provider/:provider (admin-only).
   def remove_recognition_key
     write_setting(

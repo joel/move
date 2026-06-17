@@ -3,14 +3,21 @@
 require "rails_helper"
 
 RSpec.describe EmbeddingProviders do
-  describe ".resolve" do
-    it "returns the fake provider by default and for unknown names" do
-      expect(described_class.resolve("fake")).to be_a(EmbeddingProviders::Fake)
-      expect(described_class.resolve("bogus")).to be_a(EmbeddingProviders::Fake)
+  describe ".for_move" do
+    it "returns the openai adapter when the Move is embedding-ready" do
+      move = instance_double(Move, embedding_provider_ready?: true, openai_api_key: "sk-move")
+
+      expect(described_class.for_move(move)).to be_a(EmbeddingProviders::Openai)
     end
 
-    it "returns the openai provider when selected" do
-      expect(described_class.resolve("openai")).to be_a(EmbeddingProviders::Openai)
+    it "returns the fake adapter when the Move is not embedding-ready (openai without a key, or fake)" do
+      move = instance_double(Move, embedding_provider_ready?: false, openai_api_key: nil)
+
+      expect(described_class.for_move(move)).to be_a(EmbeddingProviders::Fake)
+    end
+
+    it "returns the fake adapter for a nil move" do
+      expect(described_class.for_move(nil)).to be_a(EmbeddingProviders::Fake)
     end
   end
 
@@ -44,51 +51,43 @@ RSpec.describe EmbeddingProviders do
   end
 
   describe EmbeddingProviders::Openai do
-    subject(:provider) { described_class.new }
+    subject(:provider) { described_class.new(api_key: "sk-test") }
 
     def stub_http(code:, body:)
       response = instance_double(Net::HTTPResponse, code: code, body: body)
       allow(Net::HTTP).to receive(:start).and_return(response)
     end
 
-    it "raises without an API key" do
-      allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with("OPENAI_API_KEY").and_return(nil)
-      expect { provider.embed("x") }.to raise_error(/OPENAI_API_KEY/)
+    it "raises MissingApiKey when built without the Move's key" do
+      expect { described_class.new.embed("x") }
+        .to raise_error(EmbeddingProviders::Base::MissingApiKey)
     end
 
     it "returns a blank result for blank text without calling the API" do
       expect(provider.embed("").vector).to be_nil
     end
 
-    context "with an API key" do
-      before do
-        allow(ENV).to receive(:[]).and_call_original
-        allow(ENV).to receive(:[]).with("OPENAI_API_KEY").and_return("sk-test")
-      end
+    it "returns the embedding vector on a 2xx response" do
+      stub_http(code: "200", body: { data: [{ embedding: [0.1, 0.2, 0.3] }] }.to_json)
 
-      it "returns the embedding vector on a 2xx response" do
-        stub_http(code: "200", body: { data: [{ embedding: [0.1, 0.2, 0.3] }] }.to_json)
+      result = provider.embed("hair dryer")
 
-        result = provider.embed("hair dryer")
+      expect(result.provider).to eq("openai")
+      expect(result.vector).to eq([0.1, 0.2, 0.3])
+      expect(result.model).to eq("text-embedding-3-small")
+    end
 
-        expect(result.provider).to eq("openai")
-        expect(result.vector).to eq([0.1, 0.2, 0.3])
-        expect(result.model).to eq("text-embedding-3-small")
-      end
+    it "raises on a non-2xx response, surfacing the status and vendor message" do
+      stub_http(code: "429", body: { error: { message: "Rate limit reached" } }.to_json)
 
-      it "raises on a non-2xx response, surfacing the status and vendor message" do
-        stub_http(code: "429", body: { error: { message: "Rate limit reached" } }.to_json)
+      expect { provider.embed("hair dryer") }
+        .to raise_error(ProviderHttp::Error, /429.*Rate limit reached/)
+    end
 
-        expect { provider.embed("hair dryer") }
-          .to raise_error(ProviderHttp::Error, /429.*Rate limit reached/)
-      end
+    it "raises when a 2xx response carries no embedding" do
+      stub_http(code: "200", body: { data: [] }.to_json)
 
-      it "raises when a 2xx response carries no embedding" do
-        stub_http(code: "200", body: { data: [] }.to_json)
-
-        expect { provider.embed("hair dryer") }.to raise_error(ProviderHttp::Error, /missing data/)
-      end
+      expect { provider.embed("hair dryer") }.to raise_error(ProviderHttp::Error, /missing data/)
     end
   end
 end

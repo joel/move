@@ -22,6 +22,7 @@ class Activity
       "move.recognition_provider_changed" => ["Move", :move_id],
       "move.recognition_model_changed" => ["Move", :move_id],
       "move.recognition_key_removed" => ["Move", :move_id],
+      "move.embedding_provider_changed" => ["Move", :move_id],
       "move_membership.added" => ["Move", :move_id],
       "move_membership.role_changed" => ["Move", :move_id],
       "move_membership.removed" => ["Move", :move_id],

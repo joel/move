@@ -103,6 +103,11 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     # provider (no key) so it works offline and shows the Settings "Recognition &
     # AI" panel in its ready state; an admin can switch to a real provider + key.
     m.recognition_provider = "fake"
+    # #232 — search embeddings are per-Move BYO too. The demo keeps the
+    # network-free `fake` embedder so semantic search (the "blow dryer" ~ "Hair
+    # dryer" recovery below) works offline; an admin flips Settings → Semantic
+    # search to On (OpenAI) once a key is set, which re-embeds every item.
+    m.embedding_provider = "fake"
   end
   # #187 — showcase a per-provider model override. The demo keeps `fake` active
   # (offline), but OpenAI is pinned to a custom model: switching the provider pill

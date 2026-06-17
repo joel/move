@@ -65,6 +65,7 @@ en:
         recognition_provider_changed: "switched the AI provider to %{provider}"
         recognition_model_changed: "set the %{provider} model to %{model}"
         recognition_key_removed: "removed the %{provider} API key"
+        embedding_provider_changed: "switched semantic search to %{provider}"
         summary_viewed: "viewed the summary"
       move_membership:
         added: "added %{subject}"

@@ -207,4 +207,36 @@ RSpec.describe "Settings" do
       expect(move.reload.openai_api_key).to eq("sk-live")
     end
   end
+
+  describe "PATCH /moves/:move_id/settings/embedding_provider (#232)" do
+    before { allow(Search::RefreshDocumentJob).to receive(:perform_later) }
+
+    it "turns semantic search on for an admin and enqueues a reindex" do
+      item = create(:item, move:)
+
+      patch move_settings_embedding_provider_path(move), params: { move: { embedding_provider: "openai" } }
+
+      expect(response).to redirect_to(move_settings_path(move))
+      expect(move.reload.embedding_provider).to eq("openai")
+      expect(Search::RefreshDocumentJob).to have_received(:perform_later).with(item.id, hash_including(:tenant))
+    end
+
+    it "forbids a contributor (semantic search is admin-only)" do
+      contributor = create(:user)
+      create(:move_membership, move:, user: contributor, role: "contributor")
+      stub_current_user(contributor)
+
+      patch move_settings_embedding_provider_path(move), params: { move: { embedding_provider: "openai" } }
+
+      expect(response).to have_http_status(:forbidden)
+      expect(move.reload.embedding_provider).to eq("fake")
+    end
+
+    it "rejects an unknown option without changing the move" do
+      patch move_settings_embedding_provider_path(move), params: { move: { embedding_provider: "word2vec" } }
+
+      expect(response).to redirect_to(move_settings_path(move))
+      expect(move.reload.embedding_provider).to eq("fake")
+    end
+  end
 end
