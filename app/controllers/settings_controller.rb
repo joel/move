@@ -73,13 +73,29 @@ class SettingsController < MoveScopedController
     end
   end
 
-  # PATCH /moves/:move_id/settings/embedding_provider (admin-only).
+  # PATCH /moves/:move_id/settings/embedding_provider (admin-only). Responds with a
+  # Turbo Stream that replaces only the Semantic Search panel body, so switching the
+  # provider updates in place instead of a full-page reload (#247); a plain redirect
+  # is the non-Turbo fallback.
   def update_embedding_provider
-    write_setting(
-      Moves::SetEmbeddingProvider, policy: :manage_recognition_keys?,
-                                   provider: settings_param(:embedding_provider)
-    ) do |result|
-      result.success? ? t(".changed") : t(".invalid")
+    authorize! @move, to: :manage_recognition_keys?, with: MovePolicy
+    return redirect_to(move_settings_path(@move), alert: t(".read_only")) unless @move.writable?
+
+    result = Moves::SetEmbeddingProvider.new.call(
+      move: @move, actor: current_user, provider: settings_param(:embedding_provider)
+    )
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: turbo_stream.replace(
+          Views::Settings::EmbeddingPanelBody::ID,
+          Views::Settings::EmbeddingPanelBody.new(move: @move.reload, manage: true)
+        )
+      end
+      format.html do
+        flash_key = result.success? ? :notice : :alert
+        message = result.success? ? t(".changed") : t(".invalid")
+        redirect_to move_settings_path(@move), flash: { flash_key => message }
+      end
     end
   end
 
