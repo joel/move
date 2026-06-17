@@ -35,14 +35,32 @@ RSpec.describe Move do
     end
   end
 
-  describe "#embedding_provider_ready? (#232)" do
+  describe "#embedding_provider_ready? (#232/#237)" do
     it "is false for fake" do
       expect(build(:move, embedding_provider: "fake")).not_to be_embedding_provider_ready
     end
 
-    it "is true only for openai with the Move's own key" do
+    it "is true only when the selected real provider has the Move's own key" do
       expect(build(:move, embedding_provider: "openai", openai_api_key: nil)).not_to be_embedding_provider_ready
       expect(build(:move, embedding_provider: "openai", openai_api_key: "sk")).to be_embedding_provider_ready
+      expect(build(:move, embedding_provider: "gemini", gemini_api_key: "gk")).to be_embedding_provider_ready
+      expect(build(:move, embedding_provider: "voyage", voyage_api_key: nil)).not_to be_embedding_provider_ready
+      expect(build(:move, embedding_provider: "voyage", voyage_api_key: "vk")).to be_embedding_provider_ready
+    end
+  end
+
+  describe "#embedding_api_key_for (#237)" do
+    it "maps each real provider to its key column (openai/gemini reuse the recognition key; voyage is its own)" do
+      move = build(:move, openai_api_key: "sk", gemini_api_key: "gk", voyage_api_key: "vk")
+
+      expect(move.embedding_api_key_for("openai")).to eq("sk")
+      expect(move.embedding_api_key_for("gemini")).to eq("gk")
+      expect(move.embedding_api_key_for("voyage")).to eq("vk")
+    end
+
+    it "is nil for fake/unknown providers (they need no key)" do
+      expect(build(:move).embedding_api_key_for("fake")).to be_nil
+      expect(build(:move).embedding_api_key_for("anthropic")).to be_nil
     end
   end
 

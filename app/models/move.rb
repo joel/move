@@ -16,16 +16,18 @@ class Move < ApplicationRecord
   # default (no key, canned detections); the rest require this Move's own key.
   RECOGNITION_PROVIDERS = %w[fake openai anthropic gemini].freeze
   REAL_RECOGNITION_PROVIDERS = (RECOGNITION_PROVIDERS - %w[fake]).freeze
-  # Search embeddings are per-Move bring-your-own-key too (#232). `fake` is the
-  # network-free default (token-hashed pseudo-vectors); `openai` reuses this
-  # Move's own openai_api_key (text-embedding-3-small @ 1536d). No separate key
-  # column — OpenAI is the only real embedding provider the 1536-d column allows.
-  EMBEDDING_PROVIDERS = %w[fake openai].freeze
+  # Search embeddings are per-Move bring-your-own-key too (#232/#237). `fake` is
+  # the network-free default (token-hashed pseudo-vectors); the real providers
+  # each conform their native vector to the fixed 1536-d column (Base#fit_dimensions).
+  # OpenAI/Gemini reuse the same key as recognition; Voyage is search-only (its own
+  # key — Anthropic has no embeddings API, so Anthropic stays recognition-only).
+  EMBEDDING_PROVIDERS = %w[fake openai gemini voyage].freeze
+  REAL_EMBEDDING_PROVIDERS = (EMBEDDING_PROVIDERS - %w[fake]).freeze
 
   # Per-Move provider API keys, encrypted at rest (ActiveRecord::Encryption — keys
   # in credentials.active_record_encryption). Never tracked by Logidze (its
   # include-list excludes them), never rendered back (write-only in the UI).
-  encrypts :openai_api_key, :anthropic_api_key, :gemini_api_key
+  encrypts :openai_api_key, :anthropic_api_key, :gemini_api_key, :voyage_api_key
 
   belongs_to :created_by, class_name: "User"
   has_many :move_memberships, dependent: :destroy
@@ -79,12 +81,21 @@ class Move < ApplicationRecord
     recognition_api_key_for(recognition_provider).present?
   end
 
-  # Whether semantic search can run as configured: only when openai is selected
-  # AND this Move has its own openai_api_key (strict BYO — never a shared key).
-  # Otherwise EmbeddingProviders.for_move hands back the network-free Fake
-  # embedder and search degrades gracefully to lexical + trigram (#232).
+  # This Move's stored key for the search-embedding +provider+, or nil for
+  # fake/unknown (which need no key). OpenAI/Gemini reuse the recognition key
+  # columns; Voyage has its own. Used by EmbeddingProviders.for_move (#237).
+  def embedding_api_key_for(provider)
+    return nil unless REAL_EMBEDDING_PROVIDERS.include?(provider.to_s)
+
+    public_send("#{provider}_api_key").presence
+  end
+
+  # Whether semantic search can run as configured: only when a real provider is
+  # selected AND this Move has that provider's own key (strict BYO — never a
+  # shared key). Otherwise EmbeddingProviders.for_move hands back the network-free
+  # Fake embedder and search degrades gracefully to lexical + trigram (#232/#237).
   def embedding_provider_ready?
-    embedding_provider == "openai" && openai_api_key.present?
+    embedding_api_key_for(embedding_provider).present?
   end
 
   def archived?
