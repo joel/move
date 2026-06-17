@@ -18,4 +18,14 @@ RSpec.describe ActivityPresenter do
     expect(predicate_for("move.recognition_model_changed", { "provider" => "openai", "model" => "gpt-5" }))
       .to eq("set the openai model to gpt-5")
   end
+
+  it "renders the new AI Capability key events (#242)" do
+    expect(predicate_for("move.provider_key_set", { "provider" => "voyage" })).to eq("added the voyage API key")
+    expect(predicate_for("move.provider_key_removed", { "provider" => "gemini" })).to eq("removed the gemini API key")
+  end
+
+  it "still renders historical rows recorded under the legacy key-removed action (#242)" do
+    expect(predicate_for("move.recognition_key_removed", { "provider" => "openai" }))
+      .to eq("removed the openai API key")
+  end
 end
