@@ -5,9 +5,13 @@ run-name: ${{ github.actor }} - Release Bug Scan - ${{ github.ref_name }}
 # Runs an automated Codex bug scan whenever a release tag is pushed. Adjust the
 # tag glob below to match your release-tag convention (e.g. v1.2.3). Tag pushes
 # are independent of the deploy pipeline, so this scan never interferes with a
-# deploy. Requires an OPENAI_API_KEY repository secret — a CI-only credential set
-# directly in GitHub (Settings → Secrets and variables → Actions), NOT synced from
-# Doppler and NOT an application secret (the app is per-Move BYO since #232/#234).
+# deploy. Requires a CODEX_OPENAI_API_KEY repository secret — a CI-only credential
+# set directly in GitHub (Settings → Secrets and variables → Actions). The name is
+# deliberately NOT `OPENAI_API_KEY`: that name is/was managed by the Doppler→GitHub
+# sync, which propagates Doppler removals to GitHub, so reusing it would let
+# removing the app's Doppler key delete this scan's secret. A distinct name keeps
+# the CI credential outside the Doppler-managed set (the app is per-Move BYO since
+# #232/#234 and ships no shared AI key).
 on:
   push:
     tags:
@@ -79,7 +83,7 @@ jobs:
         id: scan
         uses: openai/codex-action@v1
         with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          openai-api-key: ${{ secrets.CODEX_OPENAI_API_KEY }}
           # Read-only: the scan analyses code, it never edits the working tree.
           sandbox: read-only
           prompt-file: ${{ runner.temp }}/codex-prompt.md

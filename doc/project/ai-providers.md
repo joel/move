@@ -28,10 +28,13 @@ embeddings #232) — there is **no app-wide AI key**:
 >
 > The one remaining consumer — the **Release Bug Scan** workflow
 > (`.github/workflows/release-bug-scan.yml`, the Codex action on `v*` tags) — is a
-> **CI concern, not an application one**. Set `OPENAI_API_KEY` **directly as a
-> GitHub Actions repository secret** (Settings → Secrets and variables → Actions),
-> independent of the Doppler→GitHub sync. Ordering: set the standalone repo secret
-> first, then remove it from Doppler so the sync can't clobber it.
+> **CI concern, not an application one**. It uses a **distinctly named** repo secret
+> **`CODEX_OPENAI_API_KEY`**, set directly in GitHub (Settings → Secrets and
+> variables → Actions). The name deliberately differs from `OPENAI_API_KEY` because
+> the Doppler→GitHub integration propagates Doppler *removals* to GitHub: reusing
+> the same name would let removing the app's Doppler key delete the scan's secret.
+> A distinct name keeps the CI credential outside the Doppler-managed set, so the
+> app key can be removed from Doppler with no effect on CI.
 
 | Capability | Module | Selector | Adapters | Default model (openai) |
 |---|---|---|---|---|
