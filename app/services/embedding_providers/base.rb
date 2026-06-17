@@ -42,5 +42,27 @@ module EmbeddingProviders
       norm = Math.sqrt(vector.sum { |x| x * x })
       norm.zero? ? vector : vector.map { |x| x / norm }
     end
+
+    # Coerce a vendor's native vector to exactly DIMENSIONS, then L2-normalize, so
+    # every provider feeds the fixed pgvector(1536) column regardless of its native
+    # width (#237 — Voyage emits 1024, Gemini 1536, OpenAI 1536). A shorter vector
+    # is **zero-padded** on the right; a longer one is truncated.
+    #
+    # Zero-padding is *exactly cosine-preserving*: for a' = [a, 0…] and b' = [b, 0…],
+    # dot(a', b') == dot(a, b) and ‖a'‖ == ‖a‖, so cos(a', b') == cos(a, b). Because
+    # reembed_move nulls and refills a Move's *whole* index on any space change, the
+    # stored item vectors and the query vector always share one provider/width/pad,
+    # so cosine ranking stays meaningful within a Move. (Truncation only fires for a
+    # hypothetical >1536-d model and is the lossy branch — none of OpenAI/Gemini/
+    # Voyage as configured hit it.)
+    def fit_dimensions(vector)
+      sized =
+        if vector.length >= DIMENSIONS
+          vector.first(DIMENSIONS)
+        else
+          vector + Array.new(DIMENSIONS - vector.length, 0.0)
+        end
+      l2_normalize(sized.map(&:to_f))
+    end
   end
 end
