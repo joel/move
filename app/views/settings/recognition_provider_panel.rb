@@ -61,9 +61,12 @@ module Views
         return active_pill(label) if @move.recognition_provider == provider
         return disabled_pill(label) unless selectable?(provider)
 
+        # Carry the *target* provider's stored model so switching to it preserves
+        # its override instead of clearing it (the action always writes the model).
         button_to(
           label, move_settings_recognition_provider_path(@move), method: :patch,
-                                                                 params: { move: { recognition_provider: provider } },
+                                                                 params: { move: { recognition_provider: provider,
+                                                                                   model: @move.recognition_model_for(provider).to_s } },
                                                                  form_class: "inline-flex", class: "#{pill} text-on-surface-variant hover:text-text-warm"
         )
       end

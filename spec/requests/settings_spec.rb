@@ -92,6 +92,17 @@ RSpec.describe "Settings" do
       expect(response.body).to include(I18n.t("settings.show.recognition.providers.needs_key"))
     end
 
+    it "carries a provider's stored model override in its switch pill, so switching preserves it (#242)" do
+      # OpenAI keyed with a saved override, but fake is active → the OpenAI pill is
+      # a switch form that must resubmit gpt-5 (else switching clears the override).
+      move.update!(recognition_provider: "fake", openai_api_key: "sk-live", openai_model: "gpt-5")
+
+      get move_settings_path(move)
+
+      expect(response.body).to include('name="move[model]"')
+      expect(response.body).to include('value="gpt-5"')
+    end
+
     it "renders the editable model field for an admin (#187)" do
       move.update!(recognition_provider: "openai", openai_api_key: "sk-live", openai_model: "gpt-5")
 
