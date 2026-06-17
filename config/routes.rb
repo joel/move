@@ -106,13 +106,16 @@ Rails.application.routes.draw do
     patch "settings/unit_system", to: "settings#update_unit_system", as: :settings_unit_system
     patch "settings/auto_confirm_threshold", to: "settings#update_auto_confirm_threshold",
                                              as: :settings_auto_confirm_threshold
-    # F3 / #185 — per-Move Recognition provider + BYO API keys (admin-only).
+    # F3 / #242 — shared "AI Capability" keys (admin-only). One key per vendor,
+    # set/removed independently of which feature uses it.
+    patch "settings/provider_key", to: "settings#update_provider_key", as: :settings_provider_key
+    delete "settings/provider_key/:provider",
+           to: "settings#remove_provider_key", as: :settings_remove_provider_key
+    # F3 / #185 — per-Move Recognition provider selector + model override (admin-only).
     patch "settings/recognition_provider",
           to: "settings#update_recognition_provider", as: :settings_recognition_provider
-    delete "settings/recognition_provider/:provider",
-           to: "settings#remove_recognition_key", as: :settings_remove_recognition_key
-    # #232 — per-Move semantic-search (embedding) provider (admin-only). Reuses the
-    # Move's OpenAI key; switching it re-embeds every item.
+    # #232 — per-Move semantic-search (embedding) provider (admin-only). Switching it
+    # re-embeds every item; #239 shows live progress.
     patch "settings/embedding_provider",
           to: "settings#update_embedding_provider", as: :settings_embedding_provider
     resources :integration_tokens, only: %i[create destroy]

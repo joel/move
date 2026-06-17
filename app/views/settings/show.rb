@@ -112,12 +112,23 @@ module Views
         end
       end
 
-      # --- AI recognition: BYO provider + keys (#185), then auto-confirm threshold ---
+      # --- AI: shared capability keys (#242), then per-feature selectors ---
       def recognition_section
-        setting_card(I18n.t("settings.show.recognition.title")) do
+        ai_capability_card if @manage_recognition
+        panel_card do
           render Views::Settings::RecognitionProviderPanel.new(move: @move, manage: @manage_recognition)
-          render Views::Settings::EmbeddingProviderPanel.new(move: @move, manage: @manage_recognition)
           threshold_block
+        end
+        panel_card do
+          render Views::Settings::EmbeddingProviderPanel.new(move: @move, manage: @manage_recognition)
+        end
+      end
+
+      # Shared keys live in their own titled card; admins only (the panel is the
+      # write surface). Keys entered here light up the selectors below.
+      def ai_capability_card
+        setting_card(I18n.t("settings.show.ai_capability.title")) do
+          render Views::Settings::AiCapabilityPanel.new(move: @move)
         end
       end
 
@@ -189,6 +200,12 @@ module Views
           h2(class: "text-headline-md text-text-warm") { title }
           yield
         end
+      end
+
+      # A card whose contents supply their own header (the feature panels render a
+      # title + status chip), so no duplicate h2.
+      def panel_card(&)
+        render Components::Ui::Card.new(padding: "p-6", &)
       end
 
       def setting_row(label, &)
