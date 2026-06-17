@@ -23,13 +23,15 @@ embeddings #232) — there is **no app-wide AI key**:
 > `EMBEDDING_PROVIDER` env vars were removed from the deploy path in #234 —
 > `config/deploy.yml`, `.github/workflows/deploy.yml` (export + required-secrets
 > check), and `.kamal/secrets` no longer reference them, so the app container
-> carries no shared AI credential.
+> carries no shared AI credential, and **`OPENAI_API_KEY` is not an app secret**:
+> remove it from Doppler `move/prd`.
 >
-> The `OPENAI_API_KEY` **repository secret is intentionally retained** — it is
-> still consumed by the **Release Bug Scan** workflow
-> (`.github/workflows/release-bug-scan.yml`, the Codex action on `v*` tags), which
-> is independent of the deploy. Do **not** delete it from Doppler/GitHub unless you
-> also retire that workflow.
+> The one remaining consumer — the **Release Bug Scan** workflow
+> (`.github/workflows/release-bug-scan.yml`, the Codex action on `v*` tags) — is a
+> **CI concern, not an application one**. Set `OPENAI_API_KEY` **directly as a
+> GitHub Actions repository secret** (Settings → Secrets and variables → Actions),
+> independent of the Doppler→GitHub sync. Ordering: set the standalone repo secret
+> first, then remove it from Doppler so the sync can't clobber it.
 
 | Capability | Module | Selector | Adapters | Default model (openai) |
 |---|---|---|---|---|

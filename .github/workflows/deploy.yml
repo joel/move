@@ -40,8 +40,9 @@ jobs:
       STORAGE_ACCESS_KEY_ID: ${{ secrets.STORAGE_ACCESS_KEY_ID }}
       STORAGE_SECRET_ACCESS_KEY: ${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
       # No OPENAI_API_KEY here: embeddings (#232) and recognition (#185) are both
-      # per-Move BYO, so the deploy injects no shared AI key. The OPENAI_API_KEY
-      # repository secret is kept only for the Release Bug Scan workflow.
+      # per-Move BYO, so the deploy injects no shared AI key (and it is no longer
+      # in Doppler). Its only consumer is the Release Bug Scan workflow, which
+      # reads a CI-only repo secret set directly in GitHub Actions settings.
 
     steps:
       # Fail fast on a missing/empty secret before kamal runs. With

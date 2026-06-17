@@ -5,7 +5,9 @@ run-name: ${{ github.actor }} - Release Bug Scan - ${{ github.ref_name }}
 # Runs an automated Codex bug scan whenever a release tag is pushed. Adjust the
 # tag glob below to match your release-tag convention (e.g. v1.2.3). Tag pushes
 # are independent of the deploy pipeline, so this scan never interferes with a
-# deploy. Requires an OPENAI_API_KEY repository secret.
+# deploy. Requires an OPENAI_API_KEY repository secret — a CI-only credential set
+# directly in GitHub (Settings → Secrets and variables → Actions), NOT synced from
+# Doppler and NOT an application secret (the app is per-Move BYO since #232/#234).
 on:
   push:
     tags:

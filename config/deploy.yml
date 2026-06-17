@@ -49,9 +49,10 @@ env:
     - STORAGE_ACCESS_KEY_ID
     - STORAGE_SECRET_ACCESS_KEY
     # No shared AI key here: both recognition (#185) and embeddings (#232) are
-    # per-Move bring-your-own-key — each Move supplies its own encrypted key. The
-    # OPENAI_API_KEY repository secret is retained ONLY for the Release Bug Scan
-    # workflow (.github/workflows/release-bug-scan.yml), not the app.
+    # per-Move bring-your-own-key — each Move supplies its own encrypted key.
+    # OPENAI_API_KEY is no longer an app secret (removed from Doppler too); the
+    # only consumer left is the Release Bug Scan workflow, which uses a CI-only
+    # GitHub Actions repo secret (Settings → Secrets and variables → Actions).
   clear:
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
     # When you start using multiple servers, you should split out job processing to a dedicated machine.
