@@ -106,7 +106,7 @@ en:
       unpacking: "Mark unpacking"
       unpacked: "Mark unpacked"
       unpack: "Open unpacking"
-      print_label: "Print label (A7)"
+      print_label: "Print label"
       print_manifest: "Print manifest (A4)"
     transition:
       transitioned: "Box marked %{status}."
