@@ -13,7 +13,7 @@ RSpec.describe "Labels" do
   end
 
   describe "GET /moves/:move_id/boxes/:box_id/label" do
-    it "serves an inline A7 label PDF" do
+    it "serves an inline label PDF" do
       get move_box_label_path(move, box)
 
       expect(response).to have_http_status(:ok)
