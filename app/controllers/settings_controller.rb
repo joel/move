@@ -120,15 +120,21 @@ class SettingsController < MoveScopedController
     false
   end
 
-  # Turbo Stream: refresh the three interdependent AI panels in place (no reload).
-  # HTML fallback: redirect to settings with the success/failure flash from +block+.
+  # Turbo Stream: refresh the three interdependent AI panels in place (no reload)
+  # AND replace the toast region so success/failure feedback still reaches the user
+  # (a blank-key submit must say so, not silently re-render — #260). HTML fallback:
+  # redirect to settings with the same flash.
   def respond_ai_update(result)
+    flash_key = result.success? ? :notice : :alert
+    message = yield(result)
     respond_to do |format|
-      format.turbo_stream { render turbo_stream: ai_panels_stream }
-      format.html do
-        flash_key = result.success? ? :notice : :alert
-        redirect_to move_settings_path(@move), flash: { flash_key => yield(result) }
+      format.turbo_stream do
+        flash.now[flash_key] = message
+        render turbo_stream: ai_panels_stream + [
+          turbo_stream.replace(Components::FlashToasts::ID, Components::FlashToasts.new)
+        ]
       end
+      format.html { redirect_to move_settings_path(@move), flash: { flash_key => message } }
     end
   end
 

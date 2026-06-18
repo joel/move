@@ -225,6 +225,16 @@ RSpec.describe "Settings" do
       expect(move.reload.anthropic_api_key).to eq("a-live")
     end
 
+    it "streams a toast (not silent) when a Turbo submit fails on a blank key (#260)" do
+      patch move_settings_provider_key_path(move),
+            params: { move: { provider: "openai", api_key: "  " } }, as: :turbo_stream
+
+      expect(response.media_type).to eq("text/vnd.turbo-stream.html")
+      expect(response.body).to include(%(target="#{Components::FlashToasts::ID}"))
+      expect(response.body).to include(I18n.t("settings.update_provider_key.api_key_required"))
+      expect(move.reload.openai_api_key).to be_nil
+    end
+
     it "forbids a contributor (keys are admin-only)" do
       contributor = create(:user)
       create(:move_membership, move:, user: contributor, role: "contributor")
