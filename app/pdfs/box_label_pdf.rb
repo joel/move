@@ -10,10 +10,11 @@ require "chunky_png"
 # (built from the current request host) so the builder stays pure and host-agnostic.
 #
 # The label is tiny (62×29mm ≈ 176×82pt), so the layout is a two-column landscape:
-# a height-filling QR on the left, box number + room on the right. The brand line
-# and the human-readable token (the old portrait label's camera-unavailable
-# fallback) are dropped — there is no vertical room for them at 29mm, and the QR is
-# the scan path.
+# a height-filling QR on the left, and box number + destination room + the
+# human-readable token stacked on the right. The token stays small but MUST remain
+# (the scan page's camera-unavailable fallback tells users to "enter the code
+# printed under the QR" — scans.en.yml `camera_unavailable`). The "MOVE" brand line
+# is dropped — no room at 29mm, and the QR carries the identity.
 class BoxLabelPdf
   include PdfFonts
   include Prawn::Measurements # mm2pt() -> PDF points
@@ -32,6 +33,8 @@ class BoxLabelPdf
   NUMBER_MIN_SIZE = 11
   ROOM_SIZE = 11 # destination room name; shrinks toward ROOM_MIN_SIZE if long
   ROOM_MIN_SIZE = 6
+  TOKEN_SIZE = 7 # human-readable manual-entry fallback; shrinks to fit one line
+  TOKEN_MIN_SIZE = 5
 
   def initialize(box:, scan_url:)
     @box = box
@@ -75,30 +78,31 @@ class BoxLabelPdf
     side
   end
 
-  # Right column: the box number (prominent) above the destination room. Both use
-  # shrink-to-fit text boxes bounded to the column, so a big number or a long,
-  # user-controlled room name scales down instead of wrapping/overflowing off the
-  # one-label-per-page die-cut (#162 / #255).
+  # Right column, stacked top→bottom: box number (prominent), destination room, and
+  # the small manual-entry token. Each is a shrink-to-fit box bounded to its slice
+  # of the column height, so a big number / long room name / long token scales down
+  # instead of wrapping or overflowing the one-per-page die-cut (#162 / #255).
   def details(doc, left:)
     width = doc.bounds.width - left
     doc.bounding_box([left, doc.bounds.top], width: width, height: doc.bounds.height) do
-      number_height = doc.bounds.height * 0.5
-      doc.text_box(
-        "##{format("%03d", @box.number.to_i)}",
-        at: [0, doc.bounds.top], width: doc.bounds.width, height: number_height,
-        size: NUMBER_SIZE, style: :bold, color: "1A1A1A",
-        overflow: :shrink_to_fit, min_font_size: NUMBER_MIN_SIZE
-      )
-      room(doc, top: doc.bounds.top - number_height)
+      h = doc.bounds.height
+      fit_text(doc, "##{format("%03d", @box.number.to_i)}",
+               top: h, height: h * 0.42, size: NUMBER_SIZE, min_size: NUMBER_MIN_SIZE)
+      fit_text(doc, @box.room&.name.presence || "Unassigned",
+               top: h * 0.58, height: h * 0.32, size: ROOM_SIZE, min_size: ROOM_MIN_SIZE)
+      fit_text(doc, @box.qr_token,
+               top: h * 0.26, height: h * 0.26, size: TOKEN_SIZE, min_size: TOKEN_MIN_SIZE,
+               color: "8A8A8A")
     end
   end
 
-  def room(doc, top:)
-    name = @box.room&.name.presence || "Unassigned"
+  # Bold text scaled to fit a fixed slice of the current bounding box. +top+ is the
+  # y of the slice's top edge (bbox-relative); +height+ is its height.
+  def fit_text(doc, text, top:, height:, size:, min_size:, color: "1A1A1A")
     doc.text_box(
-      name, at: [0, top], width: doc.bounds.width, height: top,
-            size: ROOM_SIZE, style: :bold, color: "1A1A1A",
-            overflow: :shrink_to_fit, min_font_size: ROOM_MIN_SIZE
+      text, at: [0, top], width: doc.bounds.width, height: height,
+            size: size, style: :bold, color: color,
+            overflow: :shrink_to_fit, min_font_size: min_size
     )
   end
 end
