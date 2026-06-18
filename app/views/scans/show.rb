@@ -47,7 +47,7 @@ module Views
         end
       end
 
-      # Camera-independent fallback: type the box code printed under the QR.
+      # Camera-independent fallback: type the box code printed on the label.
       def manual_entry
         form(
           data: { action: "qr-scanner#submitManual" },
