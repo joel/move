@@ -61,6 +61,5 @@ RSpec.describe "Boxes Home" do
 
     expect(page).to have_text("My Boxes")
     expect(page).to have_no_link(I18n.t("boxes.index.add"))
-    expect(page).to have_no_text(I18n.t("boxes.index.start_new"))
   end
 end

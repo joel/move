@@ -84,29 +84,13 @@ module Views
         end
       end
 
+      # The grid only renders when boxes exist, so the dashed "Start New Box" card
+      # would only ever appear alongside existing boxes — redundant with the green
+      # "+ Add box" button in the header. Dropped (#260); the empty state (no boxes)
+      # keeps its own Add CTA.
       def grid
         div(class: "grid grid-cols-1 gap-stack-gap sm:grid-cols-2 lg:grid-cols-3") do
           @boxes.each { |box| render Components::BoxCard.new(box: box, item_count: @item_counts[box.id].to_i) }
-          start_new_box_card if @editable
-        end
-      end
-
-      def start_new_box_card
-        a(
-          href: new_move_box_path(@move),
-          class: "flex flex-col gap-4 rounded-card border border-dashed border-card-border " \
-                 "bg-card p-5 transition hover:-translate-y-0.5 hover:bg-surface-container-high"
-        ) do
-          div(
-            class: "flex h-12 w-12 items-center justify-center rounded-full " \
-                   "border border-dashed border-card-border text-muted"
-          ) { render Components::Icons::Plus.new(css: "h-6 w-6") }
-          div(class: "mt-auto") do
-            h3(class: "mb-1 text-headline-md text-text-warm opacity-80") do
-              I18n.t("boxes.index.start_new")
-            end
-            p(class: "text-body-md text-muted opacity-70") { I18n.t("boxes.index.start_new_hint") }
-          end
         end
       end
 
