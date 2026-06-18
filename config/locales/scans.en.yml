@@ -5,7 +5,7 @@ en:
       hint: "Hold your device steady — the scanner detects the QR automatically."
       manual_placeholder: "Enter box code"
       manual_submit: "Open"
-      camera_unavailable: "Camera unavailable. Enter the code printed under the QR instead."
+      camera_unavailable: "Camera unavailable. Enter the box code printed on the label instead."
     resolved:
       success: "Scanned successfully"
       items: "Items inside"
