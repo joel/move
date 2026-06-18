@@ -54,4 +54,16 @@ RSpec.describe IndexingRuns::Start do
     expect(Turbo::StreamsChannel).to have_received(:broadcast_replace_to)
       .with(move, :ai_indexing, hash_including(target: Views::Settings::EmbeddingControl::ID, html: kind_of(String)))
   end
+
+  # #250 — broadcast_control runs synchronously inside the emitting action; a
+  # broadcast failure must never break its emitter (AGENTS.md §1 #4).
+  it "still succeeds (and persists the run) when the broadcast raises" do
+    create(:item, move: move)
+    allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to).and_raise(StandardError, "cable down")
+
+    result = described_class.new.call(move: move, provider: "openai")
+
+    expect(result).to be_success
+    expect(result.value!).to be_persisted
+  end
 end
