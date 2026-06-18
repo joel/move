@@ -158,7 +158,7 @@ module Views
         )
       end
 
-      # E1 — print the opaque exterior label (A7) and the sensitive manifest (A4).
+      # E1 — print the opaque exterior label (66×80mm) and the sensitive manifest (A4).
       # Available regardless of writability (you can still print an archived box).
       # PDFs open in a new tab; the manifest itself carries the sensitive warning.
       def print_actions

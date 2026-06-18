@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-# E1 — serves the opaque A7 exterior label as an inline PDF. The QR encodes the
+# E1 — serves the opaque exterior label (66×80mm thermal roll) as an inline PDF.
+# The QR encodes the
 # tenant-scoped resolve URL (scan_resolve_url) built from the current request
 # host, so it points at this org's subdomain. Carries no contents.
 class LabelsController < MoveScopedController
