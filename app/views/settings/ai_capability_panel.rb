@@ -14,12 +14,16 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::Routes
 
+      # Stable id: the page anchor and the Turbo Stream replace target so a key
+      # set/remove refreshes the masked status in place (#260), no full reload.
+      ID = "ai-capability-panel"
+
       def initialize(move:)
         @move = move
       end
 
       def view_template
-        div(class: "flex flex-col gap-2") do
+        div(id: ID, class: "flex flex-col gap-2") do
           span(class: "text-body-md text-on-surface-variant") { t("subtitle") }
           div(class: "mt-2 flex flex-col divide-y divide-card-border") do
             Move::PROVIDER_KEYS.each { |provider| provider_row(provider) }

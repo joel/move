@@ -36,14 +36,19 @@ class SettingsController < MoveScopedController
 
   # PATCH /moves/:move_id/settings/provider_key (admin-only — keys are secrets,
   # mirroring integration tokens). Sets one vendor's key in the shared AI
-  # Capability panel (#242).
+  # Capability panel (#242). Refreshes the AI panels in place (#260) — a key
+  # change lights up that vendor's options in BOTH the recognition and search
+  # selectors, so all three panels re-render; a redirect is the non-Turbo fallback.
   def update_provider_key
-    write_setting(
-      Moves::SetProviderKey, policy: :manage_recognition_keys?,
-                             provider: settings_param(:provider), api_key: settings_param(:api_key)
-    ) do |result|
-      if result.success? then t(".key_saved")
-      elsif result.failure == :api_key_required then t(".api_key_required")
+    return unless ai_write_allowed?
+
+    result = Moves::SetProviderKey.new.call(
+      move: @move, actor: current_user,
+      provider: settings_param(:provider), api_key: settings_param(:api_key)
+    )
+    respond_ai_update(result) do |r|
+      if r.success? then t(".key_saved")
+      elsif r.failure == :api_key_required then t(".api_key_required")
       else t(".invalid")
       end
     end
@@ -51,23 +56,26 @@ class SettingsController < MoveScopedController
 
   # DELETE /moves/:move_id/settings/provider_key/:provider (admin-only).
   def remove_provider_key
-    write_setting(
-      Moves::RemoveProviderKey, policy: :manage_recognition_keys?, provider: params[:provider]
-    ) do |result|
-      result.success? ? t(".key_removed") : t(".invalid")
-    end
+    return unless ai_write_allowed?
+
+    result = Moves::RemoveProviderKey.new.call(
+      move: @move, actor: current_user, provider: params[:provider]
+    )
+    respond_ai_update(result) { |r| r.success? ? t(".key_removed") : t(".invalid") }
   end
 
   # PATCH /moves/:move_id/settings/recognition_provider (admin-only). Selector +
-  # model only; the key is managed via update_provider_key (#242).
+  # model only; the key is managed via update_provider_key (#242). In place (#260).
   def update_recognition_provider
-    write_setting(
-      Moves::SetRecognitionProvider, policy: :manage_recognition_keys?,
-                                     provider: settings_param(:recognition_provider),
-                                     model: settings_param(:model)
-    ) do |result|
-      if result.success? then t(".changed")
-      elsif result.failure == :api_key_required then t(".api_key_required")
+    return unless ai_write_allowed?
+
+    result = Moves::SetRecognitionProvider.new.call(
+      move: @move, actor: current_user,
+      provider: settings_param(:recognition_provider), model: settings_param(:model)
+    )
+    respond_ai_update(result) do |r|
+      if r.success? then t(".changed")
+      elsif r.failure == :api_key_required then t(".api_key_required")
       else t(".invalid")
       end
     end
@@ -100,6 +108,44 @@ class SettingsController < MoveScopedController
   end
 
   private
+
+  # Admin gate + archived read-only guard for the in-place AI writes. Returns true
+  # to proceed; on a read-only Move redirects with the action-scoped flash and
+  # returns false (a redirect is fine even for a Turbo request — Turbo follows it).
+  def ai_write_allowed?
+    authorize! @move, to: :manage_recognition_keys?, with: MovePolicy
+    return true if @move.writable?
+
+    redirect_to(move_settings_path(@move), alert: t(".read_only"))
+    false
+  end
+
+  # Turbo Stream: refresh the three interdependent AI panels in place (no reload).
+  # HTML fallback: redirect to settings with the success/failure flash from +block+.
+  def respond_ai_update(result)
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: ai_panels_stream }
+      format.html do
+        flash_key = result.success? ? :notice : :alert
+        redirect_to move_settings_path(@move), flash: { flash_key => yield(result) }
+      end
+    end
+  end
+
+  # Replace all three AI panels (capability keys + recognition selector + search
+  # selector body) — keys and selector availability are interdependent, so always
+  # re-render the set from the (reloaded) Move to keep them consistent.
+  def ai_panels_stream
+    @move.reload
+    [
+      turbo_stream.replace(Views::Settings::AiCapabilityPanel::ID,
+                           Views::Settings::AiCapabilityPanel.new(move: @move)),
+      turbo_stream.replace(Views::Settings::RecognitionProviderPanel::ID,
+                           Views::Settings::RecognitionProviderPanel.new(move: @move, manage: true)),
+      turbo_stream.replace(Views::Settings::EmbeddingPanelBody::ID,
+                           Views::Settings::EmbeddingPanelBody.new(move: @move, manage: true))
+    ]
+  end
 
   # Shared write path: policy-authorized (editor by default), archived-guarded,
   # action-driven, then redirect back to settings with a success/failure flash

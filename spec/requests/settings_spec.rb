@@ -214,6 +214,17 @@ RSpec.describe "Settings" do
       expect(move.reload.anthropic_api_key).to eq("a-live")
     end
 
+    it "refreshes the AI panels in place (no reload) for a Turbo request (#260)" do
+      patch move_settings_provider_key_path(move),
+            params: { move: { provider: "anthropic", api_key: "a-live" } }, as: :turbo_stream
+
+      expect(response.media_type).to eq("text/vnd.turbo-stream.html")
+      expect(response.body).to include(%(target="#{Views::Settings::AiCapabilityPanel::ID}"))
+      expect(response.body).to include(%(target="#{Views::Settings::RecognitionProviderPanel::ID}"))
+      expect(response.body).to include(%(target="#{Views::Settings::EmbeddingPanelBody::ID}"))
+      expect(move.reload.anthropic_api_key).to eq("a-live")
+    end
+
     it "forbids a contributor (keys are admin-only)" do
       contributor = create(:user)
       create(:move_membership, move:, user: contributor, role: "contributor")
@@ -233,6 +244,17 @@ RSpec.describe "Settings" do
       delete move_settings_remove_provider_key_path(move, provider: "openai")
 
       expect(response).to redirect_to(move_settings_path(move))
+      expect(move.reload.openai_api_key).to be_nil
+    end
+
+    it "refreshes the AI panels in place (no reload) for a Turbo request (#260)" do
+      move.update!(openai_api_key: "sk-live")
+
+      delete move_settings_remove_provider_key_path(move, provider: "openai"), as: :turbo_stream
+
+      expect(response.media_type).to eq("text/vnd.turbo-stream.html")
+      expect(response.body).to include(%(target="#{Views::Settings::AiCapabilityPanel::ID}"))
+      expect(response.body).to include(%(target="#{Views::Settings::EmbeddingPanelBody::ID}"))
       expect(move.reload.openai_api_key).to be_nil
     end
 
@@ -256,6 +278,18 @@ RSpec.describe "Settings" do
       patch move_settings_recognition_provider_path(move), params: { move: { recognition_provider: "openai" } }
 
       expect(response).to redirect_to(move_settings_path(move))
+      expect(move.reload.recognition_provider).to eq("openai")
+    end
+
+    it "refreshes the AI panels in place (no reload) for a Turbo request (#260)" do
+      move.update!(openai_api_key: "sk-live")
+
+      patch move_settings_recognition_provider_path(move),
+            params: { move: { recognition_provider: "openai" } }, as: :turbo_stream
+
+      expect(response.media_type).to eq("text/vnd.turbo-stream.html")
+      expect(response.body).to include('action="replace"')
+      expect(response.body).to include(%(target="#{Views::Settings::RecognitionProviderPanel::ID}"))
       expect(move.reload.recognition_provider).to eq("openai")
     end
 
