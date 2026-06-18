@@ -13,13 +13,18 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::Routes
 
+      # Stable id: the page anchor and the Turbo Stream replace target so a
+      # provider/model switch (or a key change elsewhere) refreshes the pills in
+      # place (#260), no full reload.
+      ID = "ai-recognition-panel"
+
       def initialize(move:, manage:)
         @move = move
         @manage = manage
       end
 
       def view_template
-        div(class: "flex flex-col gap-4") do
+        div(id: ID, class: "flex flex-col gap-4") do
           div(class: "flex items-start justify-between gap-4") do
             div(class: "flex flex-col gap-1") do
               span(class: "text-headline-md text-text-warm") { t("title") }

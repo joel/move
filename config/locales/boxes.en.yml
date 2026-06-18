@@ -5,8 +5,6 @@ en:
     index:
       title: "My Boxes"
       add: "Add box"
-      start_new: "Start New Box"
-      start_new_hint: "Tap to add a box"
     summary:
       packed: "Packed"
       pending_review: "Pending review"

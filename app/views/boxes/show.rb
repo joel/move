@@ -36,7 +36,8 @@ module Views
       def view_template
         back_link
         header_bento
-        detail_split
+        pending_banner if @pending_count.positive?
+        detail_stack
       end
 
       private
@@ -225,24 +226,27 @@ module Views
         end
       end
 
-      def detail_split
-        div(class: "grid grid-cols-1 gap-stack-gap lg:grid-cols-12") do
-          items_section
+      # Full-width vertical stack: Gallery (photos) leads, Items below (#260).
+      def detail_stack
+        div(class: "flex flex-col gap-stack-gap") do
           render Views::Boxes::Gallery.new(
             move: @move, box: @box, media: @media,
             reviewable_media_ids: @reviewable_media_ids,
             recoverable_media_ids: @recoverable_media_ids
           )
+          items_section
         end
+      end
+
+      # Pending-review call to action, promoted above the Gallery (#260).
+      def pending_banner
+        div(class: "px-2") { pending_badge }
       end
 
       # Read-only inventory (item edit → D5, review actions → D6).
       def items_section
-        section(class: "flex flex-col gap-stack-gap lg:col-span-8") do
-          div(class: "flex items-center justify-between px-2") do
-            h3(class: "text-headline-md text-text-warm") { I18n.t("boxes.show.items") }
-            pending_badge if @pending_count.positive?
-          end
+        section(class: "flex flex-col gap-stack-gap") do
+          h3(class: "px-2 text-headline-md text-text-warm") { I18n.t("boxes.show.items") }
           @items.any? ? items_list : items_empty
         end
       end
