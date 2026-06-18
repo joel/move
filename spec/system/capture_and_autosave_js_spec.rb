@@ -57,8 +57,16 @@ RSpec.describe "Capture & auto-save (JS)", :js do
     # Inline recognition (Fake provider) lands items; the Items panel lists them as
     # links to Item Detail. Asserting on the rendered link (not a cross-thread DB
     # read) proves the full JS path: file select → auto-submit → recognition.
-    expect(page).to have_link("Coffee maker", href: %r{/moves/#{move.id}/items/})
-    expect(page).to have_link("Set of mugs", href: %r{/moves/#{move.id}/items/})
+    #
+    # Match with a CSS href-attribute selector, NOT `have_link(text, href:)`:
+    # Capybara's link href filter runs `node[:href].match?(regex)` and raises
+    # `NoMethodError: undefined method 'match?' for nil` when a candidate <a>
+    # momentarily reports a nil href during the Turbo redirect re-render — the
+    # CI-only flake (capybara/selector/definition/link.rb:35). `a[href*="…"]` only
+    # matches anchors that already carry the href (no nil to crash on), and the
+    # text filter retries cleanly on a node swapped mid-navigation.
+    expect(page).to have_css(%(a[href*="/moves/#{move.id}/items/"]), text: "Coffee maker")
+    expect(page).to have_css(%(a[href*="/moves/#{move.id}/items/"]), text: "Set of mugs")
   end
 
   it "auto-saves an item edit (no Save button) and shows the Saved badge" do
