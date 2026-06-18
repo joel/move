@@ -20,8 +20,8 @@ RSpec.describe BoxLabelPdf do
   end
 
   # #162 — print two identical labels per box in one job, and each label fits a
-  # single page; the Unicode TTF used to overflow one label onto two. On the tiny
-  # 62×29mm Brother die-cut (#255) the QR + number + room are bounded shrink-to-fit
+  # single page; the Unicode TTF used to overflow one label onto two. On the 62×90mm
+  # portrait label (#255) the QR + number + room + token are bounded shrink-to-fit
   # boxes, so this doubles as the fit guard: an overflow would render 4 pages, not 2.
   it "renders exactly two pages (one label each, no overflow)" do
     room = create(:room, move:, name: "Living Room")
@@ -43,15 +43,15 @@ RSpec.describe BoxLabelPdf do
     expect(pdf).to include("/Count 2")
   end
 
-  # #255 — the page is the 62×29mm Brother QL DK-11209 die-cut, landscape. 62mm ≈
-  # 176pt wide, 29mm ≈ 82pt tall (vs the #253 66×80mm ≈ 187×227pt, or A7 209×297pt).
-  # Locks the media size: a mismatch is what makes the printer reject the job
-  # ("Wrong Roll Type"). The MediaBox carries Prawn's fractional points, so match
-  # the leading digits rather than an exact float.
-  it "sizes each page to the 62×29mm Brother die-cut label" do
+  # #255 — the page is the 62×90mm portrait label for the Brother QL-820NWB on
+  # DK-22205 62mm continuous tape. 62mm ≈ 176pt wide, 90mm ≈ 255pt tall (vs the
+  # earlier 62×29mm landscape ≈ 176×82pt). Locks the media size: a mismatch is what
+  # made the printer reject the job. The MediaBox carries Prawn's fractional points,
+  # so match the leading digits rather than an exact float.
+  it "sizes each page to the 62×90mm continuous-tape label" do
     box = create(:box, move:, room: create(:room, move:), number: "9", qr_token: "tok-size")
     pdf = described_class.new(box:, scan_url: "https://acme.example/scan/tok-size").render
 
-    expect(pdf).to match(%r{/MediaBox \[0 0 175(\.\d+)? 82(\.\d+)?\]})
+    expect(pdf).to match(%r{/MediaBox \[0 0 175(\.\d+)? 255(\.\d+)?\]})
   end
 end
