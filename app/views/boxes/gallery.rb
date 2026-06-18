@@ -18,7 +18,7 @@ module Views
       end
 
       def view_template
-        aside(class: "flex flex-col gap-stack-gap lg:col-span-4") do
+        aside(class: "flex flex-col gap-stack-gap") do
           div(class: "flex items-center justify-between px-2") do
             h3(class: "text-headline-md text-text-warm") { I18n.t("boxes.show.gallery") }
             span(class: "text-label-caps uppercase text-muted") do
