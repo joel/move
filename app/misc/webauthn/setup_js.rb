@@ -32,14 +32,6 @@ module Webauthn
                     clientDataJSON: pack(cred.response.clientDataJSON)
                   }
                 });
-                // Remember on this browser that it registered this passkey, so
-                // the manage page can badge it "This device" and hide "Add".
-                try {
-                  var key = "move.passkeys." + (element.getAttribute("data-account-key") || "");
-                  var ids = JSON.parse(localStorage.getItem(key) || "[]");
-                  if (ids.indexOf(rawId) === -1) { ids.push(rawId); }
-                  localStorage.setItem(key, JSON.stringify(ids));
-                } catch (err) { /* localStorage unavailable — server badge still works */ }
                 element.removeEventListener("submit", f);
                 element.submit();
               }).
