@@ -285,7 +285,11 @@ class RodauthMain < Rodauth::Rails::Auth
       # Keep passkey management on the management page after adding/removing
       # (the gem default falls through to the post-login redirect → Moves index).
       webauthn_setup_redirect { webauthn_remove_path }
-      webauthn_remove_redirect { webauthn_remove_path }
+      # Stay on the management page while passkeys remain; after removing the last
+      # one, the manage page's require_webauthn_setup would bounce to the generic
+      # 2FA-setup flow, so send the user to the account page (its Security card
+      # then offers "Add passkey").
+      webauthn_remove_redirect { webauthn_setup? ? webauthn_remove_path : "/account" }
 
       # User-facing copy: the Rodauth defaults say "WebAuthn" / "authenticator",
       # which users don't understand — say "passkey" everywhere.

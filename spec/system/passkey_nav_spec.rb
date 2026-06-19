@@ -97,6 +97,20 @@ RSpec.describe "Passkey navigation" do
     expect(passkey_count(user)).to eq(1)
   end
 
+  it "lands on the account page after removing the last passkey" do
+    user = create(:user)
+    login_as(user: user)
+    seed_passkey(user, webauthn_id: "only-key", name: "Only key")
+
+    visit "/account/passkeys"
+    click_on "Remove passkey"
+
+    # No passkeys remain → the manage page would bounce to the generic 2FA flow,
+    # so we send the user to the account page (Security card offers "Add passkey").
+    expect(page).to have_current_path("/account", ignore_query: true)
+    expect(passkey_count(user)).to eq(0)
+  end
+
   it "badges the current device's passkey and hides Add on that device" do
     user = create(:user)
     login_as(user: user)
