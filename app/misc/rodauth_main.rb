@@ -320,8 +320,17 @@ class RodauthMain < Rodauth::Rails::Auth
       after_login do
         remember_login
 
-        # Backfill the user's name from the Google profile on first login.
         next unless authenticated_by&.include?("omniauth")
+
+        # Google (OmniAuth) sign-in bypasses verify_account_view, so an account
+        # freshly created by omniauth_create_account? would otherwise land with
+        # no Organization and nowhere to create Moves. Provision the personal
+        # tenant here (idempotent — guards on member_of_any_organization?). Runs
+        # after the account-creation transaction has committed, so the tenant
+        # DDL/pg_dump is not nested in a transaction.
+        ensure_personal_organization
+
+        # Backfill the user's name from the Google profile on first login.
         next if omniauth_name.blank?
 
         user = ::User.find_by(id: account_id)
