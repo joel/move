@@ -159,6 +159,23 @@ class RodauthMain < Rodauth::Rails::Auth
 
         def before_create_account
           super
+          set_account_id_and_timestamps
+        end
+
+        # rodauth-omniauth creates the account through its OWN path
+        # (omniauth_create_account -> omniauth_save_account), which does NOT call
+        # before_create_account, so the id/timestamp defaults set there are
+        # skipped. public.users.created_at/updated_at are NOT NULL with no DB
+        # default, so without this the first Google sign-up's account INSERT
+        # fails (500) before after_login is ever reached. Fill them on the
+        # OmniAuth create path too. (id has a gen_random_uuid() default, but we
+        # set it for parity with the standard path.)
+        def before_omniauth_create_account
+          super
+          set_account_id_and_timestamps
+        end
+
+        def set_account_id_and_timestamps
           account[:id] ||= SecureRandom.uuid
           timestamp = Time.current
           account[:created_at] ||= timestamp
