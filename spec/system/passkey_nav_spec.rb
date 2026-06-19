@@ -43,7 +43,21 @@ RSpec.describe "Passkey navigation" do
     click_on "Add passkey"
 
     expect(page).to have_current_path("/webauthn-setup", ignore_query: true)
-    expect(page).to have_button("Setup WebAuthn Authentication")
+    expect(page).to have_button("Add passkey") # passkey wording, not WebAuthn jargon
+  end
+
+  it "lets an account with a passkey add another (no excludeCredentials block)" do
+    user = create(:user)
+    login_as(user: user)
+    seed_passkey(user, webauthn_id: "existing-key", name: "Phone")
+
+    visit "/webauthn-setup"
+
+    # The credential options must exclude nothing, so a synced/duplicate
+    # authenticator can still register another passkey (no InvalidStateError).
+    opts = find_by_id("webauthn-setup-form")["data-credential-options"]
+    expect(JSON.parse(opts).fetch("excludeCredentials")).to eq([])
+    expect(page).to have_no_text(/WebAuthn|authenticator/i)
   end
 
   it "offers Manage passkeys to a signed-in account with a passkey" do
