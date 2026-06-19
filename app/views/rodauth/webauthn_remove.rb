@@ -124,9 +124,13 @@ module Views
       def passkey_rows
         rodauth = view_context.rodauth
         fmt = rodauth.strftime_format
+        # Schema-qualify to public: this row has no AR model, so on an org
+        # subdomain Apartment's search_path points at the (empty) tenant-cloned
+        # copy. Without `public.` the list renders zero keys and removal always
+        # fails. Mirrors the rodauth_main webauthn_keys_table qualification.
         sql = ActiveRecord::Base.sanitize_sql_array(
           [
-            "SELECT webauthn_id, last_use, name FROM user_webauthn_keys " \
+            "SELECT webauthn_id, last_use, name FROM public.user_webauthn_keys " \
             "WHERE user_id = ? ORDER BY last_use DESC",
             rodauth.account_id
           ]

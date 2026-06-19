@@ -5,9 +5,12 @@ require "rails_helper"
 RSpec.describe "Passkey navigation" do
   # Rodauth owns user_webauthn_keys directly (no AR model). Insert a row so
   # rodauth.webauthn_setup? reports the account has a registered passkey.
+  # Auth tables live in the public schema (no AR model), so qualify explicitly —
+  # otherwise on an org subdomain Apartment's search_path reads the tenant copy.
   def seed_passkey(user, webauthn_id: SecureRandom.uuid, name: nil)
     sql = ActiveRecord::Base.sanitize_sql_array(
-      ["INSERT INTO user_webauthn_keys (user_id, webauthn_id, public_key, sign_count, last_use, name) " \
+      ["INSERT INTO public.user_webauthn_keys " \
+       "(user_id, webauthn_id, public_key, sign_count, last_use, name) " \
        "VALUES (?, ?, ?, ?, ?, ?)",
        user.id, webauthn_id, "stub-public-key", 0, Time.current, name]
     )
@@ -17,7 +20,7 @@ RSpec.describe "Passkey navigation" do
   def passkey_count(user)
     ActiveRecord::Base.connection.select_value(
       ActiveRecord::Base.sanitize_sql_array(
-        ["SELECT count(*) FROM user_webauthn_keys WHERE user_id = ?", user.id]
+        ["SELECT count(*) FROM public.user_webauthn_keys WHERE user_id = ?", user.id]
       )
     )
   end
@@ -78,5 +81,50 @@ RSpec.describe "Passkey navigation" do
 
     expect(page).to have_no_text("must select")
     expect(passkey_count(user)).to eq(1)
+  end
+
+  # Regression for the schema-qualification bug: on an org subdomain Apartment
+  # points search_path at the tenant schema, so an unqualified user_webauthn_keys
+  # query reads the empty tenant copy and lists no keys (removal then always
+  # fails). This provisions a real tenant + subdomain host to exercise that path.
+  describe "on an organization subdomain" do
+    let(:slug) { "jspk" }
+    let(:org_user) { create(:user) }
+    let(:host) { "#{slug}.lvh.me" }
+
+    around do |example|
+      original_zone = Rails.application.config.x.tenant_zone
+      original_app_host = Capybara.app_host
+      original_include_port = Capybara.always_include_port
+
+      Rails.application.config.x.tenant_zone = "lvh.me"
+      Capybara.app_host = "http://#{host}"
+      Capybara.always_include_port = true
+
+      Apartment::Tenant.drop(slug) if Apartment.tenant_names.include?(slug)
+      Organizations::Create.new.call(name: "JS Passkey Org", slug: slug, owner: org_user).value!
+
+      example.run
+    ensure
+      Apartment::Tenant.drop(slug) if Apartment.tenant_names.include?(slug)
+      Rails.application.config.x.tenant_zone = original_zone
+      Capybara.app_host = original_app_host
+      Capybara.always_include_port = original_include_port
+    end
+
+    it "lists and removes public-schema passkeys (not the empty tenant copy)" do
+      seed_passkey(org_user, webauthn_id: "pk-tenant", name: "Phone")
+      login_as(user: org_user)
+
+      visit "/webauthn-remove"
+
+      expect(page).to have_text("Phone")
+      expect(page).to have_selector(:radio_button, count: 1)
+
+      click_on "Remove passkey"
+
+      expect(page).to have_no_text("must select")
+      expect(passkey_count(org_user)).to eq(0)
+    end
   end
 end
