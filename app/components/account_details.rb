@@ -56,6 +56,7 @@ module Components
             form.text_field(
               :name,
               class: "ha-input flex-1",
+              aria: { label: "Account name" },
               data: { inline_edit_target: "input" }
             )
             form.submit("Save", class: "ha-button ha-button-primary !px-4 !py-2 text-sm")

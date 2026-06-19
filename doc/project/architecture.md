@@ -77,6 +77,16 @@ flowchart TB
 - **Rodauth tables are schema-qualified to `public`** (`Sequel[:public][:users]`)
   because Rodauth shares the AR connection whose search_path Apartment switches,
   and its model-less key tables get cloned (empty) into tenants.
+- **Gotcha — raw SQL / views that read auth tables must also qualify `public.`.**
+  The Rodauth *config* qualifies its own datasets, but any hand-written query
+  outside it inherits the request's tenant `search_path`. On an org subdomain an
+  unqualified `SELECT … FROM user_webauthn_keys` reads the **empty tenant clone**,
+  not the real rows. This bit the "Manage passkeys" view (`app/views/rodauth/
+  webauthn_remove.rb#passkey_rows`): it listed zero keys on a subdomain, so every
+  removal failed with "must select a valid webauthn authenticator to remove".
+  Fix: `FROM public.user_webauthn_keys`. Same rule for `users`,
+  `user_*_keys`, `user_omniauth_identities`. The rack_test suite runs on `public`,
+  so a tenant-host system spec is the regression guard (`spec/system/passkey_nav_spec.rb`).
 
 ### Migrating tenant schemas on deploy
 

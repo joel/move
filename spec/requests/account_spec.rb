@@ -13,6 +13,7 @@ RSpec.describe "/account" do
     expect(response.body).to include("Danger zone")
     expect(response.body).to include("inline-edit") # rename toggle controller
     expect(response.body).to include('aria-label="Edit name"')
+    expect(response.body).to include('aria-label="Account name"') # labelled inline field
   end
 
   it "no longer exposes a separate edit route" do
