@@ -42,7 +42,7 @@ RSpec.describe "Passkey navigation" do
 
     click_on "Add passkey"
 
-    expect(page).to have_current_path("/webauthn-setup", ignore_query: true)
+    expect(page).to have_current_path("/account/passkeys/new", ignore_query: true)
     expect(page).to have_button("Add passkey") # passkey wording, not WebAuthn jargon
   end
 
@@ -51,7 +51,7 @@ RSpec.describe "Passkey navigation" do
     login_as(user: user)
     seed_passkey(user, webauthn_id: "existing-key", name: "Phone")
 
-    visit "/webauthn-setup"
+    visit "/account/passkeys/new"
 
     # The credential options must exclude nothing, so a synced/duplicate
     # authenticator can still register another passkey (no InvalidStateError).
@@ -71,7 +71,7 @@ RSpec.describe "Passkey navigation" do
 
     click_on "Manage passkeys"
 
-    expect(page).to have_current_path("/webauthn-remove", ignore_query: true)
+    expect(page).to have_current_path("/account/passkeys", ignore_query: true)
   end
 
   it "lists each passkey by name and removes one without an explicit selection" do
@@ -80,7 +80,7 @@ RSpec.describe "Passkey navigation" do
     seed_passkey(user, webauthn_id: "key-phone", name: "Pixel phone")
     seed_passkey(user, webauthn_id: "key-laptop", name: "Work laptop")
 
-    visit "/webauthn-remove"
+    visit "/account/passkeys"
 
     # Each named key is listed individually, and the friendly button copy is used.
     expect(page).to have_text("Pixel phone")
@@ -130,7 +130,7 @@ RSpec.describe "Passkey navigation" do
       seed_passkey(org_user, webauthn_id: "pk-tenant", name: "Phone")
       login_as(user: org_user)
 
-      visit "/webauthn-remove"
+      visit "/account/passkeys"
 
       expect(page).to have_text("Phone")
       expect(page).to have_selector(:radio_button, count: 1)
