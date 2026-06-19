@@ -43,7 +43,8 @@ module Components
       private
 
       def render_brand
-        a(href: moves_path, aria_label: I18n.t("ui.nav.brand_home"),
+        a(href: Rails.application.routes.url_helpers.moves_path,
+          aria_label: I18n.t("ui.nav.brand_home"),
           class: "mb-8 flex items-center gap-4 rounded-card px-2 py-1 " \
                  "transition hover:bg-card") do
           div(

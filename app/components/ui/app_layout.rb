@@ -37,7 +37,8 @@ module Components
           class: "lg:hidden fixed left-0 top-0 z-40 flex w-full items-center " \
                  "justify-between border-b border-card-border bg-page px-margin-mobile py-4"
         ) do
-          a(href: moves_path, aria_label: I18n.t("ui.nav.brand_home"),
+          a(href: Rails.application.routes.url_helpers.moves_path,
+            aria_label: I18n.t("ui.nav.brand_home"),
             class: "flex items-center gap-2") do
             span(
               class: "flex h-8 w-8 items-center justify-center rounded-full " \
@@ -47,7 +48,8 @@ module Components
           end
           div(class: "flex items-center gap-1") do
             render Components::Ui::ThemeToggle.new
-            a(href: account_path, aria_label: I18n.t("ui.nav.account"),
+            a(href: Rails.application.routes.url_helpers.account_path,
+              aria_label: I18n.t("ui.nav.account"),
               class: "flex h-9 w-9 items-center justify-center text-accent-sage " \
                      "transition hover:opacity-80") do
               render Components::Icons::UserCircle.new(css: "h-7 w-7")
