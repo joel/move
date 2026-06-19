@@ -97,6 +97,28 @@ RSpec.describe "Passkey navigation" do
     expect(passkey_count(user)).to eq(1)
   end
 
+  it "badges the current device's passkey and hides Add on that device" do
+    user = create(:user)
+    login_as(user: user)
+    seed_passkey(user, webauthn_id: "key-phone", name: "Pixel phone")
+    seed_passkey(user, webauthn_id: "key-laptop", name: "Work laptop")
+    # Pretend this session signed in with the phone passkey.
+    allow_any_instance_of(RodauthMain) # rubocop:disable RSpec/AnyInstance
+      .to receive(:authenticated_webauthn_id).and_return("key-phone")
+
+    visit "/account/passkeys"
+
+    phone = find("label[data-webauthn-id='key-phone']", visible: :all)
+    laptop = find("label[data-webauthn-id='key-laptop']", visible: :all)
+    # The current device's row is highlighted and its "This device" badge shown;
+    # the other's badge stays hidden.
+    expect(phone[:class]).to include("ring-2")
+    expect(phone.find("[data-passkey-list-target='badge']", visible: :all)[:class]).not_to include("hidden")
+    expect(laptop.find("[data-passkey-list-target='badge']", visible: :all)[:class]).to include("hidden")
+    # This device already has a passkey → no "Add another" card.
+    expect(page).to have_no_css("[data-passkey-list-target='addCard']")
+  end
+
   # Regression for the schema-qualification bug: on an org subdomain Apartment
   # points search_path at the tenant schema, so an unqualified user_webauthn_keys
   # query reads the empty tenant copy and lists no keys (removal then always
