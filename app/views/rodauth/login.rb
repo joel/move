@@ -3,8 +3,6 @@
 module Views
   module Rodauth
     class Login < Views::Base
-      include Phlex::Rails::Helpers::ButtonTo
-
       def view_template
         div(class: "flex min-h-[70vh] items-center justify-center") do
           div(class: "w-full max-w-md space-y-8") do
@@ -53,7 +51,7 @@ module Views
 
           render Components::WebauthnAutofill.new
 
-          render_google_section if google_configured?
+          render_google_section if view_context.google_credentials_present?
 
           render Components::RodauthLoginFormFooter.new
         end
@@ -61,7 +59,7 @@ module Views
 
       def render_google_section
         render_social_divider
-        render_google_button("Sign in with Google")
+        render Components::GoogleAuthButton.new
       end
 
       def render_social_divider
@@ -77,31 +75,6 @@ module Views
             ) { "or continue with" }
           end
         end
-      end
-
-      def render_google_button(label)
-        button_to(
-          view_context.rodauth.omniauth_request_path(:google),
-          method: :post,
-          data: { turbo: false },
-          class: "ha-button ha-button-secondary w-full " \
-                 "flex items-center justify-center gap-3"
-        ) do
-          render Components::Icons::Google.new
-          span { label }
-        end
-      end
-
-      # Show the redirect button only when the OAuth provider is actually usable:
-      # both credentials present (the code exchange needs the secret) AND on the
-      # canonical apex host (ApplicationController#on_apex_host?) — only the apex
-      # (move-easy.org) is registered with Google, so a subdomain or non-canonical
-      # public host (www/move) would fail with redirect_uri_mismatch / origin
-      # errors. Passwordless (passkey / email link) still works everywhere.
-      def google_configured?
-        ENV["GOOGLE_CLIENT_ID"].present? &&
-          ENV["GOOGLE_CLIENT_SECRET"].present? &&
-          view_context.on_apex_host?
       end
 
       def app_name

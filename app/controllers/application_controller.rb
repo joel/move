@@ -23,7 +23,7 @@ class ApplicationController < ActionController::Base
   # Changes to the importmap will invalidate the etag for HTML responses
   stale_when_importmap_changes
 
-  helper_method :current_user, :current_tenant, :on_apex_host?
+  helper_method :current_user, :current_tenant, :on_apex_host?, :google_credentials_present?
 
   before_action :set_current_user
 
@@ -56,6 +56,13 @@ class ApplicationController < ActionController::Base
   def on_apex_host?
     apex = Rails.application.config.action_mailer.default_url_options&.dig(:host)
     apex.present? && request.host == apex
+  end
+
+  # Both Google credentials are required for the OAuth redirect flow (the code
+  # exchange needs the secret). Gates whether any Google sign-in affordance —
+  # the apex button or the subdomain "route via apex" link — is offered at all.
+  def google_credentials_present?
+    ENV["GOOGLE_CLIENT_ID"].present? && ENV["GOOGLE_CLIENT_SECRET"].present?
   end
 
   def require_authenticated_user!

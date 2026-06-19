@@ -2,9 +2,10 @@
 
 require "rails_helper"
 
-# The Google "Sign in with Google" button and One Tap prompt are gated on
-# GOOGLE_CLIENT_ID. With no credentials configured (the default), neither must
-# render, so the app runs cleanly without Google set up.
+# Google sign-in is gated on both credentials being present. On the apex it's a
+# real OAuth button (+ One Tap); on org subdomains it's a link that routes
+# through the apex. With no credentials (the default) nothing Google renders, so
+# the app runs cleanly without Google set up.
 RSpec.describe "Social Login" do
   context "when GOOGLE_CLIENT_ID is not configured" do
     before do
@@ -13,11 +14,11 @@ RSpec.describe "Social Login" do
       allow(ENV).to receive(:[]).with("GOOGLE_CLIENT_ID").and_return(nil)
     end
 
-    it "does not show the Google button on the login page" do
+    it "does not show any Google affordance on the login page" do
       visit "/login"
 
       expect(page).to have_text("Sign in")
-      expect(page).to have_no_button("Sign in with Google")
+      expect(page).to have_no_text("Sign in with Google")
       expect(page).to have_no_text("or continue with")
     end
   end
@@ -30,17 +31,20 @@ RSpec.describe "Social Login" do
       allow(ENV).to receive(:[]).with("GOOGLE_CLIENT_SECRET").and_return("test-secret")
     end
 
-    # Both credentials are set here, so the button is gated purely by the host:
-    # only the apex (test: "example.com") is registered with Google, and the
-    # default rack_test host is "www.example.com" (a non-canonical public host,
-    # like www/move in prod). (If the host did match the apex, the view would
-    # render the button and raise on the unregistered :google provider — a loud
-    # failure, not a false pass.)
-    it "hides the Google button off the apex host" do
+    # Off the apex (default rack_test host "www.example.com" ≠ apex "example.com"),
+    # Google can't run in-place (single registered origin/redirect), so the button
+    # is a LINK that routes the user to the apex login, which auto-starts OAuth. It
+    # must NOT be a same-host POST button (no `/auth/google` form — which would
+    # also raise on the unregistered :google provider).
+    it "offers Google as a link routing through the apex" do
       visit "/login"
 
-      expect(page).to have_text("Sign in")
-      expect(page).to have_no_button("Sign in with Google")
+      expect(page).to have_text("or continue with")
+      expect(page).to have_link(
+        "Sign in with Google",
+        href: "https://example.com/login?via=google"
+      )
+      expect(page).to have_no_css('form[action="/auth/google"]')
     end
   end
 
@@ -52,13 +56,13 @@ RSpec.describe "Social Login" do
       allow(ENV).to receive(:[]).with("GOOGLE_CLIENT_SECRET").and_return(nil)
     end
 
-    # id without secret can't complete the OAuth code exchange, so the redirect
-    # button must stay hidden (the provider isn't registered either).
-    it "hides the Google button" do
+    # id without secret can't complete the OAuth code exchange, so no Google
+    # affordance renders (button or link) and the provider isn't registered.
+    it "hides Google entirely" do
       visit "/login"
 
       expect(page).to have_text("Sign in")
-      expect(page).to have_no_button("Sign in with Google")
+      expect(page).to have_no_text("Sign in with Google")
     end
   end
 end
