@@ -1,6 +1,5 @@
 class AddAuthenticationToUsers < ActiveRecord::Migration[8.1]
   def change
-    Post.destroy_all
     User.destroy_all
 
     add_column :users, :status, :integer, null: false, default: 1

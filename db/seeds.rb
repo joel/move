@@ -441,10 +441,3 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     "#{ItemSearchDocument.count} search docs"
   )
 end
-
-# --- Misc demo content (Posts surface) --------------------------------------
-author = User.find_or_create_by!(email: "john.doe@example.com") { |u| u.name = "John Doe" }
-Post.find_or_create_by!(title: "Hello World") do |p|
-  p.body = "This is a test post"
-  p.user = author
-end

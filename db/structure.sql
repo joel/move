@@ -1129,20 +1129,6 @@ CREATE TABLE public.organizations (
 
 
 --
--- Name: posts; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.posts (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    title character varying,
-    body text,
-    user_id uuid NOT NULL,
-    created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
-);
-
-
---
 -- Name: recognition_runs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1452,14 +1438,6 @@ ALTER TABLE ONLY public.organization_memberships
 
 ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
-
-
---
--- Name: posts posts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.posts
-    ADD CONSTRAINT posts_pkey PRIMARY KEY (id);
 
 
 --
@@ -1937,13 +1915,6 @@ CREATE UNIQUE INDEX index_organizations_on_slug ON public.organizations USING bt
 
 
 --
--- Name: index_posts_on_user_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_posts_on_user_id ON public.posts USING btree (user_id);
-
-
---
 -- Name: index_recognition_runs_on_box_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2261,14 +2232,6 @@ ALTER TABLE ONLY public.organization_memberships
 
 
 --
--- Name: posts fk_rails_5b5ddfd518; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.posts
-    ADD CONSTRAINT fk_rails_5b5ddfd518 FOREIGN KEY (user_id) REFERENCES public.users(id);
-
-
---
 -- Name: tags fk_rails_62c57c7a1f; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2451,6 +2414,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260619072859'),
 ('20260617130000'),
 ('20260617120000'),
 ('20260616170001'),

@@ -120,7 +120,6 @@ Rails.application.routes.draw do
           to: "settings#update_embedding_provider", as: :settings_embedding_provider
     resources :integration_tokens, only: %i[create destroy]
   end
-  resources :posts
   resources :users
   get "welcome/home"
 

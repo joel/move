@@ -14,7 +14,7 @@ module Views
           render Components::PageHeader.new(
             section: "Users",
             title: "New user",
-            subtitle: "Add someone who can own posts."
+            subtitle: "Add a new user to the organization."
           )
 
           div(class: "ha-card p-6") do

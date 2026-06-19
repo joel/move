@@ -37,7 +37,6 @@ module Components
     end
 
     def render_primary_links
-      link_to("Posts", view_context.posts_path, class: nav_link_class)
       return unless current_user && view_context.allowed_to?(:index?, User)
 
       link_to("Users", view_context.users_path, class: nav_link_class)
