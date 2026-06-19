@@ -22,18 +22,20 @@ RSpec.describe "Social Login" do
     end
   end
 
-  context "when configured but on an org subdomain (non-apex tenant)" do
+  context "when configured but not on the canonical apex host" do
     before do
       allow(ENV).to receive(:[]).and_call_original
       allow(ENV).to receive(:fetch).and_call_original
       allow(ENV).to receive(:[]).with("GOOGLE_CLIENT_ID").and_return("test-client-id")
-      # OAuth/One Tap derive their callback + JS origin from the request host,
-      # but only the apex is registered with Google, so Google must stay hidden
-      # on tenant subdomains (passkey / email link still work there).
-      allow(Apartment::Tenant).to receive(:current).and_return("acme")
     end
 
-    it "hides the Google button off the apex" do
+    # OAuth/One Tap derive their callback + JS origin from the request host, but
+    # only the apex (test: "example.com") is registered with Google. The default
+    # rack_test host is "www.example.com" (a non-canonical public host, like
+    # www/move in prod), so Google must stay hidden even though it's configured.
+    # (If the host did match the apex, the view would render the button and raise
+    # on the unregistered :google provider — a loud failure, not a false pass.)
+    it "hides the Google button off the apex host" do
       visit "/login"
 
       expect(page).to have_text("Sign in")

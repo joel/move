@@ -79,13 +79,9 @@ module Views
         end
       end
 
-      # Only offer Google on the apex (public tenant) — see Login#google_configured?.
-      # OAuth/One Tap use the request host for the callback + JS origin, but only
-      # the apex is registered with Google, so initiating from an org subdomain
-      # would fail. Passwordless still works on subdomains.
+      # Only offer Google on the canonical apex host — see Login#google_configured?.
       def google_configured?
-        ENV["GOOGLE_CLIENT_ID"].present? &&
-          Apartment::Tenant.current == Apartment.default_tenant
+        ENV["GOOGLE_CLIENT_ID"].present? && view_context.on_apex_host?
       end
     end
   end
