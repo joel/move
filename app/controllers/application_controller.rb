@@ -23,7 +23,7 @@ class ApplicationController < ActionController::Base
   # Changes to the importmap will invalidate the etag for HTML responses
   stale_when_importmap_changes
 
-  helper_method :current_user, :current_tenant
+  helper_method :current_user, :current_tenant, :on_apex_host?
 
   before_action :set_current_user
 
@@ -45,6 +45,17 @@ class ApplicationController < ActionController::Base
   def current_tenant
     tenant = Apartment::Tenant.current
     tenant unless tenant == Apartment.default_tenant || tenant == "public"
+  end
+
+  # True only on the canonical apex host (the URL host this app generates links
+  # for — move-easy.org in prod, move.workeverywhere.docker in dev). Google
+  # OAuth/One Tap derive their callback + FedCM origin from the request host,
+  # but only the apex is registered with Google; excluded labels (www, move)
+  # also resolve to the public tenant, so a host check — not just
+  # current_tenant.nil? — is what keeps Google off non-canonical hosts.
+  def on_apex_host?
+    apex = Rails.application.config.action_mailer.default_url_options&.dig(:host)
+    apex.present? && request.host == apex
   end
 
   def require_authenticated_user!

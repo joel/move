@@ -48,6 +48,10 @@ env:
     # move-app S3 identity on the shared SeaweedFS, scoped to the `move` bucket.
     - STORAGE_ACCESS_KEY_ID
     - STORAGE_SECRET_ACCESS_KEY
+    # Google social sign-in (OmniAuth redirect button + One Tap). When unset,
+    # the Google button/One Tap stay hidden, so the app runs fine without them.
+    - GOOGLE_CLIENT_ID
+    - GOOGLE_CLIENT_SECRET
     # No shared AI key here: both recognition (#185) and embeddings (#232) are
     # per-Move bring-your-own-key — each Move supplies its own encrypted key.
     # OPENAI_API_KEY is no longer an app secret (removed from Doppler too); the

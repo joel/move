@@ -4,7 +4,11 @@
 # google-one-tap Stimulus controller. Active only when GOOGLE_CLIENT_ID
 # is configured; otherwise the One Tap prompt never renders.
 class GoogleOneTapSessionsController < ApplicationController
-  skip_forgery_protection only: :create
+  # CSRF protection stays ON: #create writes the login session, so an
+  # unprotected cross-site POST carrying any valid Move-audience Google ID token
+  # could log a victim into the token owner's account (login CSRF). The Stimulus
+  # client sends the Rails CSRF token in the X-CSRF-Token header (same-origin
+  # fetch, so the session cookie rides along), so legitimate One Tap still works.
 
   def create
     payload = verify_google_token(params[:credential])
@@ -48,10 +52,14 @@ class GoogleOneTapSessionsController < ApplicationController
     nil
   end
 
+  # Schema-qualify the omniauth identities table to `public`: it has no AR
+  # model, so Apartment clones it (empty) into each tenant schema, and the
+  # tenant search_path is active on org subdomains. Without `public.` this
+  # raw SQL would read/write the wrong (empty) tenant copy.
   def find_user_by_identity(google_uid)
     sql = ActiveRecord::Base.sanitize_sql_array(
       [
-        "SELECT user_id FROM user_omniauth_identities " \
+        "SELECT user_id FROM public.user_omniauth_identities " \
         "WHERE provider = 'google' AND uid = ?",
         google_uid
       ]
@@ -66,7 +74,7 @@ class GoogleOneTapSessionsController < ApplicationController
 
     sql = ActiveRecord::Base.sanitize_sql_array(
       [
-        "INSERT INTO user_omniauth_identities " \
+        "INSERT INTO public.user_omniauth_identities " \
         "(id, user_id, provider, uid) VALUES (?, ?, ?, ?)",
         SecureRandom.uuid, user.id, "google", google_uid
       ]
@@ -94,9 +102,17 @@ class GoogleOneTapSessionsController < ApplicationController
     session[rodauth.authenticated_by_session_key] = ["google_one_tap"]
     rodauth.remember_login
 
+    # Provision a personal Organization if the linked account somehow has none
+    # (idempotent), then land on the user's org home rather than the apex.
+    rodauth.ensure_personal_organization
     backfill_name(user, payload)
 
-    render json: { ok: true, redirect: "/" }
+    render json: { ok: true, redirect: org_home_redirect }
+  end
+
+  def org_home_redirect
+    org = rodauth.primary_organization
+    org ? rodauth.tenant_home_url(org.slug) : "/"
   end
 
   def backfill_name(user, payload)

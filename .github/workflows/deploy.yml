@@ -39,6 +39,11 @@ jobs:
       # move-app S3 identity for the shared SeaweedFS (Active Storage).
       STORAGE_ACCESS_KEY_ID: ${{ secrets.STORAGE_ACCESS_KEY_ID }}
       STORAGE_SECRET_ACCESS_KEY: ${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
+      # Google social sign-in. OPTIONAL — when the Doppler/GitHub secrets are
+      # absent these resolve to empty and the Google button/One Tap stay hidden,
+      # so they are intentionally NOT in the required-secrets guard below.
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
       # No OPENAI_API_KEY here: embeddings (#232) and recognition (#185) are both
       # per-Move BYO, so the deploy injects no shared AI key (and it is no longer
       # in Doppler). Its only consumer is the Release Bug Scan workflow, which

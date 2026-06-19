@@ -43,9 +43,14 @@ class RodauthMain < Rodauth::Rails::Auth
       omniauth_identities_table Sequel[:public][:user_omniauth_identities]
       omniauth_identities_account_id_column :user_id
 
-      if ENV["GOOGLE_CLIENT_ID"].present?
+      # Register the provider only when BOTH credentials are present: the
+      # authorization-code flow can't exchange the code without the secret, so a
+      # half-configured provider (id set, secret blank — both are optional in the
+      # deploy) would render a button that dead-ends at the callback. One Tap is
+      # separate (it verifies the id_token via tokeninfo and needs no secret).
+      if ENV["GOOGLE_CLIENT_ID"].present? && ENV["GOOGLE_CLIENT_SECRET"].present?
         omniauth_provider :google_oauth2,
-                          ENV["GOOGLE_CLIENT_ID"],
+                          ENV.fetch("GOOGLE_CLIENT_ID", nil),
                           ENV.fetch("GOOGLE_CLIENT_SECRET", nil),
                           name: :google,
                           scope: "email,profile"
@@ -159,6 +164,23 @@ class RodauthMain < Rodauth::Rails::Auth
 
         def before_create_account
           super
+          set_account_id_and_timestamps
+        end
+
+        # rodauth-omniauth creates the account through its OWN path
+        # (omniauth_create_account -> omniauth_save_account), which does NOT call
+        # before_create_account, so the id/timestamp defaults set there are
+        # skipped. public.users.created_at/updated_at are NOT NULL with no DB
+        # default, so without this the first Google sign-up's account INSERT
+        # fails (500) before after_login is ever reached. Fill them on the
+        # OmniAuth create path too. (id has a gen_random_uuid() default, but we
+        # set it for parity with the standard path.)
+        def before_omniauth_create_account
+          super
+          set_account_id_and_timestamps
+        end
+
+        def set_account_id_and_timestamps
           account[:id] ||= SecureRandom.uuid
           timestamp = Time.current
           account[:created_at] ||= timestamp
@@ -320,8 +342,17 @@ class RodauthMain < Rodauth::Rails::Auth
       after_login do
         remember_login
 
-        # Backfill the user's name from the Google profile on first login.
         next unless authenticated_by&.include?("omniauth")
+
+        # Google (OmniAuth) sign-in bypasses verify_account_view, so an account
+        # freshly created by omniauth_create_account? would otherwise land with
+        # no Organization and nowhere to create Moves. Provision the personal
+        # tenant here (idempotent — guards on member_of_any_organization?). Runs
+        # after the account-creation transaction has committed, so the tenant
+        # DDL/pg_dump is not nested in a transaction.
+        ensure_personal_organization
+
+        # Backfill the user's name from the Google profile on first login.
         next if omniauth_name.blank?
 
         user = ::User.find_by(id: account_id)
