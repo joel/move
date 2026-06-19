@@ -43,9 +43,14 @@ class RodauthMain < Rodauth::Rails::Auth
       omniauth_identities_table Sequel[:public][:user_omniauth_identities]
       omniauth_identities_account_id_column :user_id
 
-      if ENV["GOOGLE_CLIENT_ID"].present?
+      # Register the provider only when BOTH credentials are present: the
+      # authorization-code flow can't exchange the code without the secret, so a
+      # half-configured provider (id set, secret blank — both are optional in the
+      # deploy) would render a button that dead-ends at the callback. One Tap is
+      # separate (it verifies the id_token via tokeninfo and needs no secret).
+      if ENV["GOOGLE_CLIENT_ID"].present? && ENV["GOOGLE_CLIENT_SECRET"].present?
         omniauth_provider :google_oauth2,
-                          ENV["GOOGLE_CLIENT_ID"],
+                          ENV.fetch("GOOGLE_CLIENT_ID", nil),
                           ENV.fetch("GOOGLE_CLIENT_SECRET", nil),
                           name: :google,
                           scope: "email,profile"

@@ -92,14 +92,16 @@ module Views
         end
       end
 
-      # Only offer Google on the canonical apex host (ApplicationController
-      # #on_apex_host?). OAuth + One Tap derive the callback/JS origin from the
-      # request host, but only the apex (move-easy.org) is registered with
-      # Google, so initiating from an org subdomain — or a non-canonical public
-      # host like www/move — would fail with redirect_uri_mismatch / origin
+      # Show the redirect button only when the OAuth provider is actually usable:
+      # both credentials present (the code exchange needs the secret) AND on the
+      # canonical apex host (ApplicationController#on_apex_host?) — only the apex
+      # (move-easy.org) is registered with Google, so a subdomain or non-canonical
+      # public host (www/move) would fail with redirect_uri_mismatch / origin
       # errors. Passwordless (passkey / email link) still works everywhere.
       def google_configured?
-        ENV["GOOGLE_CLIENT_ID"].present? && view_context.on_apex_host?
+        ENV["GOOGLE_CLIENT_ID"].present? &&
+          ENV["GOOGLE_CLIENT_SECRET"].present? &&
+          view_context.on_apex_host?
       end
 
       def app_name

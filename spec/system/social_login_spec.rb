@@ -22,20 +22,39 @@ RSpec.describe "Social Login" do
     end
   end
 
-  context "when configured but not on the canonical apex host" do
+  context "when fully configured but not on the canonical apex host" do
     before do
       allow(ENV).to receive(:[]).and_call_original
       allow(ENV).to receive(:fetch).and_call_original
       allow(ENV).to receive(:[]).with("GOOGLE_CLIENT_ID").and_return("test-client-id")
+      allow(ENV).to receive(:[]).with("GOOGLE_CLIENT_SECRET").and_return("test-secret")
     end
 
-    # OAuth/One Tap derive their callback + JS origin from the request host, but
-    # only the apex (test: "example.com") is registered with Google. The default
-    # rack_test host is "www.example.com" (a non-canonical public host, like
-    # www/move in prod), so Google must stay hidden even though it's configured.
-    # (If the host did match the apex, the view would render the button and raise
-    # on the unregistered :google provider — a loud failure, not a false pass.)
+    # Both credentials are set here, so the button is gated purely by the host:
+    # only the apex (test: "example.com") is registered with Google, and the
+    # default rack_test host is "www.example.com" (a non-canonical public host,
+    # like www/move in prod). (If the host did match the apex, the view would
+    # render the button and raise on the unregistered :google provider — a loud
+    # failure, not a false pass.)
     it "hides the Google button off the apex host" do
+      visit "/login"
+
+      expect(page).to have_text("Sign in")
+      expect(page).to have_no_button("Sign in with Google")
+    end
+  end
+
+  context "when GOOGLE_CLIENT_SECRET is missing" do
+    before do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:[]).with("GOOGLE_CLIENT_ID").and_return("test-client-id")
+      allow(ENV).to receive(:[]).with("GOOGLE_CLIENT_SECRET").and_return(nil)
+    end
+
+    # id without secret can't complete the OAuth code exchange, so the redirect
+    # button must stay hidden (the provider isn't registered either).
+    it "hides the Google button" do
       visit "/login"
 
       expect(page).to have_text("Sign in")

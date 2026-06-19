@@ -17,6 +17,10 @@ module Components
 
     private
 
+    # One Tap needs only GOOGLE_CLIENT_ID (the controller verifies the id_token
+    # via Google's tokeninfo endpoint — no client secret), unlike the redirect
+    # button which also requires the secret for the code exchange.
+    #
     # Only prompt on the canonical apex host: FedCM uses the page origin, and
     # only the apex (move-easy.org) is a registered Google JS origin — on an org
     # subdomain (or a non-canonical public host like www/move) One Tap would fail

@@ -79,9 +79,12 @@ module Views
         end
       end
 
-      # Only offer Google on the canonical apex host — see Login#google_configured?.
+      # Both credentials present + on the canonical apex host — see
+      # Login#google_configured?.
       def google_configured?
-        ENV["GOOGLE_CLIENT_ID"].present? && view_context.on_apex_host?
+        ENV["GOOGLE_CLIENT_ID"].present? &&
+          ENV["GOOGLE_CLIENT_SECRET"].present? &&
+          view_context.on_apex_host?
       end
     end
   end
