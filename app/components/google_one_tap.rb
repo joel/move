@@ -17,8 +17,13 @@ module Components
 
     private
 
+    # Only prompt on the apex (public tenant): FedCM uses the page origin, and
+    # only the apex (move-easy.org) is a registered Google JS origin — on an org
+    # subdomain One Tap would fail with an origin error. The component renders in
+    # the global layout, so it must guard the host itself.
     def show?
       ENV["GOOGLE_CLIENT_ID"].present? &&
+        Apartment::Tenant.current == Apartment.default_tenant &&
         !view_context.rodauth.logged_in?
     end
   end

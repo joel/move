@@ -340,9 +340,12 @@ To enable it in production:
    **OAuth 2.0 Client ID** (type: *Web application*):
    - Authorized **redirect URI**: `https://move-easy.org/auth/google/callback`
    - Authorized **JavaScript origin** (One Tap / FedCM): `https://move-easy.org`
-   - Org subdomains (`<slug>.move-easy.org`) need **no** entries: login and the
-     callback happen on the apex, then `login_redirect` hops to the subdomain on
-     the shared cookie.
+   - Org subdomains (`<slug>.move-easy.org`) need **no** entries: the Google
+     button + One Tap render **only on the apex** (public tenant), so OAuth
+     always starts and the callback always lands on the apex; `login_redirect`
+     then hops to the subdomain on the shared cookie. (On a subdomain, sign-in
+     falls back to passkey / email link — Google is hidden there because its
+     callback/JS origin would be the unregistered subdomain.)
 2. **Doppler** (`move/prd`) → add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
    (synced into GitHub Actions secrets for Kamal). They are listed in
    `config/deploy.yml` (`env.secret`) and `.kamal/secrets`; until set they
