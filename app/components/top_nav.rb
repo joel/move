@@ -5,7 +5,6 @@ module Components
   # auth-aware actions. Replace or extend this with your app's real nav.
   class TopNav < Components::Base
     include Phlex::Rails::Helpers::LinkTo
-    include Phlex::Rails::Helpers::ButtonTo
 
     def view_template
       header(class: "sticky top-0 z-40 border-b border-[var(--ha-border)]/40 " \
@@ -55,10 +54,6 @@ module Components
                        "hover:opacity-80") do
           render Components::Icons::UserCircle.new(css: "h-7 w-7")
         end
-        button_to("Sign out", view_context.rodauth.logout_path,
-                  method: :post,
-                  form: { class: "inline-flex" },
-                  class: "ha-button ha-button-secondary !px-4 !py-2 text-sm")
       else
         link_to("Sign in", view_context.rodauth.login_path,
                 class: "ha-button ha-button-primary !px-4 !py-2 text-sm")

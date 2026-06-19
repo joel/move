@@ -9,17 +9,12 @@ class AccountsController < ApplicationController
     render Views::Accounts::Show.new(user: @user)
   end
 
-  # GET /account/edit
-  def edit
-    render Views::Accounts::Edit.new(user: @user)
-  end
-
   # PATCH/PUT /account
   def update
     if @user.update(account_params)
       redirect_to account_path, notice: t(".notice")
     else
-      render Views::Accounts::Edit.new(user: @user),
+      render Views::Accounts::Show.new(user: @user),
              status: :unprocessable_content
     end
   end

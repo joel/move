@@ -17,23 +17,17 @@ module Views
             title: "My account",
             subtitle: "Keep your profile details up to date."
           ) do
-            link_to("Edit account", view_context.edit_account_path,
-                    class: "ha-button ha-button-secondary")
             button_to("Sign out", view_context.rodauth.logout_path,
                       method: :post,
                       form: { class: "inline-flex" },
                       class: "ha-button ha-button-secondary")
-            button_to("Delete account", view_context.account_path,
-                      method: :delete,
-                      class: "ha-button ha-button-danger",
-                      form: { class: "inline-flex" },
-                      data: { turbo_confirm: "Delete your account permanently?" })
           end
 
           render Components::NoticeBanner.new(message: view_context.notice) if view_context.notice.present?
 
           render Components::AccountDetails.new(user: @user)
           render_security
+          render_danger_zone
         end
       end
 
@@ -58,6 +52,29 @@ module Views
             render Components::Icons::ChevronRight.new(
               css: "h-5 w-5 text-[var(--ha-on-surface-variant)]"
             )
+          end
+        end
+      end
+
+      # Irreversible actions, isolated at the bottom so they're never adjacent to
+      # benign controls.
+      def render_danger_zone
+        section(class: "space-y-4") do
+          h2(class: "ha-overline text-[var(--ha-error)]") { "Danger zone" }
+          div(class: "ha-card border-[var(--ha-error)]/30 p-6") do
+            div(class: "flex flex-wrap items-center justify-between gap-4") do
+              div do
+                p(class: "font-medium") { "Delete account" }
+                p(class: "mt-1 text-sm text-[var(--ha-muted)]") do
+                  plain "Permanently remove your account and all of its data."
+                end
+              end
+              button_to("Delete account", view_context.account_path,
+                        method: :delete,
+                        class: "ha-button ha-button-danger",
+                        form: { class: "inline-flex" },
+                        data: { turbo_confirm: "Delete your account permanently?" })
+            end
           end
         end
       end

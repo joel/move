@@ -58,7 +58,12 @@ module Views
             raw safe(view_context.rodauth.webauthn_remove_additional_form_tags.to_s)
 
             div(class: "flex flex-col gap-3") do
-              passkey_rows.each { |row| render_passkey_row(form, row) }
+              # Pre-select the first key so a submit always carries a valid
+              # webauthn_remove value (Rodauth rejects an empty selection with
+              # "must select a valid webauthn authenticator to remove").
+              passkey_rows.each_with_index do |row, i|
+                render_passkey_row(form, row, checked: i.zero?)
+              end
             end
 
             render_remove_error
@@ -71,10 +76,10 @@ module Views
         end
       end
 
-      def render_passkey_row(form, row)
+      def render_passkey_row(form, row, checked: false)
         label(
           for: "webauthn-remove-#{row[:id]}",
-          class: "flex items-center gap-3 rounded-xl border " \
+          class: "flex cursor-pointer items-center gap-3 rounded-xl border " \
                  "border-[var(--ha-border)] bg-[var(--ha-surface-muted)] " \
                  "px-3 py-2 text-sm text-[var(--ha-text)]"
         ) do
@@ -82,6 +87,7 @@ module Views
             view_context.rodauth.webauthn_remove_param,
             row[:id],
             id: "webauthn-remove-#{row[:id]}",
+            checked: checked,
             class: "h-4 w-4",
             aria: radio_aria_attrs
           )
@@ -118,9 +124,13 @@ module Views
       def passkey_rows
         rodauth = view_context.rodauth
         fmt = rodauth.strftime_format
+        # Schema-qualify to public: this row has no AR model, so on an org
+        # subdomain Apartment's search_path points at the (empty) tenant-cloned
+        # copy. Without `public.` the list renders zero keys and removal always
+        # fails. Mirrors the rodauth_main webauthn_keys_table qualification.
         sql = ActiveRecord::Base.sanitize_sql_array(
           [
-            "SELECT webauthn_id, last_use, name FROM user_webauthn_keys " \
+            "SELECT webauthn_id, last_use, name FROM public.user_webauthn_keys " \
             "WHERE user_id = ? ORDER BY last_use DESC",
             rodauth.account_id
           ]

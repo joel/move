@@ -1,7 +1,7 @@
 Rails.application.routes.draw do
   # Google One Tap credential endpoint (active when GOOGLE_CLIENT_ID is set)
   post "auth/google/one_tap", to: "google_one_tap_sessions#create"
-  resource :account, only: %i[show edit update destroy]
+  resource :account, only: %i[show update destroy]
   # D13 — MCP assistant endpoint. Tenant-scoped (resolved from the org subdomain
   # by the Apartment elevator) and authenticated by a per-Move Bearer integration
   # token, not a session. JSON-RPC over a single POST (no SSE session state).

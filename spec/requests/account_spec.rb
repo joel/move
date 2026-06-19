@@ -7,14 +7,17 @@ RSpec.describe "/account" do
 
   before { stub_current_user(user) }
 
-  it "renders the account page" do
+  it "renders the account page with the inline rename form and danger zone" do
     get account_url
     expect(response).to be_successful
+    expect(response.body).to include("Danger zone")
+    expect(response.body).to include("inline-edit") # rename toggle controller
+    expect(response.body).to include('aria-label="Edit name"')
+    expect(response.body).to include('aria-label="Account name"') # labelled inline field
   end
 
-  it "renders the edit account page" do
-    get edit_account_url
-    expect(response).to be_successful
+  it "no longer exposes a separate edit route" do
+    expect { edit_account_path }.to raise_error(NameError)
   end
 
   it "updates the account name" do
