@@ -4,7 +4,11 @@
 # google-one-tap Stimulus controller. Active only when GOOGLE_CLIENT_ID
 # is configured; otherwise the One Tap prompt never renders.
 class GoogleOneTapSessionsController < ApplicationController
-  skip_forgery_protection only: :create
+  # CSRF protection stays ON: #create writes the login session, so an
+  # unprotected cross-site POST carrying any valid Move-audience Google ID token
+  # could log a victim into the token owner's account (login CSRF). The Stimulus
+  # client sends the Rails CSRF token in the X-CSRF-Token header (same-origin
+  # fetch, so the session cookie rides along), so legitimate One Tap still works.
 
   def create
     payload = verify_google_token(params[:credential])

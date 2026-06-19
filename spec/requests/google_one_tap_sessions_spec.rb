@@ -165,6 +165,30 @@ RSpec.describe "POST /auth/google/one_tap" do
     end
   end
 
+  context "with CSRF protection enabled (production-like)" do
+    around do |example|
+      original = ActionController::Base.allow_forgery_protection
+      ActionController::Base.allow_forgery_protection = true
+      example.run
+    ensure
+      ActionController::Base.allow_forgery_protection = original
+    end
+
+    before { insert_identity(user, google_uid) }
+
+    # #create writes the login session, so a cross-site POST without the CSRF
+    # token (carrying any valid Move-audience token) must be rejected before it
+    # can log the visitor in. The Stimulus client sends X-CSRF-Token, so genuine
+    # same-origin One Tap is unaffected.
+    it "rejects a POST that lacks the CSRF token" do
+      post "/auth/google/one_tap",
+           params: { credential: "valid-jwt" }, as: :json
+
+      expect(response).not_to have_http_status(:ok)
+      expect(response.parsed_body).not_to include("ok" => true)
+    end
+  end
+
   context "with name backfill" do
     before { insert_identity(user, google_uid) }
 
