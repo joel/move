@@ -33,7 +33,50 @@ module Views
           render Components::NoticeBanner.new(message: view_context.notice) if view_context.notice.present?
 
           render Components::AccountDetails.new(user: @user)
+          render_security
         end
+      end
+
+      private
+
+      # Passwordless passkey (WebAuthn) management: "Add passkey" until the
+      # account has one registered, then "Manage passkeys" to review/remove.
+      def render_security
+        section(class: "space-y-4") do
+          h2(class: "ha-overline") { "Security" }
+          link_to(
+            passkey_path,
+            class: "ha-card flex items-center gap-4 p-6 transition " \
+                   "hover:bg-[var(--ha-surface-high)]"
+          ) do
+            span(class: "flex h-10 w-10 flex-shrink-0 items-center justify-center " \
+                        "rounded-full bg-[var(--ha-primary-container)]/20 " \
+                        "text-[var(--ha-primary)]") do
+              render Components::Icons::Key.new(css: "h-5 w-5")
+            end
+            span(class: "flex-1 font-medium") { passkey_label }
+            render Components::Icons::ChevronRight.new(
+              css: "h-5 w-5 text-[var(--ha-on-surface-variant)]"
+            )
+          end
+        end
+      end
+
+      def passkey_path
+        rodauth = view_context.rodauth
+        passkey_registered? ? rodauth.webauthn_remove_path : rodauth.webauthn_setup_path
+      end
+
+      def passkey_label
+        passkey_registered? ? "Manage passkeys" : "Add passkey"
+      end
+
+      # rodauth.webauthn_setup? reads the authenticated Rodauth account; guard on
+      # logged_in? so the page never raises when current_user is present without a
+      # Rodauth session (e.g. request specs that stub current_user).
+      def passkey_registered?
+        rodauth = view_context.rodauth
+        rodauth.logged_in? && rodauth.webauthn_setup?
       end
     end
   end
