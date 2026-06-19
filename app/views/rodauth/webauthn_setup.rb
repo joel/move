@@ -8,70 +8,65 @@ module Views
 
       def view_template
         cred = view_context.rodauth.new_webauthn_credential
-        suggested = Webauthn::NameSuggester.from_user_agent(
-          view_context.request.user_agent
-        )
+        suggested = Webauthn::NameSuggester.from_user_agent(view_context.request.user_agent)
 
         div(class: "space-y-8") do
-          div(class: "ha-card p-8") do
-            p(class: "ha-overline") do
-              plain "Security"
-            end
-            h1(class: "mt-2 text-3xl font-semibold tracking-tight sm:text-4xl") do
-              plain "Add a passkey"
-            end
-            p(class: "mt-3 text-sm text-[var(--ha-muted)]") do
-              plain "Register this device to sign in quickly and securely."
-            end
-          end
-
+          render_hero
           render Components::RodauthFlash.new
-
-          div(class: "ha-card p-6 space-y-6") do
-            form_with(
-              url: view_context.rodauth.webauthn_setup_path,
-              method: :post,
-              id: "webauthn-setup-form",
-              data: { credential_options: cred.as_json.to_json, turbo: false },
-              class: "space-y-6"
-            ) do |form|
-              raw safe(view_context.rodauth.webauthn_setup_additional_form_tags.to_s)
-
-              form.hidden_field(
-                view_context.rodauth.webauthn_setup_challenge_param,
-                value: cred.challenge
-              )
-              form.hidden_field(
-                view_context.rodauth.webauthn_setup_challenge_hmac_param,
-                value: view_context.rodauth.compute_hmac(cred.challenge)
-              )
-              form.text_field(
-                view_context.rodauth.webauthn_setup_param,
-                value: "",
-                id: "webauthn-setup",
-                class: "hidden",
-                aria: { hidden: "true" }
-              )
-
-              render_name_field(form, suggested)
-
-              div(id: "webauthn-setup-button") do
-                form.submit(
-                  view_context.rodauth.webauthn_setup_button,
-                  class: "ha-button ha-button-primary w-full"
-                )
-              end
-            end
-          end
+          render_setup_form(cred, suggested)
         end
 
-        javascript_include_tag(
-          view_context.rodauth.webauthn_setup_js_path,
-          extname: false
-        )
+        javascript_include_tag(view_context.rodauth.webauthn_setup_js_path, extname: false)
       end
 
       private
+
+      def render_hero
+        div(class: "ha-card p-8") do
+          p(class: "ha-overline") { plain "Security" }
+          h1(class: "mt-2 text-3xl font-semibold tracking-tight sm:text-4xl") do
+            plain "Add a passkey"
+          end
+          p(class: "mt-3 text-sm text-[var(--ha-muted)]") do
+            plain "Register this device to sign in quickly and securely."
+          end
+        end
+      end
+
+      def render_setup_form(cred, suggested)
+        rodauth = view_context.rodauth
+        div(class: "ha-card p-6 space-y-6") do
+          form_with(
+            url: rodauth.webauthn_setup_path,
+            method: :post,
+            id: "webauthn-setup-form",
+            data: {
+              credential_options: cred.as_json.to_json,
+              account_key: rodauth.account_id,
+              turbo: false
+            },
+            class: "space-y-6"
+          ) do |form|
+            raw safe(rodauth.webauthn_setup_additional_form_tags.to_s)
+
+            form.hidden_field(rodauth.webauthn_setup_challenge_param, value: cred.challenge)
+            form.hidden_field(
+              rodauth.webauthn_setup_challenge_hmac_param,
+              value: rodauth.compute_hmac(cred.challenge)
+            )
+            form.text_field(
+              rodauth.webauthn_setup_param,
+              value: "", id: "webauthn-setup", class: "hidden", aria: { hidden: "true" }
+            )
+
+            render_name_field(form, suggested)
+
+            div(id: "webauthn-setup-button") do
+              form.submit(rodauth.webauthn_setup_button, class: "ha-button ha-button-primary w-full")
+            end
+          end
+        end
+      end
 
       def render_name_field(form, suggested)
         div(class: "space-y-2") do

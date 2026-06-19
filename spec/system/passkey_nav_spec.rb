@@ -42,7 +42,7 @@ RSpec.describe "Passkey navigation" do
 
     click_on "Add passkey"
 
-    expect(page).to have_current_path("/webauthn-setup", ignore_query: true)
+    expect(page).to have_current_path("/account/passkeys/new", ignore_query: true)
     expect(page).to have_button("Add passkey") # passkey wording, not WebAuthn jargon
   end
 
@@ -51,7 +51,7 @@ RSpec.describe "Passkey navigation" do
     login_as(user: user)
     seed_passkey(user, webauthn_id: "existing-key", name: "Phone")
 
-    visit "/webauthn-setup"
+    visit "/account/passkeys/new"
 
     # The credential options must exclude nothing, so a synced/duplicate
     # authenticator can still register another passkey (no InvalidStateError).
@@ -71,7 +71,7 @@ RSpec.describe "Passkey navigation" do
 
     click_on "Manage passkeys"
 
-    expect(page).to have_current_path("/webauthn-remove", ignore_query: true)
+    expect(page).to have_current_path("/account/passkeys", ignore_query: true)
   end
 
   it "lists each passkey by name and removes one without an explicit selection" do
@@ -80,7 +80,7 @@ RSpec.describe "Passkey navigation" do
     seed_passkey(user, webauthn_id: "key-phone", name: "Pixel phone")
     seed_passkey(user, webauthn_id: "key-laptop", name: "Work laptop")
 
-    visit "/webauthn-remove"
+    visit "/account/passkeys"
 
     # Each named key is listed individually, and the friendly button copy is used.
     expect(page).to have_text("Pixel phone")
@@ -95,6 +95,42 @@ RSpec.describe "Passkey navigation" do
 
     expect(page).to have_no_text("must select")
     expect(passkey_count(user)).to eq(1)
+  end
+
+  it "lands on the account page after removing the last passkey" do
+    user = create(:user)
+    login_as(user: user)
+    seed_passkey(user, webauthn_id: "only-key", name: "Only key")
+
+    visit "/account/passkeys"
+    click_on "Remove passkey"
+
+    # No passkeys remain → the manage page would bounce to the generic 2FA flow,
+    # so we send the user to the account page (Security card offers "Add passkey").
+    expect(page).to have_current_path("/account", ignore_query: true)
+    expect(passkey_count(user)).to eq(0)
+  end
+
+  it "badges the current device's passkey and hides Add on that device" do
+    user = create(:user)
+    login_as(user: user)
+    seed_passkey(user, webauthn_id: "key-phone", name: "Pixel phone")
+    seed_passkey(user, webauthn_id: "key-laptop", name: "Work laptop")
+    # Pretend this session signed in with the phone passkey.
+    allow_any_instance_of(RodauthMain) # rubocop:disable RSpec/AnyInstance
+      .to receive(:authenticated_webauthn_id).and_return("key-phone")
+
+    visit "/account/passkeys"
+
+    phone = find("label[data-webauthn-id='key-phone']", visible: :all)
+    laptop = find("label[data-webauthn-id='key-laptop']", visible: :all)
+    # The current device's row is highlighted and its "This device" badge shown;
+    # the other's badge stays hidden.
+    expect(phone[:class]).to include("ring-2")
+    expect(phone.find("[data-passkey-list-target='badge']", visible: :all)[:class]).not_to include("hidden")
+    expect(laptop.find("[data-passkey-list-target='badge']", visible: :all)[:class]).to include("hidden")
+    # This device already has a passkey → no "Add another" card.
+    expect(page).to have_no_css("[data-passkey-list-target='addCard']")
   end
 
   # Regression for the schema-qualification bug: on an org subdomain Apartment
@@ -130,7 +166,7 @@ RSpec.describe "Passkey navigation" do
       seed_passkey(org_user, webauthn_id: "pk-tenant", name: "Phone")
       login_as(user: org_user)
 
-      visit "/webauthn-remove"
+      visit "/account/passkeys"
 
       expect(page).to have_text("Phone")
       expect(page).to have_selector(:radio_button, count: 1)

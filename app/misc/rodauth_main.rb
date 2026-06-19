@@ -275,6 +275,28 @@ class RodauthMain < Rodauth::Rails::Auth
       webauthn_rp_name { ENV.fetch("WEBAUTHN_RP_NAME", Rails.application.config.x.brand_name) }
       webauthn_user_verification "preferred"
 
+      # Friendlier, account-scoped URLs (the gem defaults are /webauthn-setup and
+      # /webauthn-remove). Multi-segment route values resolve to /account/passkeys
+      # and /account/passkeys/new; the *_path helpers update with them, so every
+      # link follows. (Rodauth runs ahead of Rails and `resource :account` has no
+      # sub-paths, so there's no route conflict.)
+      webauthn_remove_route "account/passkeys"
+      webauthn_setup_route "account/passkeys/new"
+      # Keep passkey management on the management page after adding/removing
+      # (the gem default falls through to the post-login redirect → Moves index).
+      webauthn_setup_redirect { webauthn_remove_path }
+      # Where to land after removing a passkey:
+      #   - logged out (removed the credential that authenticated this
+      #     passkey-only session → Rodauth cleared it) → the login page;
+      #   - passkeys remain → stay on the management page;
+      #   - none remain → the account page (manage would bounce to the generic
+      #     2FA-setup flow, and its Security card now offers "Add passkey").
+      webauthn_remove_redirect do
+        next login_path unless logged_in?
+
+        webauthn_setup? ? webauthn_remove_path : "/account"
+      end
+
       # User-facing copy: the Rodauth defaults say "WebAuthn" / "authenticator",
       # which users don't understand — say "passkey" everywhere.
       webauthn_setup_button "Add passkey"
