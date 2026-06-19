@@ -1,23 +1,26 @@
 # frozen_string_literal: true
 
 module Components
+  # Profile panel: avatar, name (rename inline via the pencil), email, role chip.
   class AccountDetails < Components::Base
+    include Phlex::Rails::Helpers::FormWith
+    include Phlex::Rails::Helpers::Pluralize
+
     def initialize(user:)
       @user = user
     end
 
     def view_template
-      div(class: "ha-card p-8") do
+      div(
+        class: "ha-card p-8",
+        data: { controller: "inline-edit", inline_edit_open_value: @user.errors.any? }
+      ) do
         div(class: "flex items-center gap-6") do
           render_avatar
-          div(class: "flex-1") do
-            h2(class: "font-headline text-2xl font-bold") do
-              plain(@user.name.presence || "Unnamed")
-            end
-            p(class: "mt-1 text-sm " \
-                     "text-[var(--ha-on-surface-variant)]") do
-              plain @user.email
-            end
+          div(class: "min-w-0 flex-1") do
+            render_name_display
+            render_name_form
+            p(class: "mt-1 text-sm text-[var(--ha-on-surface-variant)]") { plain @user.email }
             render_role_chip
           end
         end
@@ -25,6 +28,57 @@ module Components
     end
 
     private
+
+    def render_name_display
+      div(
+        class: "flex items-center gap-2",
+        data: { inline_edit_target: "display" }
+      ) do
+        h2(class: "truncate font-headline text-2xl font-bold") do
+          plain(@user.name.presence || "Unnamed")
+        end
+        button(
+          type: "button",
+          aria: { label: "Edit name" },
+          data: { action: "inline-edit#edit" },
+          class: "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full " \
+                 "text-[var(--ha-muted)] transition hover:bg-[var(--ha-surface-high)] " \
+                 "hover:text-[var(--ha-text)]"
+        ) { render Components::Icons::Pencil.new(css: "h-4 w-4") }
+      end
+    end
+
+    def render_name_form
+      div(class: "hidden", data: { inline_edit_target: "form" }) do
+        form_with(model: @user, url: view_context.account_path, class: "space-y-3") do |form|
+          render_errors if @user.errors.any?
+          div(class: "flex items-center gap-2") do
+            form.text_field(
+              :name,
+              class: "ha-input flex-1",
+              data: { inline_edit_target: "input" }
+            )
+            form.submit("Save", class: "ha-button ha-button-primary !px-4 !py-2 text-sm")
+            button(
+              type: "button",
+              data: { action: "inline-edit#cancel" },
+              class: "ha-button ha-button-secondary !px-4 !py-2 text-sm"
+            ) { plain "Cancel" }
+          end
+        end
+      end
+    end
+
+    def render_errors
+      div(
+        id: "error_explanation",
+        class: "rounded-2xl bg-[var(--ha-error-container)] px-4 py-3 text-sm text-[var(--ha-error)]"
+      ) do
+        ul(class: "list-disc space-y-1 pl-5") do
+          @user.errors.each { |error| li { error.full_message } }
+        end
+      end
+    end
 
     def render_avatar
       div(class: "flex h-20 w-20 flex-shrink-0 items-center " \
