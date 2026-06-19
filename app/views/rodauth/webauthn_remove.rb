@@ -7,16 +7,38 @@ module Views
       include Phlex::Rails::Helpers::ContentTag
       include Phlex::Rails::Helpers::LinkTo
 
+      # Tailwind must see these literals to compile them — the passkey-list
+      # controller adds the same tokens to localStorage-matched rows at runtime.
+      HIGHLIGHT_CLASSES = "ring-2 ring-[var(--ha-primary)]"
+
       def view_template
-        div(class: "space-y-8") do
+        div(
+          class: "space-y-8",
+          data: { controller: "passkey-list", passkey_list_account_value: account_id }
+        ) do
           render_hero
           render Components::RodauthFlash.new
-          render_add_another_card
+          # Hide "Add another" when this device already has a passkey (the one it
+          # signed in with / just added). When unknown (email-link session) the
+          # card renders and the controller hides it if this browser created one.
+          render_add_another_card unless current_device_id
           render_remove_form
         end
       end
 
       private
+
+      def account_id
+        view_context.rodauth.account_id
+      end
+
+      # The credential this session authenticated with (or just registered);
+      # nil on an email-link session. Marks "the current device's passkey".
+      def current_device_id
+        return @current_device_id if defined?(@current_device_id)
+
+        @current_device_id = view_context.rodauth.authenticated_webauthn_id
+      end
 
       def render_hero
         div(class: "ha-card p-8") do
@@ -31,7 +53,7 @@ module Views
       end
 
       def render_add_another_card
-        div(class: "ha-card p-6") do
+        div(class: "ha-card p-6", data: { passkey_list_target: "addCard" }) do
           h2(class: "text-lg font-semibold") { plain "Add another passkey" }
           p(class: "mt-2 text-sm text-[var(--ha-muted)]") do
             plain "Register another device for faster, safer sign-ins."
@@ -62,7 +84,8 @@ module Views
               # webauthn_remove value (Rodauth rejects an empty selection with
               # "must select a valid webauthn authenticator to remove").
               passkey_rows.each_with_index do |row, i|
-                render_passkey_row(form, row, checked: i.zero?)
+                render_passkey_row(form, row, checked: i.zero?,
+                                              current: row[:id] == current_device_id)
               end
             end
 
@@ -76,12 +99,16 @@ module Views
         end
       end
 
-      def render_passkey_row(form, row, checked: false)
+      def render_passkey_row(form, row, checked: false, current: false)
         label(
           for: "webauthn-remove-#{row[:id]}",
-          class: "flex cursor-pointer items-center gap-3 rounded-xl border " \
-                 "border-[var(--ha-border)] bg-[var(--ha-surface-muted)] " \
-                 "px-3 py-2 text-sm text-[var(--ha-text)]"
+          data: { passkey_list_target: "row", webauthn_id: row[:id] },
+          class: [
+            "flex cursor-pointer items-center gap-3 rounded-xl border " \
+            "border-[var(--ha-border)] bg-[var(--ha-surface-muted)] px-3 py-2 " \
+            "text-sm text-[var(--ha-text)]",
+            (current ? HIGHLIGHT_CLASSES : "")
+          ].join(" ").strip
         ) do
           form.radio_button(
             view_context.rodauth.webauthn_remove_param,
@@ -91,11 +118,31 @@ module Views
             class: "h-4 w-4",
             aria: radio_aria_attrs
           )
-          span(class: "font-medium") { plain row[:name] }
-          span(class: "text-[var(--ha-muted)]") do
-            plain " — Last used: #{row[:last_use]}"
+          div(class: "flex min-w-0 flex-1 flex-col") do
+            div(class: "flex items-center gap-2") do
+              span(class: "truncate font-medium") { plain row[:name] }
+              render_this_device_badge(hidden: !current)
+            end
+            span(class: "text-xs text-[var(--ha-muted)]") do
+              plain "Last used: #{row[:last_use]}"
+            end
           end
         end
+      end
+
+      # Always in the DOM (hidden by default); revealed server-side for the
+      # signed-in-with credential, and by the passkey-list controller for rows
+      # this browser registered (localStorage).
+      def render_this_device_badge(hidden:)
+        span(
+          data: { passkey_list_target: "badge" },
+          class: [
+            "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 " \
+            "text-[10px] font-bold uppercase tracking-wide " \
+            "bg-[var(--ha-primary-container)]/30 text-[var(--ha-primary)]",
+            (hidden ? "hidden" : "")
+          ].join(" ").strip
+        ) { plain "This device" }
       end
 
       def render_remove_error
