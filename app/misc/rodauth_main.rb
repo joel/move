@@ -98,11 +98,27 @@ class RodauthMain < Rodauth::Rails::Auth
 
         def resolve_passkey_name(webauthn_credential)
           submitted = param_or_nil("passkey_name").to_s.strip
-          return submitted[0, 80] if submitted.present?
+          base = if submitted.present?
+                   submitted[0, 80]
+                 else
+                   aaguid = extract_aaguid(webauthn_credential)
+                   Webauthn::AaguidLookup.lookup(aaguid) ||
+                     Webauthn::NameSuggester.from_user_agent(request.user_agent)
+                 end
+          unique_passkey_name(base)
+        end
 
-          aaguid = extract_aaguid(webauthn_credential)
-          Webauthn::AaguidLookup.lookup(aaguid) ||
-            Webauthn::NameSuggester.from_user_agent(request.user_agent)
+        # Keep names distinct per account so the manage-passkeys list never shows
+        # two identical labels (e.g. two "Linux device" from the same User-Agent).
+        # Appends " 2", " 3", … to the first collision; trims to the 80-char column.
+        def unique_passkey_name(base)
+          existing = webauthn_keys_ds.select_map(:name).compact
+          return base unless existing.include?(base)
+
+          stem = base[0, 76]
+          n = 2
+          n += 1 while existing.include?("#{stem} #{n}")
+          "#{stem} #{n}"
         end
 
         def extract_aaguid(webauthn_credential)
@@ -232,6 +248,13 @@ class RodauthMain < Rodauth::Rails::Auth
       end
       webauthn_rp_name { ENV.fetch("WEBAUTHN_RP_NAME", Rails.application.config.x.brand_name) }
       webauthn_user_verification "preferred"
+
+      # User-facing copy (the gem default is the jargon "Remove WebAuthn
+      # Authenticator").
+      webauthn_remove_button "Remove passkey"
+      # Friendlier same-device duplicate handling (InvalidStateError); block form
+      # defers the constant load to request time. See app/misc/webauthn/setup_js.rb.
+      webauthn_setup_js { Webauthn::SetupJs::SOURCE }
 
       # ── OmniAuth hooks ────────────────────────────────────────
       omniauth_login_failure_redirect { login_path }
