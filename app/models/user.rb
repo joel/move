@@ -4,7 +4,5 @@
 class User < ApplicationRecord
   include Roleable
 
-  has_many :posts, dependent: :destroy
-
   validates :email, presence: true, uniqueness: { case_sensitive: false }
 end

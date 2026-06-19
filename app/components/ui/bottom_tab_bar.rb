@@ -16,8 +16,8 @@ module Components
       def view_template
         nav(
           class: "lg:hidden fixed bottom-0 left-0 z-50 flex w-full items-center " \
-                 "justify-around rounded-t-card border-t border-card-border " \
-                 "bg-card px-4 pb-6 pt-3",
+                 "justify-between rounded-t-card border-t border-card-border " \
+                 "bg-card px-2 pb-6 pt-3",
           aria_label: I18n.t("ui.nav.menu"),
           **@attrs
         ) do
@@ -33,7 +33,8 @@ module Components
           href: dest.href,
           aria_current: (active ? "page" : nil),
           class: [
-            "flex flex-col items-center justify-center rounded-full px-4 py-1 transition",
+            "flex flex-1 min-w-0 flex-col items-center justify-center " \
+            "rounded-full px-1 py-1 transition",
             (active ? "bg-accent-sage text-page" : "text-muted active:bg-surface-container-high")
           ].join(" ")
         ) do
@@ -46,7 +47,8 @@ module Components
       def elevated_tab(dest)
         a(
           href: dest.href,
-          class: "relative flex flex-col items-center justify-center px-4 py-1 text-muted",
+          class: "relative flex flex-1 min-w-0 flex-col items-center " \
+                 "justify-center px-1 py-1 text-muted",
           aria_label: I18n.t(dest.label_key)
         ) do
           div(

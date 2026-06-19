@@ -34,27 +34,25 @@ export default class extends Controller {
     const isDark = mode === "dark" || (mode === "system" && prefersDark)
     document.documentElement.classList.toggle("dark", isDark)
 
-    if (this.hasLabelTarget) {
-      this.labelTarget.textContent = isDark ? "Light mode" : "Dark mode"
-    }
+    // The controller is mounted once on <body> but the toggle can be rendered
+    // several times (root nav, Move sidebar, Move mobile top bar). Update every
+    // target so the visible control always reflects the active theme.
+    this.labelTargets.forEach((el) => {
+      el.textContent = isDark ? "Light mode" : "Dark mode"
+    })
 
-    if (this.hasIconDarkTarget) {
-      this.iconDarkTarget.classList.toggle("hidden", !isDark)
-    }
-
-    if (this.hasIconLightTarget) {
-      this.iconLightTarget.classList.toggle("hidden", isDark)
-    }
+    this.iconDarkTargets.forEach((el) => el.classList.toggle("hidden", !isDark))
+    this.iconLightTargets.forEach((el) => el.classList.toggle("hidden", isDark))
 
     // F3 settings switch: reflect the active theme as the switch's on/off state.
-    if (this.hasSwitchTarget) {
-      this.switchTarget.setAttribute("aria-checked", isDark ? "true" : "false")
-    }
+    this.switchTargets.forEach((el) => {
+      el.setAttribute("aria-checked", isDark ? "true" : "false")
+    })
 
-    if (this.hasKnobTarget) {
-      this.knobTarget.classList.toggle("translate-x-6", isDark)
-      this.knobTarget.classList.toggle("translate-x-1", !isDark)
-    }
+    this.knobTargets.forEach((el) => {
+      el.classList.toggle("translate-x-6", isDark)
+      el.classList.toggle("translate-x-1", !isDark)
+    })
   }
 
   isDark() {

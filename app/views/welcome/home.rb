@@ -26,10 +26,8 @@ module Views
             end
           end
           div(class: "flex flex-wrap justify-center gap-3") do
-            link_to("Browse posts", view_context.posts_path,
-                    class: "ha-button ha-button-primary")
             link_to("My account", view_context.account_path,
-                    class: "ha-button ha-button-secondary")
+                    class: "ha-button ha-button-primary")
           end
         end
       end

@@ -37,34 +37,24 @@ module Components
     end
 
     def render_primary_links
-      link_to("Posts", view_context.posts_path, class: nav_link_class)
       return unless current_user && view_context.allowed_to?(:index?, User)
 
       link_to("Users", view_context.users_path, class: nav_link_class)
     end
 
     def render_theme_toggle
-      button(
-        type: "button",
-        data: { action: "theme#toggle" },
-        aria_label: "Toggle theme",
-        class: "flex h-9 w-9 items-center justify-center rounded-full " \
-               "text-[var(--ha-muted)] transition hover:bg-[var(--ha-surface-high)] " \
-               "hover:text-[var(--ha-text)]"
-      ) do
-        span(data: { theme_target: "iconLight" }) do
-          render Components::Icons::Sun.new(css: "h-5 w-5")
-        end
-        span(data: { theme_target: "iconDark" }, class: "hidden") do
-          render Components::Icons::Moon.new(css: "h-5 w-5")
-        end
-      end
+      render Components::Ui::ThemeToggle.new
     end
 
     def render_auth_actions
       if current_user
-        link_to("Account", view_context.account_path, class: nav_link_class)
-        link_to(passkey_label, passkey_path, class: nav_link_class)
+        link_to(view_context.account_path,
+                aria: { label: "Account" },
+                class: "flex h-9 w-9 items-center justify-center rounded-full " \
+                       "text-accent-sage transition hover:bg-[var(--ha-surface-high)] " \
+                       "hover:opacity-80") do
+          render Components::Icons::UserCircle.new(css: "h-7 w-7")
+        end
         button_to("Sign out", view_context.rodauth.logout_path,
                   method: :post,
                   form: { class: "inline-flex" },
@@ -73,25 +63,6 @@ module Components
         link_to("Sign in", view_context.rodauth.login_path,
                 class: "ha-button ha-button-primary !px-4 !py-2 text-sm")
       end
-    end
-
-    # Passwordless passkey (WebAuthn) management: "Add passkey" until the account
-    # has one registered, then "Manage passkeys" to review/remove existing keys.
-    def passkey_path
-      rodauth = view_context.rodauth
-      passkey_registered? ? rodauth.webauthn_remove_path : rodauth.webauthn_setup_path
-    end
-
-    def passkey_label
-      passkey_registered? ? "Manage passkeys" : "Add passkey"
-    end
-
-    # rodauth.webauthn_setup? reads the authenticated Rodauth account; guard on
-    # logged_in? so the nav never raises when current_user is present without a
-    # Rodauth session (e.g. request specs that stub current_user).
-    def passkey_registered?
-      rodauth = view_context.rodauth
-      rodauth.logged_in? && rodauth.webauthn_setup?
     end
 
     def nav_link_class

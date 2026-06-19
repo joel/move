@@ -1,6 +1,10 @@
 class AddAuthenticationToUsers < ActiveRecord::Migration[8.1]
   def change
-    Post.destroy_all
+    # Clear legacy posts first (model-free — the Post model has been removed).
+    # posts.user_id has a FK to users with no cascade, so on a DB that applied
+    # create_posts but not yet this migration, User.destroy_all would otherwise
+    # abort on that constraint.
+    execute("DELETE FROM posts") if table_exists?(:posts)
     User.destroy_all
 
     add_column :users, :status, :integer, null: false, default: 1

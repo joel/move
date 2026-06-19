@@ -33,13 +33,20 @@ module Components
               full_width: true
             )
           end
+          render Components::Ui::ThemeToggle.new(
+            css: "flex h-10 w-10 items-center justify-center rounded-full " \
+                 "text-muted transition hover:bg-card hover:text-text-warm"
+          )
         end
       end
 
       private
 
       def render_brand
-        div(class: "mb-8 flex items-center gap-4 px-2") do
+        a(href: Rails.application.routes.url_helpers.moves_path,
+          aria_label: I18n.t("ui.nav.brand_home"),
+          class: "mb-8 flex items-center gap-4 rounded-card px-2 py-1 " \
+                 "transition hover:bg-card") do
           div(
             class: "flex h-10 w-10 items-center justify-center rounded-full " \
                    "bg-accent-sage text-page text-headline-md font-bold"
