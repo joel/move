@@ -7,20 +7,15 @@ module Views
       include Phlex::Rails::Helpers::ContentTag
       include Phlex::Rails::Helpers::LinkTo
 
-      # Tailwind must see these literals to compile them — the passkey-list
-      # controller adds the same tokens to localStorage-matched rows at runtime.
       HIGHLIGHT_CLASSES = "ring-2 ring-[var(--ha-primary)]"
 
       def view_template
-        div(
-          class: "space-y-8",
-          data: { controller: "passkey-list", passkey_list_account_value: account_id }
-        ) do
+        div(class: "space-y-8") do
           render_hero
           render Components::RodauthFlash.new
           # Hide "Add another" when this device already has a passkey (the one it
-          # signed in with / just added). When unknown (email-link session) the
-          # card renders and the controller hides it if this browser created one.
+          # signed in with / just added). On an email-link session this is unknown
+          # (no current credential), so the card renders.
           render_add_another_card unless current_device_id
           render_remove_form
         end
@@ -28,12 +23,9 @@ module Views
 
       private
 
-      def account_id
-        view_context.rodauth.account_id
-      end
-
       # The credential this session authenticated with (or just registered);
-      # nil on an email-link session. Marks "the current device's passkey".
+      # nil on an email-link session. The only reliable "current device" signal —
+      # localStorage can't tell which of several browser-created keys is current.
       def current_device_id
         return @current_device_id if defined?(@current_device_id)
 
@@ -53,7 +45,7 @@ module Views
       end
 
       def render_add_another_card
-        div(class: "ha-card p-6", data: { passkey_list_target: "addCard" }) do
+        div(class: "ha-card p-6") do
           h2(class: "text-lg font-semibold") { plain "Add another passkey" }
           p(class: "mt-2 text-sm text-[var(--ha-muted)]") do
             plain "Register another device for faster, safer sign-ins."
@@ -102,7 +94,7 @@ module Views
       def render_passkey_row(form, row, checked: false, current: false)
         label(
           for: "webauthn-remove-#{row[:id]}",
-          data: { passkey_list_target: "row", webauthn_id: row[:id] },
+          data: { webauthn_id: row[:id] },
           class: [
             "flex cursor-pointer items-center gap-3 rounded-xl border " \
             "border-[var(--ha-border)] bg-[var(--ha-surface-muted)] px-3 py-2 " \
@@ -121,7 +113,7 @@ module Views
           div(class: "flex min-w-0 flex-1 flex-col") do
             div(class: "flex items-center gap-2") do
               span(class: "truncate font-medium") { plain row[:name] }
-              render_this_device_badge(hidden: !current)
+              render_this_device_badge if current
             end
             span(class: "text-xs text-[var(--ha-muted)]") do
               plain "Last used: #{row[:last_use]}"
@@ -130,18 +122,12 @@ module Views
         end
       end
 
-      # Always in the DOM (hidden by default); revealed server-side for the
-      # signed-in-with credential, and by the passkey-list controller for rows
-      # this browser registered (localStorage).
-      def render_this_device_badge(hidden:)
+      # Shown only on the credential this session authenticated with.
+      def render_this_device_badge
         span(
-          data: { passkey_list_target: "badge" },
-          class: [
-            "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 " \
-            "text-[10px] font-bold uppercase tracking-wide " \
-            "bg-[var(--ha-primary-container)]/30 text-[var(--ha-primary)]",
-            (hidden ? "hidden" : "")
-          ].join(" ").strip
+          class: "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 " \
+                 "text-[10px] font-bold uppercase tracking-wide " \
+                 "bg-[var(--ha-primary-container)]/30 text-[var(--ha-primary)]"
         ) { plain "This device" }
       end
 

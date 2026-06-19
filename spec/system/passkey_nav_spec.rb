@@ -122,15 +122,16 @@ RSpec.describe "Passkey navigation" do
 
     visit "/account/passkeys"
 
-    phone = find("label[data-webauthn-id='key-phone']", visible: :all)
-    laptop = find("label[data-webauthn-id='key-laptop']", visible: :all)
-    # The current device's row is highlighted and its "This device" badge shown;
-    # the other's badge stays hidden.
+    # Exactly one row (the signed-in credential) is badged + highlighted.
+    expect(page).to have_text("This device", count: 1)
+    phone = find("label[data-webauthn-id='key-phone']")
+    laptop = find("label[data-webauthn-id='key-laptop']")
     expect(phone[:class]).to include("ring-2")
-    expect(phone.find("[data-passkey-list-target='badge']", visible: :all)[:class]).not_to include("hidden")
-    expect(laptop.find("[data-passkey-list-target='badge']", visible: :all)[:class]).to include("hidden")
+    expect(phone).to have_text("This device")
+    expect(laptop).to have_no_text("This device")
+    expect(laptop[:class]).not_to include("ring-2")
     # This device already has a passkey → no "Add another" card.
-    expect(page).to have_no_css("[data-passkey-list-target='addCard']")
+    expect(page).to have_no_text("Add another passkey")
   end
 
   # Regression for the schema-qualification bug: on an org subdomain Apartment

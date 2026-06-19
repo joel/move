@@ -40,11 +40,7 @@ module Views
             url: rodauth.webauthn_setup_path,
             method: :post,
             id: "webauthn-setup-form",
-            data: {
-              credential_options: cred.as_json.to_json,
-              account_key: rodauth.account_id,
-              turbo: false
-            },
+            data: { credential_options: cred.as_json.to_json, turbo: false },
             class: "space-y-6"
           ) do |form|
             raw safe(rodauth.webauthn_setup_additional_form_tags.to_s)
