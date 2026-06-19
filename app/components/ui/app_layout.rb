@@ -37,13 +37,21 @@ module Components
           class: "lg:hidden fixed left-0 top-0 z-40 flex w-full items-center " \
                  "justify-between border-b border-card-border bg-page px-margin-mobile py-4"
         ) do
-          span(class: "text-headline-md text-text-warm font-bold") { "Move" }
-          button(
-            type: "button",
-            aria_label: I18n.t("ui.nav.account"),
-            class: "text-accent-sage transition hover:opacity-80"
-          ) do
-            render Components::Icons::UserCircle.new(css: "h-7 w-7")
+          a(href: moves_path, aria_label: I18n.t("ui.nav.brand_home"),
+            class: "flex items-center gap-2") do
+            span(
+              class: "flex h-8 w-8 items-center justify-center rounded-full " \
+                     "bg-accent-sage text-page text-body-md font-bold"
+            ) { "M" }
+            span(class: "text-headline-md text-text-warm font-bold") { "Move" }
+          end
+          div(class: "flex items-center gap-1") do
+            render Components::Ui::ThemeToggle.new
+            a(href: account_path, aria_label: I18n.t("ui.nav.account"),
+              class: "flex h-9 w-9 items-center justify-center text-accent-sage " \
+                     "transition hover:opacity-80") do
+              render Components::Icons::UserCircle.new(css: "h-7 w-7")
+            end
           end
         end
       end
