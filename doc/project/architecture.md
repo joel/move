@@ -84,6 +84,9 @@ flowchart TB
   not the real rows. This bit the "Manage passkeys" view (`app/views/rodauth/
   webauthn_remove.rb#passkey_rows`): it listed zero keys on a subdomain, so every
   removal failed with "must select a valid webauthn authenticator to remove".
+  Same rule applies to the Google One Tap controller's raw identity lookups
+  (`app/controllers/google_one_tap_sessions_controller.rb`) — they qualify
+  `public.user_omniauth_identities`.
   Fix: `FROM public.user_webauthn_keys`. Same rule for `users`,
   `user_*_keys`, `user_omniauth_identities`. The rack_test suite runs on `public`,
   so a tenant-host system spec is the regression guard (`spec/system/passkey_nav_spec.rb`).
@@ -205,7 +208,7 @@ admin. New-user email invitations are deferred.
 |---|---|---|
 | Tenancy config | `config/initializers/apartment.rb` | excluded_models, persistent_schemas, use_sql, pg_exclude_clone_tables, pg_excluded_names |
 | Subdomain elevator | `config/initializers/apartment_elevator.rb` | zone-based (`.docker`/`.app` aren't always public suffixes), 404 on unknown |
-| Auth | `app/misc/rodauth_main.rb` | passwordless; **all tables `Sequel[:public][:…]`**; onboarding creates tenant post-verify |
+| Auth | `app/misc/rodauth_main.rb` | passwordless (passkey / email-link / Google); **all tables `Sequel[:public][:…]`**; a personal tenant is provisioned both post-verify and after a Google (OmniAuth) login (`after_login` → `ensure_personal_organization`, idempotent). Google sign-in is gated on `GOOGLE_CLIENT_ID` — see [`new-app-recipe.md`](new-app-recipe.md) §6c |
 | Page layouts | `app/views/layouts/*` | `ApplicationLayout` (TopNav, auth/marketing) vs `AppShellLayout` (D0 sidebar + bottom tab bar, in-app surfaces); shared `<head>` in `ChromeHead`. Controllers opt in via `layout -> { … }` (e.g. `BoxesController`) |
 | File storage | `config/storage.yml`, `config/deploy.yml`, `bin/cli-files/storage-cmd/storage_service.rb` | Active Storage; dev/test = Disk, prod = the **shared host-wide SeaweedFS S3** gateway (also used by sibling apps) via move's own `move` bucket (`STORAGE_ENDPOINT=http://seaweedfs:8333`, `force_path_style`). Local `bin/cli storage start` exposes the SeaweedFS Web UI at `https://storage.workeverywhere.docker` (filer `:8888`) and the app bucket at `https://bucket.workeverywhere.docker` (S3 `:8333` with `/move` prefixed). Images served through **proxy URLs** (internal endpoint never exposed). Media tables are per-tenant (not Apartment-excluded) |
 | Background jobs | `config/queue.yml`, `app/jobs/*` | Solid Queue: async (dev), `:inline` (test), in-Puma (prod, `SOLID_QUEUE_IN_PUMA`). Jobs restore the Apartment tenant from args (`Current` is never carried across the enqueue boundary) |

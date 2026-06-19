@@ -321,6 +321,43 @@ capture → recognition):
 
 ---
 
+## 6c. Google social sign-in (optional)
+
+Google sign-in ships wired but **dormant** — every code path is gated on
+`ENV["GOOGLE_CLIENT_ID"].present?`, so with no credentials the Google button and
+One Tap prompt stay hidden and the app runs normally. Two flows are supported:
+the standard OmniAuth redirect button (`rodauth-omniauth` +
+`omniauth-google-oauth2`, paths `/auth/google` + `/auth/google/callback`) and
+Google One Tap (FedCM, `POST /auth/google/one_tap` →
+`GoogleOneTapSessionsController`). Self-service is on (`omniauth_create_account?
+true`), and a brand-new Google account is given a personal Organization in
+`after_login` (`ensure_personal_organization`, idempotent), since the OmniAuth
+redirect bypasses the post-verify onboarding path.
+
+To enable it in production:
+
+1. **Google Cloud Console** → *APIs & Services* → *Credentials* → create an
+   **OAuth 2.0 Client ID** (type: *Web application*):
+   - Authorized **redirect URI**: `https://move-easy.org/auth/google/callback`
+   - Authorized **JavaScript origin** (One Tap / FedCM): `https://move-easy.org`
+   - Org subdomains (`<slug>.move-easy.org`) need **no** entries: login and the
+     callback happen on the apex, then `login_redirect` hops to the subdomain on
+     the shared cookie.
+2. **Doppler** (`move/prd`) → add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+   (synced into GitHub Actions secrets for Kamal). They are listed in
+   `config/deploy.yml` (`env.secret`) and `.kamal/secrets`; until set they
+   resolve to empty, which just keeps the feature hidden.
+3. **Redeploy** (`kamal deploy`, or merge any commit) so the new secret env is
+   baked into the container — a bare `kamal app start` keeps the old env.
+4. **Verify** on `https://move-easy.org`: the button + One Tap appear; a new
+   Google account signs in, gets a personal org, and lands on its subdomain.
+
+> Local dev cannot exercise real Google: Google requires an `https` (or
+> `localhost`) origin, and the dev host is `http://<slug>.workeverywhere.docker`.
+> Specs therefore mock OmniAuth / stub the token endpoint
+> (`spec/requests/google_one_tap_sessions_spec.rb`), and real end-to-end Google
+> verification is done against prod.
+
 ## 7. Cutover order (zero-confusion sequence)
 
 1. Buy domain → add Cloudflare zone → registrar nameservers → wait active.
