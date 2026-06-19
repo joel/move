@@ -49,7 +49,7 @@ module Components
     def render_auth_actions
       if current_user
         link_to(view_context.account_path,
-                aria_label: "Account",
+                aria: { label: "Account" },
                 class: "flex h-9 w-9 items-center justify-center rounded-full " \
                        "text-accent-sage transition hover:bg-[var(--ha-surface-high)] " \
                        "hover:opacity-80") do
