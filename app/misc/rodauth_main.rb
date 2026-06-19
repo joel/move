@@ -121,16 +121,30 @@ class RodauthMain < Rodauth::Rails::Auth
           "#{stem} #{n}"
         end
 
-        # Don't exclude already-registered credentials from new-passkey creation.
-        # Rodauth's default feeds every stored credential id into WebAuthn's
-        # `excludeCredentials`; because platform passkeys (Google/iCloud) sync
-        # across a user's devices, the existing credential is present everywhere,
-        # so the authenticator refuses to create another (InvalidStateError) and
-        # the user can never add a second passkey. excludeCredentials is only a
-        # dedup hint, not a security control — returning none lets users add more
-        # passkeys (same device or different); the manage page handles duplicates.
-        def account_webauthn_ids
-          []
+        # Allow adding another passkey even when one is already registered, by
+        # dropping ONLY the creation-time `excludeCredentials` list. Rodauth's
+        # default feeds every stored credential id into `excludeCredentials`;
+        # because platform passkeys (Google/iCloud) sync across a user's devices,
+        # the existing credential is present everywhere, so the authenticator
+        # refuses to create another (InvalidStateError) and the user can never
+        # add a second passkey. excludeCredentials is only a dedup hint, not a
+        # security control.
+        #
+        # We override `new_webauthn_credential` (creation) rather than
+        # `account_webauthn_ids`, because that method ALSO builds `allowCredentials`
+        # for passkey sign-in (`webauthn_allow`) — blanking it would break
+        # authentication for non-discoverable credentials (#268 / Codex P1). This
+        # mirrors the gem's implementation with `:exclude` forced empty.
+        def new_webauthn_credential
+          WebAuthn::Credential.options_for_create(
+            timeout: webauthn_setup_timeout,
+            user: { id: account_webauthn_user_id, name: webauthn_user_name },
+            authenticator_selection: webauthn_authenticator_selection,
+            attestation: webauthn_attestation,
+            extensions: webauthn_extensions,
+            exclude: [],
+            **webauthn_create_relying_party_opts
+          )
         end
 
         def extract_aaguid(webauthn_credential)
