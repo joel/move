@@ -95,3 +95,13 @@ Move/DatabaseAggregation:
   Enabled: true
   Exclude:
     - 'spec/**/*'
+
+# Architecture fitness tests describe a layering concept, not a single class.
+# Merge (not replace) the cop's default Exclude, which already exempts
+# spec/requests, spec/system, etc.
+RSpec/DescribeClass:
+  inherit_mode:
+    merge:
+      - Exclude
+  Exclude:
+    - 'spec/architecture/**/*'
