@@ -67,6 +67,7 @@ en:
       failed: "Could not move the item."
     mark_removed:
       removed: "Item marked as removed."
+      wrong_phase: "This box is still being packed — delete the item instead of marking it unpacked."
     restore:
       restored: "Item restored to its box."
     destroy:

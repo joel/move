@@ -212,8 +212,8 @@ RSpec.describe "Items" do
   end
 
   describe "PATCH mark_removed / restore" do
-    it "toggles presence without changing review state" do
-      item = create(:item, :manual, move:, box:)
+    it "toggles presence without changing review state (unpacking box)" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: "unpacking"))
 
       patch mark_removed_move_item_path(move, item)
       expect(item.reload.presence_state).to eq("removed")
@@ -221,6 +221,17 @@ RSpec.describe "Items" do
 
       patch restore_move_item_path(move, item)
       expect(item.reload.presence_state).to eq("in_box")
+    end
+
+    it "refuses mark_removed while the box is still packing (delete is the tool)" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: "packing"))
+
+      patch mark_removed_move_item_path(move, item)
+
+      aggregate_failures do
+        expect(item.reload.presence_state).to eq("in_box")
+        expect(flash[:alert]).to eq(I18n.t("items.mark_removed.wrong_phase"))
+      end
     end
   end
 

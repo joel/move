@@ -214,6 +214,20 @@ RSpec.describe "Boxes" do
 
       expect(response.body).not_to include(I18n.t("boxes.gallery.unpacked"))
     end
+
+    it "does not badge a photo whose sourced item moved to another box and is still packed" do
+      box = create(:box, move:, number: "1", status: "unpacking")
+      other = create(:box, move:, number: "2")
+      photo = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: photo, presence_state: "removed")
+      # Sibling from the same photo moved out (box_id changes, source_media_id stays)
+      # and is still in_box there — the photo is NOT fully unpacked.
+      create(:item, move:, box: other, source_media: photo, presence_state: "in_box")
+
+      get move_box_path(move, box)
+
+      expect(response.body).not_to include(I18n.t("boxes.gallery.unpacked"))
+    end
   end
 
   describe "GET /moves/:move_id/boxes/:id/edit" do

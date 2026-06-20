@@ -189,16 +189,19 @@ class BoxesController < MoveScopedController
   # Photos in this box whose every sourced item has been unpacked (presence
   # removed) — drives the gallery "Unpacked" badge during the destination-side
   # unpacking surface. SQL aggregate (HARD RULE — no Ruby grouping): group the
-  # box's kept items by their source photo and keep only photos with zero items
-  # still in the box. Empty before the box is unpacking — nothing to badge yet.
+  # MOVE's kept items by their source photo, scoped to this box's photos, and keep
+  # only photos with zero items still in_box. Move-wide (not @box.items) because an
+  # item moved to another box keeps its source_media_id: a box-scoped count would
+  # miss a still-packed sibling living in another box and badge the photo too early
+  # (mirrors recoverable_media_ids' move-wide check). Empty before unpacking.
   def unpacked_media_ids
     return [] unless @box.unpacking? || @box.unpacked?
 
-    @box.items
-        .where.not(source_media_id: nil)
-        .group(:source_media_id)
-        .having("COUNT(*) FILTER (WHERE presence_state = 'in_box') = 0")
-        .pluck(:source_media_id)
+    @move.items
+         .where(source_media_id: @box.media.select(:id))
+         .group(:source_media_id)
+         .having("COUNT(*) FILTER (WHERE presence_state = 'in_box') = 0")
+         .pluck(:source_media_id)
   end
 
   def set_box
