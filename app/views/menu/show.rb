@@ -40,6 +40,7 @@ module Views
         ]
         links << [I18n.t("menu.show.members"), Components::Icons::Users, move_members_path(@move)] if @admin
         links << [I18n.t("menu.show.summary"), Components::Icons::Chart, move_summary_path(@move)]
+        links << [I18n.t("menu.show.label_print"), Components::Icons::Tag, move_label_print_path(@move)]
         links
       end
 

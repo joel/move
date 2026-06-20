@@ -11,6 +11,7 @@ en:
       categories: "Categories, Tags & Rooms"
       members: "Members & Roles"
       summary: "Summary & Volume"
+      label_print: "Print Labels"
       settings: "Settings"
       assistant: "Assistant & Integrations"
       account: "Account"

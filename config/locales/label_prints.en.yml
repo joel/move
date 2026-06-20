@@ -1,0 +1,15 @@
+# E1 — Label Print (range) strings. No customer-facing copy is hard-coded in the
+# Phlex view; everything renders through label_print.*.
+en:
+  label_print:
+    title: "Print Labels"
+    subtitle: "Print exterior labels for a range of boxes in one PDF (2 per box)."
+    empty_state: "This move has no boxes yet. Add a box to print its label."
+    range_hint: "Boxes %{min}–%{max} · %{count} total"
+    from: "From box #"
+    to: "To box #"
+    submit: "Print labels"
+    errors:
+      invalid_range: "Enter a valid range — the first box number must be less than or equal to the last."
+      empty: "No boxes found in that range."
+      too_many: "Too many labels at once (max %{max}). Narrow the range."
