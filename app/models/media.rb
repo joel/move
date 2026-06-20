@@ -4,6 +4,12 @@
 # Active Storage attachment; recognition runs read it. No crop/bounding-box data
 # is ever stored. Lives in the tenant schema (no organization_id).
 class Media < ApplicationRecord
+  # Soft-deletable: a photo is discarded when packing-removing the last item it
+  # sourced (Items::Remove). The cascade-trace columns already exist; `default_scope
+  # { kept }` then hides a deleted photo from the gallery. No media is discarded by
+  # any other path, so the scope is a no-op for existing queries.
+  include Discardable
+
   MEDIA_TYPES = %w[image].freeze
   CAPTURED_VIA = %w[web mcp].freeze
 
