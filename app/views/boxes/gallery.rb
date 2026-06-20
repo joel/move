@@ -9,12 +9,16 @@ module Views
     # dead end. Photos still queued/processing render as plain thumbnails — they're
     # transient and never enter the review walk (the "Photo 1 of 0" guard, #162).
     class Gallery < Views::Base
-      def initialize(move:, box:, media:, reviewable_media_ids: [], recoverable_media_ids: [])
+      def initialize(move:, box:, media:, reviewable_media_ids: [], recoverable_media_ids: [],
+                     unpacked_media_ids: [])
         @move = move
         @box = box
         @media = media
         @reviewable_media_ids = reviewable_media_ids.to_set
         @recoverable_media_ids = recoverable_media_ids.to_set
+        # Photos whose every sourced item has been unpacked (destination side) —
+        # badged so the gallery reflects unpacking progress (empty while packing).
+        @unpacked_media_ids = unpacked_media_ids.to_set
       end
 
       def view_template
@@ -53,13 +57,14 @@ module Views
       def recovery_link(media)
         a(
           href: move_box_recovery_photo_path(@move, @box, media_id: media.id),
-          class: "#{tile_classes} group relative ring-error/40 hover:ring-2"
+          class: "#{tile_classes} group ring-error/40 hover:ring-2"
         ) do
           image(media, hover: true)
           span(class: "absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center " \
                       "rounded-full bg-error/90 text-on-error") do
             render Components::Icons::Alert.new(css: "h-3.5 w-3.5")
           end
+          unpacked_badge(media)
         end
       end
 
@@ -71,15 +76,35 @@ module Views
           href: move_box_review_photo_path(@move, @box, media_id: media.id),
           data: { turbo_prefetch: "false" },
           class: "#{tile_classes} group ring-accent-sage hover:ring-2"
-        ) { image(media, hover: true) }
+        ) do
+          image(media, hover: true)
+          unpacked_badge(media)
+        end
       end
 
       def plain_thumb(media)
-        div(class: tile_classes) { image(media) }
+        div(class: tile_classes) do
+          image(media)
+          unpacked_badge(media)
+        end
+      end
+
+      # Destination-side badge: every item this photo sourced has been unpacked.
+      # A sage check, top-left so it never collides with the recovery alert marker
+      # (top-right) — and the two are mutually exclusive anyway (a recoverable photo
+      # has no item; an unpacked one does).
+      def unpacked_badge(media)
+        return unless @unpacked_media_ids.include?(media.id)
+
+        span(class: "absolute left-1.5 top-1.5 z-10 inline-flex items-center gap-1 rounded-full " \
+                    "bg-accent-sage/90 px-2 py-0.5 text-label-caps uppercase text-page") do
+          render Components::Icons::Check.new(css: "h-3 w-3")
+          plain I18n.t("boxes.gallery.unpacked")
+        end
       end
 
       def tile_classes
-        "flex aspect-square items-center justify-center overflow-hidden " \
+        "relative flex aspect-square items-center justify-center overflow-hidden " \
           "rounded-xl bg-surface-container-high text-muted transition"
       end
 

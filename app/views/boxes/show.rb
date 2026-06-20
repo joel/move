@@ -16,12 +16,13 @@ module Views
       }.freeze
 
       def initialize(move:, box:, items: [], media: [], editable: false, pending_count: 0,
-                     reviewable_media_ids: [], recoverable_media_ids: [])
+                     reviewable_media_ids: [], recoverable_media_ids: [], unpacked_media_ids: [])
         @move = move
         @box = box
         @items = items
         @media = media
         @editable = editable
+        @unpacked_media_ids = unpacked_media_ids # photos whose every item is unpacked
         # Count of items the C2 walk can review (computed by the controller — see
         # BoxesController#reviewable_count): unreviewed AND photo-backed.
         @pending_count = pending_count
@@ -232,7 +233,7 @@ module Views
           render Views::Boxes::Gallery.new(
             move: @move, box: @box, media: @media,
             reviewable_media_ids: @reviewable_media_ids,
-            recoverable_media_ids: @recoverable_media_ids
+            recoverable_media_ids: @recoverable_media_ids, unpacked_media_ids: @unpacked_media_ids
           )
           items_section
         end

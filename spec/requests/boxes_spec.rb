@@ -188,6 +188,32 @@ RSpec.describe "Boxes" do
 
       expect(response.body).not_to include(move_box_recovery_photo_path(move, box, media_id: photo.id))
     end
+
+    it "badges a gallery photo whose every item is unpacked, but not one with an in-box item" do
+      box = create(:box, move:, number: "1", status: "unpacking")
+      all_unpacked = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: all_unpacked, presence_state: "removed")
+      still_packed = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: still_packed, presence_state: "removed")
+      create(:item, move:, box:, source_media: still_packed, presence_state: "in_box")
+
+      get move_box_path(move, box)
+
+      # The all-unpacked photo carries the badge; the one with a still-in-box item
+      # does not (the gallery renders one badge → one occurrence).
+      expect(response.body).to include(I18n.t("boxes.gallery.unpacked"))
+      expect(response.body.scan(I18n.t("boxes.gallery.unpacked")).size).to eq(1)
+    end
+
+    it "shows no unpacked badge while the box is still packing" do
+      box = create(:box, move:, number: "1", status: "packing")
+      photo = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: photo, presence_state: "removed")
+
+      get move_box_path(move, box)
+
+      expect(response.body).not_to include(I18n.t("boxes.gallery.unpacked"))
+    end
   end
 
   describe "GET /moves/:move_id/boxes/:id/edit" do
