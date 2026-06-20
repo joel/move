@@ -46,12 +46,15 @@ module Items
 
       media.discard_in_batch!(batch_id: batch_id, parent: item)
       Success()
-    rescue StandardError => e
-      # Best-effort (#291): the item discard is the primary effect and is already
-      # committed by Discards::Cascade. Failing here would skip the `item.deleted`
-      # event and its activity-feed restore affordance, hiding the item with no undo.
-      # A leftover-visible orphaned photo is the benign failure mode, so swallow the
-      # error (logged) and let the event fire.
+    rescue ActiveRecord::StatementInvalid, Discard::RecordNotDiscarded => e
+      # Best-effort (#291/#293): the item discard is the primary effect and is
+      # already committed by Discards::Cascade. A *DB-level* failure to also hide
+      # the orphaned photo (the only two ways `discard_in_batch!` can fail: a bad
+      # UPDATE → StatementInvalid, or the discard callback aborting →
+      # RecordNotDiscarded) must not skip the `item.deleted` event and its
+      # activity-feed restore affordance — a leftover-visible photo is the benign
+      # outcome. Deliberately narrow: any other error (a real bug) propagates and
+      # fails loudly rather than being swallowed.
       Rails.logger.error("Items::Remove: orphaned media discard failed (media=#{media.id}): #{e.message}")
       Success()
     end

@@ -90,4 +90,15 @@ RSpec.describe Items::Remove do
       expect(Rails.event).to have_received(:notify).with("item.deleted", hash_including(item_id: item.id))
     end
   end
+
+  # #293 — best-effort is deliberately narrow: an UNEXPECTED error (a bug) must
+  # propagate, not be swallowed by a broad rescue.
+  it "lets an unexpected photo-discard error propagate (no broad rescue)" do
+    media = create(:media, move:, box:)
+    item = create(:item, move:, box:, source_media: media)
+    allow_any_instance_of(Media).to receive(:discard_in_batch!) # rubocop:disable RSpec/AnyInstance
+      .and_raise(NoMethodError, "unexpected")
+
+    expect { remove(item) }.to raise_error(NoMethodError)
+  end
 end
