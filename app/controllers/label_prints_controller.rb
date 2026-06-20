@@ -54,13 +54,17 @@ class LabelPrintsController < MoveScopedController
     [param_int(:from), param_int(:to)]
   end
 
-  # A positive integer from the param, else nil (non-numeric / blank / ≤ 0).
+  # A valid box-number bound from the param, else nil (non-numeric / blank / ≤ 0 /
+  # above the bigint range — a bound past Box::MAX_NUMBER would raise
+  # ActiveRecord::RangeError on the number::bigint comparison, i.e. a 500).
   def param_int(key)
     value = params[key].to_s.strip
     return nil unless value.match?(/\A\d+\z/)
 
     number = value.to_i
-    number.positive? ? number : nil
+    return nil unless number.positive? && number <= Box::MAX_NUMBER
+
+    number
   end
 
   def boxes_in_range(from, to)

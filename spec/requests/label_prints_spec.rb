@@ -67,6 +67,13 @@ RSpec.describe "Label Prints" do
       expect(response.body).to include(I18n.t("label_print.errors.invalid_range"))
     end
 
+    it "rejects a bound above the bigint range instead of 500ing" do
+      get move_label_print_labels_path(move, from: 1, to: "#{Box::MAX_NUMBER}0")
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include(I18n.t("label_print.errors.invalid_range"))
+    end
+
     it "shows an empty-range message when no boxes match" do
       get move_label_print_labels_path(move, from: 90, to: 99)
 
