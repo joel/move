@@ -175,15 +175,16 @@ module Views
       # A *removed* item always offers Restore-to-box — that presence inverse is its
       # only C3 undo, regardless of phase (legacy/seed data can leave an item removed
       # on a still-packing box). Otherwise: while unpacking/unpacked, removing means
-      # "physically taken out" (presence → removed, reversible); while packing/sealed/
-      # in transit, the item was added by mistake — Delete it (and its orphaned photo,
-      # restorable from the activity feed).
+      # "physically taken out" (presence → removed, reversible); while *packing*, the
+      # item was added by mistake — Delete it (and its orphaned photo, restorable from
+      # the activity feed). A sealed / in-transit box is closed: no removal control —
+      # unseal it to edit contents (#290, mirrors capture being packing-only).
       def presence_control
         if @item.removed?
           restore_to_box_control
         elsif @item.box.unpacking? || @item.box.unpacked?
           mark_unpacked_control
-        else
+        elsif @item.box.packing?
           delete_control
         end
       end

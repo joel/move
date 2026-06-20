@@ -67,11 +67,11 @@ en:
       failed: "Could not move the item."
     mark_removed:
       removed: "Item marked as removed."
-      wrong_phase: "This box is still being packed — delete the item instead of marking it unpacked."
+      wrong_phase: "This box isn’t being unpacked yet — you can’t mark items unpacked."
       failed: "Could not update this item."
     restore:
       restored: "Item restored to its box."
     destroy:
       deleted: "%{name} was deleted."
       delete_failed: "Could not delete this item."
-      wrong_phase: "This box is being unpacked — mark the item unpacked instead of deleting it."
+      wrong_phase: "Items can only be deleted while the box is being packed — unseal it first, or mark it unpacked."
