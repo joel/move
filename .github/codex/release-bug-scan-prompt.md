@@ -20,9 +20,14 @@ context are provided at the top of this prompt.
      removed validations or callbacks, N+1 risks, missing `dependent:` handling,
      changed security/permission defaults, secrets or tokens in code.
    - **Code that deserves human review** even if not provably wrong.
-3. Prefer a few **high-signal** findings over an exhaustive list. If the diff is
+3. Apply the project **review rubric** (`.github/codex/review-rubric.md`) — its
+   correctness traps (broad rescue in core logic, Ruby-side aggregation, untyped
+   `Arel.sql` casts, guards that live only in the controller/UI, non-atomic
+   multi-record writes, param-allowlist-≠-persisted) are the recurring classes
+   here; check the diff against them specifically.
+4. Prefer a few **high-signal** findings over an exhaustive list. If the diff is
    low-risk, say so plainly — do not invent findings to fill space.
-4. Do **not** modify any files. This is a read-only analysis.
+5. Do **not** modify any files. This is a read-only analysis.
 
 ## Output format
 
