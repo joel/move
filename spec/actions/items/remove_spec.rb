@@ -59,13 +59,35 @@ RSpec.describe Items::Remove do
     expect(Item.exists?(item.id)).to be(false)
   end
 
-  it "refuses to delete once the box is unpacking (use the presence transition)" do
-    item = create(:item, :manual, move:, box: create(:box, move:, status: "unpacking"))
+  %w[sealed in_transit unpacking unpacked].each do |phase|
+    it "refuses to delete once the box is #{phase} (packing-phase only, #290)" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: phase))
+
+      result = remove(item)
+
+      expect(result).to be_failure
+      expect(result.failure).to eq(:wrong_phase)
+      expect(Item.exists?(item.id)).to be(true)
+    end
+  end
+
+  # #291 — the item discard is the primary effect (already committed by the
+  # cascade); a failure cleaning up the orphaned photo must not suppress the
+  # item.deleted event / restore affordance.
+  it "still deletes the item and emits item.deleted if the photo discard fails" do
+    media = create(:media, move:, box:)
+    item = create(:item, move:, box:, source_media: media)
+    allow_any_instance_of(Media).to receive(:discard_in_batch!) # rubocop:disable RSpec/AnyInstance
+      .and_raise(ActiveRecord::StatementInvalid, "boom")
+    allow(Rails.event).to receive(:notify)
 
     result = remove(item)
 
-    expect(result).to be_failure
-    expect(result.failure).to eq(:wrong_phase)
-    expect(Item.exists?(item.id)).to be(true)
+    aggregate_failures do
+      expect(result).to be_success
+      expect(Item.exists?(item.id)).to be(false)            # item still deleted
+      expect(Media.exists?(media.id)).to be(true)           # photo left visible (benign)
+      expect(Rails.event).to have_received(:notify).with("item.deleted", hash_including(item_id: item.id))
+    end
   end
 end

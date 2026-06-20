@@ -110,6 +110,19 @@ RSpec.describe "Items" do
       expect(response.body).to include(I18n.t("items.show.restore"))
       expect(response.body).not_to include(I18n.t("items.show.delete"))
     end
+
+    it "renders no removal control on a closed (sealed / in_transit) box (#290)" do
+      %w[sealed in_transit].each do |phase|
+        item = create(:item, :manual, move:, box: create(:box, move:, status: phase))
+
+        get move_item_path(move, item)
+
+        aggregate_failures do
+          expect(response.body).not_to include(I18n.t("items.show.delete"))
+          expect(response.body).not_to include(I18n.t("items.show.mark_unpacked"))
+        end
+      end
+    end
   end
 
   describe "DELETE /moves/:move_id/items/:id" do
@@ -139,8 +152,8 @@ RSpec.describe "Items" do
       expect(Media.exists?(media.id)).to be(true)
     end
 
-    it "refuses to delete once the box is unpacking, redirecting with an alert" do
-      item = create(:item, :manual, move:, box: create(:box, move:, status: "unpacking"))
+    it "refuses to delete on a non-packing box (sealed), redirecting with an alert" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: "sealed"))
 
       delete move_item_path(move, item)
 

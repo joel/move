@@ -21,12 +21,14 @@ module Items
 
     private
 
-    # Deletion is a *packing-phase* operation. Once the box is unpacking/unpacked,
-    # the reversible presence transition (MarkRemoved) is the right tool, so refuse
-    # to delete — the phase-aware UI must not be the only guard (a stale form or a
-    # direct request could otherwise soft-delete destination-side inventory).
+    # Deletion is a *packing-phase* operation only (#290). Once a box is sealed it
+    # is closed — unseal it (sealed → packing) to edit its contents — and once it
+    # is unpacking/unpacked the reversible presence transition (MarkRemoved) is the
+    # right tool. Mirrors the capture/add gating (Box#capturable? is packing-only),
+    # and the phase-aware UI must not be the only guard (a stale form or a direct
+    # request could otherwise soft-delete closed-box inventory).
     def ensure_packing_phase(box)
-      return Failure(:wrong_phase) if box.unpacking? || box.unpacked?
+      return Failure(:wrong_phase) unless box.packing?
 
       Success()
     end
@@ -44,8 +46,14 @@ module Items
 
       media.discard_in_batch!(batch_id: batch_id, parent: item)
       Success()
-    rescue ActiveRecord::RecordInvalid, Discard::RecordNotDiscarded => e
-      Failure(e.message)
+    rescue StandardError => e
+      # Best-effort (#291): the item discard is the primary effect and is already
+      # committed by Discards::Cascade. Failing here would skip the `item.deleted`
+      # event and its activity-feed restore affordance, hiding the item with no undo.
+      # A leftover-visible orphaned photo is the benign failure mode, so swallow the
+      # error (logged) and let the event fire.
+      Rails.logger.error("Items::Remove: orphaned media discard failed (media=#{media.id}): #{e.message}")
+      Success()
     end
 
     def emit_event(item, actor, source, batch_id)
