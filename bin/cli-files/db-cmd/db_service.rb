@@ -161,7 +161,7 @@ module AppCLI
         else
           create_missing_databases(missing)
         end
-      rescue StandardError => e
+      rescue StandardError => e # rubocop:disable Move/BroadRescue -- dev CLI best-effort DB check
         shell.say("Could not verify databases: #{e.message}")
       end
 

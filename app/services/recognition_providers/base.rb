@@ -249,7 +249,7 @@ module RecognitionProviders
       scale = MAX_IMAGE_EDGE.to_f / [img.width, img.height].max
       img   = img.resize(scale) if scale < 1.0
       [img.jpegsave_buffer(Q: 82, strip: true), "image/jpeg"]
-    rescue StandardError
+    rescue StandardError # rubocop:disable Move/BroadRescue -- vips absent (NameError)/bad input → original bytes
       nil # vips absent (NameError) or unsupported input — use the original bytes.
     end
   end

@@ -1,5 +1,8 @@
 inherit_from: .rubocop_todo.yml
 
+require:
+  - ./lib/rubocop/move
+
 plugins:
   - rubocop-capybara
   - rubocop-factory_bot
@@ -79,3 +82,16 @@ Rails/ApplicationRecord:
 
 Style/Documentation:
   Enabled: false
+
+# --- Project custom cops (lib/rubocop/cop/move) -----------------------------
+# Encode recurring standards so the pre-commit hook + CI enforce them, instead of
+# relying on review/memory (see AGENTS.md §1).
+Move/BroadRescue:
+  Enabled: true
+  Exclude:
+    - 'spec/**/*'
+
+Move/DatabaseAggregation:
+  Enabled: true
+  Exclude:
+    - 'spec/**/*'

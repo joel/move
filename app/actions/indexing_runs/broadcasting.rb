@@ -22,7 +22,7 @@ module IndexingRuns
         target: Views::Settings::EmbeddingControl::ID,
         html: ApplicationController.render(Views::Settings::EmbeddingControl.new(move: move), layout: false)
       )
-    rescue StandardError => e
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- §1#4 broadcast must not break emitter
       Rails.logger.warn("[indexing] embedding control broadcast failed: #{e.class}: #{e.message}")
     end
   end

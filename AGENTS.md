@@ -80,6 +80,10 @@ These are non-negotiable for all domain work. Do not reinvent these wheels.
    - **A broadcast must never break its emitter.** A `Rails.event` subscriber runs
      synchronously inside the emitting action, so wrap render/broadcast in a
      `rescue` (or enqueue a job) — a broadcast failure must not fail the action.
+     Such a broad `rescue` is the *only* sanctioned use of `rescue StandardError`;
+     it is flagged by the **`Move/BroadRescue`** cop and must opt out per-site with
+     `# rubocop:disable Move/BroadRescue -- <reason>` so the exception stays
+     conscious. Core domain logic must rescue specific error classes (#293).
    - turbo-rails' `turbo.min.js` already bundles `@rails/actioncable`; add
      `ApplicationCable::Connection`/`Channel` (Turbo::StreamsChannel needs them).
    - The one remaining JS poller (`recognition_poller_controller.js`, recovery
@@ -96,7 +100,14 @@ These are non-negotiable for all domain work. Do not reinvent these wheels.
    raw `MAX(number::bigint)` compares lexically (`"9" > "10"`) — the exact bug
    behind `LabelPrintsController#range_bounds` and `Boxes::Create#next_number`
    (#283). Loading-and-computing in Ruby is an O(N)-for-O(1) regression; flag it
-   in review.
+   in review. The unambiguous shapes (`pluck(...).<reducer>`, `to_a.<reducer>`,
+   `select { … }.count`) are enforced by the **`Move/DatabaseAggregation`** cop;
+   `group_by` is not copped (it is legitimate on already-in-memory collections).
+
+> **These cops live in `lib/rubocop/cop/move/`** (wired via `require:` in
+> `.rubocop.yml`, with RuboCop::RSpec specs). They make rules #4/#5 deterministic
+> and merge-blocking instead of review-enforced. When a recurring class of defect
+> escapes review, prefer adding/extending a cop over re-reminding.
 
 ---
 

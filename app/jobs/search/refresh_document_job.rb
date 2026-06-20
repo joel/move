@@ -16,7 +16,7 @@ module Search
           # A since-deleted item still counts as "done" for the run's progress —
           # there is nothing left to embed.
           Search::RefreshDocument.new.call(item: item) if item
-        rescue StandardError
+        rescue StandardError # rubocop:disable Move/BroadRescue -- tags outcome then re-raises (no swallow)
           outcome = :failure
           raise
         ensure

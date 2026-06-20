@@ -38,7 +38,7 @@ module RecognitionRuns
       ActiveRecord::Base.transaction { materialize(run, result) }
       finish(run, result)
       Success(run)
-    rescue StandardError => e
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- any failure marks the run failed (Failure)
       fail_run(run, e)
       Failure(run)
     end

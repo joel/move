@@ -13,7 +13,7 @@ class Activity
       return unless attrs
 
       Activity.create!(attrs)
-    rescue StandardError => e
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- §1#4 subscriber must not break emitter
       Rails.logger.error("[activity] #{event[:name]} dropped: #{e.class}: #{e.message}")
     end
   end

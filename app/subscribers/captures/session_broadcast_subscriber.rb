@@ -39,7 +39,7 @@ module Captures
         target: Views::Captures::SessionPanel::ID,
         html: ApplicationController.render(Captures::SessionContent.new(box).panel, layout: false)
       )
-    rescue StandardError => e
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- §1#4 broadcast must not break emitter
       Rails.logger.warn("[captures] session panel broadcast failed: #{e.class}: #{e.message}")
     end
   end

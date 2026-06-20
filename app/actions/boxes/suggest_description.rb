@@ -23,7 +23,7 @@ module Boxes
         text = RecognitionProviders.for_move(box.move).summarize_contents(items: items)
         emit(box, "ai")
         Success(clamp(text.presence || deterministic(items)))
-      rescue StandardError
+      rescue StandardError # rubocop:disable Move/BroadRescue -- advisory AI; degrades to deterministic summary
         # Missing key, non-2xx, malformed body, or any raw Net::HTTP / TLS / DNS
         # transport failure (EOFError, Errno::ECONNRESET, OpenSSL::SSL::SSLError, a
         # timeout, …) degrades to the deterministic summary. The scope is just the

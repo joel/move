@@ -36,7 +36,11 @@ module MoveApp
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
-    config.autoload_lib(ignore: %w[assets tasks templates])
+    # `rubocop` holds custom cops (lib/rubocop/cop/move) loaded only by RuboCop's
+    # own runner via `.rubocop.yml`; they subclass `RuboCop::Cop::Base`, which the
+    # Rails app runtime never requires — so eager-loading them (CI sets
+    # `eager_load = true`) would raise. Keep them out of the app autoloaders.
+    config.autoload_lib(ignore: %w[assets tasks templates rubocop])
 
     # Configuration for the application, engines, and railties goes here.
     #
