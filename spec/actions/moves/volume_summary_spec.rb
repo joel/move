@@ -47,6 +47,14 @@ RSpec.describe Moves::VolumeSummary do
     expect(kitchen_summary.missing_dimension_count).to eq(1)
   end
 
+  it "preserves fractional volume (coerces the SQL sum to BigDecimal, not Integer)" do
+    box(room: nil, dims: [40.5, 30.5, 25]) # 40.50 * 30.50 * 25.00 = 30_881.25
+
+    result = described_class.new.call(move:, actor:).value!
+
+    expect(result.total_volume_cm3).to eq(BigDecimal("30881.25"))
+  end
+
   it "reports nil totals when nothing has been measured" do
     box(room: nil) # no dimensions, no weight
 
