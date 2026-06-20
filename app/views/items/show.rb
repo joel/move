@@ -171,7 +171,20 @@ module Views
         end
       end
 
+      # The remove control's meaning depends on where the box is in its lifecycle.
+      # While unpacking (or unpacked), removing an item means "physically taken out
+      # of the box" (presence → removed, reversible). While still packing/sealed/in
+      # transit, the item was added by mistake — removing it *deletes* it (and its
+      # orphaned photo), restorable from the activity feed.
       def presence_control
+        if @item.box.unpacking? || @item.box.unpacked?
+          unpacking_presence_control
+        else
+          delete_control
+        end
+      end
+
+      def unpacking_presence_control
         if @item.removed?
           button_to(
             I18n.t("items.show.restore"), restore_move_item_path(@move, @item),
@@ -179,11 +192,19 @@ module Views
           )
         else
           button_to(
-            I18n.t("items.show.remove"), mark_removed_move_item_path(@move, @item),
+            I18n.t("items.show.mark_unpacked"), mark_removed_move_item_path(@move, @item),
             method: :patch, class: danger_button,
-            data: { turbo_confirm: I18n.t("items.show.remove_confirm") }
+            data: { turbo_confirm: I18n.t("items.show.mark_unpacked_confirm") }
           )
         end
+      end
+
+      def delete_control
+        button_to(
+          I18n.t("items.show.delete"), move_item_path(@move, @item),
+          method: :delete, class: danger_button,
+          data: { turbo_confirm: I18n.t("items.show.delete_confirm") }
+        )
       end
 
       def ghost_button
