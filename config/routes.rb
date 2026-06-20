@@ -102,6 +102,10 @@ Rails.application.routes.draw do
     # only, never archived; theme is a client preference). Integration tokens are
     # the per-Move MCP credentials (admin-only create/revoke).
     get "menu", to: "menu#show", as: :menu
+    # E1 — Label Print: pick a box-number range (e.g. 2–5) and print all those
+    # exterior labels in one PDF (2 pages per box). Reached from the Menu.
+    get "label_print", to: "label_prints#show", as: :label_print
+    get "label_print/labels", to: "label_prints#print", as: :label_print_labels
     get "settings", to: "settings#show", as: :settings
     patch "settings/unit_system", to: "settings#update_unit_system", as: :settings_unit_system
     patch "settings/auto_confirm_threshold", to: "settings#update_auto_confirm_threshold",
