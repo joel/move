@@ -5,6 +5,24 @@
 # by day, and decides which rows offer Restore (a still-discarded deleted record)
 # or Revert (the latest edit of a record that has prior versions). Keeps
 # ActivitiesController thin — it just renders what this exposes.
+#
+# NOTE — the group_by / select / max_by below run in Ruby ON PURPOSE; they are
+# NOT the "push aggregation to the database" anti-pattern (AGENTS.md §1 #5). The
+# controller hands us one **bounded, keyset-paginated page** of Activity rows
+# (`@move.activities.<scopes>.limit(PAGE).to_a`) that is rendered in full, so every
+# operation here works on records **already in memory because they're displayed**,
+# not on rows loaded just to compute a number:
+#   - `grouped`        — day-buckets the page's presenters for the feed's date
+#                        headers (you can't group-in-SQL what you're rendering).
+#   - `load_subjects`  — groups the page by subject_type to BATCH-LOAD related
+#                        records in one query per type (this *is* N+1 avoidance;
+#                        SQL-ifying it would dismantle the batch loader).
+#   - `latest_updates` — picks the latest edit per subject for the Revert flag,
+#                        over rows we already hold; a SQL window query would be a
+#                        redundant second fetch of the on-screen page.
+# Re-deriving any of these in SQL would add a redundant query (or is impossible),
+# i.e. a regression — not a cleanup. The rule targets O(N) row-loads-to-aggregate
+# (e.g. the volume summary, #285), which is a different shape from this.
 class ActivityFeed
   UPDATE_ACTIONS = %w[item.updated box.updated].freeze
   DELETE_ACTIONS = %w[box.deleted item.deleted].freeze
