@@ -33,11 +33,16 @@ module RuboCop
       class DatabaseAggregation < Base
         MSG = "Aggregate in the database, not Ruby (AGENTS.md §1 #5): this reduces " \
               "rows loaded by `%<loader>s` in Ruby. Use a SQL aggregate " \
-              "(sum/minimum/maximum/count/average, group(:x).count, pick(Arel.sql(...)))."
+              "(sum/minimum/maximum/count/average, group(:x).count, exists?, " \
+              "pick(Arel.sql(...)))."
 
-        # Terminal calls that compute a single value (or grouped counts, `tally`)
-        # from a collection — the Ruby-side aggregation §1 #5 forbids on loaded rows.
-        REDUCERS = %i[sum min max minmax count size length reduce inject average tally].freeze
+        # Terminal calls that collapse a collection to one answer — a value, grouped
+        # counts (`tally`), or an existence/membership check — the Ruby-side
+        # aggregation §1 #5 forbids on loaded rows (use a SQL aggregate / `exists?`).
+        REDUCERS = %i[
+          sum min max minmax count size length reduce inject average tally
+          any? none? one? empty? include?
+        ].freeze
         # Pure element transforms to walk through when hunting the underlying load.
         TRANSFORMS = %i[map flat_map collect compact flatten uniq reverse sort sort_by].freeze
 

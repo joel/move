@@ -37,6 +37,19 @@ RSpec.describe RuboCop::Cop::Move::DatabaseAggregation, :config do
     RUBY
   end
 
+  it "flags an existence check on loaded rows (`pluck(...).any?` — use exists?)" do
+    expect_offense(<<~RUBY)
+      items.pluck(:id).any?
+      ^^^^^^^^^^^^^^^^^^^^^ #{pluck_msg}
+    RUBY
+  end
+
+  it "accepts a relation existence predicate (SQL `any?`/`exists?`)" do
+    expect_no_offenses(<<~RUBY)
+      items.where(active: true).any?
+    RUBY
+  end
+
   it "flags a reducer on a no-arg `to_a`" do
     expect_offense(<<~RUBY)
       items.to_a.size
