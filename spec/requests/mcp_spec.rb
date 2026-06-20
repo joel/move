@@ -166,13 +166,23 @@ RSpec.describe "MCP endpoint" do
   end
 
   describe "mark_unpacked" do
-    it "marks an item removed from its box" do
-      box = create(:box, move:, number: 6)
+    it "marks an item removed from its box (unpacking)" do
+      box = create(:box, move:, number: 6, status: "unpacking")
       item = create(:item, move:, box:, name: "Plate")
 
       tool_call("mark_unpacked", { item_id: item.id })
 
       expect(item.reload.presence_state).to eq("removed")
+    end
+
+    it "refuses to mark_unpacked while the box is still packing" do
+      box = create(:box, move:, number: 7, status: "packing")
+      item = create(:item, move:, box:, name: "Plate")
+
+      body = tool_call("mark_unpacked", { item_id: item.id })
+
+      expect(body.dig("result", "isError")).to be(true)
+      expect(item.reload.presence_state).to eq("in_box")
     end
   end
 

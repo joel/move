@@ -121,15 +121,18 @@ class ItemsController < MoveScopedController
   end
 
   # PATCH /moves/:move_id/items/:id/mark_removed
-  # The C3 "mark unpacked" path — valid only once the box is being unpacked.
-  # While packing the right tool is delete (#destroy), so refuse here too, mirroring
-  # Items::Remove's phase guard, so a stale form / direct PATCH can't mark a
-  # still-packing item removed. (The C2 review walk's own remove path is separate.)
+  # The C3 "mark unpacked" path. Items::MarkRemoved enforces the unpacking-phase
+  # rule (delete is the tool while packing), so a stale form / direct PATCH on a
+  # still-packing item is refused with a friendly alert.
   def mark_removed
-    return redirect_to move_item_path(@move, @item), alert: t(".wrong_phase") unless @item.box.unpacking? || @item.box.unpacked?
-
-    Items::MarkRemoved.new.call(item: @item, actor: current_user)
-    redirect_to move_item_path(@move, @item), notice: t(".removed")
+    case Items::MarkRemoved.new.call(item: @item, actor: current_user)
+    in Dry::Monads::Success(_)
+      redirect_to move_item_path(@move, @item), notice: t(".removed")
+    in Dry::Monads::Failure(:wrong_phase)
+      redirect_to move_item_path(@move, @item), alert: t(".wrong_phase")
+    in Dry::Monads::Failure(_)
+      redirect_to move_item_path(@move, @item), alert: t(".failed")
+    end
   end
 
   # PATCH /moves/:move_id/items/:id/restore

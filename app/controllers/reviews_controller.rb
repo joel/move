@@ -56,7 +56,9 @@ class ReviewsController < MoveScopedController
 
   # PATCH .../review/photo/:media_id/items/:id/remove — drop a wrong detection.
   def remove_item
-    Items::MarkRemoved.new.call(item: @item, actor: current_user)
+    # The review walk removes a mis-detected item *during packing* — a distinct use
+    # case from destination-side unpacking, so it bypasses MarkRemoved's phase guard.
+    Items::MarkRemoved.new.call(item: @item, actor: current_user, allow_any_phase: true)
     redirect_to move_box_review_photo_path(@move, @box, @media)
   end
 
