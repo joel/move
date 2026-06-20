@@ -182,6 +182,12 @@ The project uses `overcommit`. Commits will fail if the following hooks are not 
 
 ### PR Review Response Rules
 
+> **Review rubric:** [`.github/codex/review-rubric.md`](.github/codex/review-rubric.md)
+> is the standard set every review (human or Codex) applies up front, and the
+> self-review checklist to run **before** opening a PR — so recurring classes are
+> caught on the first pass, not round 5. Architecture items in it are also enforced
+> by `spec/architecture/` and the `Move/*` cops.
+
 > **Codex reviews every PR automatically.** `chatgpt-codex-connector[bot]` posts a
 > review **a few minutes after the PR is opened** (and re-runs on new pushes or a
 > `@codex review` comment). **Always proactively wait for and check the Codex
