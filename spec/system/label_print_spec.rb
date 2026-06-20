@@ -25,6 +25,14 @@ RSpec.describe "Label Print" do
     expect(page).to have_button(I18n.t("label_print.submit"))
   end
 
+  it "submits the form outside Turbo (the PDF response is not HTML)" do
+    visit move_label_print_path(move)
+
+    # data-turbo=false → a native submit, so the browser renders/downloads the PDF
+    # instead of Turbo silently dropping the non-HTML response.
+    expect(page).to have_css('form[data-turbo="false"]')
+  end
+
   it "shows an empty state when the move has no boxes" do
     empty = create(:move, created_by: user, name: "Empty Move")
 

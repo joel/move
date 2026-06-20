@@ -43,9 +43,14 @@ module Views
           p(class: "text-body-md text-muted") do
             I18n.t("label_print.range_hint", min: @min_number, max: @max_number, count: @box_count)
           end
+          # data-turbo=false: a valid range returns application/pdf (not HTML), and
+          # Turbo Drive can't turn a non-HTML form response into a navigation — the
+          # button would appear to do nothing. Force a native submit so the browser
+          # renders/downloads the PDF. ("false" as a string — Phlex omits
+          # boolean-false attributes.)
           form(
             action: move_label_print_labels_path(@move), method: "get",
-            class: "flex flex-col gap-stack-gap"
+            data: { turbo: "false" }, class: "flex flex-col gap-stack-gap"
           ) do
             div(class: "grid grid-cols-2 gap-3") do
               number_field("from", I18n.t("label_print.from"), @from || @min_number)
