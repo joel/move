@@ -85,6 +85,19 @@ These are non-negotiable for all domain work. Do not reinvent these wheels.
    - The one remaining JS poller (`recognition_poller_controller.js`, recovery
      surface) is being migrated to cable (#244) — do not add new ones.
 
+5. **Aggregation/filtering → the database, never the application layer.** Do
+   **not** load rows into Ruby to compute what SQL can: no
+   `pluck(...).map/min/max/sum/size`, no `.select { … }.count`, no
+   `.to_a.sum(&:x)`, no Ruby `group_by` for counts. Use SQL — `minimum`/`maximum`/
+   `sum`/`count`/`average`, `pick(Arel.sql("MIN(x), MAX(x), COUNT(*)"))`,
+   `group(:x).count`, `where(...).count`, `exists?`, `distinct`. Let Postgres
+   return the answer (one row), not the rows. **Coerce `Arel.sql` aggregate
+   outputs** (`&.to_i` / `&.to_f`): untyped casts come back as **strings**, so a
+   raw `MAX(number::bigint)` compares lexically (`"9" > "10"`) — the exact bug
+   behind `LabelPrintsController#range_bounds` and `Boxes::Create#next_number`
+   (#283). Loading-and-computing in Ruby is an O(N)-for-O(1) regression; flag it
+   in review.
+
 ---
 
 ## 2. CLI Operations (`bin/cli`)
