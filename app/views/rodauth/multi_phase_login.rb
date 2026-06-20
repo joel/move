@@ -4,7 +4,6 @@ module Views
   module Rodauth
     class MultiPhaseLogin < Views::Base
       include Phlex::Rails::Helpers::LinkTo
-      include Phlex::Rails::Helpers::ButtonTo
 
       def view_template
         login_value = view_context.params[
@@ -15,7 +14,7 @@ module Views
           render_header(login_value)
           render Components::RodauthFlash.new
           render_auth_methods
-          render_google_option if google_configured?
+          render_google_option if view_context.google_credentials_present?
           render_footer
         end
       end
@@ -50,16 +49,7 @@ module Views
 
       def render_google_option
         div(class: "ha-card p-6") do
-          button_to(
-            view_context.rodauth.omniauth_request_path(:google),
-            method: :post,
-            data: { turbo: false },
-            class: "ha-button ha-button-secondary w-full " \
-                   "flex items-center justify-center gap-3"
-          ) do
-            render Components::Icons::Google.new
-            span { "Sign in with Google" }
-          end
+          render Components::GoogleAuthButton.new
         end
       end
 
@@ -77,14 +67,6 @@ module Views
             class: "ha-button ha-button-secondary"
           )
         end
-      end
-
-      # Both credentials present + on the canonical apex host — see
-      # Login#google_configured?.
-      def google_configured?
-        ENV["GOOGLE_CLIENT_ID"].present? &&
-          ENV["GOOGLE_CLIENT_SECRET"].present? &&
-          view_context.on_apex_host?
       end
     end
   end

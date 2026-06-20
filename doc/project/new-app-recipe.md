@@ -323,8 +323,8 @@ capture → recognition):
 
 ## 6c. Google social sign-in (optional)
 
-Google sign-in ships wired but **dormant** — every code path is gated on
-`ENV["GOOGLE_CLIENT_ID"].present?`, so with no credentials the Google button and
+Google sign-in ships wired but **dormant** — gated on both credentials being
+present (`google_credentials_present?`), so with none the Google button and
 One Tap prompt stay hidden and the app runs normally. Two flows are supported:
 the standard OmniAuth redirect button (`rodauth-omniauth` +
 `omniauth-google-oauth2`, paths `/auth/google` + `/auth/google/callback`) and
@@ -340,13 +340,16 @@ To enable it in production:
    **OAuth 2.0 Client ID** (type: *Web application*):
    - Authorized **redirect URI**: `https://move-easy.org/auth/google/callback`
    - Authorized **JavaScript origin** (One Tap / FedCM): `https://move-easy.org`
-   - Org subdomains (`<slug>.move-easy.org`) need **no** entries: the Google
-     button + One Tap render **only on the apex host** itself (matched against
-     `config.action_mailer.default_url_options[:host]`), so OAuth always starts
-     and the callback always lands on `move-easy.org`; `login_redirect` then hops
-     to the subdomain on the shared cookie. (On a subdomain — or a non-canonical
-     public host like `www`/`move` — Google is hidden and sign-in falls back to
-     passkey / email link, since its callback/JS origin would be unregistered.)
+   - Org subdomains (`<slug>.move-easy.org`) need **no** entries: the apex host
+     is matched against `config.action_mailer.default_url_options[:host]`, and
+     OAuth always starts + the callback always lands on `move-easy.org`;
+     `login_redirect` then hops to the subdomain on the shared cookie. On a
+     subdomain the **redirect button is a link** to `https://move-easy.org/login?via=google`,
+     which auto-starts the same-origin OAuth there (`Components::GoogleAuthButton`
+     + the `auto-submit` controller's connect handler) — a subdomain can't POST
+     cross-origin with a valid CSRF token. **One Tap stays apex-only** (FedCM is
+     bound to the page's JS origin and can't be routed). Non-canonical public
+     hosts like `www`/`move` show nothing (they aren't the apex host).
 2. **Doppler** (`move/prd`) → add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
    (synced into GitHub Actions secrets for Kamal). They are listed in
    `config/deploy.yml` (`env.secret`) and `.kamal/secrets`; until set they
@@ -355,6 +358,8 @@ To enable it in production:
    baked into the container — a bare `kamal app start` keeps the old env.
 4. **Verify** on `https://move-easy.org`: the button + One Tap appear; a new
    Google account signs in, gets a personal org, and lands on its subdomain.
+   Also confirm an org subdomain's `/login` shows a Google **link** that routes
+   to the apex and auto-starts the flow.
 
 > Local dev cannot exercise real Google: Google requires an `https` (or
 > `localhost`) origin, and the dev host is `http://<slug>.workeverywhere.docker`.
