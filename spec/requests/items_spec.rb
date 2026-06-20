@@ -100,6 +100,16 @@ RSpec.describe "Items" do
       expect(response.body).to include(I18n.t("items.show.mark_unpacked"))
       expect(response.body).not_to include(I18n.t("items.show.delete"))
     end
+
+    it "always offers Restore (not Delete) for an already-removed item, even while packing" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: "packing"),
+                                    presence_state: "removed")
+
+      get move_item_path(move, item)
+
+      expect(response.body).to include(I18n.t("items.show.restore"))
+      expect(response.body).not_to include(I18n.t("items.show.delete"))
+    end
   end
 
   describe "DELETE /moves/:move_id/items/:id" do
@@ -127,6 +137,18 @@ RSpec.describe "Items" do
       delete move_item_path(move, item)
 
       expect(Media.exists?(media.id)).to be(true)
+    end
+
+    it "refuses to delete once the box is unpacking, redirecting with an alert" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: "unpacking"))
+
+      delete move_item_path(move, item)
+
+      aggregate_failures do
+        expect(Item.exists?(item.id)).to be(true)
+        expect(response).to redirect_to(move_item_path(move, item))
+        expect(flash[:alert]).to eq(I18n.t("items.destroy.wrong_phase"))
+      end
     end
   end
 

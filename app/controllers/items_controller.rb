@@ -99,6 +99,8 @@ class ItemsController < MoveScopedController
     case result
     in Dry::Monads::Success(item)
       redirect_to move_box_path(@move, item.box), notice: t(".deleted", name: item.name)
+    in Dry::Monads::Failure(:wrong_phase)
+      redirect_to move_item_path(@move, @item), alert: t(".wrong_phase")
     in Dry::Monads::Failure(_)
       redirect_to move_item_path(@move, @item), alert: t(".delete_failed")
     end

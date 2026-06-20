@@ -11,6 +11,7 @@ module Items
   # tenant context. C3 only exposes this while the box is still packing.
   class Remove < BaseAction
     def call(item:, actor:, source: :web)
+      yield ensure_packing_phase(item.box)
       media = item.source_media
       batch_id = yield Discards::Cascade.new.call(record: item, actor: actor, source: source)
       yield discard_orphaned_media(item, media, batch_id)
@@ -19,6 +20,16 @@ module Items
     end
 
     private
+
+    # Deletion is a *packing-phase* operation. Once the box is unpacking/unpacked,
+    # the reversible presence transition (MarkRemoved) is the right tool, so refuse
+    # to delete — the phase-aware UI must not be the only guard (a stale form or a
+    # direct request could otherwise soft-delete destination-side inventory).
+    def ensure_packing_phase(box)
+      return Failure(:wrong_phase) if box.unpacking? || box.unpacked?
+
+      Success()
+    end
 
     # Discard the source photo only when no *other kept* item still references it
     # (one photo can source several items — deleting one must not strip the photo

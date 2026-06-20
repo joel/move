@@ -172,31 +172,35 @@ module Views
       end
 
       # The remove control's meaning depends on where the box is in its lifecycle.
-      # While unpacking (or unpacked), removing an item means "physically taken out
-      # of the box" (presence → removed, reversible). While still packing/sealed/in
-      # transit, the item was added by mistake — removing it *deletes* it (and its
-      # orphaned photo), restorable from the activity feed.
+      # A *removed* item always offers Restore-to-box — that presence inverse is its
+      # only C3 undo, regardless of phase (legacy/seed data can leave an item removed
+      # on a still-packing box). Otherwise: while unpacking/unpacked, removing means
+      # "physically taken out" (presence → removed, reversible); while packing/sealed/
+      # in transit, the item was added by mistake — Delete it (and its orphaned photo,
+      # restorable from the activity feed).
       def presence_control
-        if @item.box.unpacking? || @item.box.unpacked?
-          unpacking_presence_control
+        if @item.removed?
+          restore_to_box_control
+        elsif @item.box.unpacking? || @item.box.unpacked?
+          mark_unpacked_control
         else
           delete_control
         end
       end
 
-      def unpacking_presence_control
-        if @item.removed?
-          button_to(
-            I18n.t("items.show.restore"), restore_move_item_path(@move, @item),
-            method: :patch, class: ghost_button
-          )
-        else
-          button_to(
-            I18n.t("items.show.mark_unpacked"), mark_removed_move_item_path(@move, @item),
-            method: :patch, class: danger_button,
-            data: { turbo_confirm: I18n.t("items.show.mark_unpacked_confirm") }
-          )
-        end
+      def restore_to_box_control
+        button_to(
+          I18n.t("items.show.restore"), restore_move_item_path(@move, @item),
+          method: :patch, class: ghost_button
+        )
+      end
+
+      def mark_unpacked_control
+        button_to(
+          I18n.t("items.show.mark_unpacked"), mark_removed_move_item_path(@move, @item),
+          method: :patch, class: danger_button,
+          data: { turbo_confirm: I18n.t("items.show.mark_unpacked_confirm") }
+        )
       end
 
       def delete_control

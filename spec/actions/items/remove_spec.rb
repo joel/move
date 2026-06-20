@@ -58,4 +58,14 @@ RSpec.describe Items::Remove do
     expect(remove(item)).to be_success
     expect(Item.exists?(item.id)).to be(false)
   end
+
+  it "refuses to delete once the box is unpacking (use the presence transition)" do
+    item = create(:item, :manual, move:, box: create(:box, move:, status: "unpacking"))
+
+    result = remove(item)
+
+    expect(result).to be_failure
+    expect(result.failure).to eq(:wrong_phase)
+    expect(Item.exists?(item.id)).to be(true)
+  end
 end

@@ -72,3 +72,4 @@ en:
     destroy:
       deleted: "%{name} was deleted."
       delete_failed: "Could not delete this item."
+      wrong_phase: "This box is being unpacked — mark the item unpacked instead of deleting it."
