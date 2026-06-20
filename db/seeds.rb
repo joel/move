@@ -346,6 +346,49 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
 
   # (D6 review items are seeded with their photos in the box-1 walk above.)
 
+  # Phase-aware item removal demo (#288): give both removal surfaces a
+  # photo-backed item so they're showcase-ready.
+  #  - Box #9 (packing): a photo that sourced TWO items. Open either item's C3 to
+  #    see "Delete from box" — delete one and the photo stays (its sibling still
+  #    uses it); delete both and the photo goes with the last item. Restore either
+  #    from the activity feed.
+  #  - Box #7 (unpacking): a photo whose items are all already unpacked, so its
+  #    gallery thumbnail carries the "Unpacked" badge.
+  seed_removal_photo = lambda do |box, label, detections|
+    next unless box&.media&.none?
+
+    media = box.media.new(
+      move: move, media_type: "image", captured_via: "web", captured_at: 2.minutes.ago
+    )
+    media.image.attach(
+      io: Rails.public_path.join("icon.png").open,
+      filename: "#{label.parameterize}.png", content_type: "image/png"
+    )
+    media.save!
+    run = box.recognition_runs.create!(
+      move: move, media: media, provider: "fake", provider_model: "fake-1", status: "succeeded",
+      started_at: 1.minute.ago, completed_at: Time.current,
+      metadata: { "item_count" => detections.size, "provider" => "fake" }
+    )
+    detections.each do |name, presence|
+      suggestion = run.recognition_suggestions.create!(
+        move: move, box: box, media: media, proposed_name: name, proposed_quantity: 1,
+        confidence_score: 0.9, state: "pending"
+      )
+      item = box.items.create!(
+        move: move, source_media: media, source_recognition_suggestion_id: suggestion.id,
+        name: name, quantity: 1, confidence_score: 0.9, created_via: "recognition",
+        review_state: "confirmed", presence_state: presence
+      )
+      suggestion.update!(item: item)
+    end
+  end
+
+  seed_removal_photo.call(move.boxes.find_by(number: "9"), "Skillet and bowls",
+                          [["Cast Iron Skillet", "in_box"], ["Mixing Bowls", "in_box"]])
+  seed_removal_photo.call(move.boxes.find_by(number: "7"), "Bedside shelf",
+                          [["Phone Charger", "removed"], ["Paperback", "removed"]])
+
   # --- D9: an archived Move with a sealed box so the E2 *archived* scan state is
   # showcase-ready (read-only resolve). Scan demo: open /moves/<this move>/scan and
   # enter the box code "demo-archived-box", or scan box #1 of the active Move's

@@ -54,22 +54,35 @@ RSpec.describe "Manual add & item detail" do
     expect(item.presence_state).to eq("in_box")
   end
 
-  it "hides the Move control once an item is removed" do
-    create(:box, move:, number: "2", room: kitchen)
+  it "deletes a mistaken item while packing (restorable via the activity feed)" do
     item = create(:item, :manual, move:, box: source)
+
+    visit move_item_path(move, item)
+    expect(page).to have_button(I18n.t("items.show.delete"))
+    click_button I18n.t("items.show.delete")
+
+    expect(Item.exists?(item.id)).to be(false)
+    expect(Item.with_discarded.find(item.id)).to be_discarded
+  end
+
+  it "hides the Move control once an item is marked unpacked" do
+    unpacking = create(:box, move:, number: "3", room: kitchen, status: "unpacking")
+    create(:box, move:, number: "2", room: kitchen)
+    item = create(:item, :manual, move:, box: unpacking)
 
     visit move_item_path(move, item)
     expect(page).to have_button(I18n.t("items.show.move"))
 
-    click_button I18n.t("items.show.remove")
+    click_button I18n.t("items.show.mark_unpacked")
     expect(page).to have_no_button(I18n.t("items.show.move"))
   end
 
-  it "removes then restores an item (presence axis)" do
-    item = create(:item, :manual, move:, box: source)
+  it "marks unpacked then restores an item (presence axis)" do
+    unpacking = create(:box, move:, number: "3", room: kitchen, status: "unpacking")
+    item = create(:item, :manual, move:, box: unpacking)
 
     visit move_item_path(move, item)
-    click_button I18n.t("items.show.remove")
+    click_button I18n.t("items.show.mark_unpacked")
     expect(item.reload.presence_state).to eq("removed")
 
     click_button I18n.t("items.show.restore")

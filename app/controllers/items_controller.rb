@@ -6,8 +6,8 @@
 # authorize, call the action, pattern-match, render.
 class ItemsController < MoveScopedController
   before_action :set_box, only: %i[new create]
-  before_action :set_item, only: %i[show update move mark_removed restore]
-  before_action :require_writable_move!, only: %i[new create update move mark_removed restore]
+  before_action :set_item, only: %i[show update destroy move mark_removed restore]
+  before_action :require_writable_move!, only: %i[new create update destroy move mark_removed restore]
 
   # GET /moves/:move_id/items/:id
   def show
@@ -89,6 +89,23 @@ class ItemsController < MoveScopedController
     end
   end
 
+  # DELETE /moves/:move_id/items/:id
+  # Packing-phase delete (C3 shows this while the box is still packing): the item
+  # was added by mistake. Soft-deletes the item and its now-orphaned source photo;
+  # the activity feed offers a restore. Distinct from mark_removed (unpacking).
+  def destroy
+    result = Items::Remove.new.call(item: @item, actor: current_user)
+
+    case result
+    in Dry::Monads::Success(item)
+      redirect_to move_box_path(@move, item.box), notice: t(".deleted", name: item.name)
+    in Dry::Monads::Failure(:wrong_phase)
+      redirect_to move_item_path(@move, @item), alert: t(".wrong_phase")
+    in Dry::Monads::Failure(_)
+      redirect_to move_item_path(@move, @item), alert: t(".delete_failed")
+    end
+  end
+
   # PATCH /moves/:move_id/items/:id/move
   def move
     target = @move.boxes.find_by(id: params[:target_box_id])
@@ -104,9 +121,18 @@ class ItemsController < MoveScopedController
   end
 
   # PATCH /moves/:move_id/items/:id/mark_removed
+  # The C3 "mark unpacked" path. Items::MarkRemoved enforces the unpacking-phase
+  # rule (delete is the tool while packing), so a stale form / direct PATCH on a
+  # still-packing item is refused with a friendly alert.
   def mark_removed
-    Items::MarkRemoved.new.call(item: @item, actor: current_user)
-    redirect_to move_item_path(@move, @item), notice: t(".removed")
+    case Items::MarkRemoved.new.call(item: @item, actor: current_user)
+    in Dry::Monads::Success(_)
+      redirect_to move_item_path(@move, @item), notice: t(".removed")
+    in Dry::Monads::Failure(:wrong_phase)
+      redirect_to move_item_path(@move, @item), alert: t(".wrong_phase")
+    in Dry::Monads::Failure(_)
+      redirect_to move_item_path(@move, @item), alert: t(".failed")
+    end
   end
 
   # PATCH /moves/:move_id/items/:id/restore

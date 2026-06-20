@@ -24,9 +24,14 @@ en:
       saved: "Saved"
       save_failed: "Couldn’t save"
       move: "Move"
-      remove: "Remove"
+      # Unpacking phase (box unpacking/unpacked): physically taking the item out.
+      mark_unpacked: "Mark unpacked"
+      mark_unpacked_confirm: "Mark this item as unpacked from its box?"
       restore: "Restore to box"
-      remove_confirm: "Mark this item as removed from its box?"
+      # Packing phase: the item was added by mistake — delete it (and its orphaned
+      # photo). Restorable from the activity feed.
+      delete: "Delete from box"
+      delete_confirm: "Delete this item? Its photo is removed too if no other item uses it. You can restore it from the activity feed."
       "yes": "Yes"
       "no": "No"
       archived: "This move is archived and is read-only."
@@ -62,5 +67,11 @@ en:
       failed: "Could not move the item."
     mark_removed:
       removed: "Item marked as removed."
+      wrong_phase: "This box is still being packed — delete the item instead of marking it unpacked."
+      failed: "Could not update this item."
     restore:
       restored: "Item restored to its box."
+    destroy:
+      deleted: "%{name} was deleted."
+      delete_failed: "Could not delete this item."
+      wrong_phase: "This box is being unpacked — mark the item unpacked instead of deleting it."

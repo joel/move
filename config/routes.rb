@@ -65,7 +65,7 @@ Rails.application.routes.draw do
                        constraints: { token: /[A-Za-z0-9_-]+/ }
     # C3 — Item detail / edit. Scoped to the Move (not the box) so the record
     # survives a box-to-box move; presence/box changes via member actions.
-    resources :items, only: %i[show update] do
+    resources :items, only: %i[show update destroy] do
       member do
         patch :move
         patch :mark_removed

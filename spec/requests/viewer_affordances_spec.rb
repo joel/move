@@ -61,7 +61,7 @@ RSpec.describe "Viewer read-only affordances" do
       get move_item_path(move, item)
       aggregate_failures do
         expect(response.body).not_to include(Components::Ui::SaveStatus::ID)
-        expect(response.body).not_to include(I18n.t("items.show.remove"))
+        expect(response.body).not_to include(I18n.t("items.show.delete"))
         expect(response.body).to include(I18n.t("items.show.view_only"))
         expect(response.body).to include("Lamp") # the detail is still shown
       end

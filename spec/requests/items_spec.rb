@@ -82,6 +82,76 @@ RSpec.describe "Items" do
     end
   end
 
+  describe "phase-aware remove control (C3)" do
+    it "renders Delete while the box is still packing" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: "packing"))
+
+      get move_item_path(move, item)
+
+      expect(response.body).to include(I18n.t("items.show.delete"))
+      expect(response.body).not_to include(I18n.t("items.show.mark_unpacked"))
+    end
+
+    it "renders Mark unpacked once the box is unpacking" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: "unpacking"))
+
+      get move_item_path(move, item)
+
+      expect(response.body).to include(I18n.t("items.show.mark_unpacked"))
+      expect(response.body).not_to include(I18n.t("items.show.delete"))
+    end
+
+    it "always offers Restore (not Delete) for an already-removed item, even while packing" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: "packing"),
+                                    presence_state: "removed")
+
+      get move_item_path(move, item)
+
+      expect(response.body).to include(I18n.t("items.show.restore"))
+      expect(response.body).not_to include(I18n.t("items.show.delete"))
+    end
+  end
+
+  describe "DELETE /moves/:move_id/items/:id" do
+    it "soft-deletes the item and its orphaned photo, redirecting to the box" do
+      packing = create(:box, move:, status: "packing")
+      media = create(:media, move:, box: packing)
+      item = create(:item, move:, box: packing, source_media: media)
+
+      delete move_item_path(move, item)
+
+      aggregate_failures do
+        expect(response).to redirect_to(move_box_path(move, packing))
+        expect(Item.exists?(item.id)).to be(false)
+        expect(Media.exists?(media.id)).to be(false)
+        expect(Item.with_discarded.find(item.id)).to be_discarded
+      end
+    end
+
+    it "keeps a photo shared with another kept item" do
+      packing = create(:box, move:, status: "packing")
+      media = create(:media, move:, box: packing)
+      item = create(:item, move:, box: packing, source_media: media)
+      create(:item, move:, box: packing, source_media: media)
+
+      delete move_item_path(move, item)
+
+      expect(Media.exists?(media.id)).to be(true)
+    end
+
+    it "refuses to delete once the box is unpacking, redirecting with an alert" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: "unpacking"))
+
+      delete move_item_path(move, item)
+
+      aggregate_failures do
+        expect(Item.exists?(item.id)).to be(true)
+        expect(response).to redirect_to(move_item_path(move, item))
+        expect(flash[:alert]).to eq(I18n.t("items.destroy.wrong_phase"))
+      end
+    end
+  end
+
   describe "PATCH /moves/:move_id/items/:id" do
     it "updates editable attributes" do
       item = create(:item, :manual, move:, box:, name: "Old")
@@ -142,8 +212,8 @@ RSpec.describe "Items" do
   end
 
   describe "PATCH mark_removed / restore" do
-    it "toggles presence without changing review state" do
-      item = create(:item, :manual, move:, box:)
+    it "toggles presence without changing review state (unpacking box)" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: "unpacking"))
 
       patch mark_removed_move_item_path(move, item)
       expect(item.reload.presence_state).to eq("removed")
@@ -151,6 +221,17 @@ RSpec.describe "Items" do
 
       patch restore_move_item_path(move, item)
       expect(item.reload.presence_state).to eq("in_box")
+    end
+
+    it "refuses mark_removed while the box is still packing (delete is the tool)" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: "packing"))
+
+      patch mark_removed_move_item_path(move, item)
+
+      aggregate_failures do
+        expect(item.reload.presence_state).to eq("in_box")
+        expect(flash[:alert]).to eq(I18n.t("items.mark_removed.wrong_phase"))
+      end
     end
   end
 

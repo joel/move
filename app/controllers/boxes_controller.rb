@@ -45,7 +45,9 @@ class BoxesController < MoveScopedController
       reviewable_media_ids: @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id),
       # Orphaned photos worth a recovery affordance (failed / zero-detection) —
       # these link to the recovery screen instead of being dead-end thumbnails.
-      recoverable_media_ids: recoverable_media_ids
+      recoverable_media_ids: recoverable_media_ids,
+      # Photos whose every sourced item has been unpacked — the gallery badges them.
+      unpacked_media_ids: unpacked_media_ids
     )
   end
 
@@ -182,6 +184,24 @@ class BoxesController < MoveScopedController
         .where(id: runs.where(status: RecognitionRun::TERMINAL).select(:media_id))
         .where.not(id: runs.where(status: %w[queued processing]).select(:media_id))
         .pluck(:id)
+  end
+
+  # Photos in this box whose every sourced item has been unpacked (presence
+  # removed) — drives the gallery "Unpacked" badge during the destination-side
+  # unpacking surface. SQL aggregate (HARD RULE — no Ruby grouping): group the
+  # MOVE's kept items by their source photo, scoped to this box's photos, and keep
+  # only photos with zero items still in_box. Move-wide (not @box.items) because an
+  # item moved to another box keeps its source_media_id: a box-scoped count would
+  # miss a still-packed sibling living in another box and badge the photo too early
+  # (mirrors recoverable_media_ids' move-wide check). Empty before unpacking.
+  def unpacked_media_ids
+    return [] unless @box.unpacking? || @box.unpacked?
+
+    @move.items
+         .where(source_media_id: @box.media.select(:id))
+         .group(:source_media_id)
+         .having("COUNT(*) FILTER (WHERE presence_state = 'in_box') = 0")
+         .pluck(:source_media_id)
   end
 
   def set_box

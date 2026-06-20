@@ -2,6 +2,9 @@
 # the Phlex components; everything renders through boxes.*.
 en:
   boxes:
+    gallery:
+      # Badge on a photo whose every sourced item has been unpacked (E3).
+      unpacked: "Unpacked"
     index:
       title: "My Boxes"
       add: "Add box"
