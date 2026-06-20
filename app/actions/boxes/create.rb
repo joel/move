@@ -42,7 +42,10 @@ module Boxes
     # discarded box's number, and the plain "Add box" would then fail validation
     # with "Number has already been taken" (#192).
     def next_number(move)
-      ((move.boxes.with_discarded.pluck(:number).map(&:to_i).max || 0) + 1).to_s
+      # Highest existing number + 1, computed in SQL (MAX), not by loading every
+      # number into Ruby. number is a string column, so the Arel.sql cast comes
+      # back untyped (a string) — to_i coerces it (nil → 0 for the first box).
+      (move.boxes.with_discarded.maximum(Arel.sql("number::bigint")).to_i + 1).to_s
     end
 
     def dimensions(params)

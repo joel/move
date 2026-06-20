@@ -74,12 +74,13 @@ class LabelPrintsController < MoveScopedController
   end
 
   # Min/max box number + count, to pre-fill and hint the form (default = all boxes).
-  # number is a string column, and pluck(number::bigint) still comes back as
-  # strings (AR keeps the column type despite the SQL cast), so coerce to Integer
-  # before min/max — otherwise "9" > "10" lexically and box 10 is dropped.
+  # Computed in SQL (one row), not by loading every number into Ruby. number is a
+  # string column and Arel.sql aggregates come back untyped (as strings), so the
+  # numeric MIN/MAX are correct (SQL compared them) but must be coerced — to_i.
   def range_bounds
-    numbers = authorized_scope(@move.boxes).pluck(Arel.sql("number::bigint")).map(&:to_i)
-    { min_number: numbers.min, max_number: numbers.max, box_count: numbers.size }
+    min, max, count = authorized_scope(@move.boxes)
+                      .pick(Arel.sql("MIN(number::bigint), MAX(number::bigint), COUNT(*)"))
+    { min_number: min&.to_i, max_number: max&.to_i, box_count: count.to_i }
   end
 
   def filename(from, to)

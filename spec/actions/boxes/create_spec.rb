@@ -22,6 +22,16 @@ RSpec.describe Boxes::Create do
     expect(box.number).to eq("3")
   end
 
+  # The next number is the SQL numeric MAX + 1, not a lexical one — past single
+  # digits a string compare would pick "9" over "10" and collide.
+  it "numbers past single digits numerically" do
+    create(:box, move:, number: "9")
+    create(:box, move:, number: "10")
+
+    box = described_class.new.call(move:, params: {}, creator:).value!
+    expect(box.number).to eq("11")
+  end
+
   # #192 — a discarded box keeps its number reserved (the uniqueness validator
   # ignores default_scope, so it sees every row). Numbering must skip it, or a
   # plain "Add box" after deleting the highest box dead-ends on validation.
