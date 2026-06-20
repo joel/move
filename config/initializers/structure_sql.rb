@@ -36,7 +36,7 @@ module DeterministicStructureSearchPath
       WHERE nspname NOT IN ('public', 'information_schema')
         AND nspname NOT LIKE 'pg\\_%'
     SQL
-  rescue StandardError
+  rescue StandardError # rubocop:disable Move/BroadRescue -- DB may be unavailable at load/dump time
     []
   end
 

@@ -158,7 +158,7 @@ class RodauthMain < Rodauth::Rails::Auth
             .authenticator_data
             .attested_credential_data
             &.aaguid
-        rescue StandardError
+        rescue StandardError # rubocop:disable Move/BroadRescue -- optional aaguid from untrusted data → nil
           nil
         end
 

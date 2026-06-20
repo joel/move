@@ -44,7 +44,7 @@ module Organizations
       Success()
     rescue Apartment::TenantExists
       Failure(:tenant_exists)
-    rescue StandardError => e
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- cleanup orphan tenant row; returns Failure
       # The schema could not be created; do not leave an orphaned registry row.
       organization.destroy
       Failure(e.message)

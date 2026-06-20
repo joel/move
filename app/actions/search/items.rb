@@ -42,7 +42,7 @@ module Search
     def safe_query_embedding(embedder, query)
       result = embedder.embed(query)
       result.vector ? [result.vector, result.model] : [nil, nil]
-    rescue StandardError => e
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- §7.3 drop semantic leg, serve lexical
       Rails.logger.warn("[search] query embedding failed: #{e.class}: #{e.message}")
       [nil, nil]
     end

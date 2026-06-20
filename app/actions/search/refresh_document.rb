@@ -52,7 +52,7 @@ module Search
       doc.embedding = result.vector
       doc.embedding_model = result.vector ? result.model : nil
       doc.embedded_at = result.vector ? Time.current : nil
-    rescue StandardError => e
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- §7.3 keep item lexically searchable
       Rails.logger.warn("[search] embedding failed for item=#{doc.item_id}: #{e.class}: #{e.message}")
       doc.embedding = nil
       doc.embedding_model = nil
