@@ -26,6 +26,21 @@ RSpec.describe Items::Restore do
     end
   end
 
+  it "restores a shared photo when bringing back any item that references it" do
+    media = create(:media, move:, box:)
+    first = create(:item, move:, box:, source_media: media)
+    second = create(:item, move:, box:, source_media: media)
+    Items::Remove.new.call(item: first, actor:)  # photo kept — second still uses it
+    Items::Remove.new.call(item: second, actor:) # photo now discarded (second's batch)
+
+    restore(Item.with_discarded.find(first.id))  # restore the FIRST item, not the second
+
+    # The photo comes back because first now references it again, even though it
+    # was discarded under the second item's batch.
+    expect(Media.exists?(media.id)).to be(true)
+    expect(Media.find(media.id)).not_to be_discarded
+  end
+
   it "leaves a photo discarded independently for another reason alone" do
     media = create(:media, move:, box:)
     item = create(:item, :manual, move:, box:, source_media: nil)

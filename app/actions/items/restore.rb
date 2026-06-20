@@ -9,26 +9,25 @@ module Items
     def call(item:, actor:, source: :web)
       batch_id = item.discard_batch_id
       yield Discards::CascadeRestore.new.call(record: item, actor: actor, source: source)
-      yield restore_orphaned_media(item, batch_id)
+      yield restore_source_photo(item)
       yield emit_event(item, actor, source, batch_id)
       Success(item)
     end
 
     private
 
-    # Items::Remove discards the item's now-orphaned source photo under the same
-    # batch (parent = the item) — Media isn't a structural discard child of Item,
-    # so the cascade-restore above won't touch it. Restore any photo tagged with
-    # this batch + parent, mirroring the cascade's batch/parent-matched invariant
-    # (a photo discarded for another reason carries a different batch and is left).
-    def restore_orphaned_media(item, batch_id)
-      return Success() unless batch_id
+    # A photo must be visible whenever a kept item references it. Items::Remove
+    # discards a shared photo only once its LAST referencing item is removed —
+    # under THAT item's batch, which may differ from this one's (two items can
+    # share a photo and be deleted separately). So matching the photo by this
+    # item's batch would miss it. Instead, simply un-discard the restored item's
+    # own source photo if it's discarded — the item now references it again.
+    # Media isn't a structural discard child of Item, so CascadeRestore won't.
+    def restore_source_photo(item)
+      media = Media.with_discarded.find_by(id: item.source_media_id)
+      return Success() unless media&.discarded?
 
-      Media.with_discarded.where(
-        discard_batch_id: batch_id,
-        discarded_by_parent_type: Item.base_class.name,
-        discarded_by_parent_id: item.id
-      ).find_each(&:undiscard_in_batch!)
+      media.undiscard_in_batch!
       Success()
     rescue ActiveRecord::RecordInvalid, Discard::RecordNotUndiscarded => e
       Failure(e.message)
