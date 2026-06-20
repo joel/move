@@ -30,6 +30,13 @@ RSpec.describe RuboCop::Cop::Move::DatabaseAggregation, :config do
     RUBY
   end
 
+  it "flags `pluck(...).tally` (Ruby-side grouped count — use group(:x).count)" do
+    expect_offense(<<~RUBY)
+      items.pluck(:status).tally
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^ #{pluck_msg}
+    RUBY
+  end
+
   it "flags a reducer on a no-arg `to_a`" do
     expect_offense(<<~RUBY)
       items.to_a.size

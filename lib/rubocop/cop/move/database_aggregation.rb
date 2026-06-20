@@ -35,10 +35,11 @@ module RuboCop
               "rows loaded by `%<loader>s` in Ruby. Use a SQL aggregate " \
               "(sum/minimum/maximum/count/average, group(:x).count, pick(Arel.sql(...)))."
 
-        # Terminal calls that compute a single value from a collection.
-        REDUCERS = %i[sum min max minmax count size length reduce inject average].freeze
+        # Terminal calls that compute a single value (or grouped counts, `tally`)
+        # from a collection — the Ruby-side aggregation §1 #5 forbids on loaded rows.
+        REDUCERS = %i[sum min max minmax count size length reduce inject average tally].freeze
         # Pure element transforms to walk through when hunting the underlying load.
-        TRANSFORMS = %i[map flat_map collect compact flatten uniq reverse sort sort_by tally].freeze
+        TRANSFORMS = %i[map flat_map collect compact flatten uniq reverse sort sort_by].freeze
 
         def on_send(node)
           return unless REDUCERS.include?(node.method_name)
