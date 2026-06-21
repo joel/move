@@ -114,6 +114,10 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   # in the Settings "Recognition & AI" panel reveals "gpt-5" pre-filled in the
   # editable Model field.
   move.update!(openai_model: "gpt-5") unless move.openai_model == "gpt-5"
+  # Phase 45 — showcase the per-Move "Labels per box" preference at a non-default 3
+  # (default is 2: lid + side), so Settings → Move Preferences shows the select on
+  # "3" and both label prints emit 3 pages per box. Idempotent.
+  move.update!(labels_per_box: 3) unless move.labels_per_box == 3
   # #242 — showcase the shared "AI Capability" panel. Placeholder keys (never
   # real) for three vendors so the panel renders "Key set ••••" rows and the
   # Recognition/Semantic Search selectors light up their keyed options; Anthropic
