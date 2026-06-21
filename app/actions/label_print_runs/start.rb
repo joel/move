@@ -15,15 +15,21 @@ module LabelPrintRuns
     def call(move:, from:, to:, host:, protocol:)
       return Failure(:invalid_range) if from.nil? || to.nil? || from > to
 
-      count = move.boxes.in_number_range(from, to).count # SQL COUNT, not rows-into-Ruby
-      return Failure(:empty) if count.zero?
-      return Failure(:too_many) if count > LabelPrintRun::MAX_LABELS
+      # Snapshot the exact box ids now (SQL, in print order). The job renders THIS
+      # set, not a re-query of the mutable range — so total_count, the MAX_LABELS
+      # cap, and the rendered PDF always agree even if boxes are added/deleted/
+      # renumbered while the job waits in the queue (mirrors IndexingRuns::Start).
+      box_ids = move.boxes.in_number_range(from, to).ids
+      return Failure(:empty) if box_ids.empty?
+      return Failure(:too_many) if box_ids.size > LabelPrintRun::MAX_LABELS
 
       run = move.label_print_runs.create!(
-        from_number: from, to_number: to, total_count: count,
+        from_number: from, to_number: to, total_count: box_ids.size,
         status: "processing", started_at: Time.current
       )
-      GenerateJob.perform_later(run.id, tenant: Apartment::Tenant.current, host: host, protocol: protocol)
+      GenerateJob.perform_later(
+        run.id, tenant: Apartment::Tenant.current, host: host, protocol: protocol, box_ids: box_ids
+      )
       Success(run)
     end
   end

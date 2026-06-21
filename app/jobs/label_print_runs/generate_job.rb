@@ -12,20 +12,22 @@ module LabelPrintRuns
   class GenerateJob < ApplicationJob
     queue_as :default
 
-    def perform(run_id, tenant:, host:, protocol:)
+    def perform(run_id, tenant:, host:, protocol:, box_ids:)
       Apartment::Tenant.switch(tenant) do
         Current.tenant = tenant
         run = LabelPrintRun.find_by(id: run_id)
         return unless run&.in_progress? # gone, or a retry after it already finished/failed
 
-        generate(run, host, protocol)
+        generate(run, host, protocol, box_ids)
       end
     end
 
     private
 
-    def generate(run, host, protocol)
-      entries = run.move.boxes.in_number_range(run.from_number, run.to_number).includes(:room).map do |box|
+    def generate(run, host, protocol, box_ids)
+      # Render exactly the ids Start snapshotted + validated (in print order), so the
+      # PDF always matches total_count even if the range changed since enqueue (#303).
+      entries = run.move.boxes.where(id: box_ids).ordered.includes(:room).map do |box|
         { box: box, scan_url: scan_url(run.move, box, host, protocol) }
       end
       step = [run.total_count / 20, 1].max

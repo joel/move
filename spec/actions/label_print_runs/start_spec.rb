@@ -24,7 +24,8 @@ RSpec.describe LabelPrintRuns::Start do
     expect(run.from_number).to eq(1)
     expect(run.to_number).to eq(5)
     expect(LabelPrintRuns::GenerateJob).to have_received(:perform_later)
-      .with(run.id, hash_including(tenant: anything, host: "acme.example.com", protocol: "https"))
+      .with(run.id, hash_including(tenant: anything, host: "acme.example.com", protocol: "https",
+                                   box_ids: move.boxes.in_number_range(1, 5).ids))
   end
 
   it "counts numerically, not lexically (box 10 is in 1..10)" do
