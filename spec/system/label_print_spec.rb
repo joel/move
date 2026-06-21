@@ -25,12 +25,19 @@ RSpec.describe "Label Print" do
     expect(page).to have_button(I18n.t("label_print.submit"))
   end
 
-  it "submits the form outside Turbo (the PDF response is not HTML)" do
+  it "submits the range, starting a run, and lands on the progress page with a download" do
+    # :inline queue adapter → GenerateJob runs during the POST, so by the time the
+    # redirect lands the run is completed and the Download is shown.
     visit move_label_print_path(move)
+    fill_in I18n.t("label_print.from"), with: "1"
+    fill_in I18n.t("label_print.to"), with: "3"
+    click_on I18n.t("label_print.submit")
 
-    # data-turbo=false → a native submit, so the browser renders/downloads the PDF
-    # instead of Turbo silently dropping the non-HTML response.
-    expect(page).to have_css('form[data-turbo="false"]')
+    expect(page).to have_text(I18n.t("label_print.run.title"))
+    expect(page).to have_link(I18n.t("label_print.status.download"))
+    run = move.label_print_runs.last
+    expect(page).to have_current_path(move_label_print_run_path(move, run), ignore_query: true)
+    expect(run).to be_ready
   end
 
   it "shows an empty state when the move has no boxes" do

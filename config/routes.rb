@@ -103,9 +103,13 @@ Rails.application.routes.draw do
     # the per-Move MCP credentials (admin-only create/revoke).
     get "menu", to: "menu#show", as: :menu
     # E1 — Label Print: pick a box-number range (e.g. 2–5) and print all those
-    # exterior labels in one PDF (2 pages per box). Reached from the Menu.
+    # exterior labels in one PDF (2 pages per box). Reached from the Menu. The form
+    # POSTs a run; the PDF is rendered in a background job with a live progress bar
+    # (#303), then downloaded — no synchronous request-blocking render.
     get "label_print", to: "label_prints#show", as: :label_print
-    get "label_print/labels", to: "label_prints#print", as: :label_print_labels
+    resources :label_print_runs, path: "label_print/runs", only: %i[create show] do
+      member { get :download }
+    end
     get "settings", to: "settings#show", as: :settings
     patch "settings/unit_system", to: "settings#update_unit_system", as: :settings_unit_system
     patch "settings/auto_confirm_threshold", to: "settings#update_auto_confirm_threshold",

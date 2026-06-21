@@ -2,12 +2,14 @@
 
 module Views
   module LabelPrints
-    # E1 — Label Print range picker. Choose a box-number range and print all those
-    # exterior labels in one PDF (2 pages per box). A plain GET form to the print
-    # action: a valid range navigates to the inline PDF; an invalid/empty range
-    # re-renders here with the error (so validation stays on this page).
+    # E1 — Label Print range picker. Choose a box-number range and generate all
+    # those exterior labels in one PDF (2 pages per box). POSTs a run: a valid range
+    # starts a background generation job and redirects to the live progress page
+    # (#303); an invalid/empty range re-renders here with the error (validation
+    # stays on this page).
     class Show < Views::Base
       include Phlex::Rails::Helpers::Routes
+      include Phlex::Rails::Helpers::FormWith
 
       def initialize(move:, min_number:, max_number:, box_count:, from: nil, to: nil, error: nil)
         @move = move
@@ -43,14 +45,12 @@ module Views
           p(class: "text-body-md text-muted") do
             I18n.t("label_print.range_hint", min: @min_number, max: @max_number, count: @box_count)
           end
-          # data-turbo=false: a valid range returns application/pdf (not HTML), and
-          # Turbo Drive can't turn a non-HTML form response into a navigation — the
-          # button would appear to do nothing. Force a native submit so the browser
-          # renders/downloads the PDF. ("false" as a string — Phlex omits
-          # boolean-false attributes.)
-          form(
-            action: move_label_print_labels_path(@move), method: "get",
-            data: { turbo: "false" }, class: "flex flex-col gap-stack-gap"
+          # POSTs a run: the response is an HTML redirect to the progress page, so
+          # no data-turbo=false workaround is needed (form_with injects the CSRF
+          # token + method). The number fields submit by their `name`.
+          form_with(
+            url: move_label_print_runs_path(@move), method: :post,
+            class: "flex flex-col gap-stack-gap"
           ) do
             div(class: "grid grid-cols-2 gap-3") do
               number_field("from", I18n.t("label_print.from"), @from || @min_number)
