@@ -1,0 +1,345 @@
+# Move
+
+> Move is a calm, collaborative **moving-inventory manager**. You pack belongings into
+> numbered boxes, snap a photo and let a vision model list the contents, find anything
+> across the whole relocation with hybrid search, print QR labels and manifests, and tick
+> items off as you unpack at the destination — solo or with a household, each with the
+> right role. An MCP assistant lets an AI client query and mutate a move programmatically
+> through the very same business logic as the web UI. Built on a multi-tenant **Rails 8.1
+> / Ruby 4.0** stack — **no Node**, server-rendered with Phlex + Hotwire, schema-per-tenant
+> isolation via Apartment.
+
+This file is the `llms-full.txt` context dump per <https://llmstxt.org/>. It carries the
+structural and institutional knowledge an AI agent needs to work in this repo. The
+**operational rulebook is `AGENTS.md`** (root; `CLAUDE.md` is a symlink to it) — read it
+before any non-trivial change; the conventions there are non-negotiable and OVERRIDE
+defaults. This file summarizes *what the system is*; `AGENTS.md` governs *how you must
+work in it*.
+
+Authoritative companions:
+- `AGENTS.md` — workflow, CLI, quality gates, deployment, hard-won gotchas (the rulebook).
+- `app/actions/AGENTS.md` / `README.md` — the business-logic layer (actions → events → subscribers).
+- `app/mcp/README.md` — the MCP assistant surface.
+- `doc/project/architecture.md` — full runtime + tenancy architecture with Mermaid diagrams.
+- `doc/project/new-app-recipe.md` — reproducible setup recipe (gems, Kamal, Cloudflare, Doppler, CI).
+- `doc/phases/README.md` — design-led, screen-by-screen phase plan + screen↔phase↔design map.
+- `.github/codex/review-rubric.md` — the standard every PR review applies (and the pre-PR self-review checklist).
+
+---
+
+## 1. System Architecture & Tech Stack
+
+### What & why
+
+Move is a server-rendered, multi-tenant Rails monolith for managing a physical
+relocation end-to-end: **pack → recognise → search → collaborate → unpack**. Each
+customer organisation is an isolated PostgreSQL schema (a "tenant"); within a tenant,
+the central aggregate is a **Move** (a relocation project) containing **Boxes**, each
+holding **Items**, with **Media** (photos) feeding **AI recognition** that proposes
+items, **hybrid search** over confirmed items, and an append-only **activity feed**.
+
+### Primary data flow
+
+```
+Browser → Cloudflare edge (TLS, WAF, wildcard cert)
+        → Cloudflare Tunnel (outbound-only; origin has NO open inbound ports)
+        → cloudflared (systemd, on origin) → kamal-proxy (plain HTTP, forwards all hosts)
+        → Rails app (Puma)
+            • Apartment elevator resolves the tenant from the subdomain (sets PG search_path)
+            • thin controller: authorize (ActionPolicy) → call an Action → pattern-match → render (Phlex)
+            • Action runs Dry::Monads railway, emits a `Rails.event` (domain.verb)
+            • subscribers fan out: activity feed, search reindex (Solid Queue), audit
+            • live UI via ActionCable / Turbo Streams (NO client polling)
+        → PostgreSQL 18 (+ pgvector); images → SeaweedFS via Active Storage (S3)
+```
+
+The **MCP assistant** (`POST /mcp`, stateless JSON-RPC, per-Move Bearer token) reuses the
+*same* actions, so it cannot bypass authorization, tenancy, or audit.
+
+### Core stack (explicit versions)
+
+| Layer | Choice | Notes |
+|---|---|---|
+| Language | **Ruby 4.0.5** | pinned via **mise** (`.ruby-version`); prefix commands with `mise x --` |
+| Framework | **Rails 8.1** (`~> 8.1.3`) | `schema_format :sql` → `db/structure.sql` (no `schema.rb`) |
+| DB | **PostgreSQL 18** + **pgvector** (`neighbor` gem) | pinned everywhere (dev/CI/prod); needs matching `pg_dump` for tenant cloning |
+| Views | **Phlex** (`phlex-rails ~> 2.0`) | server-side Ruby components; `application.html.erb` is unused — the real head is `Views::Layouts::ChromeHead` |
+| Frontend | **Hotwire** (turbo-rails + stimulus-rails), **importmap-rails** | NO Node/npm; live updates over Turbo Streams |
+| CSS | **Tailwind** (standalone CLI: `tailwindcss-rails` + `tailwindcss-ruby`) | no Node |
+| Assets | **Propshaft** | new-asset staleness gotchas in dev (see §4/§5) |
+| Multi-tenancy | **ros-apartment ~> 3.4** | schema-per-tenant; `Apartment::Elevator::Subdomain` |
+| Auth | **Rodauth** (rodauth-rails) + **webauthn** + **omniauth-google-oauth2** + **rodauth-omniauth** | passwordless email links, passkeys, Google sign-in |
+| Authorization | **action_policy** | admin / contributor (editor) / viewer, enforced server-side |
+| Business logic | **dry-monads ~> 1.10** | Result/do-notation "railway" in `app/actions/` |
+| Soft delete | **discard ~> 2.0** | `discarded_at`; cascade restore via `Discards::Cascade(Restore)` + `discard_batch_id` |
+| Versioning | **logidze ~> 1.4** | Postgres-trigger field history (jsonb `log_data`); powers activity-feed revert |
+| Background / cache / cable | **solid_queue / solid_cache / solid_cable** | DB-backed; Solid Queue runs in-process with Puma in prod |
+| Storage | **Active Storage → SeaweedFS** (`aws-sdk-s3`), **ruby-vips** / `image_processing` | per-tenant Active Storage; libvips variants |
+| AI | **mcp** gem (assistant); vision/embedding providers OpenAI / Anthropic / Gemini / Voyage | per-Move bring-your-own-key, encrypted at rest |
+| PDFs / QR | **prawn ~> 2.5** + **prawn-table** + **rqrcode ~> 3.0** + **chunky_png** | A7 labels, A4 manifests; embed a Unicode TTF (never AFM fonts) |
+| Deploy | **Kamal** + **Cloudflare Tunnel** + **Doppler** (secrets) | auto-deploy on push to `main` |
+| Test / quality | **RSpec** (rspec-rails), **Capybara** + Selenium, **Brakeman**, **RuboCop** (+ custom `Move/*` cops), **erb_lint**, **bundler-audit**, **overcommit** | CI `lint` + `test` gate `main` |
+
+---
+
+## 2. Domain Vocabulary & Business Logic (Ubiquitous Language)
+
+- **Organization** — a customer tenant. **One PostgreSQL schema per Organization**
+  (Apartment). There is *no* `organization_id` column on tenant tables — the active schema
+  *is* the org. Lives in the `public` schema registry. Reached via subdomain `<slug>.move-easy.org`.
+- **User / account** — a person. Lives in the shared `public` schema (Rodauth tables).
+  Referenced from tenant tables **by UUID with no cross-schema foreign key**.
+- **OrganizationMembership** — joins a User to an Organization (public schema).
+- **Move** — a relocation project, the central aggregate inside a tenant. Status:
+  `planned → started → finished → archived`. An **archived** Move is read-only
+  (`writable? == !archived?`). Has a `unit_system` (metric/imperial) and an
+  `auto_confirm_threshold` (0–1). Holds **encrypted per-Move provider API keys**.
+- **MoveMembership** — joins a User to a Move with a **role**: `admin` / `contributor`
+  (a.k.a. *editor*) / `viewer`. Gates reads vs mutations (MovePolicy / BoxPolicy).
+- **Box** — a physical container inside a Move. Lifecycle:
+  `packing → sealed → in_transit → unpacking → unpacked` (a sealed box can be unsealed;
+  an unpacked box can be reopened to unpacking). Has a numeric `number` (unique per Move,
+  bounded to bigint), a `qr_token`, optional `room`, dimensions (`length/width/height_cm`)
+  and `weight`. **Soft-deletable**; discarding a Box cascades the discard to its Items
+  under one `discard_batch_id`.
+- **Item** — an inventory entry in **exactly one** Box. Two orthogonal axes:
+  - `review_state`: `pending_review` / `auto_confirmed` / `confirmed` / `needs_correction`.
+  - `presence_state`: `in_box` / `removed` (the *unpacking* axis — independent of soft-delete).
+  - `created_via`: `recognition` / `manual` / `mcp`.
+  - **Searchable set** = `in_box` AND `review_state ∈ {confirmed, auto_confirmed}`.
+  - Also soft-deletable (the *deletion* axis, orthogonal to `presence_state: removed`).
+- **Media** — a photo attached to a Box/Move (Active Storage → SeaweedFS). Soft-deletable.
+- **RecognitionRun / RecognitionSuggestion** — a vision-model pass over a photo and its
+  proposed items; suggestions are materialized into Items (auto-confirmed when score ≥
+  the Move's `auto_confirm_threshold`, else pending review).
+- **Vocabulary** — controlled, **per-Move** lists the recognition steers toward:
+  **Room**, **Category**, **Tag**. Selection-only on items; managed under `/vocabularies/:kind`.
+- **ItemSearchDocument** — the hybrid-search projection (one row per item: lexical tsvector
+  + trigram + optional pgvector embedding pinned to its `embedding_model`).
+- **IndexingRun** — a whole-Move re-embedding pass (live ActionCable progress).
+- **Activity** — append-only audit journal row (one per change). Powers **Restore**
+  (undelete) and **Revert** (undo latest field edit), both editor-only.
+- **MoveIntegrationToken** — a per-Move Bearer credential for the MCP endpoint (admin-only).
+
+**Key business rules / invariants**
+- Tenancy isolation is structural (schema), never a `where(organization_id:)`. Never
+  hand-roll subdomain resolution or org scoping — use Apartment.
+- Recognition & embeddings are **strict per-Move BYO key** — a real provider needs *this
+  Move's own* key; it never falls back to a shared key. `fake` providers are network-free
+  defaults. If no embedding key, search **degrades gracefully** to lexical + trigram.
+- A QR token from another org's schema is simply absent on resolution → a non-disclosing
+  "unrecognized" state (cross-tenant lookups can't leak).
+- Items are scoped to the **Move** (not the box) so they survive a box-to-box move; the
+  box label/manifest scope to the box.
+- The vector space is an invariant: a search leg is pinned to `embedding_model` so a
+  stale-space vector degrades to lexical rather than mis-ranking.
+
+---
+
+## 3. State of the Codebase (Where Things Live)
+
+### High-level directory map (why each exists)
+
+```
+app/
+  actions/        ← ALL business logic. One Domain::Verb < BaseAction per operation
+                    (Dry::Monads). Subfolders by aggregate: moves/ boxes/ items/
+                    captures/ recognition_runs/ reviews/ search/ vocabularies/
+                    move_memberships/ move_integration_tokens/ organizations/
+                    manifests/ qr/ indexing_runs/ discards/. Has its own AGENTS.md.
+  controllers/    ← THIN. authorize → call action → pattern-match → render. One per surface.
+  components/     ← Phlex view components (Base, UI library under ui/, icons/).
+  views/          ← Phlex view classes (incl. rodauth/ overrides, layouts/ChromeHead, pwa/).
+  models/         ← Persistence only: associations, validations, scopes. NO domain logic.
+  policies/       ← ActionPolicy authorization (MovePolicy, BoxPolicy, …).
+  subscribers/    ← Rails.event subscribers (activity/ captures/ manifests/ search/).
+  jobs/           ← Solid Queue jobs (recognition_runs/, search/, purge_abandoned_uploads).
+  services/       ← Provider adapters: recognition_providers/, embedding_providers/,
+                    image_normalizer, provider_http. (Integration glue, not domain rules.)
+  mcp/            ← MCP server + tool definitions (move_mcp/). Reuses app/actions. Own README.
+  pdfs/           ← Prawn PDF generators (labels, manifests). Embed a Unicode TTF.
+  presenters/ helpers/ mailers/ channels/ misc/ (Rodauth auth glue — see app/misc/AGENTS.md)
+config/
+  routes.rb       ← Routing hub. Heavily commented, screen-keyed (A1, B1, C2, …).
+  initializers/   ← apartment.rb, apartment_elevator.rb, rodauth.rb, roles.rb,
+                    search_indexing.rb, recognition_broadcast.rb, activity_log.rb,
+                    mcp_audit.rb, manifest_audit.rb, phlex.rb, structure_sql.rb, …
+  deploy.yml      ← Kamal (app + postgres:18 accessory). Secrets via Doppler.
+db/
+  structure.sql   ← schema_format :sql (NO schema.rb). Must match migrations (overcommit hook).
+  seeds.rb        ← Demo org/move/account. Guarded OFF in production. Tenancy-aware.
+lib/
+  rubocop/cop/move/  ← Custom cops: broad_rescue.rb, database_aggregation.rb (merge-blocking).
+  tasks/             ← search.rake, rubocop.rake, erblint.rake.
+spec/               ← RSpec. Incl. spec/architecture/ (fitness tests enforcing §1 rules).
+doc/
+  project/        ← architecture.md, new-app-recipe.md, ai-providers.md, diagrams/.
+  phases/         ← Design-led phase plan (D0–D13) + Steps logs + DESIGN-DISCREPANCIES.md.
+  ai/             ← Domain-led companion plan (v0.2 prompts).
+bin/cli           ← Thor CLI piloting app/db/mail/storage/services containers.
+```
+
+### Key files / primes (core logic entry points)
+
+- **Routing hub**: `config/routes.rb` — every surface, screen-keyed and commented.
+- **Action base / railway**: `app/actions/base_action.rb` (+ `app/actions/AGENTS.md`).
+- **Core schema/domain**: `app/models/move.rb`, `box.rb`, `item.rb` (read these first).
+- **Tenancy**: `config/initializers/apartment.rb` + `apartment_elevator.rb`.
+- **Auth**: `config/initializers/rodauth.rb` + `app/misc/` (+ `app/misc/AGENTS.md` for gotchas).
+- **Authorization roles**: `config/initializers/roles.rb`, `app/policies/`.
+- **Live updates / events**: `recognition_broadcast.rb`, `search_indexing.rb`,
+  `activity_log.rb` initializers + `app/subscribers/`.
+- **MCP**: `app/controllers/mcp_controller.rb`, `app/mcp/move_mcp/` (+ `app/mcp/README.md`).
+- **Custom enforcement**: `lib/rubocop/cop/move/*`, `spec/architecture/`.
+
+### Schemas / state systems
+
+- **Database**: PostgreSQL 18, `schema_format :sql` (`db/structure.sql`). `public` schema
+  holds shared/auth/registry tables (`users`, `user_*_keys`, `organizations`,
+  `organization_memberships`); each org is its own schema (moves, boxes, items, media,
+  vocabularies, activities, …), cloned from `public` with excluded tables omitted.
+- **Caching / jobs / websockets**: Solid Cache / Solid Queue / Solid Cable (all DB-backed).
+- **Sessions**: cookie-based (`session_store.rb`). Cross-domain auth currently uses a
+  **shared `.move-easy.org` cookie** (see §4 tech debt #280).
+
+---
+
+## 4. Active Working Context (Current Phase)
+
+> **Update this section at the end of each session** (the "dynamic workflow" wrap-up).
+
+**As of 2026-06-21:**
+
+### What just happened (recent merged work)
+- **Standards-as-cops enforcement ladder** (#295/#297, PRs #296/#298): encoded the
+  AGENTS.md §1 rules as *merge-blocking gates* instead of review reminders —
+  custom RuboCop cops `Move/BroadRescue` and `Move/DatabaseAggregation`
+  (`lib/rubocop/cop/move/`), architecture fitness tests (`spec/architecture/`), and a
+  review rubric (`.github/codex/review-rubric.md`).
+- **Phase-aware item removal** (#288–#293): while *packing* → `Items::Remove` (deletes the
+  item + orphan-safe photo; Media is now Discardable); while *unpacking* →
+  `Items::MarkRemoved` (phase guard lives IN the action). Photo restore by reference, not batch.
+- Release cadence: shipped through **v0.41.x**. Google social sign-in is **live in prod**
+  (v0.39.0); AI-Panel epic (vendor-neutral embeddings, shared "AI Capability" keys, live
+  ActionCable indexing progress) shipped in the v0.36.x line.
+- All design-led phases **D0–D13 are shipped and released**. No mapped phases remain —
+  **confirm scope with the user before starting new feature work.**
+
+### Current bottlenecks / technical debt (be careful not to break)
+- **#280 — cross-domain auth uses a shared `.move-easy.org` cookie**, not the spec'd
+  token-handoff. This is the one open, foundational follow-up (auth + tenancy — do it in
+  plan mode). No multi-org users yet.
+- **`recognition_poller_controller.js`** is the one remaining JS poller (recovery
+  surface), grandfathered; #244 closed. **Do not add new pollers** — rule §1.4 forbids them.
+- **Dev asset staleness** (not code bugs, prod precompiles fresh): new Stimulus
+  controllers and new Tailwind utilities are invisible in dev until
+  `assets:precompile` / `tailwindcss:build` + `bin/cli app restart`. See §5 anti-patterns.
+
+### First task on resume
+There is **no active feature phase queued**. Resume by confirming scope with the user.
+The only standing engineering follow-up is **#280** (token-handoff tenant-isolation
+migration). Otherwise the codebase is in a green, released state.
+
+---
+
+## 5. Rules of Engagement & Patterns
+
+> These mirror **AGENTS.md §1** (non-negotiable) and the recurring gotchas. The four
+> architecture rules are enforced by `spec/architecture/` and the `Move/*` RuboCop cops —
+> violations are **merge-blocking**, not advisory.
+
+### Design standards (strictly enforced)
+1. **Multi-tenancy → Apartment gem.** Never hand-roll subdomain resolution,
+   `Current.organization` scoping, or `organization_id` filtering. Tenant = schema.
+2. **Business logic → `app/actions/`, never in models.** Every operation is a
+   `Domain::Verb < BaseAction` using Dry::Monads result/do-notation and emitting a
+   `domain.verb` `Rails.event`. Models stay persistence-only; controllers stay thin.
+3. **Live-test authentication after every change.** Auth (passwordless Rodauth +
+   remember-me + Apartment elevator) is fragile; a green suite is NOT sufficient. Verify
+   create → sign in → sign out → sign back in in the running app.
+4. **Live updates → ActionCable / Turbo Streams. JS polling is FORBIDDEN.** Push
+   server-side state over turbo-rails broadcasting (an action emits an event → a subscriber
+   re-renders the Phlex view → `Turbo::StreamsChannel.broadcast_replace_to`). Signed stream
+   names derived from a tenant-unique uuid are the auth boundary.
+5. **Aggregation / filtering → the database, never Ruby.** No `pluck(...).map/min/max/sum`,
+   no `.select { }.count`, no `.to_a.sum`. Use SQL (`minimum`/`maximum`/`sum`/`count`,
+   `pick(Arel.sql(...))`, `group(:x).count`, `exists?`, `distinct`). **Coerce `Arel.sql`
+   aggregate outputs** (`&.to_i`/`&.to_f`) — untyped casts come back as **strings**
+   (lexical `"9" > "10"` bug).
+
+### Patterns to follow
+- **Result pattern**: actions return Dry::Monads `Success`/`Failure`; controllers
+  pattern-match. No raised exceptions for expected failure paths.
+- **Side effects via events, not model callbacks**: action emits `Rails.event` → subscriber
+  → (often) a Solid Queue job. (Search reindex is the reference impl.)
+- **A broadcast/subscriber must never break its emitter**: a `Rails.event` subscriber runs
+  synchronously inside the emitting action — wrap render/broadcast in a `rescue` (or enqueue
+  a job). This is the *only* sanctioned `rescue StandardError`, and must opt out per-site:
+  `# rubocop:disable Move/BroadRescue -- <reason>`.
+- **UI is built against Google Stitch designs**, not imagination — open the canonical
+  Stitch screen + the Phase D0 design tokens before any customer-facing UI work (AGENTS.md
+  "Design source of truth"). No magic colour/spacing/radius values.
+- **Seed data is part of the deliverable** — extend `db/seeds.rb` (idempotent,
+  tenancy-aware, comprehensive states) for any new user-facing surface.
+- **PDFs must embed a Unicode TTF** (`PdfFonts` mixin) before rendering user text — never
+  the built-in AFM fonts (they raise on accents/emoji).
+
+### Anti-patterns to avoid (banned)
+- ❌ `organization_id` columns / manual tenant scoping (use Apartment schemas).
+- ❌ Domain logic in models or fat controllers (use `app/actions/`).
+- ❌ JS polling (`setInterval`+`fetch`, Stimulus pollers, refresh meta tags).
+- ❌ Loading rows into Ruby to compute counts/sums/min/max/filters (push to SQL).
+- ❌ Bare `rescue StandardError` outside the sanctioned broadcast-isolation site.
+- ❌ Inline `on*` event handlers in Phlex (`onchange`/`onclick`) — Phlex raises; use a
+  Stimulus controller + `data-action`.
+- ❌ Inventing UI not in Stitch; using non-"Refined Palette" screens as canonical.
+- ❌ `[skip ci]` / `[ci skip]` / `[no ci]` markers in commits (they skip the prod deploy
+  via squash-merge); `[skip deploy]` only when truly intended.
+- ❌ Ending a PR on a docs-only commit (path-ignored CI never produces required checks →
+  `BLOCKED`). Keep a code-touching commit at HEAD.
+- ❌ Raw `Model.create!` in runner scripts (use FactoryBot factories — they encode required
+  associations).
+- ❌ "Written by Claude" / "Claude Code" in commit messages (forbidden by global rules).
+
+### Workflow rules (from AGENTS.md)
+- **Issue first**, then branch from `main` (`feature/*` `fix/*` `docs/*` `refactor/*`),
+  atomic commits (`#<issue> Subject`), live `/product-review`, PR (`Closes #<issue>`).
+- **Wait for + address the Codex automated review** on every PR before declaring done;
+  reply to and resolve every comment.
+- **Prefix Ruby commands with `mise x --`**; `unset GITHUB_TOKEN` before `gh`.
+- **Pre-commit gates** (mirror CI): `rubocop`, `erb_lint --lint-all`, `brakeman
+  --exit-on-warn`, `bundle-audit check --update`, RSpec unit + system. overcommit enforces
+  these + `RailsSchemaUpToDate` (structure.sql must match migrations).
+- `main` is protected; push to `main` auto-deploys to prod via Kamal.
+- When a defect class escapes review, **add/extend a cop or fitness test** — don't just
+  re-remind.
+
+### Local dev quick reference
+- Dev URLs: `https://move.workeverywhere.docker` (apex), org subdomain e.g.
+  `acme.workeverywhere.docker`; mail at `https://mail.workeverywhere.docker`.
+  (Per agent memory, `/product-review` access is `http://acme.workeverywhere.docker:8080`
+  HTTP — verify against memory `dev-product-review-access`.)
+- `bin/cli services start`, `bin/rails db:seed`. Demo: `demo@example.com`, org `acme`,
+  move "Seattle Relocation". Magic links are single-use.
+- Prod demo account: `jlstaar@gmail.com` → `demo.move-easy.org` (NEVER bypass auth for any
+  real user).
+
+---
+
+## 6. Next Steps (Immediately Pending Roadmap)
+
+- **Active goal:** none queued — all design-led phases (D0–D13) are shipped and released.
+  **Confirm scope with the user before starting new feature work.**
+- **Standing engineering follow-up:** **#280** — replace the shared `.move-easy.org`
+  cross-domain auth cookie with the spec'd token-handoff (foundational tenant-isolation;
+  touches auth + tenancy — approach in plan mode).
+- **Continuous:** keep encoding recurring review findings as `Move/*` cops or
+  `spec/architecture/` fitness tests; keep `doc/project/` (+ diagrams) and `db/seeds.rb`
+  current with every cross-cutting change.
+
+---
+
+_Maintenance: at the end of a session, ask the assistant to update §4 (Active Working
+Context) and §6 (Next Steps) to reflect what was completed, what stayed blocked, and the
+first task on resume. Keep this file aligned with `AGENTS.md` — `AGENTS.md` is the rulebook;
+this file is the map._
