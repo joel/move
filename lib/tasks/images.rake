@@ -25,6 +25,13 @@ namespace :images do
     rescue ImageNormalizer::UnsupportedFormat, ImageNormalizer::ImageTooLarge => e
       warn "[images:optimize] skip media #{media.id}: #{e.class} (#{e.message})"
       nil
+    rescue ActiveStorage::Error => e
+      # Expected operational failures only (missing blob / download / attach /
+      # purge — ActiveStorage::FileNotFoundError, IntegrityError, …): log and skip
+      # so one bad object doesn't strand the rest. A genuine code bug (any other
+      # exception) still surfaces and aborts the run rather than being masked.
+      warn "[images:optimize] skip media #{media.id} (storage): #{e.class} (#{e.message})"
+      nil
     end
 
     grand_total = 0

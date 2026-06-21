@@ -71,4 +71,22 @@ RSpec.describe "images:optimize", type: :task do
 
     expect(media.reload.image.blob.id).to eq(blob_id)
   end
+
+  it "skips a media with an operational storage error and still optimises the rest (#305)" do
+    bad = create(:media) # factory attaches sample_image.png
+    good = create(:media)
+    attach_large_jpeg(good) # re-attaches as big.jpg
+    # Key the failure on the blob, not call order — UUID PKs mean find_each order
+    # is not creation order, so a count-based stub is flaky (it was, in CI).
+    allow(ImageNormalizer).to receive(:call).and_wrap_original do |orig, attachable|
+      raise ActiveStorage::FileNotFoundError if attachable[:filename].to_s.include?("sample_image")
+
+      orig.call(attachable)
+    end
+
+    expect { task.invoke }.not_to raise_error
+
+    expect(bad.reload.optimized_at).to be_nil # skipped, not stamped
+    expect(good.reload.optimized_at).to be_present # the run continued
+  end
 end
