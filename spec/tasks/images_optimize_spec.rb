@@ -73,15 +73,15 @@ RSpec.describe "images:optimize", type: :task do
   end
 
   it "skips a media with an operational storage error and still optimises the rest (#305)" do
-    bad = create(:media) # processed first (id asc) — its blob download blows up
+    bad = create(:media) # factory attaches sample_image.png
     good = create(:media)
-    attach_large_jpeg(good)
-    calls = 0
-    allow(ImageNormalizer).to receive(:call).and_wrap_original do |orig, *args, **kwargs|
-      calls += 1
-      raise ActiveStorage::FileNotFoundError if calls == 1
+    attach_large_jpeg(good) # re-attaches as big.jpg
+    # Key the failure on the blob, not call order — UUID PKs mean find_each order
+    # is not creation order, so a count-based stub is flaky (it was, in CI).
+    allow(ImageNormalizer).to receive(:call).and_wrap_original do |orig, attachable|
+      raise ActiveStorage::FileNotFoundError if attachable[:filename].to_s.include?("sample_image")
 
-      orig.call(*args, **kwargs)
+      orig.call(attachable)
     end
 
     expect { task.invoke }.not_to raise_error

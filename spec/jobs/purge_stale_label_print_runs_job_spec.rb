@@ -7,9 +7,9 @@ RSpec.describe PurgeStaleLabelPrintRunsJob do
 
   before { allow(Organization).to receive(:pluck).with(:slug).and_return([Apartment::Tenant.current]) }
 
-  it "destroys runs (and their attached PDFs) older than the retention window, keeping fresh ones" do
-    old = create(:label_print_run, :completed, move:, created_at: 2.days.ago)
-    fresh = create(:label_print_run, :completed, move:, created_at: 1.hour.ago)
+  it "destroys runs (and their attached PDFs) finished before the retention window, keeping fresh ones" do
+    old = create(:label_print_run, :completed, move:, finished_at: 2.days.ago)
+    fresh = create(:label_print_run, :completed, move:, finished_at: 1.hour.ago)
     old_blob_id = old.document.blob.id
 
     described_class.perform_now
