@@ -48,4 +48,9 @@ en:
       skipped:
         one: "1 box skipped (%{reason}): %{numbers}."
         other: "%{count} boxes skipped (%{reason}): %{numbers}."
+      # The skipped-number list is capped so it can't overflow the cookie session;
+      # the remainder collapses to "… and N more".
+      skipped_overflow:
+        one: "%{numbers} and 1 more"
+        other: "%{numbers} and %{count} more"
       invalid_step: "That isn't a valid bulk step."

@@ -80,6 +80,33 @@ RSpec.describe "Bulk box steps" do
       expect(move.boxes.where(status: "sealed").count).to eq(1)
     end
 
+    it "leads with the skipped sentence (not 'no boxes in that state') when all are skipped" do
+      create(:box, move:, status: "packing", room: nil, number: "1")
+      create(:box, move:, status: "packing", room: nil, number: "2")
+
+      post move_box_steps_path(move), params: { to: "sealed" }
+
+      # Boxes WERE in the source state — the misleading zero-state copy must not show.
+      expect(flash[:notice]).not_to include(
+        I18n.t("box_steps.create.transitioned.zero")
+      )
+      expect(flash[:notice]).to eq(
+        I18n.t("box_steps.create.skipped", count: 2,
+                                           reason: I18n.t("box_steps.skip_reason.room_required"),
+                                           numbers: "1, 2")
+      )
+    end
+
+    it "caps the skipped box-number list so a large batch can't overflow the cookie" do
+      26.times { |i| create(:box, move:, status: "packing", room: nil, number: (i + 1).to_s) }
+
+      post move_box_steps_path(move), params: { to: "sealed" }
+
+      # 26 skipped, only 20 numbers listed + "and 6 more".
+      expect(flash[:notice]).to include("and 6 more")
+      expect(flash[:notice]).to include("26 boxes skipped")
+    end
+
     it "rejects an invalid step with an alert and no change" do
       create(:box, :with_room, move:, status: "sealed")
 
