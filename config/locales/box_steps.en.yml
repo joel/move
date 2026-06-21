@@ -1,0 +1,51 @@
+# Phase 44 — Bulk box lifecycle steps. No customer-facing copy is hard-coded in
+# the Phlex view; everything renders through box_steps.*. The per-step keys are
+# keyed by the destination status (sealed / in_transit / unpacking / unpacked).
+en:
+  box_steps:
+    show:
+      title: "Bulk box steps"
+      subtitle: "Advance every box in a state through one lifecycle step at once."
+      distribution: "Current state"
+      distribution_count:
+        one: "1 box"
+        other: "%{count} boxes"
+      empty_title: "Nothing to advance"
+      empty_body: "Every box has reached the end of its lifecycle, or there are no boxes yet."
+      steps:
+        sealed:
+          button:
+            one: "Seal 1 packing box"
+            other: "Seal all %{count} packing boxes"
+          caption: "Boxes need a room before they can be sealed."
+          confirm: "Seal all packing boxes? Boxes without a room will be skipped."
+        in_transit:
+          button:
+            one: "Send 1 sealed box in transit"
+            other: "Send all %{count} sealed boxes in transit"
+          caption: "Mark sealed boxes as on the way to the destination."
+          confirm: "Mark all sealed boxes as in transit?"
+        unpacking:
+          button:
+            one: "Start unpacking 1 box"
+            other: "Start unpacking all %{count} boxes"
+          caption: "Open the destination-side unpacking checklist for these boxes."
+          confirm: "Start unpacking all in-transit boxes?"
+        unpacked:
+          button:
+            one: "Mark 1 box unpacked"
+            other: "Mark all %{count} boxes unpacked"
+          caption: "Removes every remaining item from these boxes."
+          confirm: "Mark all boxes unpacked? This removes their remaining items from the boxes."
+    skip_reason:
+      room_required: "need a room first"
+      default: "couldn't be advanced"
+    create:
+      transitioned:
+        zero: "No boxes were in that state — nothing changed."
+        one: "1 box marked %{status}."
+        other: "%{count} boxes marked %{status}."
+      skipped:
+        one: "1 box skipped (%{reason}): %{numbers}."
+        other: "%{count} boxes skipped (%{reason}): %{numbers}."
+      invalid_step: "That isn't a valid bulk step."
