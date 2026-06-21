@@ -10,13 +10,16 @@
 # The layout lives in BoxLabelsPdf (the batch builder); this is the single-box entry
 # point — it delegates with one entry so single and batch share one tested layout.
 class BoxLabelPdf
-  def initialize(box:, scan_url:)
+  # copies: the Move's labels_per_box (Phase 45); defaults to the prior fixed count
+  # so a bare call still renders 2 (lid + side).
+  def initialize(box:, scan_url:, copies: BoxLabelsPdf::DEFAULT_COPIES)
     @box = box
     @scan_url = scan_url
+    @copies = copies
   end
 
-  # Returns the rendered PDF as a binary string (two identical pages — lid + side).
+  # Returns the rendered PDF as a binary string (`copies` identical pages).
   def render
-    BoxLabelsPdf.new(entries: [{ box: @box, scan_url: @scan_url }]).render
+    BoxLabelsPdf.new(entries: [{ box: @box, scan_url: @scan_url }], copies: @copies).render
   end
 end

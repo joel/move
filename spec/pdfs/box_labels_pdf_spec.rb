@@ -27,6 +27,23 @@ RSpec.describe BoxLabelsPdf do
     expect(pdf).to include("/Count 2")
   end
 
+  it "emits `copies` pages per box (Phase 45 labels_per_box)" do
+    boxes = [1, 2, 3, 4].map do |n|
+      create(:box, move:, number: n.to_s, qr_token: "tok-c#{n}", room: create(:room, move:))
+    end
+
+    pdf = described_class.new(entries: boxes.map { |b| entry(b) }, copies: 3).render
+
+    expect(pdf).to include("/Count 12") # 4 boxes × 3 copies
+  end
+
+  it "renders a single copy when copies: 1" do
+    box = create(:box, move:, number: "7", qr_token: "tok-one1", room: create(:room, move:))
+    pdf = described_class.new(entries: [entry(box)], copies: 1).render
+
+    expect(pdf).to include("/Count 1")
+  end
+
   it "yields (done, total) once per box for progress reporting (#303)" do
     boxes = [1, 2, 3].map { |n| create(:box, move:, number: n.to_s, qr_token: "t#{n}", room: create(:room, move:)) }
     progress = []
