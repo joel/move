@@ -10,6 +10,9 @@ class LabelPrintRun < ApplicationRecord
   STATUSES = %w[queued processing completed failed].freeze
   # Non-terminal: progress is recorded only against these.
   ACTIVE = %w[queued processing].freeze
+  # Terminal: safe to reap (the job has finished or failed). The cleanup never
+  # deletes an ACTIVE run, so a queue backlog can't strand a user mid-generation.
+  TERMINAL = (STATUSES - ACTIVE).freeze
   # Guard against an accidental hundreds-of-boxes print job (was
   # LabelPrintsController::MAX_LABELS). Checked before a run is ever created.
   MAX_LABELS = 200

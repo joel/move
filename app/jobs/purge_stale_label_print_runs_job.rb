@@ -7,13 +7,18 @@
 #
 # RETENTION: a run's PDF is downloaded within minutes of generating, so a day-old
 # run is spent. The form simply starts a fresh run if someone needs the labels again.
+#
+# Only **terminal** runs are reaped — never a queued/processing one. A Solid Queue
+# backlog could otherwise leave a run non-terminal past the retention window, and
+# deleting it (plus its attachment) would strand a user still waiting on it (#305).
 class PurgeStaleLabelPrintRunsJob < ApplicationJob
   RETENTION = 1.day
 
   def perform
     Organization.pluck(:slug).each do |slug|
       Apartment::Tenant.switch(slug) do
-        LabelPrintRun.where(created_at: ..RETENTION.ago).find_each(&:destroy)
+        LabelPrintRun.where(status: LabelPrintRun::TERMINAL, created_at: ..RETENTION.ago)
+                     .find_each(&:destroy)
       end
     end
   end

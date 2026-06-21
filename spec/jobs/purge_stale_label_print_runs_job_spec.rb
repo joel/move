@@ -18,4 +18,16 @@ RSpec.describe PurgeStaleLabelPrintRunsJob do
     expect(LabelPrintRun.exists?(fresh.id)).to be(true)
     expect(ActiveStorage::Blob.exists?(old_blob_id)).to be(false) # blob reaped via destroy
   end
+
+  it "never reaps a non-terminal run, even past the retention window (#305)" do
+    # A queue backlog can leave a run queued/processing for >1 day; deleting it
+    # would strand a user still waiting on it.
+    queued = create(:label_print_run, move:, status: "queued", created_at: 3.days.ago)
+    processing = create(:label_print_run, :processing, move:, created_at: 3.days.ago)
+
+    described_class.perform_now
+
+    expect(LabelPrintRun.exists?(queued.id)).to be(true)
+    expect(LabelPrintRun.exists?(processing.id)).to be(true)
+  end
 end
