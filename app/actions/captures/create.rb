@@ -79,7 +79,10 @@ module Captures
     # for #110); web uploads attach in place (no blob to purge).
     def attach_media(box, captured_via, upload, normalized)
       media = box.media.new(
-        move: box.move, media_type: "image", captured_via: captured_via, captured_at: Time.current
+        move: box.move, media_type: "image", captured_via: captured_via, captured_at: Time.current,
+        # ImageNormalizer already wrote the optimised master, so stamp it now —
+        # the images:optimize backfill (Phase 42) then skips freshly-captured media.
+        optimized_at: Time.current
       )
       media.image.attach(normalized)
       media.save!

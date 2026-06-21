@@ -3,30 +3,38 @@
 require "marcel"
 require "stringio"
 
-# NB: ruby-vips (`require "vips"`) is loaded lazily inside #transcode, not here —
-# it dlopens libvips at require time, and only the transcode path actually needs
-# it. Requiring it at load would make boot/eager-load fail anywhere libvips is
-# absent (e.g. the bare CI runner) even for the PNG/JPEG/WEBP pass-through path.
+# NB: ruby-vips (`require "vips"`) is loaded lazily inside #optimize, not here —
+# it dlopens libvips at require time. Requiring it at load would make boot/
+# eager-load fail anywhere libvips is absent (e.g. a bare runner). A native
+# upload still degrades to pass-through if libvips is genuinely missing.
 
-# Normalizes an uploaded image to a format the browser AND the recognition
-# vision providers can both handle. Captures accept photos from a file input or
-# the MCP base64 tool; the formats people actually have (notably iPhone HEIC)
-# aren't renderable in most browsers or readable by OpenAI/Anthropic vision.
+# Normalizes AND optimises an uploaded image so the stored blob is a bounded,
+# high-quality master the browser AND the recognition vision providers can both
+# handle. Captures accept photos from a file input or the MCP direct upload; the
+# formats people actually have (notably iPhone HEIC) aren't renderable in most
+# browsers or readable by OpenAI/Anthropic vision, and a raw phone photo is 12MP+
+# / several MB — far more than any surface displays (the gallery shows ~400px
+# thumbnails; recognition re-downscales to 1536px) and wasteful to store.
 #
-# Rather than reject them (the #78 stopgap) we transcode the decodable ones to
-# JPEG on the way in, so the stored blob is always browser- and provider-safe
-# (the 5 display surfaces serve the original blob directly to <img>). The
-# content type is sniffed from the bytes (Marcel), not trusted from the client.
+# So every decodable image is decoded, auto-rotated, **down-scaled to a
+# MASTER_IMAGE_EDGE long edge** (never up-scaled), alpha-flattened, and re-encoded
+# as a stripped JPEG. The stored blob is therefore always browser- and
+# provider-safe AND small; the display surfaces serve sized Active Storage
+# *variants* off this master (Media#image :thumb/:detail). Stripping EXIF also
+# drops GPS metadata (a privacy win). The content type is sniffed from the bytes
+# (Marcel), never trusted from the client (Phase 42, #299).
 #
-#   - native (JPEG/PNG/WEBP)            → returned unchanged
+#   - native (JPEG/PNG/WEBP)            → decoded, auto-rotated, down-scaled,
+#                                         re-encoded as JPEG (NOT passed through)
 #   - transcodable (HEIC/HEIF/AVIF/
-#     TIFF/BMP/GIF)                     → decoded (first frame), auto-rotated,
-#                                         re-encoded as JPEG
+#     TIFF/BMP/GIF)                     → same path (first frame for animated)
 #   - anything else (SVG, PDF, …) or a
 #     file that won't decode            → raises UnsupportedFormat
 #
 # libvips ships the HEIF/AVIF/TIFF decoders in the app image (libde265 + dav1d);
-# see doc/project/ai-providers.md. There is deliberately no SVG/vector path.
+# see doc/project/ai-providers.md. There is deliberately no SVG/vector path. If
+# libvips is genuinely absent, a native upload degrades to pass-through (still
+# display/provider safe, just unoptimised) rather than failing the capture.
 class ImageNormalizer
   NATIVE = %w[image/jpeg image/png image/webp].freeze
   # Includes the HEIC/HEIF *sequence* brands (image/heic-sequence,
@@ -36,7 +44,13 @@ class ImageNormalizer
     image/heic image/heic-sequence image/heif image/heif-sequence
     image/avif image/tiff image/bmp image/gif
   ].freeze
-  JPEG_QUALITY = 88
+  PROCESSABLE = (NATIVE + TRANSCODABLE).freeze
+  JPEG_QUALITY = 85
+  # Long-edge cap for the stored master. 2048 keeps full-screen viewing crisp on
+  # retina/desktop while recognition re-downscales to 1536 with negligible loss;
+  # a 12MP phone photo (~3-5MB) lands around 300-600KB. Display surfaces request
+  # smaller variants still (Media :thumb 400px / :detail 1600px).
+  MASTER_IMAGE_EDGE = 2048
 
   class UnsupportedFormat < StandardError; end
   class ImageTooLarge < StandardError; end
@@ -44,7 +58,8 @@ class ImageNormalizer
   # @param attachable [ActionDispatch::Http::UploadedFile, Rack::Test::UploadedFile,
   #   Hash] the upload (an UploadedFile, or the {io:, filename:, content_type:}
   #   attachable hash the MCP tool builds).
-  # @return the original attachable (native) or a JPEG attachable hash (transcoded).
+  # @return a JPEG attachable hash (the optimised master), or the original
+  #   attachable unchanged when libvips is absent and the upload is already native.
   # @raise [ImageTooLarge] when the upload exceeds Media::MAX_IMAGE_BYTES.
   # @raise [UnsupportedFormat] for non-image / vector / undecodable input.
   def self.call(attachable) = new(attachable).call
@@ -63,22 +78,32 @@ class ImageNormalizer
     # filename to "capture.jpg", so trusting either would let a HEIC upload pass
     # as an already-safe JPEG and get stored unconverted.
     type = Marcel::MimeType.for(StringIO.new(bytes))
-    return @attachable if NATIVE.include?(type)
-    return transcode(type) if TRANSCODABLE.include?(type)
+    return optimize(type) if PROCESSABLE.include?(type)
 
     raise UnsupportedFormat, "Unsupported image format: #{type}"
   end
 
   private
 
-  def transcode(type)
+  # Decode → auto-rotate → down-scale (never up-scale) → flatten alpha → JPEG.
+  def optimize(type)
     require "vips"
     # access: :sequential keeps memory flat for large photos; first frame only
-    # for animated GIF/HEIF; autorot bakes EXIF orientation; strip drops metadata.
-    jpeg = Vips::Image.new_from_buffer(bytes, "", access: :sequential)
-                      .autorot
-                      .jpegsave_buffer(Q: JPEG_QUALITY, strip: true)
+    # for animated GIF/HEIF; autorot bakes EXIF orientation before any strip.
+    img   = Vips::Image.new_from_buffer(bytes, "", access: :sequential).autorot
+    scale = MASTER_IMAGE_EDGE.to_f / [img.width, img.height].max
+    img   = img.resize(scale) if scale < 1.0
+    # PNG/WEBP transparency would render as black in JPEG — flatten onto white.
+    img   = img.flatten(background: 255) if img.has_alpha?
+    jpeg  = img.jpegsave_buffer(Q: JPEG_QUALITY, strip: true)
     { io: StringIO.new(jpeg), filename: "#{File.basename(filename, ".*")}.jpg", content_type: "image/jpeg" }
+  rescue LoadError
+    # libvips genuinely unavailable. A native upload is already display/provider
+    # safe, so store it unchanged (unoptimised); a transcodable one can't be made
+    # safe without vips, so it must be rejected.
+    raise UnsupportedFormat, "Cannot process #{type}: libvips unavailable" unless NATIVE.include?(type)
+
+    @attachable
   rescue Vips::Error
     # The bytes claimed a decodable type but libvips couldn't read them
     # (truncated/corrupt). Treat as unsupported — never leak the vips detail.
@@ -103,7 +128,7 @@ class ImageNormalizer
     io.respond_to?(:size) ? io.size.to_i : bytes.bytesize
   end
 
-  # Only used to name the transcoded output blob — never to decide the type.
+  # Only used to name the optimised output blob — never to decide the type.
   def filename
     if @attachable.is_a?(Hash) then @attachable[:filename].to_s
     elsif @attachable.respond_to?(:original_filename) then @attachable.original_filename.to_s

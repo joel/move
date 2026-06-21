@@ -7,6 +7,31 @@ RSpec.describe ImageNormalizer do
   def upload(name, type) = Rack::Test::UploadedFile.new(fixture(name), type)
   def jpeg?(bytes) = Marcel::MimeType.for(StringIO.new(bytes)) == "image/jpeg"
 
+  # [width, height] of an encoded image, via libvips.
+  def dims(bytes)
+    require "vips"
+    img = Vips::Image.new_from_buffer(bytes, "")
+    [img.width, img.height]
+  end
+
+  # Build encoded test images in-memory (avoids committing multi-MB fixtures).
+  # Returns nil when libvips is absent so the dependent specs can skip.
+  # Gaussian noise (not a solid fill) so JPEG can't crush it to near-nothing —
+  # keeps "downscaled output is smaller than the original" a meaningful assertion.
+  def vips_jpeg(width, height)
+    require "vips"
+    Vips::Image.gaussnoise(width, height, mean: 128, sigma: 50).cast("uchar").jpegsave_buffer(Q: 92)
+  rescue LoadError
+    nil
+  end
+
+  def vips_rgba_png(width, height)
+    require "vips"
+    Vips::Image.black(width, height, bands: 4).add([200, 100, 50, 128]).cast("uchar").pngsave_buffer
+  rescue LoadError
+    nil
+  end
+
   # Whether the running libvips can actually decode a fixture — HEIC needs the
   # libheif HEVC plugin (libde265) and AVIF the AV1 plugin (aom/dav1d), which are
   # present in the app/CI image but not every dev host. Lets the real-bytes
@@ -32,9 +57,41 @@ RSpec.describe ImageNormalizer do
     skip "libvips here lacks the codec plugin to decode #{name}"
   end
 
-  it "returns a native (JPEG/PNG/WEBP) upload unchanged" do
-    file = upload("sample_image.png", "image/png")
-    expect(described_class.call(file)).to be(file)
+  it "optimises a native (JPEG/PNG/WEBP) upload into a JPEG master (no longer passed through)" do
+    result = described_class.call(upload("sample_image.png", "image/png"))
+
+    expect(result).to include(content_type: "image/jpeg", filename: "sample_image.jpg")
+    expect(jpeg?(result[:io].read)).to be(true)
+  end
+
+  it "down-scales an oversized photo to the master long-edge cap" do
+    bytes = vips_jpeg(3000, 2000) || skip("libvips unavailable")
+    attachable = { io: StringIO.new(bytes), filename: "huge.jpg", content_type: "image/jpeg" }
+
+    result = described_class.call(attachable)
+    out = result[:io].read
+
+    expect(jpeg?(out)).to be(true)
+    expect(dims(out).max).to eq(ImageNormalizer::MASTER_IMAGE_EDGE) # 3000 → 2048
+    expect(out.bytesize).to be < bytes.bytesize
+  end
+
+  it "does not up-scale an image already within the cap" do
+    bytes = vips_jpeg(120, 90) || skip("libvips unavailable")
+    attachable = { io: StringIO.new(bytes), filename: "small.jpg", content_type: "image/jpeg" }
+
+    out = described_class.call(attachable)[:io].read
+
+    expect(dims(out)).to eq([120, 90]) # unchanged, never enlarged
+  end
+
+  it "flattens a transparent (alpha) PNG to JPEG without error" do
+    bytes = vips_rgba_png(300, 300) || skip("libvips unavailable")
+    attachable = { io: StringIO.new(bytes), filename: "alpha.png", content_type: "image/png" }
+
+    out = described_class.call(attachable)[:io].read
+
+    expect(jpeg?(out)).to be(true)
   end
 
   it "transcodes a TIFF upload to a JPEG attachable" do
@@ -55,9 +112,10 @@ RSpec.describe ImageNormalizer do
   end
 
   it "sniffs the real type from the bytes, not the (mislabeled) declared type" do
-    # PNG bytes mislabeled as TIFF must still be treated as the native PNG.
-    file = upload("sample_image.png", "image/tiff")
-    expect(described_class.call(file)).to be(file)
+    # PNG bytes mislabeled as TIFF must still be decoded as the real PNG and
+    # optimised to a valid JPEG (not mangled by trusting the declared type).
+    result = described_class.call(upload("sample_image.png", "image/tiff"))
+    expect(jpeg?(result[:io].read)).to be(true)
   end
 
   it "ignores the MCP default type/filename (image/jpeg + capture.jpg) and transcodes by content" do
