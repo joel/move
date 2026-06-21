@@ -153,7 +153,7 @@ Extend `db/seeds.rb` so that after `bin/reset` a developer can sign in and **imm
 - **Production-guarded** — keep `return if Rails.env.production?` (`db:prepare` auto-seeds a fresh DB).
 - **Tenancy-aware** — provision the demo tenant via the tenant-creation action, `Apartment::Tenant.switch` for tenant-scoped records, and guard the demo to the base schema (`return unless Apartment::Tenant.current == "public"`).
 - **Loginable** — seeded sign-in accounts need a verified status; note the demo email + org subdomain in a comment.
-- **Verify** — run `bin/reset` twice (idempotency) and confirm the records render during Step 8 (`/product-review`).
+- **Verify** — run `bin/rails db:seed` twice **against the same database** (idempotency: `bin/reset` drops/recreates the DB, so re-running it can't catch non-idempotent seeds — it masks them), and confirm the records render during Step 8 (`/product-review`).
 
 ### Step 6: Pre-Commit Validation
 
