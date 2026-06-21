@@ -53,7 +53,7 @@ module Views
           div(class: "relative overflow-hidden rounded-card border border-card-border bg-surface-container-high") do
             badge
             if @media.image.attached?
-              img(src: view_context.rails_storage_proxy_path(@media.image),
+              img(src: view_context.rails_storage_proxy_path(@media.image.variant(:detail)),
                   class: "aspect-square w-full object-cover lg:aspect-auto lg:h-full", alt: "", loading: "lazy")
             else
               div(class: "flex aspect-square w-full items-center justify-center text-muted") do

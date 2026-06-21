@@ -29,7 +29,14 @@ class Media < ApplicationRecord
   belongs_to :box
   has_many :recognition_runs, dependent: :destroy
   has_many :recognition_suggestions, dependent: :destroy
-  has_one_attached :image
+  # The attachment is the optimised master (≤2048px JPEG, written by
+  # ImageNormalizer); display surfaces serve these sized variants off it rather
+  # than the master blob (Phase 42, #299). :thumb feeds the gallery grid + capture
+  # preview; :detail feeds the full-width viewers (item/review/recovery).
+  has_one_attached :image do |attachable|
+    attachable.variant :thumb,  resize_to_limit: [400, 400]
+    attachable.variant :detail, resize_to_limit: [1600, 1600]
+  end
 
   validates :media_type, inclusion: { in: MEDIA_TYPES }
   validates :captured_via, inclusion: { in: CAPTURED_VIA }

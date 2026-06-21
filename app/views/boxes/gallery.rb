@@ -111,7 +111,7 @@ module Views
       def image(media, hover: false)
         if media.image.attached?
           img(
-            src: view_context.rails_storage_proxy_path(media.image), alt: "", loading: "lazy",
+            src: view_context.rails_storage_proxy_path(media.image.variant(:thumb)), alt: "", loading: "lazy",
             class: "h-full w-full object-cover#{" transition group-hover:scale-105" if hover}"
           )
         else
