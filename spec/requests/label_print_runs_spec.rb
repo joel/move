@@ -85,11 +85,14 @@ RSpec.describe "Label Print Runs" do
       expect(response.body).to include(I18n.t("label_print.status.progress_label"))
     end
 
-    it "shows the Download link when the run is ready" do
+    it "shows a Turbo-bypassing Download link when the run is ready" do
       run = create(:label_print_run, :completed, move:)
       get move_label_print_run_path(move, run)
       expect(response.body).to include(I18n.t("label_print.status.download"))
       expect(response.body).to include(download_move_label_print_run_path(move, run))
+      # The PDF response isn't HTML, so the link must bypass Turbo Drive or the
+      # download is swallowed (the old form's gotcha, reintroduced on this link).
+      expect(response.body).to include('data-turbo="false"')
     end
 
     it "shows a Try again link when the run failed" do

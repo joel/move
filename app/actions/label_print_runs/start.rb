@@ -19,7 +19,9 @@ module LabelPrintRuns
       # set, not a re-query of the mutable range — so total_count, the MAX_LABELS
       # cap, and the rendered PDF always agree even if boxes are added/deleted/
       # renumbered while the job waits in the queue (mirrors IndexingRuns::Start).
-      box_ids = move.boxes.in_number_range(from, to).ids
+      # LIMIT MAX+1 bounds the load: an over-cap range fetches one extra id and is
+      # rejected, never materializing every id of an intentionally broad range.
+      box_ids = move.boxes.in_number_range(from, to).limit(LabelPrintRun::MAX_LABELS + 1).ids
       return Failure(:empty) if box_ids.empty?
       return Failure(:too_many) if box_ids.size > LabelPrintRun::MAX_LABELS
 

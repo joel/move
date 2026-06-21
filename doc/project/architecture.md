@@ -237,6 +237,47 @@ flowchart LR
   S3 --> V["move bucket"]
 ```
 
+### 4a. Label print: async generation with live progress (#303)
+
+Bulk label generation never blocks the request. The form POSTs a run, the user is
+redirected to a progress page, and a background job renders the PDF box-by-box,
+pushing progress over a per-run Turbo Stream (no polling — the #239 pattern). The
+QR scan URLs need the request host, which the controller passes to the job (a job
+has no request of its own). The finished PDF is an Active Storage attachment served
+behind a `data-turbo="false"` Download link (Turbo Drive would otherwise swallow the
+non-HTML response).
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant C as LabelPrintRunsController
+  participant S as LabelPrintRuns::Start
+  participant Q as Solid Queue
+  participant J as GenerateJob
+  participant R as RecordProgress
+  participant Ch as Turbo::StreamsChannel
+  B->>C: POST label_print/runs (from,to)
+  C->>S: call(from,to, host, protocol)
+  S->>S: snapshot box_ids (SQL, LIMIT MAX+1) → validate empty/too_many
+  S->>Q: GenerateJob.perform_later(run, tenant, host, protocol, box_ids)
+  C-->>B: 302 → run page (turbo_stream_from run:progress)
+  J->>J: switch tenant; render BoxLabelsPdf box-by-box
+  loop every ~total/20 boxes
+    J->>R: completed = done
+    R->>Ch: broadcast_replace_to(run,:progress) LabelPrintStatus
+    Ch-->>B: Turbo Stream → bar advances (no reload)
+  end
+  J->>J: attach PDF; status=completed
+  J->>Ch: final broadcast → "Download" replaces the bar
+  Ch-->>B: Turbo Stream → Download link
+  B->>C: GET …/download (data-turbo=false → native)
+  C-->>B: 200 application/pdf (attachment)
+```
+
+A `GenerateJob` failure marks the run `failed` and broadcasts that state (a "Try
+again" link), then re-raises; a retry no-ops because the run is no longer in
+progress. `PurgeStaleLabelPrintRunsJob` reaps day-old run PDFs per tenant.
+
 ---
 
 ## 5. Why this shape (the two forks we evaluated)

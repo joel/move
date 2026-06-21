@@ -46,8 +46,13 @@ module Components
           render Components::Icons::Check.new(css: "h-4 w-4")
           plain t("ready_title")
         end
+        # data-turbo=false: the download returns a PDF (not HTML), and Turbo Drive
+        # would intercept the same-origin link and fetch it in the background instead
+        # of letting the browser save it. "false" as a string — Phlex omits
+        # boolean-false attributes (see app/components agent notes).
         render Components::Ui::Button.new(
-          label: t("download"), href: download_move_label_print_run_path(@run.move, @run)
+          label: t("download"), href: download_move_label_print_run_path(@run.move, @run),
+          data: { turbo: "false" }
         )
       end
 
