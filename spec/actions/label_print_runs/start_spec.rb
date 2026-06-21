@@ -34,6 +34,16 @@ RSpec.describe LabelPrintRuns::Start do
     expect(result.value!.total_count).to eq(3)
   end
 
+  it "snapshots the Move's labels_per_box as the job's copies (Phase 45)" do
+    seed_boxes(1, 2)
+    move.update!(labels_per_box: 4)
+
+    described_class.new.call(**args)
+
+    expect(LabelPrintRuns::GenerateJob).to have_received(:perform_later)
+      .with(anything, hash_including(copies: 4))
+  end
+
   it "fails :invalid_range when from > to or a bound is missing" do
     expect(described_class.new.call(**args, from: 5, to: 2).failure).to eq(:invalid_range)
     expect(described_class.new.call(**args, from: nil).failure).to eq(:invalid_range)

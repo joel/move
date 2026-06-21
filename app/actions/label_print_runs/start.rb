@@ -29,8 +29,11 @@ module LabelPrintRuns
         from_number: from, to_number: to, total_count: box_ids.size,
         status: "processing", started_at: Time.current
       )
+      # Snapshot labels_per_box at click time (like box_ids/host) so a Settings
+      # change while the job waits in the queue can't alter the in-flight PDF (#303).
       GenerateJob.perform_later(
-        run.id, tenant: Apartment::Tenant.current, host: host, protocol: protocol, box_ids: box_ids
+        run.id, tenant: Apartment::Tenant.current, host: host, protocol: protocol,
+                box_ids: box_ids, copies: move.labels_per_box
       )
       Success(run)
     end
