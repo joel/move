@@ -71,6 +71,10 @@ class Box < ApplicationRecord
   validates :description, length: { maximum: DESCRIPTION_MAX_LENGTH }, allow_blank: true
 
   scope :ordered, -> { order(Arel.sql("number::bigint")) }
+  # Boxes whose numeric label falls in [from, to], in print order. The DB compares
+  # number::bigint (the column is a string), so the range is numeric, not lexical
+  # — shared by the label-print form, action, and the generation job (#303).
+  scope :in_number_range, ->(from, to) { where("number::bigint BETWEEN ? AND ?", from, to).ordered }
 
   # Distinct complete L×W×H sizes already used in this (Move-scoped) relation, so
   # the Add Box form can offer one-tap reuse instead of re-typing — the point is to
