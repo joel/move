@@ -247,6 +247,16 @@ has no request of its own). The finished PDF is an Active Storage attachment ser
 behind a `data-turbo="false"` Download link (Turbo Drive would otherwise swallow the
 non-HTML response).
 
+**Copies per box are a per-Move setting (Phase 45).** `moves.labels_per_box` (1–10,
+default **2** = lid + side) controls how many identical pages each box gets.
+`BoxLabelsPdf` takes a `copies:` arg (default `DEFAULT_COPIES = 2`, so a bare call is
+unchanged); both print paths pass the Move's value — the single-box `LabelsController`
+inline, and the bulk `LabelPrintRuns::Start` **snapshots it as a `GenerateJob`
+argument** at click time (like `box_ids`), so a Settings change while the job is
+queued can't alter the in-flight PDF. Total pages = boxes × copies; the `MAX_LABELS`
+guard stays a **box-count** cap (worst case 200 × 10 = 2000 pages). The setting is
+edited in Settings → Move Preferences via `Moves::SetLabelsPerBox`.
+
 ```mermaid
 sequenceDiagram
   participant B as Browser
