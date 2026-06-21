@@ -165,6 +165,17 @@ bundle exec rake
 
 If the project splits them out (e.g. fix-lint, lint, tests, system-tests tasks), run each in turn. Confirm the task names against the project's Rakefile rather than assuming they exist.
 
+> **`:js`/system specs needing a real browser CANNOT be validated in the dev app
+> container — chromedriver is absent there.** Such specs run in real Chrome even
+> under `TEST_BROWSER=rack_test` (see agent memory), so in the dev container they
+> fail with `Selenium::WebDriver::Error::WebDriverError: ... 127.0.0.1:9515:
+> Connection refused`. **Treat that error as environmental (CI-only), not a code
+> regression** — don't burn cycles "fixing" it locally. Run the non-`:js` system
+> specs locally (they pass under `rack_test`), and rely on the CI `test` job (which
+> provisions Chrome) for the `:js` ones. Confirm CI green on HEAD before merge
+> (Step 10b). If a `:js`-covered surface is central to the change, live-verify it
+> instead via `/product-review` (real browser through `agent-browser`).
+
 ### Step 7: Commit (Atomic Commits Required)
 
 **NEVER bundle all changes into a single giant commit.** Each commit must be:
