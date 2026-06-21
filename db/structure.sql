@@ -1031,7 +1031,9 @@ CREATE TABLE public.media (
     discarded_at timestamp(6) without time zone,
     discard_batch_id uuid,
     discarded_by_parent_type character varying,
-    discarded_by_parent_id uuid
+    discarded_by_parent_id uuid,
+    optimized_at timestamp(6) without time zone,
+    original_byte_size bigint
 );
 
 
@@ -2414,6 +2416,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260621120000'),
 ('20260619072859'),
 ('20260617130000'),
 ('20260617120000'),

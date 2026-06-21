@@ -76,4 +76,15 @@ RSpec.describe Media do
       end
     end
   end
+
+  describe "image variants (Phase 42)" do
+    it "exposes :thumb and :detail variants off the master attachment" do
+      media = create(:media)
+
+      expect(media.image.variant(:thumb).variation.transformations)
+        .to include(resize_to_limit: [400, 400])
+      expect(media.image.variant(:detail).variation.transformations)
+        .to include(resize_to_limit: [1600, 1600])
+    end
+  end
 end

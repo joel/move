@@ -79,7 +79,7 @@ module Views
       def media_image
         if @item.source_media&.image&.attached?
           img(
-            src: view_context.rails_storage_proxy_path(@item.source_media.image),
+            src: view_context.rails_storage_proxy_path(@item.source_media.image.variant(:detail)),
             class: "aspect-square w-full object-cover", alt: "", loading: "lazy"
           )
         else

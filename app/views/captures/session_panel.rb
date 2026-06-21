@@ -99,7 +99,7 @@ module Views
                    "rounded-lg bg-surface-container-high text-muted") do
           if media.image.attached?
             img(
-              src: view_context.rails_storage_proxy_path(media.image),
+              src: view_context.rails_storage_proxy_path(media.image.variant(:thumb)),
               class: "h-full w-full object-cover", alt: "", loading: "lazy"
             )
           else

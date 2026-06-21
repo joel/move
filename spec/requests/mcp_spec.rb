@@ -301,7 +301,9 @@ RSpec.describe "MCP endpoint" do
         media = box.media.order(:created_at).last
         expect(media).to be_present
         expect(media.captured_via).to eq("mcp")
-        expect(media.image.content_type).to eq("image/png")
+        # Phase 42: every upload is optimised to a JPEG master, so even a native
+        # PNG is stored as image/jpeg (not passed through unchanged).
+        expect(media.image.content_type).to eq("image/jpeg")
       end
 
       it "transcodes a non-native uploaded blob (TIFF) to JPEG on attach" do
