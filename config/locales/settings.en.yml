@@ -14,6 +14,10 @@ en:
         units: "Measurement Units"
         metric: "Metric"
         imperial: "Imperial"
+        labels_per_box: "Labels per box"
+        labels_per_box_caption: >-
+          How many copies of each box's label to print — for example, one for the
+          lid and one for a side. Applies to single and bulk label printing.
       ai_capability:
         title: "AI Capability"
         subtitle: >-
@@ -91,6 +95,10 @@ en:
     update_auto_confirm_threshold:
       threshold_changed: "Auto-confirm threshold updated."
       threshold_invalid: "Choose a confidence between 0 and 1."
+      read_only: "This move is archived and can't be changed."
+    update_labels_per_box:
+      labels_per_box_changed: "Labels per box updated."
+      labels_per_box_invalid: "Choose between 1 and 10 labels per box."
       read_only: "This move is archived and can't be changed."
     update_provider_key:
       key_saved: "API key saved."
