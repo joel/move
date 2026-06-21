@@ -16,3 +16,6 @@ production:
   purge_abandoned_uploads:
     class: PurgeAbandonedUploadsJob
     schedule: every day at 4am
+  purge_stale_label_print_runs:
+    class: PurgeStaleLabelPrintRunsJob
+    schedule: every day at 4am
