@@ -22,7 +22,7 @@ RSpec.describe "Menu hub" do
       expect(response.body).to include(move_settings_path(move))
     end
 
-    it "hides the admin-only Members link for a contributor" do
+    it "hides the admin-only Members link for a contributor but shows Bulk box steps" do
       contributor = create(:user)
       create(:move_membership, move:, user: contributor, role: "contributor")
       stub_current_user(contributor)
@@ -31,6 +31,19 @@ RSpec.describe "Menu hub" do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).not_to include(move_members_path(move))
+      # A contributor is an editor → the editor-only Bulk box steps link is shown.
+      expect(response.body).to include(move_box_steps_path(move))
+    end
+
+    it "hides the editor-only Bulk box steps link for a viewer" do
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+
+      get move_menu_path(move)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include(move_box_steps_path(move))
     end
 
     it "404s a non-member non-disclosingly" do

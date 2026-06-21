@@ -278,6 +278,25 @@ A `GenerateJob` failure marks the run `failed` and broadcasts that state (a "Try
 again" link), then re-raises; a retry no-ops because the run is no longer in
 progress. `PurgeStaleLabelPrintRunsJob` reaps day-old run PDFs per tenant.
 
+### 4b. Bulk box lifecycle steps (Phase 44)
+
+`BoxStepsController` (editor-only, Menu-reached) advances **every** box in a source
+state through one forward lifecycle edge in a single click — "Seal all packing
+boxes", "Send all sealed boxes in transit", "Start unpacking all", "Mark all
+unpacked". It is a synchronous PRG redirect (no job/cable): a status change is a
+cheap UPDATE and the only fan-out (one activity row per box) is bounded sync inserts.
+
+`Boxes::BulkTransition` **reuses `Boxes::TransitionStatus` per box** rather than
+hand-rolling an `UPDATE` — so the seal-requires-room guard, the `unpacked → items
+removed` cascade, and the `box.status_changed` event are preserved for every box
+with zero duplication (the feed gets N per-box rows). The forward steps are a
+curated subset of `Box::TRANSITIONS` (`BulkTransition::STEPS`); backward edges
+(unseal/reopen) stay corrective and per-box. It is **best-effort partial**: a
+roomless box can't be sealed (`:room_required`), so the bulk transitions every box
+it can and reports the skipped numbers + reason rather than failing the batch. All
+counts/filtering are SQL — `move.boxes.group(:status).count` for the distribution,
+`where(status:)` for the source set (AGENTS.md §1 #5). No schema change.
+
 ---
 
 ## 5. Why this shape (the two forks we evaluated)

@@ -12,9 +12,10 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::Routes
 
-      def initialize(move:, admin:)
+      def initialize(move:, admin:, editor:)
         @move = move
         @admin = admin
+        @editor = editor
       end
 
       def view_template
@@ -40,6 +41,7 @@ module Views
         ]
         links << [I18n.t("menu.show.members"), Components::Icons::Users, move_members_path(@move)] if @admin
         links << [I18n.t("menu.show.summary"), Components::Icons::Chart, move_summary_path(@move)]
+        links << [I18n.t("menu.show.box_steps"), Components::Icons::Bolt, move_box_steps_path(@move)] if @editor
         links << [I18n.t("menu.show.label_print"), Components::Icons::Tag, move_label_print_path(@move)]
         links
       end

@@ -102,6 +102,12 @@ Rails.application.routes.draw do
     # only, never archived; theme is a client preference). Integration tokens are
     # the per-Move MCP credentials (admin-only create/revoke).
     get "menu", to: "menu#show", as: :menu
+    # Phase 44 — Bulk box lifecycle steps. Reached from the Menu (editor-only).
+    # `show` lists the state distribution + a confirm-guarded button per available
+    # forward step; `create` advances every box in one source state through the
+    # requested step (Boxes::BulkTransition, reusing the per-box TransitionStatus).
+    get "box_steps", to: "box_steps#show", as: :box_steps
+    post "box_steps", to: "box_steps#create"
     # E1 — Label Print: pick a box-number range (e.g. 2–5) and print all those
     # exterior labels in one PDF (2 pages per box). Reached from the Menu. The form
     # POSTs a run; the PDF is rendered in a background job with a live progress bar

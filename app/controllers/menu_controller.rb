@@ -15,7 +15,12 @@ class MenuController < MoveScopedController
 
     render Views::Menu::Show.new(
       move: @move,
-      admin: allowed_to?(:manage_members?, @move, with: MovePolicy)
+      admin: allowed_to?(:manage_members?, @move, with: MovePolicy),
+      # Bulk box steps is an editor-only surface, so the link is hidden for
+      # viewers (and the controller still enforces it) — no dead-end 403. An
+      # editor on an archived Move still sees it and gets the friendly read-only
+      # redirect, consistent with the other editor surfaces.
+      editor: allowed_to?(:edit_contents?, @move, with: MovePolicy)
     )
   end
 end

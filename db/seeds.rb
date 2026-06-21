@@ -139,7 +139,10 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
 
   # number => attributes. Covers every lifecycle state (packing/sealed/
   # in_transit/unpacking/unpacked), boxes with full / partial / no dimensions,
-  # and a roomless box (to demo the seal-requires-room guard). Sizes repeat on
+  # and a roomless box (to demo the seal-requires-room guard). This same spread
+  # exercises the Menu's "Bulk box steps" surface (Phase 44): each forward step
+  # has a non-empty source state, and the roomless box 6 is reported as skipped
+  # by "Seal all packing boxes". Sizes repeat on
   # purpose so the Add Box form's "Reuse dimensions" chips have something to
   # offer: 40×30×25 appears 3× (a stack of identical boxes) and 60×40×40 twice.
   # `desc` exercises the contents-description surface: sealed boxes carry one
