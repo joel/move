@@ -140,22 +140,20 @@ Branch naming: `feature/*` for features, `fix/*` for bugs, `docs/*` for document
 
 ### Step 5: Implement Changes
 
-Write code, following project conventions. If your Ruby version manager needs activation (rbenv/mise/etc.), prefix Ruby commands accordingly.
-
-**For any UI work** (new views, components, forms, layouts, styling changes), use the `/ui-designer` skill. It provides access to the Tailwind CSS reference library and ensures consistency with the project design system (the `ha-*` CSS design-token system). Always check the library before building new components from scratch.
+Write code, following project conventions. If your Ruby version manager needs activation (rv/mise/etc.), prefix Ruby commands accordingly.
 
 **Live updates → ActionCable, never JS polling.** To reflect server-side progress or state in the UI, push it over ActionCable / turbo-rails Turbo Stream broadcasting — `setInterval`+`fetch`, Stimulus pollers, and refresh meta tags are **forbidden**. See `AGENTS.md` §1 convention #4 (signed stream from a tenant-unique record; subscriber re-renders via `ApplicationController.render(view, layout: false)` + `Turbo::StreamsChannel.broadcast_replace_to`; wrap the broadcast in a `rescue` so it can't fail the emitting action). Reference impls: #239 (indexing progress), #241 (capture panel).
 
 ### Step 5b: Seed data (Mandatory for any new user-facing surface)
 
-Extend `db/seeds.rb` so that after `bin/rails db:seed` a developer can sign in and **immediately showcase and play with** the surface this phase adds — no manual record-building. See the project's `AGENTS.md` §8 for the full rule. In short:
+Extend `db/seeds.rb` so that after `bin/reset` a developer can sign in and **immediately showcase and play with** the surface this phase adds — no manual record-building. See the project's `AGENTS.md` §8 for the full rule. In short:
 
 - **Comprehensive states** — seed records across the meaningful states the surface renders (lifecycle states, with/without optional data, an empty case).
 - **Idempotent** — `find_or_create_by` keyed on a natural attribute; re-running never duplicates.
 - **Production-guarded** — keep `return if Rails.env.production?` (`db:prepare` auto-seeds a fresh DB).
 - **Tenancy-aware** — provision the demo tenant via the tenant-creation action, `Apartment::Tenant.switch` for tenant-scoped records, and guard the demo to the base schema (`return unless Apartment::Tenant.current == "public"`).
 - **Loginable** — seeded sign-in accounts need a verified status; note the demo email + org subdomain in a comment.
-- **Verify** — run `bin/rails db:seed` twice (idempotency) and confirm the records render during Step 8 (`/product-review`).
+- **Verify** — run `bin/reset` twice (idempotency) and confirm the records render during Step 8 (`/product-review`).
 
 ### Step 6: Pre-Commit Validation
 
@@ -248,6 +246,9 @@ before pushing (see the project's `AGENTS.md` §7):
   author/regenerate the scene; otherwise hand-author the `.excalidraw` JSON.
 - Commit docs atomically (markdown-only commits are path-ignored by CI). Record
   hard-won gotchas in agent memory too.
+- In specific directory like: `app/actions/README.md` or `app/views/README.md`, add a **per-directory README** with a short
+  summary of the directory's purpose, its key files, and any gotchas. This is
+  especially important for directories that are not obvious from their name.
 
 > **Don't leave a docs-only commit as the PR tip.** Branch protection requires the
 > `lint`/`test` checks **on the HEAD sha**, but CI path-ignores `**/*.md`/`doc/**`/
