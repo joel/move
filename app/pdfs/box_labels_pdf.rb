@@ -41,6 +41,9 @@ class BoxLabelsPdf
   end
 
   # Returns the rendered PDF as a binary string (PAGE_COUNT pages per entry).
+  # If a block is given it is yielded `(done, total)` after each box's pages are
+  # laid out, so a caller (LabelPrintRuns::GenerateJob, #303) can report live
+  # generation progress. The single-box BoxLabelPdf calls this without a block.
   def render
     doc = Prawn::Document.new(
       page_size: [mm2pt(LABEL_WIDTH_MM), mm2pt(LABEL_LENGTH_MM)], margin: MARGIN
@@ -50,12 +53,14 @@ class BoxLabelsPdf
     # Prawn::Document already opens the first page; every subsequent label page is
     # an explicit start_new_page.
     first = true
-    @entries.each do |entry|
+    total = @entries.size
+    @entries.each_with_index do |entry, index|
       PAGE_COUNT.times do
         doc.start_new_page unless first
         first = false
         label_content(doc, entry[:box], entry[:scan_url])
       end
+      yield(index + 1, total) if block_given?
     end
 
     doc.render

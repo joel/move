@@ -389,6 +389,33 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   seed_removal_photo.call(move.boxes.find_by(number: "7"), "Bedside shelf",
                           [["Phone Charger", "removed"], ["Paperback", "removed"]])
 
+  # --- Phase 43: a completed bulk label-print run so the E1 progress/download page
+  # is showcase-ready without generating live (the form starts a fresh run). The PDF
+  # is rendered from boxes 1–3 against this org's subdomain so the QR codes resolve.
+  label_range = move.boxes.in_number_range(1, 3).includes(:room)
+  if label_range.exists?
+    label_run = move.label_print_runs.find_or_create_by!(from_number: 1, to_number: 3) do |r|
+      r.total_count = label_range.count
+      r.completed_count = r.total_count
+      r.status = "completed"
+      r.started_at = 1.minute.ago
+      r.finished_at = Time.current
+    end
+    unless label_run.document.attached?
+      label_host = "#{Apartment::Tenant.current}.#{Rails.application.config.x.tenant_zone}"
+      label_entries = label_range.map do |box|
+        { box: box,
+          scan_url: Rails.application.routes.url_helpers.move_scan_resolve_url(
+            move, box.qr_token, host: label_host, protocol: "https"
+          ) }
+      end
+      label_run.document.attach(
+        io: StringIO.new(BoxLabelsPdf.new(entries: label_entries).render),
+        filename: "boxes-001-003-labels.pdf", content_type: "application/pdf"
+      )
+    end
+  end
+
   # --- D9: an archived Move with a sealed box so the E2 *archived* scan state is
   # showcase-ready (read-only resolve). Scan demo: open /moves/<this move>/scan and
   # enter the box code "demo-archived-box", or scan box #1 of the active Move's

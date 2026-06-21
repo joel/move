@@ -2,6 +2,8 @@
 
 require "rails_helper"
 
+# The range-picker form. Submitting it POSTs a run — that async flow (create / show /
+# download / validation) lives in spec/requests/label_print_runs_spec.rb.
 RSpec.describe "Label Prints" do
   let(:user) { create(:user) }
   let(:move) { create(:move, created_by: user) } # creator → member
@@ -15,11 +17,12 @@ RSpec.describe "Label Prints" do
   end
 
   describe "GET /moves/:move_id/label_print" do
-    it "renders the range form" do
+    it "renders the range form posting to the runs endpoint" do
       get move_label_print_path(move)
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(I18n.t("label_print.submit"))
+      expect(response.body).to include(move_label_print_runs_path(move))
     end
 
     it "404s a non-member non-disclosingly" do
@@ -37,57 +40,6 @@ RSpec.describe "Label Prints" do
 
       # Numeric max is 10 — a string compare would pick "9"/"5" and drop box 10.
       expect(response.body).to include(I18n.t("label_print.range_hint", min: 1, max: 10, count: 5))
-    end
-  end
-
-  describe "GET /moves/:move_id/label_print/labels" do
-    it "serves an inline PDF with 2 pages per box in the range" do
-      # 2..5 spans boxes 2, 3, 5 (4 is absent) → 3 boxes × 2 pages.
-      get move_label_print_labels_path(move, from: 2, to: 5)
-
-      expect(response).to have_http_status(:ok)
-      expect(response.media_type).to eq("application/pdf")
-      expect(response.headers["Content-Disposition"])
-        .to include("inline").and include("boxes-002-005-labels.pdf")
-      expect(response.body[0, 4]).to eq("%PDF")
-      expect(response.body).to include("/Count 6")
-    end
-
-    it "rejects from > to with a validation message" do
-      get move_label_print_labels_path(move, from: 5, to: 2)
-
-      expect(response).to have_http_status(:unprocessable_content)
-      expect(response.body).to include(I18n.t("label_print.errors.invalid_range"))
-    end
-
-    it "rejects a non-numeric bound" do
-      get move_label_print_labels_path(move, from: "abc", to: 5)
-
-      expect(response).to have_http_status(:unprocessable_content)
-      expect(response.body).to include(I18n.t("label_print.errors.invalid_range"))
-    end
-
-    it "rejects a bound above the bigint range instead of 500ing" do
-      get move_label_print_labels_path(move, from: 1, to: "#{Box::MAX_NUMBER}0")
-
-      expect(response).to have_http_status(:unprocessable_content)
-      expect(response.body).to include(I18n.t("label_print.errors.invalid_range"))
-    end
-
-    it "shows an empty-range message when no boxes match" do
-      get move_label_print_labels_path(move, from: 90, to: 99)
-
-      expect(response).to have_http_status(:unprocessable_content)
-      expect(response.body).to include(I18n.t("label_print.errors.empty"))
-    end
-
-    it "rejects a range over the safety cap" do
-      stub_const("LabelPrintsController::MAX_LABELS", 2)
-
-      get move_label_print_labels_path(move, from: 1, to: 5) # 4 boxes > cap 2
-
-      expect(response).to have_http_status(:unprocessable_content)
-      expect(response.body).to include(I18n.t("label_print.errors.too_many", max: 2))
     end
   end
 end

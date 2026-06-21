@@ -213,6 +213,7 @@ admin. New-user email invitations are deferred.
 | File storage | `config/storage.yml`, `config/deploy.yml`, `bin/cli-files/storage-cmd/storage_service.rb` | Active Storage; dev/test = Disk, prod = the **shared host-wide SeaweedFS S3** gateway (also used by sibling apps) via move's own `move` bucket (`STORAGE_ENDPOINT=http://seaweedfs:8333`, `force_path_style`). Local `bin/cli storage start` exposes the SeaweedFS Web UI at `https://storage.workeverywhere.docker` (filer `:8888`) and the app bucket at `https://bucket.workeverywhere.docker` (S3 `:8333` with `/move` prefixed). Images served through **proxy URLs** (internal endpoint never exposed). Media tables are per-tenant (not Apartment-excluded) |
 | Image optimisation | `app/services/image_normalizer.rb`, `app/models/media.rb`, `lib/tasks/images.rake` (#299) | Every upload (web + MCP, one choke point) is decoded, auto-rotated, down-scaled to a **≤2048px JPEG master** (`MASTER_IMAGE_EDGE`, Q85, EXIF/GPS stripped, alpha flattened) before attach — the phone original is **never stored**. Display surfaces serve sized named variants (`Media#image` `:thumb` 400px / `:detail` 1600px), not the master. `media.optimized_at`/`original_byte_size` track the backfill; `images:optimize` re-encodes pre-existing blobs across all tenants (idempotent) and reclaims storage. Recognition is unaffected — it re-downscales to 1536px itself |
 | Background jobs | `config/queue.yml`, `app/jobs/*` | Solid Queue: async (dev), `:inline` (test), in-Puma (prod, `SOLID_QUEUE_IN_PUMA`). Jobs restore the Apartment tenant from args (`Current` is never carried across the enqueue boundary) |
+| Label print (async) | `app/models/label_print_run.rb`, `app/actions/label_print_runs/*`, `app/jobs/label_print_runs/generate_job.rb` (#303) | Bulk label generation is a background job with a **live progress bar** over ActionCable/Turbo Streams (same no-polling pattern as the indexing bar, #239), not a synchronous request-blocking render. `LabelPrintRuns::Start` SQL-counts the box range and enqueues; `GenerateJob` builds `BoxLabelsPdf` box-by-box, reporting progress via `RecordProgress` (atomic SQL set + rescued `broadcast_replace_to(run, :progress)`), attaches the PDF to the run, and the run page (`turbo_stream_from(@run, :progress)`) flips to a Download. QR scan URLs use the request `host`/`protocol` passed at enqueue (a job has no request). `PurgeStaleLabelPrintRunsJob` reaps old run PDFs daily, per tenant |
 | Recognition | `app/services/recognition_providers/*` | Provider-agnostic adapter interface (`fake`/`openai`/`anthropic` via `RECOGNITION_PROVIDER`); normalized `label/confidence/count` only — no raw vendor data or bounding boxes. Vendor adapters POST via shared `provider_http.rb`, which raises on non-2xx so a rate-limited/unauthorized call fails the run loudly instead of a phantom empty `succeeded`. Enabling openai in prod: [`ai-providers.md`](ai-providers.md) |
 | Deterministic dump | `config/initializers/structure_sql.rb` | exclude tenant schemas + normalize search_path |
 | Per-env tenancy | `config/environments/*.rb` | `tenant_zone`, `cookie_domain`, `config.hosts` |
@@ -235,6 +236,47 @@ flowchart LR
   T -->|"move-bucket + addPrefix /move"| S3["SeaweedFS S3 gateway<br/>:8333"]
   S3 --> V["move bucket"]
 ```
+
+### 4a. Label print: async generation with live progress (#303)
+
+Bulk label generation never blocks the request. The form POSTs a run, the user is
+redirected to a progress page, and a background job renders the PDF box-by-box,
+pushing progress over a per-run Turbo Stream (no polling — the #239 pattern). The
+QR scan URLs need the request host, which the controller passes to the job (a job
+has no request of its own). The finished PDF is an Active Storage attachment served
+behind a `data-turbo="false"` Download link (Turbo Drive would otherwise swallow the
+non-HTML response).
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant C as LabelPrintRunsController
+  participant S as LabelPrintRuns::Start
+  participant Q as Solid Queue
+  participant J as GenerateJob
+  participant R as RecordProgress
+  participant Ch as Turbo::StreamsChannel
+  B->>C: POST label_print/runs (from,to)
+  C->>S: call(from,to, host, protocol)
+  S->>S: snapshot box_ids (SQL, LIMIT MAX+1) → validate empty/too_many
+  S->>Q: GenerateJob.perform_later(run, tenant, host, protocol, box_ids)
+  C-->>B: 302 → run page (turbo_stream_from run:progress)
+  J->>J: switch tenant; render BoxLabelsPdf box-by-box
+  loop every ~total/20 boxes
+    J->>R: completed = done
+    R->>Ch: broadcast_replace_to(run,:progress) LabelPrintStatus
+    Ch-->>B: Turbo Stream → bar advances (no reload)
+  end
+  J->>J: attach PDF; status=completed
+  J->>Ch: final broadcast → "Download" replaces the bar
+  Ch-->>B: Turbo Stream → Download link
+  B->>C: GET …/download (data-turbo=false → native)
+  C-->>B: 200 application/pdf (attachment)
+```
+
+A `GenerateJob` failure marks the run `failed` and broadcasts that state (a "Try
+again" link), then re-raises; a retry no-ops because the run is no longer in
+progress. `PurgeStaleLabelPrintRunsJob` reaps day-old run PDFs per tenant.
 
 ---
 

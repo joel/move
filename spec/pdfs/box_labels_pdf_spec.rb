@@ -27,6 +27,15 @@ RSpec.describe BoxLabelsPdf do
     expect(pdf).to include("/Count 2")
   end
 
+  it "yields (done, total) once per box for progress reporting (#303)" do
+    boxes = [1, 2, 3].map { |n| create(:box, move:, number: n.to_s, qr_token: "t#{n}", room: create(:room, move:)) }
+    progress = []
+
+    described_class.new(entries: boxes.map { |b| entry(b) }).render { |done, total| progress << [done, total] }
+
+    expect(progress).to eq([[1, 3], [2, 3], [3, 3]])
+  end
+
   it "sizes each page to the 62×90mm continuous-tape label" do
     box = create(:box, move:, number: "9", qr_token: "tok-size", room: create(:room, move:))
     pdf = described_class.new(entries: [entry(box)]).render

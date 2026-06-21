@@ -49,6 +49,8 @@ class Move < ApplicationRecord
   has_many :integration_tokens, class_name: "MoveIntegrationToken", dependent: :destroy
   # G1 — append-only activity feed entries (Technical Foundation §8.2).
   has_many :activities, dependent: :destroy
+  # E1 — bulk label-print generation passes, for live progress + download (#303).
+  has_many :label_print_runs, dependent: :destroy
 
   validates :name, presence: true
   validates :status, inclusion: { in: STATUSES }

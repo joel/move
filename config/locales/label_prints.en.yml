@@ -13,3 +13,14 @@ en:
       invalid_range: "Enter a valid range — the first box number must be less than or equal to the last."
       empty: "No boxes found in that range."
       too_many: "Too many labels at once (max %{max}). Narrow the range."
+    run:
+      title: "Generating labels"
+      subtitle: "Boxes %{from}–%{to} · %{count} labels"
+      back: "Back to Print Labels"
+    status:
+      progress_label: "Generating"
+      in_progress: "Generating %{done} of %{total} labels…"
+      ready_title: "Your labels are ready."
+      download: "Download PDF"
+      failed_title: "Label generation failed."
+      retry: "Try again"

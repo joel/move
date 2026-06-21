@@ -1016,6 +1016,25 @@ CREATE TABLE public.items (
 
 
 --
+-- Name: label_print_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.label_print_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    from_number bigint NOT NULL,
+    to_number bigint NOT NULL,
+    total_count integer DEFAULT 0 NOT NULL,
+    completed_count integer DEFAULT 0 NOT NULL,
+    status character varying DEFAULT 'queued'::character varying NOT NULL,
+    started_at timestamp(6) without time zone,
+    finished_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: media; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1392,6 +1411,14 @@ ALTER TABLE ONLY public.item_tags
 
 ALTER TABLE ONLY public.items
     ADD CONSTRAINT items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: label_print_runs label_print_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.label_print_runs
+    ADD CONSTRAINT label_print_runs_pkey PRIMARY KEY (id);
 
 
 --
@@ -1788,6 +1815,20 @@ CREATE INDEX index_items_on_review_state ON public.items USING btree (review_sta
 --
 
 CREATE INDEX index_items_on_source_media_id ON public.items USING btree (source_media_id);
+
+
+--
+-- Name: index_label_print_runs_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_label_print_runs_on_move_id ON public.label_print_runs USING btree (move_id);
+
+
+--
+-- Name: index_label_print_runs_on_move_id_and_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_label_print_runs_on_move_id_and_status ON public.label_print_runs USING btree (move_id, status);
 
 
 --
@@ -2202,6 +2243,14 @@ ALTER TABLE ONLY public.items
 
 
 --
+-- Name: label_print_runs fk_rails_4324e4d4b8; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.label_print_runs
+    ADD CONSTRAINT fk_rails_4324e4d4b8 FOREIGN KEY (move_id) REFERENCES public.moves(id);
+
+
+--
 -- Name: activities fk_rails_4378dca565; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2416,6 +2465,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260621140000'),
 ('20260621120000'),
 ('20260619072859'),
 ('20260617130000'),
