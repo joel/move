@@ -33,6 +33,21 @@ RSpec.describe Move do
     it "rejects unknown embedding providers (#232)" do
       expect(build(:move, embedding_provider: "word2vec")).not_to be_valid
     end
+
+    it "defaults labels_per_box to 2 (Phase 45)" do
+      expect(create(:move).labels_per_box).to eq(2)
+    end
+
+    it "accepts labels_per_box across the 1..10 range" do
+      expect(build(:move, labels_per_box: 1)).to be_valid
+      expect(build(:move, labels_per_box: 10)).to be_valid
+    end
+
+    it "rejects an out-of-range or non-integer labels_per_box" do
+      expect(build(:move, labels_per_box: 0)).not_to be_valid
+      expect(build(:move, labels_per_box: 11)).not_to be_valid
+      expect(build(:move, labels_per_box: 2.5)).not_to be_valid
+    end
   end
 
   describe "#embedding_provider_ready? (#232/#237)" do

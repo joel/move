@@ -23,6 +23,9 @@ class Move < ApplicationRecord
   # key — Anthropic has no embeddings API, so Anthropic stays recognition-only).
   EMBEDDING_PROVIDERS = %w[fake openai gemini voyage].freeze
   REAL_EMBEDDING_PROVIDERS = (EMBEDDING_PROVIDERS - %w[fake]).freeze
+  # How many identical exterior labels print per box (E1 / #303). 1..10; the
+  # default of 2 (lid + side) preserves the prior fixed BoxLabelsPdf behaviour.
+  LABELS_PER_BOX_RANGE = (1..10)
   # Every provider that holds an encrypted key — the union of the real recognition
   # and embedding providers. The shared "AI Capability" panel manages exactly these
   # (#242); a key entered once powers whichever features list that provider.
@@ -57,6 +60,10 @@ class Move < ApplicationRecord
   validates :unit_system, inclusion: { in: UNIT_SYSTEMS }
   validates :auto_confirm_threshold,
             numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 1 }
+  validates :labels_per_box,
+            numericality: { only_integer: true,
+                            greater_than_or_equal_to: LABELS_PER_BOX_RANGE.min,
+                            less_than_or_equal_to: LABELS_PER_BOX_RANGE.max }
   validates :recognition_provider, inclusion: { in: RECOGNITION_PROVIDERS }
   validates :embedding_provider, inclusion: { in: EMBEDDING_PROVIDERS }
   # Free-text model overrides (#187): any string the provider accepts. Kept

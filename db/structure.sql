@@ -1118,7 +1118,8 @@ CREATE TABLE public.moves (
     anthropic_model character varying,
     gemini_model character varying,
     embedding_provider character varying DEFAULT 'fake'::character varying NOT NULL,
-    voyage_api_key text
+    voyage_api_key text,
+    labels_per_box integer DEFAULT 2 NOT NULL
 );
 
 
@@ -2465,6 +2466,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260621180000'),
 ('20260621140000'),
 ('20260621120000'),
 ('20260619072859'),
