@@ -25,6 +25,11 @@ namespace :images do
     rescue ImageNormalizer::UnsupportedFormat, ImageNormalizer::ImageTooLarge => e
       warn "[images:optimize] skip media #{media.id}: #{e.class} (#{e.message})"
       nil
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- best-effort backfill: one bad/missing blob must not abort the run
+      # Missing blob / download / attach / purge failure on one object — log and
+      # skip so a single corrupt Active Storage object doesn't strand the rest.
+      warn "[images:optimize] skip media #{media.id} (storage): #{e.class} (#{e.message})"
+      nil
     end
 
     grand_total = 0
