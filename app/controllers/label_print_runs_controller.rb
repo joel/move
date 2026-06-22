@@ -53,7 +53,9 @@ class LabelPrintRunsController < MoveScopedController
   end
 
   def range_error(reason)
-    t("label_print.errors.#{reason}", max: LabelPrintRun::MAX_LABELS)
+    # :too_many's max is the effective box cap for this Move's labels_per_box (#312),
+    # not the raw box cap — at 10 copies the real limit is 40 boxes, not 200.
+    t("label_print.errors.#{reason}", max: LabelPrintRun.box_cap(@move.labels_per_box))
   end
 
   def filename(run)

@@ -15,15 +15,20 @@ module LabelPrintRuns
     def call(move:, from:, to:, host:, protocol:)
       return Failure(:invalid_range) if from.nil? || to.nil? || from > to
 
+      # The effective box cap depends on labels_per_box: a run is bounded by total
+      # PDF pages (boxes × copies), not boxes alone, since the job renders the whole
+      # document into memory (#312). box_cap collapses both limits into one number.
+      cap = LabelPrintRun.box_cap(move.labels_per_box)
+
       # Snapshot the exact box ids now (SQL, in print order). The job renders THIS
-      # set, not a re-query of the mutable range — so total_count, the MAX_LABELS
-      # cap, and the rendered PDF always agree even if boxes are added/deleted/
-      # renumbered while the job waits in the queue (mirrors IndexingRuns::Start).
-      # LIMIT MAX+1 bounds the load: an over-cap range fetches one extra id and is
-      # rejected, never materializing every id of an intentionally broad range.
-      box_ids = move.boxes.in_number_range(from, to).limit(LabelPrintRun::MAX_LABELS + 1).ids
+      # set, not a re-query of the mutable range — so total_count, the cap, and the
+      # rendered PDF always agree even if boxes are added/deleted/renumbered while
+      # the job waits in the queue (mirrors IndexingRuns::Start). LIMIT cap+1 bounds
+      # the load: an over-cap range fetches one extra id and is rejected, never
+      # materializing every id of an intentionally broad range.
+      box_ids = move.boxes.in_number_range(from, to).limit(cap + 1).ids
       return Failure(:empty) if box_ids.empty?
-      return Failure(:too_many) if box_ids.size > LabelPrintRun::MAX_LABELS
+      return Failure(:too_many) if box_ids.size > cap
 
       run = move.label_print_runs.create!(
         from_number: from, to_number: to, total_count: box_ids.size,

@@ -62,6 +62,26 @@ RSpec.describe LabelPrintRuns::Start do
     end.not_to change(LabelPrintRun, :count)
   end
 
+  it "fails :too_many on the page cap before the box cap at high copies (#312)" do
+    # 4 boxes is well under MAX_LABELS (200), but at 10 copies that's 40 pages —
+    # over a stubbed 20-page cap. Proves the page cap, not the box cap, rejects it.
+    seed_boxes(1, 2, 3, 5)
+    move.update!(labels_per_box: 10)
+    stub_const("LabelPrintRun::MAX_PAGES", 20) # box_cap = min(200, 20/10) = 2
+
+    expect do
+      expect(described_class.new.call(**args).failure).to eq(:too_many)
+    end.not_to change(LabelPrintRun, :count)
+  end
+
+  it "succeeds at high copies when the page count is within the cap (#312)" do
+    seed_boxes(1, 2) # 2 boxes × 10 copies = 20 pages, exactly the cap
+    move.update!(labels_per_box: 10)
+    stub_const("LabelPrintRun::MAX_PAGES", 20) # box_cap = min(200, 20/10) = 2
+
+    expect(described_class.new.call(**args)).to be_success
+  end
+
   it "is allowed on an archived Move (read-only intent)" do
     archived = create(:move, status: "archived")
     create(:box, :with_room, move: archived, number: "1")

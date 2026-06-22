@@ -70,6 +70,14 @@ RSpec.describe "Label Print Runs" do
       expect(response.body).to include(I18n.t("label_print.errors.too_many", max: 2))
     end
 
+    it "shows the effective (page-derived) cap in the error at high copies (#312)" do
+      move.update!(labels_per_box: 10)
+      stub_const("LabelPrintRun::MAX_PAGES", 20) # box_cap = min(200, 20/10) = 2
+      post move_label_print_runs_path(move), params: { from: 1, to: 5 } # 4 boxes > 2
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include(I18n.t("label_print.errors.too_many", max: 2))
+    end
+
     it "404s a non-member" do
       stub_current_user(create(:user))
       post move_label_print_runs_path(move), params: { from: 1, to: 2 }

@@ -16,6 +16,20 @@ class LabelPrintRun < ApplicationRecord
   # Guard against an accidental hundreds-of-boxes print job (was
   # LabelPrintsController::MAX_LABELS). Checked before a run is ever created.
   MAX_LABELS = 200
+  # Cap on total PDF *pages* per run (boxes × labels_per_box). The job renders the
+  # whole document into memory before attaching it (BoxLabelsPdf), so the page count
+  # — not the box count — is the real CPU/memory/storage driver. 400 = the prior
+  # worst case (200 boxes × the old fixed 2 copies), so a high labels_per_box can't
+  # multiply the workload (#312; was 2,000 pages at 200 boxes × 10).
+  MAX_PAGES = 400
+
+  # Effective box cap for a run, given the Move's labels_per_box: the lesser of the
+  # box cap and the page cap divided by copies. Single source of truth for both the
+  # Start guard and the controller's error message. copies is 1..10 (Move-validated);
+  # floored to ≥1 defensively so a bad value can't divide by zero.
+  def self.box_cap(copies)
+    [MAX_LABELS, MAX_PAGES / [copies.to_i, 1].max].min
+  end
 
   belongs_to :move
   # The finished PDF. Reaped by PurgeStaleLabelPrintRunsJob so generated documents
