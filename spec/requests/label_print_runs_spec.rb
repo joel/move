@@ -78,6 +78,25 @@ RSpec.describe "Label Print Runs" do
       expect(response.body).to include(I18n.t("label_print.errors.too_many", max: 2))
     end
 
+    it "asks for confirmation before a large batch, without starting a run (#314)" do
+      stub_const("LabelPrintRuns::Start::WARN_LABELS", 5) # 4 boxes × 2 copies = 8 labels
+      expect do
+        post move_label_print_runs_path(move), params: { from: 1, to: 5 }
+      end.not_to change(LabelPrintRun, :count)
+      # 422 (not 200) so Turbo Drive renders the confirm prompt on form submit.
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include(I18n.t("label_print.confirm.title", labels: 8))
+      expect(response.body).to include(I18n.t("label_print.confirm.submit"))
+    end
+
+    it "starts the run when the large batch is confirmed (#314)" do
+      stub_const("LabelPrintRuns::Start::WARN_LABELS", 5)
+      expect do
+        post move_label_print_runs_path(move), params: { from: 1, to: 5, confirmed: "true" }
+      end.to change(LabelPrintRun, :count).by(1)
+      expect(response).to redirect_to(move_label_print_run_path(move, LabelPrintRun.last))
+    end
+
     it "404s a non-member" do
       stub_current_user(create(:user))
       post move_label_print_runs_path(move), params: { from: 1, to: 2 }

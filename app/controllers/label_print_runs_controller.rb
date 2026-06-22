@@ -21,12 +21,19 @@ class LabelPrintRunsController < MoveScopedController
   def create
     result = LabelPrintRuns::Start.new.call(
       move: @move, from: param_int(:from), to: param_int(:to),
-      host: request.host_with_port, protocol: request.protocol
+      host: request.host_with_port, protocol: request.protocol,
+      confirmed: ActiveModel::Type::Boolean.new.cast(params[:confirmed])
     )
 
     case result
     in Dry::Monads::Success(run)
       redirect_to move_label_print_run_path(@move, run)
+    in Dry::Monads::Failure(payload) if payload.is_a?(Hash)
+      # A large batch needs an explicit "print anyway" — re-render the form in its
+      # confirm state. Status 422 (not 200) so Turbo renders the response: Turbo
+      # Drive ignores a non-redirect 200 on a form submit and the prompt never shows
+      # (the error path relies on the same 422). Hash payload carries the counts.
+      render label_print_form(confirm: payload), status: :unprocessable_content
     in Dry::Monads::Failure(reason)
       render label_print_form(error: range_error(reason)), status: :unprocessable_content
     end

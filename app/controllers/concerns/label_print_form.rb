@@ -9,9 +9,10 @@ module LabelPrintForm
 
   private
 
-  def label_print_form(error: nil)
+  def label_print_form(error: nil, confirm: nil)
     Views::LabelPrints::Show.new(
-      move: @move, error: error, from: params[:from], to: params[:to], **range_bounds
+      move: @move, error: error, confirm: confirm,
+      from: params[:from], to: params[:to], **range_bounds
     )
   end
 

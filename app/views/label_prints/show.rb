@@ -12,7 +12,7 @@ module Views
       include Phlex::Rails::Helpers::Routes
       include Phlex::Rails::Helpers::FormWith
 
-      def initialize(move:, min_number:, max_number:, box_count:, from: nil, to: nil, error: nil)
+      def initialize(move:, min_number:, max_number:, box_count:, from: nil, to: nil, error: nil, confirm: nil)
         @move = move
         @min_number = min_number
         @max_number = max_number
@@ -20,6 +20,7 @@ module Views
         @from = from
         @to = to
         @error = error
+        @confirm = confirm
       end
 
       def view_template
@@ -29,11 +30,47 @@ module Views
             title: I18n.t("label_print.title"),
             subtitle: I18n.t("label_print.subtitle", copies: @move.labels_per_box)
           )
-          @box_count.zero? ? empty_state : form_card
+          if @confirm
+            confirm_card
+          elsif @box_count.zero?
+            empty_state
+          else
+            form_card
+          end
         end
       end
 
       private
+
+      # Large-batch confirmation (#314): the range is valid but would print a lot of
+      # labels, so ask before burning thermal paper. "Print anyway" re-POSTs the same
+      # range with confirmed=true; "Back" returns to the range picker.
+      def confirm_card
+        div(class: "ha-card p-6 flex flex-col gap-stack-gap") do
+          p(class: "text-body-md font-semibold text-secondary") do
+            I18n.t("label_print.confirm.title", labels: @confirm[:labels])
+          end
+          p(class: "text-body-md text-muted") do
+            I18n.t("label_print.confirm.body", boxes: @confirm[:boxes], copies: @confirm[:copies])
+          end
+          form_with(
+            url: move_label_print_runs_path(@move), method: :post,
+            class: "flex flex-col gap-stack-gap"
+          ) do
+            input(type: "hidden", name: "from", value: @from)
+            input(type: "hidden", name: "to", value: @to)
+            input(type: "hidden", name: "confirmed", value: "true")
+            render Components::Ui::Button.new(
+              label: I18n.t("label_print.confirm.submit"), type: "submit",
+              variant: :terracotta, full_width: true
+            )
+          end
+          render Components::Ui::Button.new(
+            label: I18n.t("label_print.confirm.cancel"),
+            href: move_label_print_path(@move), variant: :ghost, full_width: true
+          )
+        end
+      end
 
       def empty_state
         div(class: "ha-card p-8 text-center") do

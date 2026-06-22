@@ -9,10 +9,15 @@ en:
     from: "From box #"
     to: "To box #"
     submit: "Print labels"
+    confirm:
+      title: "Print %{labels} labels?"
+      body: "That's %{boxes} boxes × %{copies} per box — a lot of thermal paper. Print anyway, or go back and narrow the range."
+      submit: "Print anyway"
+      cancel: "Back"
     errors:
       invalid_range: "Enter a valid range — the first box number must be less than or equal to the last."
       empty: "No boxes found in that range."
-      too_many: "Too many boxes at once (max %{max}). Narrow the range."
+      too_many: "Too many labels at once — at %{max} boxes max for this per-box setting. Narrow the range or lower labels per box."
     run:
       title: "Generating labels"
       subtitle: "Boxes %{from}–%{to} · %{count} boxes"

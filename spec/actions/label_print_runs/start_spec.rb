@@ -97,6 +97,30 @@ RSpec.describe LabelPrintRuns::Start do
     expect(described_class.new.call(**args)).to be_success
   end
 
+  it "asks for confirmation above the warn threshold and creates no run (#314)" do
+    seed_boxes(1, 2, 3, 5) # 4 boxes × 2 copies = 8 labels
+    stub_const("LabelPrintRuns::Start::WARN_LABELS", 5)
+
+    result = nil
+    expect { result = described_class.new.call(**args) }.not_to change(LabelPrintRun, :count)
+    expect(result.failure).to eq(confirm: true, boxes: 4, copies: 2, labels: 8)
+  end
+
+  it "prints when the large batch is confirmed (#314)" do
+    seed_boxes(1, 2, 3, 5)
+    stub_const("LabelPrintRuns::Start::WARN_LABELS", 5)
+
+    expect { expect(described_class.new.call(**args, confirmed: true)).to be_success }
+      .to change(LabelPrintRun, :count).by(1)
+  end
+
+  it "does not warn at or below the threshold (#314)" do
+    seed_boxes(1, 2, 3, 5) # 8 labels
+    stub_const("LabelPrintRuns::Start::WARN_LABELS", 8) # 8 is not > 8
+
+    expect(described_class.new.call(**args)).to be_success
+  end
+
   it "is allowed on an archived Move (read-only intent)" do
     archived = create(:move, status: "archived")
     create(:box, :with_room, move: archived, number: "1")
