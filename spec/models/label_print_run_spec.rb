@@ -9,21 +9,6 @@ RSpec.describe LabelPrintRun do
     expect(build(:label_print_run, move:)).to be_valid
   end
 
-  describe ".box_cap (#312)" do
-    it "is the box cap at the default 2 copies (page cap not binding)" do
-      expect(described_class.box_cap(2)).to eq(described_class::MAX_LABELS) # min(200, 400/2)=200
-    end
-
-    it "drops to the page cap divided by copies when copies are high" do
-      expect(described_class.box_cap(10)).to eq(40) # min(200, 400/10)
-      expect(described_class.box_cap(5)).to eq(80)  # min(200, 400/5)
-    end
-
-    it "floors a zero/negative copies to 1 so it never divides by zero" do
-      expect(described_class.box_cap(0)).to eq(described_class::MAX_LABELS)
-    end
-  end
-
   describe "#progress_percent" do
     it "is a clamped whole-number percent of completed/total" do
       run = build(:label_print_run, total_count: 8, completed_count: 2)

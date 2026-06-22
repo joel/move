@@ -64,7 +64,7 @@ RSpec.describe "Label Print Runs" do
     end
 
     it "rejects a range over the safety cap" do
-      stub_const("LabelPrintRun::MAX_LABELS", 2)
+      stub_const("LabelPrintRuns::Start::MAX_LABELS", 2)
       post move_label_print_runs_path(move), params: { from: 1, to: 5 } # 4 boxes > 2
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.body).to include(I18n.t("label_print.errors.too_many", max: 2))
@@ -72,7 +72,7 @@ RSpec.describe "Label Print Runs" do
 
     it "shows the effective (page-derived) cap in the error at high copies (#312)" do
       move.update!(labels_per_box: 10)
-      stub_const("LabelPrintRun::MAX_PAGES", 20) # box_cap = min(200, 20/10) = 2
+      stub_const("LabelPrintRuns::Start::MAX_PAGES", 20) # box_cap = min(200, 20/10) = 2
       post move_label_print_runs_path(move), params: { from: 1, to: 5 } # 4 boxes > 2
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.body).to include(I18n.t("label_print.errors.too_many", max: 2))

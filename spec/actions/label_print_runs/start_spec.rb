@@ -12,6 +12,21 @@ RSpec.describe LabelPrintRuns::Start do
     numbers.each { |n| create(:box, :with_room, move:, number: n.to_s) }
   end
 
+  describe ".box_cap (#312)" do
+    it "is the box cap at the default 2 copies (page cap not binding)" do
+      expect(described_class.box_cap(2)).to eq(described_class::MAX_LABELS) # min(200, 400/2)=200
+    end
+
+    it "drops to the page budget divided by copies when copies are high" do
+      expect(described_class.box_cap(10)).to eq(40) # min(200, 400/10)
+      expect(described_class.box_cap(5)).to eq(80)  # min(200, 400/5)
+    end
+
+    it "floors a zero/negative copies to 1 so it never divides by zero" do
+      expect(described_class.box_cap(0)).to eq(described_class::MAX_LABELS)
+    end
+  end
+
   it "creates a processing run with the SQL box COUNT and enqueues the generation job" do
     seed_boxes(1, 2, 3, 5) # 4 boxes in 1..5 (gap at 4)
 
@@ -56,7 +71,7 @@ RSpec.describe LabelPrintRuns::Start do
 
   it "fails :too_many above the safety cap and never creates a run" do
     seed_boxes(1, 2, 3)
-    stub_const("LabelPrintRun::MAX_LABELS", 2)
+    stub_const("LabelPrintRuns::Start::MAX_LABELS", 2)
     expect do
       expect(described_class.new.call(**args).failure).to eq(:too_many)
     end.not_to change(LabelPrintRun, :count)
@@ -67,7 +82,7 @@ RSpec.describe LabelPrintRuns::Start do
     # over a stubbed 20-page cap. Proves the page cap, not the box cap, rejects it.
     seed_boxes(1, 2, 3, 5)
     move.update!(labels_per_box: 10)
-    stub_const("LabelPrintRun::MAX_PAGES", 20) # box_cap = min(200, 20/10) = 2
+    stub_const("LabelPrintRuns::Start::MAX_PAGES", 20) # box_cap = min(200, 20/10) = 2
 
     expect do
       expect(described_class.new.call(**args).failure).to eq(:too_many)
@@ -77,7 +92,7 @@ RSpec.describe LabelPrintRuns::Start do
   it "succeeds at high copies when the page count is within the cap (#312)" do
     seed_boxes(1, 2) # 2 boxes × 10 copies = 20 pages, exactly the cap
     move.update!(labels_per_box: 10)
-    stub_const("LabelPrintRun::MAX_PAGES", 20) # box_cap = min(200, 20/10) = 2
+    stub_const("LabelPrintRuns::Start::MAX_PAGES", 20) # box_cap = min(200, 20/10) = 2
 
     expect(described_class.new.call(**args)).to be_success
   end

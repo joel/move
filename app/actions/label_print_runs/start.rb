@@ -12,13 +12,26 @@ module LabelPrintRuns
   # (Move membership). `host`/`protocol` come from the request so the job (which has
   # no request) can build the QR scan URLs against the org subdomain.
   class Start < BaseAction
+    # How big a single bulk print job may be (the domain guard, kept in the action
+    # layer — AGENTS.md §1 #2). MAX_LABELS caps boxes; MAX_PAGES caps total PDF
+    # *pages* (boxes × copies) since GenerateJob renders the whole document into
+    # memory — the page count, not the box count, is the real CPU/memory/storage
+    # driver (#312). 400 = the prior worst case (200 boxes × the old fixed 2 copies),
+    # so a high labels_per_box can't multiply the workload (was 2,000 at 200 × 10).
+    MAX_LABELS = 200
+    MAX_PAGES = 400
+
+    # Effective box cap for a Move's labels_per_box: the lesser of the box cap and
+    # the page budget. copies is 1..10 (Move-validated); floored to ≥1 so a bad
+    # value can't divide by zero.
+    def self.box_cap(copies)
+      [MAX_LABELS, MAX_PAGES / [copies.to_i, 1].max].min
+    end
+
     def call(move:, from:, to:, host:, protocol:)
       return Failure(:invalid_range) if from.nil? || to.nil? || from > to
 
-      # The effective box cap depends on labels_per_box: a run is bounded by total
-      # PDF pages (boxes × copies), not boxes alone, since the job renders the whole
-      # document into memory (#312). box_cap collapses both limits into one number.
-      cap = LabelPrintRun.box_cap(move.labels_per_box)
+      cap = self.class.box_cap(move.labels_per_box)
 
       # Snapshot the exact box ids now (SQL, in print order). The job renders THIS
       # set, not a re-query of the mutable range — so total_count, the cap, and the
