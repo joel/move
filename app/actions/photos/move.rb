@@ -10,16 +10,19 @@ module Photos
   # phase (only the writable-Move guard applies, like Items::Move); recognition rows
   # keep their historical box.
   #
-  # Each item moves through Items::Move so it inherits that action's guards, the
-  # `item.moved` event (activity feed + search reindex), and the in_box presence
-  # rule — then the photo's own box_id follows, all in one transaction so the photo
-  # and its items can never split across boxes. Emits `media.moved` for the photo.
+  # The photo and its items move in one locked transaction so they can never split
+  # across boxes; the domain events (`item.moved` per item, `media.moved` for the
+  # photo) are emitted *after* commit so the search reindex — which runs in a
+  # separate queue DB, outside this transaction — observes the committed boxes
+  # rather than the stale source box (Codex #318). `item.moved` reuses the existing
+  # Search::IndexSubscriber + activity feed; only `box_id` changes, so presence
+  # stays `in_box`.
   class Move < BaseAction
     def call(media:, target_box:, mover:)
       yield ensure_writable(media.move)
       yield validate(media, target_box)
-      yield relocate(media, target_box, mover)
-      yield emit_event(media, target_box, mover)
+      moved_item_ids = yield relocate(media, target_box)
+      emit_moves(media, moved_item_ids, target_box, mover)
       Success(media)
     end
 
@@ -33,29 +36,28 @@ module Photos
       Success()
     end
 
-    # Move the co-located items, then the photo, atomically. A single item failing
-    # (it shouldn't — the set is pre-filtered to movable items) rolls the whole
-    # relocation back and surfaces that failure rather than half-moving the photo.
-    def relocate(media, target_box, mover)
-      failure = nil
+    # Relocate the photo and its co-located items in one locked transaction; returns
+    # the moved item ids. Emits NO events in here on purpose: an `item.moved` inside
+    # this transaction enqueues the search reindex job, which lives in a *separate*
+    # queue DB and so isn't covered by this app-DB transaction — it could run before
+    # the move commits and index the items under the stale source box (Codex #318).
+    # The caller emits the events after commit instead. The box update is done
+    # directly (not via Items::Move) because that action's guards — in_box, not
+    # same/cross box — are already satisfied by `co_located_items` + `validate`; only
+    # `box_id` changes, so presence stays `in_box`.
+    def relocate(media, target_box)
+      ids = nil
       ActiveRecord::Base.transaction do
-        # Lock the photo row FIRST and read its box only after the lock, so two
-        # concurrent moves of the same photo serialize: the second waits, then sees
-        # the first's committed box as its source — it can't cache a stale source,
-        # find "no co-located items", and strand the photo in a different box from
-        # its items (Codex #318). FOR UPDATE via lock!.
+        # FOR UPDATE: serialize concurrent moves of the same photo. Read the source
+        # box only AFTER the lock so the second mover sees the first's committed box
+        # and can't strand the photo apart from its items.
         media.lock!
-        source_box_id = media.box_id
-        co_located_items(media, source_box_id).each do |item|
-          result = Items::Move.new.call(item: item, target_box: target_box, mover: mover)
-          next if result.success?
-
-          failure = result
-          raise ActiveRecord::Rollback
-        end
+        items = co_located_items(media, media.box_id).to_a
+        items.each { |item| item.update!(box: target_box) }
         media.update!(box: target_box)
+        ids = items.map(&:id)
       end
-      failure || Success()
+      Success(ids)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
     end
@@ -67,12 +69,19 @@ module Photos
       media.move.items.in_box.where(source_media_id: media.id, box_id: source_box_id)
     end
 
-    def emit_event(media, target_box, mover)
+    # Emitted AFTER the transaction commits so each side effect — activity rows and
+    # the search reindex job (its own queue DB) — observes the committed boxes.
+    # `item.moved` mirrors Items::Move's payload (reuses Search::IndexSubscriber and
+    # the activity feed); `media.moved` records the photo move itself.
+    def emit_moves(media, item_ids, target_box, mover)
+      item_ids.each do |id|
+        Rails.event.notify(
+          "item.moved", item_id: id, move_id: media.move_id, to_box_id: target_box.id, mover_id: mover&.id
+        )
+      end
       Rails.event.notify(
-        "media.moved", media_id: media.id, move_id: media.move_id,
-                       to_box_id: target_box.id, mover_id: mover&.id
+        "media.moved", media_id: media.id, move_id: media.move_id, to_box_id: target_box.id, mover_id: mover&.id
       )
-      Success()
     end
   end
 end
