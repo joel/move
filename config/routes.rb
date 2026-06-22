@@ -33,6 +33,8 @@ Rails.application.routes.draw do
       patch "review/photo/:media_id/items/:id/rename", to: "reviews#rename_item", as: :review_rename_item
       patch "review/photo/:media_id/items/:id/remove", to: "reviews#remove_item", as: :review_remove_item
       post "review/photo/:media_id/items", to: "reviews#add_item", as: :review_add_item
+      # C3 — move a whole photo (and its co-located items) to another box (#317).
+      patch "review/photo/:media_id/move", to: "reviews#move_photo", as: :review_move_photo
       # Recovery — a persistent entry point for an orphaned photo (recognition
       # failed or found nothing, so no item). Re-run recognition or hand off to the
       # manual add (B3). `state` is the polled status fragment.

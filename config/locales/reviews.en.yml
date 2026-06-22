@@ -15,6 +15,9 @@ en:
       remove_named: "Remove %{name}"
       add: "Add item"
       add_placeholder: "Add a missed item…"
+      move_heading: "Move this photo to another box"
+      move_to_box: "Box #%{number}"
+      move_submit: "Move"
       next: "Next Photo"
       finish: "Finish review"
       empty_title: "Nothing detected here"
@@ -22,3 +25,10 @@ en:
     flash:
       nothing: "Nothing to review in this box yet."
       add_failed: "Could not add that item — give it a name and try again."
+      photo_moved: "Photo moved to box #%{number}."
+      move_photo_errors:
+        box_missing: "Pick a box to move the photo to."
+        same_box: "The photo is already in that box."
+        cross_move: "You can only move a photo within the same move."
+        move_archived: "This move is archived and can't be changed."
+        failed: "Could not move the photo. Try again."
