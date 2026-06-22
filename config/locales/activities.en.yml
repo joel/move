@@ -70,6 +70,7 @@ en:
         # recorded under the old action still render in the append-only feed.
         recognition_key_removed: "removed the %{provider} API key"
         embedding_provider_changed: "switched semantic search to %{provider}"
+        labels_per_box_changed: "set labels per box to %{labels_per_box}"
         summary_viewed: "viewed the summary"
       move_membership:
         added: "added %{subject}"
