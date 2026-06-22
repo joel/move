@@ -50,9 +50,27 @@ RSpec.describe LabelPrintRuns::GenerateJob do
 
     described_class.perform_now(run.id, tenant:, host: "acme.move-easy.org", protocol: "https", box_ids: ids_in(1, 1))
 
-    expect(BoxLabelsPdf).to have_received(:new) do |entries:|
+    expect(BoxLabelsPdf).to have_received(:new) do |entries:, **|
       expect(entries.first[:scan_url]).to start_with("https://acme.move-easy.org/")
     end
+  end
+
+  it "renders `copies` pages per box from the passed argument (Phase 45)" do
+    run = run_for(1, 3)
+
+    described_class.perform_now(
+      run.id, tenant:, host: "h", protocol: "https", box_ids: ids_in(1, 3), copies: 3
+    )
+
+    expect(run.reload.document.download).to include("/Count 9") # 3 boxes × 3 copies
+  end
+
+  it "defaults to 2 copies when no copies arg is passed (pre-Phase-45 in-flight job)" do
+    run = run_for(1, 3)
+
+    described_class.perform_now(run.id, tenant:, host: "h", protocol: "https", box_ids: ids_in(1, 3))
+
+    expect(run.reload.document.download).to include("/Count 6") # 3 boxes × 2 default copies
   end
 
   it "marks the run failed (and re-raises) when rendering blows up" do

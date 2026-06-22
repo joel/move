@@ -3,23 +3,23 @@
 en:
   label_print:
     title: "Print Labels"
-    subtitle: "Print exterior labels for a range of boxes in one PDF (2 per box)."
+    subtitle: "Print exterior labels for a range of boxes in one PDF (%{copies} per box)."
     empty_state: "This move has no boxes yet. Add a box to print its label."
-    range_hint: "Boxes %{min}–%{max} · %{count} total"
+    range_hint: "Boxes %{min}–%{max} · %{count} boxes"
     from: "From box #"
     to: "To box #"
     submit: "Print labels"
     errors:
       invalid_range: "Enter a valid range — the first box number must be less than or equal to the last."
       empty: "No boxes found in that range."
-      too_many: "Too many labels at once (max %{max}). Narrow the range."
+      too_many: "Too many boxes at once (max %{max}). Narrow the range."
     run:
       title: "Generating labels"
-      subtitle: "Boxes %{from}–%{to} · %{count} labels"
+      subtitle: "Boxes %{from}–%{to} · %{count} boxes"
       back: "Back to Print Labels"
     status:
       progress_label: "Generating"
-      in_progress: "Generating %{done} of %{total} labels…"
+      in_progress: "Generating %{done} of %{total} boxes…"
       ready_title: "Your labels are ready."
       download: "Download PDF"
       failed_title: "Label generation failed."

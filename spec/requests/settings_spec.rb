@@ -20,6 +20,9 @@ RSpec.describe "Settings" do
       expect(response.body).to include(I18n.t("settings.show.recognition.threshold"))
       expect(response.body).to include("threshold") # slider Stimulus controller
       expect(response.body).to include('id="assistant"')
+      # Phase 45 — the labels-per-box auto-submitting select is present for an editor.
+      expect(response.body).to include(I18n.t("settings.show.preferences.labels_per_box"))
+      expect(response.body).to include("settings/labels_per_box")
     end
 
     it "shows resolved values read-only for a viewer" do
@@ -203,6 +206,42 @@ RSpec.describe "Settings" do
 
       expect(response).to redirect_to(move_settings_path(move))
       expect(move.reload.auto_confirm_threshold).to eq(0.8)
+    end
+  end
+
+  describe "PATCH /moves/:move_id/settings/labels_per_box (Phase 45)" do
+    it "persists a valid value for an editor" do
+      patch move_settings_labels_per_box_path(move), params: { move: { labels_per_box: "5" } }
+
+      expect(response).to redirect_to(move_settings_path(move))
+      expect(move.reload.labels_per_box).to eq(5)
+    end
+
+    it "rejects an out-of-range value without changing the move" do
+      patch move_settings_labels_per_box_path(move), params: { move: { labels_per_box: "0" } }
+
+      expect(response).to redirect_to(move_settings_path(move))
+      expect(move.reload.labels_per_box).to eq(2)
+    end
+
+    it "forbids a viewer" do
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+
+      patch move_settings_labels_per_box_path(move), params: { move: { labels_per_box: "5" } }
+
+      expect(response).to have_http_status(:forbidden)
+      expect(move.reload.labels_per_box).to eq(2)
+    end
+
+    it "refuses changes on an archived move" do
+      move.update!(status: "archived")
+
+      patch move_settings_labels_per_box_path(move), params: { move: { labels_per_box: "5" } }
+
+      expect(response).to redirect_to(move_settings_path(move))
+      expect(move.reload.labels_per_box).to eq(2)
     end
   end
 

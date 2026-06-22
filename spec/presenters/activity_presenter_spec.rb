@@ -24,6 +24,11 @@ RSpec.describe ActivityPresenter do
     expect(predicate_for("move.provider_key_removed", { "provider" => "gemini" })).to eq("removed the gemini API key")
   end
 
+  it "interpolates the count into a labels-per-box summary (#310)" do
+    expect(predicate_for("move.labels_per_box_changed", { "labels_per_box" => 5 }))
+      .to eq("set labels per box to 5")
+  end
+
   it "still renders historical rows recorded under the legacy key-removed action (#242)" do
     expect(predicate_for("move.recognition_key_removed", { "provider" => "openai" }))
       .to eq("removed the openai API key")

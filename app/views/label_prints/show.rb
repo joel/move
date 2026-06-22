@@ -3,7 +3,8 @@
 module Views
   module LabelPrints
     # E1 — Label Print range picker. Choose a box-number range and generate all
-    # those exterior labels in one PDF (2 pages per box). POSTs a run: a valid range
+    # those exterior labels in one PDF (the Move's labels_per_box pages per box).
+    # POSTs a run: a valid range
     # starts a background generation job and redirects to the live progress page
     # (#303); an invalid/empty range re-renders here with the error (validation
     # stays on this page).
@@ -26,7 +27,7 @@ module Views
           render Components::Ui::SectionHeader.new(
             eyebrow: @move.name,
             title: I18n.t("label_print.title"),
-            subtitle: I18n.t("label_print.subtitle")
+            subtitle: I18n.t("label_print.subtitle", copies: @move.labels_per_box)
           )
           @box_count.zero? ? empty_state : form_card
         end

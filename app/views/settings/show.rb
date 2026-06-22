@@ -82,10 +82,36 @@ module Views
         end
       end
 
-      # --- Move preferences: measurement units (editor-gated segmented toggle) ---
+      # --- Move preferences: measurement units + labels-per-box (editor-gated) ---
       def preferences_section
         setting_card(I18n.t("settings.show.preferences.title")) do
           setting_row(I18n.t("settings.show.preferences.units")) { unit_toggle }
+          setting_row(I18n.t("settings.show.preferences.labels_per_box")) { labels_per_box_control }
+          p(class: "text-body-md text-on-surface-variant") do
+            I18n.t("settings.show.preferences.labels_per_box_caption")
+          end
+        end
+      end
+
+      # How many identical exterior labels print per box (Phase 45). Editors get an
+      # auto-submitting select (the existing auto-submit controller — Phlex blocks
+      # inline on* handlers); viewers / archived Moves see the resolved number.
+      def labels_per_box_control
+        return resolved_value(@move.labels_per_box) unless @editable
+
+        form_with(url: move_settings_labels_per_box_path(@move), method: :patch,
+                  data: { controller: "auto-submit" }) do
+          select(
+            name: "move[labels_per_box]",
+            aria_label: I18n.t("settings.show.preferences.labels_per_box"),
+            data: { action: "change->auto-submit#submit" },
+            class: "rounded-full border border-card-border bg-card px-5 py-2 text-body-md " \
+                   "text-text-warm focus:outline-none focus:ring-2 focus:ring-accent-sage/40"
+          ) do
+            Move::LABELS_PER_BOX_RANGE.each do |n|
+              option(value: n.to_s, selected: @move.labels_per_box == n) { n.to_s }
+            end
+          end
         end
       end
 

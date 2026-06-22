@@ -12,26 +12,28 @@ module LabelPrintRuns
   class GenerateJob < ApplicationJob
     queue_as :default
 
-    def perform(run_id, tenant:, host:, protocol:, box_ids:)
+    # copies defaults to DEFAULT_COPIES so a job enqueued before Phase 45 deployed
+    # (without the arg) still renders the prior fixed 2 pages per box.
+    def perform(run_id, tenant:, host:, protocol:, box_ids:, copies: BoxLabelsPdf::DEFAULT_COPIES)
       Apartment::Tenant.switch(tenant) do
         Current.tenant = tenant
         run = LabelPrintRun.find_by(id: run_id)
         return unless run&.in_progress? # gone, or a retry after it already finished/failed
 
-        generate(run, host, protocol, box_ids)
+        generate(run, host, protocol, box_ids, copies)
       end
     end
 
     private
 
-    def generate(run, host, protocol, box_ids)
+    def generate(run, host, protocol, box_ids, copies)
       # Render exactly the ids Start snapshotted + validated (in print order), so the
       # PDF always matches total_count even if the range changed since enqueue (#303).
       entries = run.move.boxes.where(id: box_ids).ordered.includes(:room).map do |box|
         { box: box, scan_url: scan_url(run.move, box, host, protocol) }
       end
       step = [run.total_count / 20, 1].max
-      pdf = BoxLabelsPdf.new(entries: entries).render do |done, total|
+      pdf = BoxLabelsPdf.new(entries: entries, copies: copies).render do |done, total|
         RecordProgress.new.call(run_id: run.id, completed: done) if (done % step).zero? || done == total
       end
       run.document.attach(io: StringIO.new(pdf), filename: filename(run), content_type: "application/pdf")

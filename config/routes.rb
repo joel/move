@@ -109,7 +109,7 @@ Rails.application.routes.draw do
     get "box_steps", to: "box_steps#show", as: :box_steps
     post "box_steps", to: "box_steps#create"
     # E1 — Label Print: pick a box-number range (e.g. 2–5) and print all those
-    # exterior labels in one PDF (2 pages per box). Reached from the Menu. The form
+    # exterior labels in one PDF (labels_per_box pages per box). Reached from the Menu. The form
     # POSTs a run; the PDF is rendered in a background job with a live progress bar
     # (#303), then downloaded — no synchronous request-blocking render.
     get "label_print", to: "label_prints#show", as: :label_print
@@ -120,6 +120,9 @@ Rails.application.routes.draw do
     patch "settings/unit_system", to: "settings#update_unit_system", as: :settings_unit_system
     patch "settings/auto_confirm_threshold", to: "settings#update_auto_confirm_threshold",
                                              as: :settings_auto_confirm_threshold
+    # Phase 45 — how many identical exterior labels to print per box (1..10),
+    # applied by both the single-box and bulk label prints. Editors only.
+    patch "settings/labels_per_box", to: "settings#update_labels_per_box", as: :settings_labels_per_box
     # F3 / #242 — shared "AI Capability" keys (admin-only). One key per vendor,
     # set/removed independently of which feature uses it.
     patch "settings/provider_key", to: "settings#update_provider_key", as: :settings_provider_key

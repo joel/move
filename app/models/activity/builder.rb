@@ -24,6 +24,7 @@ class Activity
       "move.provider_key_set" => ["Move", :move_id],
       "move.provider_key_removed" => ["Move", :move_id],
       "move.embedding_provider_changed" => ["Move", :move_id],
+      "move.labels_per_box_changed" => ["Move", :move_id],
       "move_membership.added" => ["Move", :move_id],
       "move_membership.role_changed" => ["Move", :move_id],
       "move_membership.removed" => ["Move", :move_id],
@@ -42,7 +43,7 @@ class Activity
     # Payload keys preserved in metadata (drives the rendered summary/diff).
     META_KEYS = %i[to to_box_id created_via unit_system auto_confirm_threshold role
                    user_id kind detached_count detached_item_count discard_batch_id
-                   token_name provider model].freeze
+                   token_name provider model labels_per_box].freeze
 
     # Whether the subscriber should bother building this event at all.
     def self.records?(name)

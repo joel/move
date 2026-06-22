@@ -28,5 +28,19 @@ RSpec.describe "Labels" do
       expect { get move_box_label_path(move, box) }.not_to raise_error
       expect(response).to have_http_status(:ok)
     end
+
+    it "emits the Move's labels_per_box copies (Phase 45)" do
+      move.update!(labels_per_box: 4)
+
+      get move_box_label_path(move, box)
+
+      expect(response.body).to include("/Count 4")
+    end
+
+    it "defaults to 2 pages on a default Move (regression)" do
+      get move_box_label_path(move, box)
+
+      expect(response.body).to include("/Count 2")
+    end
   end
 end

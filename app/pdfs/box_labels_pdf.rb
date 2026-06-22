@@ -7,8 +7,12 @@ require "chunky_png"
 # Brother QL-820NWB on DK-22205 62mm continuous tape, #255) for many boxes in print
 # order. Same layout as a single label — a full-tape-width QR hero that resolves
 # (in-app, authenticated) to the box, with the box number, destination room, and the
-# human-readable manual-entry token stacked beneath — repeated PAGE_COUNT (lid +
-# side) pages per box. Carries **no contents** (Domain §12).
+# human-readable manual-entry token stacked beneath — repeated `copies` (default 2:
+# lid + side) pages per box. Carries **no contents** (Domain §12).
+#
+# `copies` is the Move's `labels_per_box` setting (Phase 45), passed in by the caller
+# so this builder stays Move-agnostic; it defaults to DEFAULT_COPIES (2) so a bare
+# call (and pre-Phase-45 behaviour) is unchanged.
 #
 # `entries` is an ordered list of `{ box:, scan_url: }`. Each box's scan URL is built
 # by the caller from the request host, so this builder stays pure and host-agnostic.
@@ -31,16 +35,19 @@ class BoxLabelsPdf
   TOKEN_SIZE = 9 # human-readable manual-entry fallback; shrinks to fit
   TOKEN_MIN_SIZE = 6
 
-  # Two identical labels (pages) per box so the user can stick one on the lid and
-  # one on a side in a single print job.
-  PAGE_COUNT = 2
+  # Default copies per box (lid + side) — the prior fixed count. Used when no
+  # Move-configured `labels_per_box` is passed (a bare builder call, or a bulk job
+  # enqueued before Phase 45 deployed), so behaviour is unchanged by default.
+  DEFAULT_COPIES = 2
 
-  # entries: [{ box:, scan_url: }, ...] in print order.
-  def initialize(entries:)
+  # entries: [{ box:, scan_url: }, ...] in print order. copies: the Move's
+  # labels_per_box (1..10) — how many identical pages to emit per box.
+  def initialize(entries:, copies: DEFAULT_COPIES)
     @entries = entries
+    @copies = copies
   end
 
-  # Returns the rendered PDF as a binary string (PAGE_COUNT pages per entry).
+  # Returns the rendered PDF as a binary string (`copies` pages per entry).
   # If a block is given it is yielded `(done, total)` after each box's pages are
   # laid out, so a caller (LabelPrintRuns::GenerateJob, #303) can report live
   # generation progress. The single-box BoxLabelPdf calls this without a block.
@@ -55,7 +62,7 @@ class BoxLabelsPdf
     first = true
     total = @entries.size
     @entries.each_with_index do |entry, index|
-      PAGE_COUNT.times do
+      @copies.times do
         doc.start_new_page unless first
         first = false
         label_content(doc, entry[:box], entry[:scan_url])

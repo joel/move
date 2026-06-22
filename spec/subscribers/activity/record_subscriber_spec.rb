@@ -56,6 +56,13 @@ RSpec.describe Activity::RecordSubscriber do
     expect(Activity.last.action).to eq("move.provider_key_removed")
   end
 
+  it "records a labels-per-box change, keeping the count in metadata (#310)" do
+    expect { emit("move.labels_per_box_changed", move_id: move.id, actor_id: actor.id, labels_per_box: 5) }
+      .to change(Activity, :count).by(1)
+    expect(Activity.last.action).to eq("move.labels_per_box_changed")
+    expect(Activity.last.metadata).to include("labels_per_box" => 5)
+  end
+
   it "skips events it does not map" do
     expect { emit("recognition_run.processing", recognition_run_id: SecureRandom.uuid) }
       .not_to change(Activity, :count)

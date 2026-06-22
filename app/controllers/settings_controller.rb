@@ -34,6 +34,13 @@ class SettingsController < MoveScopedController
     end
   end
 
+  # PATCH /moves/:move_id/settings/labels_per_box
+  def update_labels_per_box
+    write_setting(Moves::SetLabelsPerBox, labels_per_box: settings_param(:labels_per_box)) do |result|
+      result.success? ? t(".labels_per_box_changed") : t(".labels_per_box_invalid")
+    end
+  end
+
   # PATCH /moves/:move_id/settings/provider_key (admin-only — keys are secrets,
   # mirroring integration tokens). Sets one vendor's key in the shared AI
   # Capability panel (#242). Refreshes the AI panels in place (#260) — a key
