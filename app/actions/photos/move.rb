@@ -46,25 +46,38 @@ module Photos
     # same/cross box — are already satisfied by `co_located_items` + `validate`; only
     # `box_id` changes, so presence stays `in_box`.
     def relocate(media, target_box)
-      ids = nil
+      result = nil
       ActiveRecord::Base.transaction do
         # FOR UPDATE: serialize concurrent moves of the same photo. Read the source
         # box only AFTER the lock so the second mover sees the first's committed box
         # and can't strand the photo apart from its items.
         media.lock!
-        # FOR UPDATE on the items too: a concurrent individual Items::Move on one of
-        # these items would otherwise be clobbered (we'd overwrite its new box with
-        # target). Locking + the `box_id = source_box_id` predicate means an item
-        # moved out before our SELECT is simply not matched (its deliberate move is
-        # kept), and one racing us blocks until we commit (Codex #318).
-        items = co_located_items(media, media.box_id).lock.to_a
-        items.each { |item| item.update!(box: target_box) }
-        media.update!(box: target_box)
-        ids = items.map(&:id)
+        # Re-check after the lock: a concurrent move of the same photo to the SAME
+        # target may have committed while we waited, so the pre-lock `validate`
+        # same_box check is stale. Bail rather than re-emit a no-op move (duplicate
+        # activity rows + redundant reindex) (Codex #318).
+        result = if media.box_id == target_box.id
+                   Failure(:same_box)
+                 else
+                   move_rows(media, target_box)
+                 end
       end
-      Success(ids)
+      result
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
+    end
+
+    # Inside the photo lock: relocate the co-located items then the photo, returning
+    # Success(moved_item_ids). FOR UPDATE on the items too — a concurrent individual
+    # Items::Move on one of them would otherwise be clobbered (we'd overwrite its new
+    # box). Locking + the `box_id = source_box_id` predicate means an item moved out
+    # before our SELECT is simply not matched (its deliberate move is kept), and one
+    # racing us blocks until we commit (Codex #318).
+    def move_rows(media, target_box)
+      items = co_located_items(media, media.box_id).lock.to_a
+      items.each { |item| item.update!(box: target_box) }
+      media.update!(box: target_box)
+      Success(items.map(&:id))
     end
 
     # Items detected in this photo that are still in its box and present — the

@@ -72,6 +72,15 @@ RSpec.describe Photos::Move do
     expect(media.reload.box_id).to eq(source.id)
   end
 
+  it "bails :same_box when a concurrent move already placed the photo in target after the lock (#317)" do
+    item = create(:item, move:, box: source, source_media: media)
+    # Simulate a racing move committing the photo to target while we wait on lock!.
+    allow(media).to receive(:lock!) { media.update_columns(box_id: target.id) } # rubocop:disable Rails/SkipsModelValidations
+
+    expect(call.failure).to eq(:same_box)
+    expect(item.reload.box_id).to eq(source.id) # nothing re-moved
+  end
+
   it "fails :move_archived on an archived Move (read-only)" do
     archived = create(:move, status: "archived")
     box = create(:box, move: archived)
