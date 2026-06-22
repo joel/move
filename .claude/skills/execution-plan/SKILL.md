@@ -155,6 +155,22 @@ Extend `db/seeds.rb` so that after `bin/reset` a developer can sign in and **imm
 - **Loginable** — seeded sign-in accounts need a verified status; note the demo email + org subdomain in a comment.
 - **Verify** — run `bin/rails db:seed` twice **against the same database** (idempotency: `bin/reset` drops/recreates the DB, so re-running it can't catch non-idempotent seeds — it masks them), and confirm the records render during Step 8 (`/product-review`).
 
+### Step 5c: Concurrency & race-condition review (design up front; self-review before the PR)
+
+**Trigger this step whenever the change has ≥2 of:** an explicit DB transaction · a domain action/event that enqueues a background job · two requests that can mutate the **same rows** · a guard whose failure branch redirects/renders. These are the "concurrency-sensitive" signals — when they're present, **design the interleavings before coding**, don't let the reviewer (Codex) discover them one at a time. (`Photos::Move` / #317 took **6 Codex rounds**, every one a real race, because the concurrency model was deferred to review — and round 5 was a *regression introduced by round 4's fix*. Patching interleavings one-by-one is whack-a-mole; one correct model ends it. See agent memory `design-concurrency-before-pr`.)
+
+**Before writing the action**, enumerate the interleavings in a short comment in the action and code to that model:
+
+- **Two requests on the same record** — same target vs different target. Lock **every** row you will mutate at the top of the transaction (`lock!` / `.lock`, FOR UPDATE), and re-read mutable state **after** the lock (a pre-lock validation like `same_box` is stale once you're behind the lock).
+- **Idempotent races** — if a concurrent request already produced the desired end state, return an idempotent **success** (so the caller lands somewhere valid), not a failure that redirects to a now-stale URL (the round-5 404).
+- **Job-vs-commit (cross-DB)** — Solid Queue runs in a **separate queue DB**, so `perform_later` inside an app-DB transaction is **not** covered by it and can run **before** commit on stale rows. **Emit domain events (which enqueue jobs) after the transaction commits** — collect ids inside, `Rails.event.notify` outside — or set `enqueue_after_transaction_commit`. (Agent memory `event-emit-after-commit-separate-queue-db`.)
+- **Blast radius of a new return value** — a new `Failure(:reason)` isn't done until its controller render/redirect path is verified (don't strand the user).
+
+**Then be your own adversary before opening the PR**, so races are caught in one local pass at zero CI latency instead of across N Codex rounds:
+
+- Run **`/security-review`** and/or **`/qa-review`** on the diff (they exist to run *before* the PR), and apply the concurrency section of `.github/codex/review-rubric.md`.
+- **If Codex's *first* finding is still a race, audit the whole concurrency surface and fix every sibling in one push** — never fix one and resubmit (that's what turns 1 issue into 6 rounds).
+
 ### Step 6: Pre-Commit Validation
 
 Run the project's lint/test/system-test tasks and ensure they all pass before committing. Many Rails projects expose these as rake tasks; run everything at once with:
@@ -532,6 +548,7 @@ unset GITHUB_TOKEN && gh release view <tag> --repo <owner>/<repo> >/dev/null 2>&
 4.  git checkout -b feature/                           → Create branch
 5.  <implement changes>                                → Write code
 5b. extend db/seeds.rb (+ bundle exec rails db:seed)   → Showcase-ready demo data
+5c. concurrency model + /security-review (if race-prone) → Design interleavings up front; self-review pre-PR
 6.  bundle exec rake                                   → Lint + tests + system tests
 7.  git commit (+ append sha to audit log)             → Overcommit hooks validate
 8.  /product-review                                    → Live browser verification
