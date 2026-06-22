@@ -25,6 +25,14 @@ RSpec.describe "Label Prints" do
       expect(response.body).to include(move_label_print_runs_path(move))
     end
 
+    it "reflects the Move's labels_per_box in the subtitle (#310)" do
+      move.update!(labels_per_box: 5)
+
+      get move_label_print_path(move)
+
+      expect(response.body).to include(I18n.t("label_print.subtitle", copies: 5))
+    end
+
     it "404s a non-member non-disclosingly" do
       stub_current_user(create(:user))
 

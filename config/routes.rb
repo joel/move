@@ -109,7 +109,7 @@ Rails.application.routes.draw do
     get "box_steps", to: "box_steps#show", as: :box_steps
     post "box_steps", to: "box_steps#create"
     # E1 — Label Print: pick a box-number range (e.g. 2–5) and print all those
-    # exterior labels in one PDF (2 pages per box). Reached from the Menu. The form
+    # exterior labels in one PDF (labels_per_box pages per box). Reached from the Menu. The form
     # POSTs a run; the PDF is rendered in a background job with a live progress bar
     # (#303), then downloaded — no synchronous request-blocking render.
     get "label_print", to: "label_prints#show", as: :label_print
