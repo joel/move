@@ -63,6 +63,15 @@ RSpec.describe Activity::RecordSubscriber do
     expect(Activity.last.metadata).to include("labels_per_box" => 5)
   end
 
+  it "records a photo move, keeping the target box in metadata (#317)" do
+    photo = create(:media, move:, box:)
+    target = create(:box, move:)
+    expect { emit("media.moved", media_id: photo.id, move_id: move.id, to_box_id: target.id, actor_id: actor.id) }
+      .to change(Activity, :count).by(1)
+    expect(Activity.last).to have_attributes(action: "media.moved", subject_type: "Media", subject_id: photo.id)
+    expect(Activity.last.metadata).to include("to_box_id" => target.id)
+  end
+
   it "skips events it does not map" do
     expect { emit("recognition_run.processing", recognition_run_id: SecureRandom.uuid) }
       .not_to change(Activity, :count)

@@ -24,6 +24,15 @@ RSpec.describe ActivityPresenter do
     expect(predicate_for("move.provider_key_removed", { "provider" => "gemini" })).to eq("removed the gemini API key")
   end
 
+  it "renders a photo move to its target box (#317)" do
+    box = Struct.new(:number).new(5)
+    activity = Activity.new(action: "media.moved", metadata: { "to_box_id" => "box-uuid" }, occurred_at: Time.current)
+    predicate = described_class.new(
+      activity, actors: {}, subjects: { %w[Box box-uuid] => box }, current_user_id: nil
+    ).predicate
+    expect(predicate).to eq("moved a photo to Box 5")
+  end
+
   it "interpolates the count into a labels-per-box summary (#310)" do
     expect(predicate_for("move.labels_per_box_changed", { "labels_per_box" => 5 }))
       .to eq("set labels per box to 5")

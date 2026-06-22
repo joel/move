@@ -8,9 +8,9 @@
 # authorize, call the action, render/redirect.
 class ReviewsController < MoveScopedController
   before_action :set_box
-  before_action :set_media, only: %i[photo rename_item remove_item add_item]
+  before_action :set_media, only: %i[photo rename_item remove_item add_item move_photo]
   before_action :set_item, only: %i[rename_item remove_item]
-  before_action :require_writable_move!, only: %i[rename_item remove_item add_item]
+  before_action :require_writable_move!, only: %i[rename_item remove_item add_item move_photo]
 
   # GET /moves/:move_id/boxes/:box_id/review
   # Enter at the first photo that still has *unreviewed* items (resuming a
@@ -36,7 +36,8 @@ class ReviewsController < MoveScopedController
     render Views::Reviews::Photo.new(
       move: @move, box: @box, media: @media, items: photo_items(@media),
       position: position_of(@media, walk), total: walk.size,
-      next_media: next_after(@media, walk), editable: editable_move?
+      next_media: next_after(@media, walk), editable: editable_move?,
+      move_boxes: other_boxes
     )
   end
 
@@ -76,7 +77,32 @@ class ReviewsController < MoveScopedController
     end
   end
 
+  # PATCH .../review/photo/:media_id/move — move this photo (and its co-located
+  # items) to another box in the same Move (#317). On success the photo now lives
+  # in the target box, so redirect there (its review URL under @box would 404).
+  def move_photo
+    target = @move.boxes.find_by(id: params[:target_box_id])
+
+    case Photos::Move.new.call(media: @media, target_box: target, mover: current_user)
+    in Dry::Monads::Success(_media)
+      redirect_to move_box_path(@move, target), notice: t("reviews.flash.photo_moved", number: target.number)
+    in Dry::Monads::Failure(reason)
+      redirect_to move_box_review_photo_path(@move, @box, @media), alert: move_photo_error(reason)
+    end
+  end
+
   private
+
+  def move_photo_error(reason)
+    key = %i[box_missing same_box cross_move move_archived].include?(reason) ? reason : :failed
+    t("reviews.flash.move_photo_errors.#{key}")
+  end
+
+  # Boxes (other than this one) the photo can be moved to, numerically ordered — a
+  # string `number` would sort lexically ("10" before "9"), the #283 trap.
+  def other_boxes
+    authorized_scope(@move.boxes).where.not(id: @box.id).order(Arel.sql("number::bigint"))
+  end
 
   # Every photo in this box that ever produced an item (in-box OR removed), in
   # capture order — the stable walk for position / total / next. It deliberately

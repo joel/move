@@ -10,7 +10,7 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::FormWith
 
-      def initialize(move:, box:, media:, items:, position:, total:, next_media:, editable: false)
+      def initialize(move:, box:, media:, items:, position:, total:, next_media:, editable: false, move_boxes: [])
         @move = move
         @box = box
         @media = media
@@ -19,6 +19,9 @@ module Views
         @total = total
         @next_media = next_media
         @editable = editable
+        # Other boxes in this Move the photo can be moved to (#317); empty when this
+        # is the only box (the control is then hidden).
+        @move_boxes = move_boxes
       end
 
       def view_template
@@ -79,6 +82,7 @@ module Views
             header
             list
             add_form if @editable
+            move_photo_control if @editable && @move_boxes.any?
             footer
           end
         end
@@ -176,6 +180,29 @@ module Views
           button(type: "submit", class: icon_button(:sage)) do
             render Components::Icons::Check.new(css: "h-5 w-5")
             span(class: "sr-only") { I18n.t("reviews.photo.add") }
+          end
+        end
+      end
+
+      # Move the whole photo (and its co-located items) to another box (#317). A box
+      # picker + submit; the server validates same-box / cross-move / archived.
+      def move_photo_control
+        div(class: "mt-stack-gap border-t border-card-border pt-stack-gap") do
+          span(class: "text-label-caps uppercase text-muted") { I18n.t("reviews.photo.move_heading") }
+          form_with(url: move_box_review_move_photo_path(@move, @box, @media), method: :patch,
+                    class: "mt-2 flex items-center gap-2") do
+            select(
+              name: "target_box_id", aria_label: I18n.t("reviews.photo.move_heading"),
+              class: "flex-1 rounded-card border border-card-border bg-card p-2 text-body-md " \
+                     "text-text-warm focus:border-accent-sage focus:ring-0"
+            ) do
+              @move_boxes.each do |box|
+                option(value: box.id) { I18n.t("reviews.photo.move_to_box", number: box.number) }
+              end
+            end
+            render Components::Ui::Button.new(
+              label: I18n.t("reviews.photo.move_submit"), type: "submit", variant: :secondary
+            )
           end
         end
       end

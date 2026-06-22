@@ -143,6 +143,40 @@ RSpec.describe "Per-photo review" do
     end
   end
 
+  describe "PATCH .../review/photo/:media_id/move (#317)" do
+    it "renders the move control on the photo page when another box exists" do
+      detected(name: "Lamp")
+      create(:box, move:, number: "7")
+
+      get move_box_review_photo_path(move, box, media)
+
+      expect(response.body).to include(I18n.t("reviews.photo.move_heading"))
+    end
+
+    it "moves the photo and its items to the target box and redirects there" do
+      item = detected(name: "Lamp")
+      target = create(:box, move:, number: "7")
+
+      patch move_box_review_move_photo_path(move, box, media), params: { target_box_id: target.id }
+
+      expect(media.reload.box_id).to eq(target.id)
+      expect(item.reload.box_id).to eq(target.id)
+      expect(response).to redirect_to(move_box_path(move, target))
+      expect(flash[:notice]).to eq(I18n.t("reviews.flash.photo_moved", number: target.number))
+    end
+
+    it "rejects a target outside this Move (scoped to @move.boxes) without moving the photo" do
+      detected(name: "Lamp")
+      foreign = create(:box, move: create(:move)) # another Move → not found in @move.boxes
+
+      patch move_box_review_move_photo_path(move, box, media), params: { target_box_id: foreign.id }
+
+      expect(media.reload.box_id).to eq(box.id)
+      # The cross-Move box id resolves to nil under @move.boxes, so it's :box_missing.
+      expect(flash[:alert]).to eq(I18n.t("reviews.flash.move_photo_errors.box_missing"))
+    end
+  end
+
   describe "archived Move (read-only)" do
     let(:move) { create(:move, :archived, created_by: user) }
 
