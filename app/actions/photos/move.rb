@@ -37,9 +37,15 @@ module Photos
     # (it shouldn't — the set is pre-filtered to movable items) rolls the whole
     # relocation back and surfaces that failure rather than half-moving the photo.
     def relocate(media, target_box, mover)
-      source_box_id = media.box_id
       failure = nil
       ActiveRecord::Base.transaction do
+        # Lock the photo row FIRST and read its box only after the lock, so two
+        # concurrent moves of the same photo serialize: the second waits, then sees
+        # the first's committed box as its source — it can't cache a stale source,
+        # find "no co-located items", and strand the photo in a different box from
+        # its items (Codex #318). FOR UPDATE via lock!.
+        media.lock!
+        source_box_id = media.box_id
         co_located_items(media, source_box_id).each do |item|
           result = Items::Move.new.call(item: item, target_box: target_box, mover: mover)
           next if result.success?
