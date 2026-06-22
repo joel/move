@@ -20,6 +20,11 @@ module LabelPrintRuns
     # so a high labels_per_box can't multiply the workload (was 2,000 at 200 × 10).
     MAX_LABELS = 200
     MAX_PAGES = 400
+    # Soft warning threshold: a run generating more than this many labels
+    # (boxes × copies) asks the user to confirm before printing, so an accidental
+    # large range can't silently burn thermal paper (#314). Below the hard caps
+    # above — this is a prompt, not a rejection.
+    WARN_LABELS = 50
 
     # Effective box cap for a Move's labels_per_box: the lesser of the box cap and
     # the page budget. copies is 1..10 (Move-validated); floored to ≥1 so a bad
@@ -28,7 +33,7 @@ module LabelPrintRuns
       [MAX_LABELS, MAX_PAGES / [copies.to_i, 1].max].min
     end
 
-    def call(move:, from:, to:, host:, protocol:)
+    def call(move:, from:, to:, host:, protocol:, confirmed: false)
       return Failure(:invalid_range) if from.nil? || to.nil? || from > to
 
       cap = self.class.box_cap(move.labels_per_box)
@@ -43,17 +48,37 @@ module LabelPrintRuns
       return Failure(:empty) if box_ids.empty?
       return Failure(:too_many) if box_ids.size > cap
 
+      # A large batch asks for confirmation first; the controller renders the Hash
+      # payload as a prompt (array payloads break dry-monads pattern matching).
+      prompt = confirmation_prompt(box_ids.size, move.labels_per_box, confirmed)
+      return Failure(prompt) if prompt
+
       run = move.label_print_runs.create!(
         from_number: from, to_number: to, total_count: box_ids.size,
         status: "processing", started_at: Time.current
       )
+      enqueue(run, box_ids, host, protocol)
+      Success(run)
+    end
+
+    private
+
+    # The confirm payload when a run would print more than WARN_LABELS labels and the
+    # user hasn't confirmed yet, else nil (small batch, or already confirmed).
+    def confirmation_prompt(boxes, copies, confirmed)
+      labels = boxes * copies
+      return if confirmed || labels <= WARN_LABELS
+
+      { confirm: true, boxes:, copies:, labels: }
+    end
+
+    def enqueue(run, box_ids, host, protocol)
       # Snapshot labels_per_box at click time (like box_ids/host) so a Settings
       # change while the job waits in the queue can't alter the in-flight PDF (#303).
       GenerateJob.perform_later(
-        run.id, tenant: Apartment::Tenant.current, host: host, protocol: protocol,
-                box_ids: box_ids, copies: move.labels_per_box
+        run.id, tenant: Apartment::Tenant.current, host:, protocol:,
+                box_ids:, copies: run.move.labels_per_box
       )
-      Success(run)
     end
   end
 end
