@@ -52,7 +52,12 @@ module Photos
         # box only AFTER the lock so the second mover sees the first's committed box
         # and can't strand the photo apart from its items.
         media.lock!
-        items = co_located_items(media, media.box_id).to_a
+        # FOR UPDATE on the items too: a concurrent individual Items::Move on one of
+        # these items would otherwise be clobbered (we'd overwrite its new box with
+        # target). Locking + the `box_id = source_box_id` predicate means an item
+        # moved out before our SELECT is simply not matched (its deliberate move is
+        # kept), and one racing us blocks until we commit (Codex #318).
+        items = co_located_items(media, media.box_id).lock.to_a
         items.each { |item| item.update!(box: target_box) }
         media.update!(box: target_box)
         ids = items.map(&:id)
