@@ -13,10 +13,6 @@ class LabelPrintRun < ApplicationRecord
   # Terminal: safe to reap (the job has finished or failed). The cleanup never
   # deletes an ACTIVE run, so a queue backlog can't strand a user mid-generation.
   TERMINAL = (STATUSES - ACTIVE).freeze
-  # Guard against an accidental hundreds-of-boxes print job (was
-  # LabelPrintsController::MAX_LABELS). Checked before a run is ever created.
-  MAX_LABELS = 200
-
   belongs_to :move
   # The finished PDF. Reaped by PurgeStaleLabelPrintRunsJob so generated documents
   # don't accumulate in storage.
