@@ -72,13 +72,15 @@ RSpec.describe Photos::Move do
     expect(media.reload.box_id).to eq(source.id)
   end
 
-  it "bails :same_box when a concurrent move already placed the photo in target after the lock (#317)" do
+  it "is an idempotent no-op (success, no events) when a race already placed the photo in target (#317)" do
     item = create(:item, move:, box: source, source_media: media)
     # Simulate a racing move committing the photo to target while we wait on lock!.
     allow(media).to receive(:lock!) { media.update_columns(box_id: target.id) } # rubocop:disable Rails/SkipsModelValidations
+    allow(Rails.event).to receive(:notify).and_call_original
 
-    expect(call.failure).to eq(:same_box)
+    expect(call).to be_success
     expect(item.reload.box_id).to eq(source.id) # nothing re-moved
+    expect(Rails.event).not_to have_received(:notify).with("media.moved", anything) # no duplicate
   end
 
   it "fails :move_archived on an archived Move (read-only)" do

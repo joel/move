@@ -22,7 +22,11 @@ module Photos
       yield ensure_writable(media.move)
       yield validate(media, target_box)
       moved_item_ids = yield relocate(media, target_box)
-      emit_moves(media, moved_item_ids, target_box, mover)
+      # :noop = a concurrent move already placed the photo in target while we waited
+      # on the lock. The end state the caller wanted holds, so it's an idempotent
+      # success (the controller redirects to the target box) — but emit nothing, as
+      # this request moved nothing (no duplicate activity rows / reindex).
+      emit_moves(media, moved_item_ids, target_box, mover) unless moved_item_ids == :noop
       Success(media)
     end
 
@@ -54,10 +58,11 @@ module Photos
         media.lock!
         # Re-check after the lock: a concurrent move of the same photo to the SAME
         # target may have committed while we waited, so the pre-lock `validate`
-        # same_box check is stale. Bail rather than re-emit a no-op move (duplicate
-        # activity rows + redundant reindex) (Codex #318).
+        # same_box check is stale. Return an idempotent no-op (NOT Failure(:same_box),
+        # which would make the controller redirect to the old box's review URL and
+        # 404 — the photo already lives in target now) (Codex #318).
         result = if media.box_id == target_box.id
-                   Failure(:same_box)
+                   Success(:noop)
                  else
                    move_rows(media, target_box)
                  end
