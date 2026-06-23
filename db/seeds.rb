@@ -187,20 +187,48 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     end
   end
 
+  # Recognition replay: prefer the recorded REAL recognition output per photo
+  # (db/seed_data/recognition/<slug>.json, written by `seed_recognition:record`)
+  # so the demo shows authentic detections; fall back to the authored catalog
+  # `items:` offline. review_state splits on the Move's auto-confirm threshold,
+  # exactly like RecognitionRuns::Process. Recorded category/tag names resolve
+  # against the Move vocabulary, growing it for any new value the model proposed
+  # (mirroring the pipeline; a box-only tag can't ride on an item).
+  threshold = move.auto_confirm_threshold.to_f
+  resolve_category = lambda do |name|
+    name = name.to_s.strip
+    next nil if name.blank?
+
+    move.categories.where("LOWER(name) = ?", name.downcase).first || move.categories.create!(name: name)
+  end
+  resolve_tags = lambda do |names|
+    Array(names).filter_map do |raw|
+      name = raw.to_s.strip
+      next if name.blank?
+
+      existing = move.tags.where("LOWER(name) = ?", name.downcase).first
+      next existing if existing&.applies_to&.in?(%w[item both])
+      next nil if existing # box-only tag — can't tag an item
+
+      move.tags.create!(name: name, applies_to: "item")
+    end.uniq
+  end
+
   # Photos → one Media + one generated image each (SeedData::PHOTOS). Covers the
-  # per-photo review walk (box 1: PHOTO X OF Y → "Next Photo" → "Finish review"
-  # across the confidence/review-state bands — edit a name inline, remove a wrong
-  # detection, add a missed item, page on), the recovery tiles (a FAILED run + a
-  # SUCCEEDED-with-zero-detections run = orphaned photos showing Retry / Add item
-  # manually), and the phase-aware removal demo (#288: box 9 photo sourcing two
-  # in-box items; box 7 photo whose items are all already unpacked → "Unpacked"
-  # badge). Seeded directly (not via the live pipeline) so db:seed stays
-  # deterministic. Idempotent per box: skipped once the box already has any media.
+  # per-photo review walk (box 1), the recovery tiles (a FAILED run + a
+  # SUCCEEDED-with-zero-detections run = orphaned photos), and the phase-aware
+  # removal demo (#288: box 9 sources two in-box items; box 7's items are all
+  # already unpacked → "Unpacked" badge). Idempotent per box: skipped once the
+  # box already has any media.
   SeedData::PHOTOS.group_by { |photo| photo[:box] }.each do |box_number, photos|
     box = move.boxes.find_by(number: box_number)
     next unless box&.media&.none?
 
     photos.each do |photo|
+      recorded = photo[:status] == "succeeded" ? SeedData.recorded_recognition(photo[:slug]) : nil
+      provider = recorded&.dig("provider") || photo[:provider]
+      provider_model = recorded&.dig("provider_model") || photo[:provider_model]
+
       media = box.media.new(
         move: move, media_type: "image", captured_via: "web",
         # Stagger capture times so the box-1 walk orders the photos as listed.
@@ -210,8 +238,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
       media.image.attach(seed_image_attachable.call(photo[:slug]))
       media.save!
 
-      run_attrs = { move: move, media: media, provider: photo[:provider],
-                    provider_model: photo[:provider_model],
+      run_attrs = { move: move, media: media, provider: provider, provider_model: provider_model,
                     started_at: 1.minute.ago, completed_at: Time.current }
       if photo[:status] == "failed"
         box.recognition_runs.create!(run_attrs.merge(
@@ -221,23 +248,26 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
         next
       end
 
+      detections = SeedData.detections_for(photo, threshold: threshold)
+      presence = photo[:presence] || "in_box"
       run = box.recognition_runs.create!(run_attrs.merge(
                                            status: "succeeded",
-                                           metadata: { "item_count" => photo[:items].size,
-                                                       "provider" => photo[:provider] }
+                                           metadata: { "item_count" => detections.size, "provider" => provider }
                                          ))
-      photo[:items].each do |attrs|
+      detections.each do |attrs|
+        category = resolve_category.call(attrs[:category])
         suggestion = run.recognition_suggestions.create!(
           move: move, box: box, media: media, proposed_name: attrs[:name],
-          proposed_quantity: attrs[:qty] || 1, confidence_score: attrs[:confidence],
+          proposed_quantity: attrs[:quantity], proposed_category: category,
+          proposed_fragile: attrs[:fragile], confidence_score: attrs[:confidence],
           state: attrs[:review] == "auto_confirmed" ? "auto_accepted" : "pending"
         )
         item = box.items.create!(
           move: move, source_media: media, source_recognition_suggestion_id: suggestion.id,
-          name: attrs[:name], quantity: attrs[:qty] || 1, fragile: attrs[:fragile] || false,
+          name: attrs[:name], quantity: attrs[:quantity], fragile: attrs[:fragile],
           confidence_score: attrs[:confidence], created_via: "recognition",
-          review_state: attrs[:review], presence_state: attrs[:presence] || "in_box",
-          category: categories[attrs[:category]], tags: (attrs[:tags] || []).filter_map { |name| tags[name] }
+          review_state: attrs[:review], presence_state: presence,
+          category: category, tags: resolve_tags.call(attrs[:tags])
         )
         suggestion.update!(item: item)
       end

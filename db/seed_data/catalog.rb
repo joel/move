@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json"
+
 # Demo catalog for the "Seattle Relocation" showcase Move (db/seeds.rb).
 #
 # This is the single source of truth for the demo's boxes, photos and items. Two
@@ -143,14 +145,17 @@ module SeedData
       ] },
 
     # --- Box 7 (Bedroom, unpacking): removal demo — items already unpacked -----
-    { box: "7", slug: "bedside-shelf", status: "succeeded", captured_at: 120,
+    # presence at the photo level (applied to every item) so the box-7 removal
+    # demo keeps its "all already unpacked" state even when recorded recognition
+    # replaces the authored item names. Default is "in_box".
+    { box: "7", slug: "bedside-shelf", status: "succeeded", captured_at: 120, presence: "removed",
       provider: "fake", provider_model: "fake-1",
       prompt: "A realistic smartphone photo of a bedside shelf with a phone " \
               "charger and cable, and a paperback novel. Even indoor light, no text.",
       items: [
-        { name: "Phone Charger", confidence: 0.90, review: "confirmed", presence: "removed",
+        { name: "Phone Charger", confidence: 0.90, review: "confirmed",
           category: "Electronics", tags: ["Everyday Use"] },
-        { name: "Paperback", confidence: 0.90, review: "confirmed", presence: "removed", category: "Books" }
+        { name: "Paperback", confidence: 0.90, review: "confirmed", category: "Books" }
       ] },
 
     # --- Box 9 (Kitchen, packing): removal demo — one photo, two in-box items --
@@ -266,4 +271,64 @@ module SeedData
     { box: "7", name: "Reading Glasses", qty: 1, fragile: true,
       category: nil, tags: ["Important"], review: "confirmed", presence: "removed" }
   ].freeze
+
+  # --- Recognition record/replay --------------------------------------------
+  # The expensive vision-recognition output is recorded ONCE from a real run
+  # (`rails seed_recognition:record`, OpenAI gpt-image-1's sibling gpt-5-mini)
+  # into db/seed_data/recognition/<slug>.json, committed, and replayed by the
+  # seed — so reseeding the same dataset never re-pays for tokens. The authored
+  # `items:` above stay as the offline fallback when no recording exists yet.
+
+  # The recorded recognition objects for a photo slug, or nil when none committed.
+  def self.recorded_recognition(slug)
+    path = File.join(__dir__, "recognition", "#{slug}.json")
+    return nil unless File.exist?(path)
+
+    JSON.parse(File.read(path))
+  rescue JSON::ParserError
+    nil
+  end
+
+  # The detections to seed for a succeeded photo: the recorded REAL recognition
+  # objects when present (review_state derived from confidence vs `threshold`,
+  # mirroring RecognitionRuns::Process), else the authored catalog items
+  # (explicit review_state) as the offline fallback. Uniform hash shape either
+  # way: { name:, quantity:, confidence:, fragile:, category:, tags:, review: }.
+  def self.detections_for(photo, threshold:)
+    recorded = recorded_recognition(photo[:slug])
+    return normalize_recorded(recorded["objects"], threshold: threshold) if recorded
+
+    Array(photo[:items]).map { |item| authored_detection(item) }
+  end
+
+  # Normalize recorded provider objects into the uniform detection shape, with
+  # review_state split on the auto-confirm threshold (the pipeline's rule). Drops
+  # blank labels and clamps a missing/zero count to 1.
+  def self.normalize_recorded(objects, threshold:)
+    Array(objects).filter_map { |object| recorded_detection(object, threshold: threshold) }
+  end
+
+  def self.recorded_detection(object, threshold:)
+    label = object["label"].to_s.strip
+    return nil if label.empty?
+
+    confidence = object["confidence"]&.to_f
+    {
+      name: label,
+      quantity: [object["count"].to_i, 1].max,
+      confidence: confidence,
+      fragile: object["fragile"] == true,
+      category: object["category"].to_s.strip.presence,
+      tags: Array(object["tags"]).map { |tag| tag.to_s.strip }.reject(&:empty?).uniq,
+      review: confidence && confidence >= threshold ? "auto_confirmed" : "pending_review"
+    }
+  end
+
+  def self.authored_detection(item)
+    {
+      name: item[:name], quantity: item[:qty] || 1, confidence: item[:confidence],
+      fragile: item[:fragile] || false, category: item[:category],
+      tags: item[:tags] || [], review: item[:review]
+    }
+  end
 end

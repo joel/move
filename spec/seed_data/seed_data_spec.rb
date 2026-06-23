@@ -84,6 +84,68 @@ RSpec.describe SeedData do
     end
   end
 
+  describe ".normalize_recorded" do
+    subject(:detections) { described_class.normalize_recorded(objects, threshold: 0.8) }
+
+    let(:objects) do
+      [
+        { "label" => "Coffee maker", "confidence" => 0.95, "count" => 0, "category" => "Appliances",
+          "fragile" => false, "tags" => [] },
+        { "label" => "Wine glasses", "confidence" => 0.4, "count" => 6, "category" => "Kitchenware",
+          "fragile" => true, "tags" => [" Valuable ", "Valuable", ""] },
+        { "label" => "  ", "confidence" => 0.9, "count" => 1, "category" => "x", "fragile" => false, "tags" => [] }
+      ]
+    end
+
+    it "drops blank labels and clamps a zero count to 1" do
+      expect(detections.pluck(:name)).to eq(["Coffee maker", "Wine glasses"])
+      expect(detections.first[:quantity]).to eq(1)
+      expect(detections.last[:quantity]).to eq(6)
+    end
+
+    it "splits review_state on the auto-confirm threshold" do
+      expect(detections.first[:review]).to eq("auto_confirmed")  # 0.95 >= 0.8
+      expect(detections.last[:review]).to eq("pending_review")   # 0.40 < 0.8
+    end
+
+    it "strips, blank-drops and dedupes tags" do
+      expect(detections.last[:tags]).to eq(["Valuable"])
+      expect(detections.last[:fragile]).to be(true)
+    end
+  end
+
+  describe ".detections_for" do
+    it "falls back to the authored items when no recording is committed" do
+      photo = SeedData::PHOTOS.find { |p| p[:slug] == "kitchen-counter" }
+      allow(described_class).to receive(:recorded_recognition).with("kitchen-counter").and_return(nil)
+
+      detections = described_class.detections_for(photo, threshold: 0.8)
+      expect(detections.pluck(:name)).to eq(photo[:items].pluck(:name))
+      expect(detections.pluck(:review)).to eq(photo[:items].pluck(:review))
+    end
+
+    it "uses the recorded objects when present" do
+      photo = SeedData::PHOTOS.find { |p| p[:slug] == "kitchen-counter" }
+      allow(described_class).to receive(:recorded_recognition).with("kitchen-counter").and_return(
+        "objects" => [{ "label" => "Kettle", "confidence" => 0.9, "count" => 1,
+                        "category" => "Appliances", "fragile" => false, "tags" => [] }]
+      )
+
+      detections = described_class.detections_for(photo, threshold: 0.8)
+      expect(detections.pluck(:name)).to eq(["Kettle"])
+    end
+  end
+
+  it "every succeeded photo has authored fallback items; recovery tiles have none" do
+    SeedData::PHOTOS.each do |photo|
+      if photo[:status] == "succeeded"
+        expect(photo[:items]).not_to be_empty, "#{photo[:slug]} fallback items"
+      else
+        expect(photo[:items]).to be_empty, "#{photo[:slug]} (#{photo[:status]}) items"
+      end
+    end
+  end
+
   def expect_valid_item(item)
     label = item[:name]
     expect(label).to be_present

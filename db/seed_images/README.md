@@ -23,12 +23,40 @@ OPENAI_API_KEY=sk-… FORCE=1 bin/rails seed_images:generate
 Each image is downscaled to a 512px long edge and saved as a small stripped JPEG
 (~30–80 KB). Cost is roughly $0.04/image (≈ a dollar for the full set).
 
+## Recognition is recorded too (record / replay)
+
+The demo's item *detections* are also a recorded artifact, not hand-authored.
+After the images exist, a second one-off task runs the **real** recognition
+pipeline (OpenAI `gpt-5-mini`) over each photo and records what it detects into
+`db/seed_data/recognition/<slug>.json`. `db:seed` replays those, so reseeding the
+same dataset **never re-pays for vision tokens**:
+
+```bash
+OPENAI_API_KEY=sk-… bin/rails seed_recognition:record   # needs the images first
+```
+
+`review_state` is derived on replay from each detection's confidence vs the
+Move's `auto_confirm_threshold` (≥ → `auto_confirmed`, else `pending_review`),
+exactly like `RecognitionRuns::Process`. The authored `items:` in the catalog
+stay as the **offline fallback** when a slug has no recording yet. The synthetic
+showcase states the model can't produce — `needs_correction`, the failed/empty
+recovery tiles, the manual (no-photo) items — remain authored in the catalog.
+
+## Refresh both artifacts at once
+
+```bash
+OPENAI_API_KEY=sk-… bin/rails seed_data:refresh   # images, then recognition
+```
+
 ## Workflow
 
 1. Edit `db/seed_data/catalog.rb` (add/adjust a `PHOTOS` entry with a `slug` +
-   `prompt`).
-2. Run `seed_images:generate`, review the JPEGs here, then commit them.
-3. `bin/rails db:seed` — items light up with their real photos.
+   `prompt`, and authored fallback `items:`).
+2. Run `seed_data:refresh` (or the two tasks individually), review the JPEGs here
+   and the JSON in `db/seed_data/recognition/`, then commit both.
+3. `bin/rails db:seed` — items light up with real photos **and** real recorded
+   detections. No reset needed; the seed upgrades placeholders in place.
 
 Until a slug's JPEG exists here, `db:seed` falls back to `public/icon.png` for
-that photo, so seeding never breaks on a missing image.
+that photo; until its recognition JSON exists, it falls back to the authored
+`items:` — so seeding never breaks on a missing artifact.
