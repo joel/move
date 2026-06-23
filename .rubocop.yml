@@ -62,6 +62,7 @@ Metrics/BlockLength:
   Exclude:
     - config/**/*
     - spec/**/*
+    - lib/tasks/**/* # rake task definitions are inherently one long block
 
 Metrics/ClassLength:
   Exclude:
@@ -75,6 +76,7 @@ Metrics/MethodLength:
 Metrics/ModuleLength:
   Exclude:
     - config/**/*
+    - db/seed_data/**/* # static demo-catalog data modules, not logic
 
 Rails/ApplicationRecord:
   Exclude:

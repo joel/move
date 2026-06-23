@@ -24,6 +24,7 @@ end
 return unless Apartment::Tenant.current == "public"
 
 require "securerandom"
+require Rails.root.join("db/seed_data/catalog").to_s
 
 # --- Demo accounts + organization (tenant) ----------------------------------
 # Sign in (passwordless) with these emails on the org subdomain
@@ -141,38 +142,16 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   Moves::DefaultVocabularies.apply(move)
   rooms = move.rooms.index_by(&:name)
 
-  # number => attributes. Covers every lifecycle state (packing/sealed/
-  # in_transit/unpacking/unpacked), boxes with full / partial / no dimensions,
-  # and a roomless box (to demo the seal-requires-room guard). This same spread
-  # exercises the Menu's "Bulk box steps" surface (Phase 44): each forward step
-  # has a non-empty source state, and the roomless box 6 is reported as skipped
-  # by "Seal all packing boxes". Sizes repeat on
-  # purpose so the Add Box form's "Reuse dimensions" chips have something to
-  # offer: 40×30×25 appears 3× (a stack of identical boxes) and 60×40×40 twice.
-  # `desc` exercises the contents-description surface: sealed boxes carry one
-  # (shown on the detail card); packing boxes 2 and 9 deliberately have none so
-  # the ✨ AI-suggest field and the seal-time "describe before sealing" modal are
-  # demoable (box 2 also has items, so a real suggestion can be generated).
-  boxes = {
-    "1" => { room: "Kitchen",     status: "sealed",     dims: [40, 30, 25, 8],
-             desc: "Cookware, small appliances, heavy utensils. Keep upright." },
-    "2" => { room: "Kitchen",     status: "packing",    dims: [] },
-    "3" => { room: "Living Room", status: "sealed",     dims: [60, 40, 40, 15],
-             desc: "Books, framed photos, throw blankets." },
-    "4" => { room: "Bedroom",     status: "packing",    dims: [50, 40, nil, 6] },
-    "5" => { room: "Garage",      status: "in_transit", dims: [80, 60, 50, 22],
-             desc: "Power tools, extension cords, hardware." },
-    "6" => { room: nil,           status: "packing",    dims: [] },
-    "7" => { room: "Bedroom",     status: "unpacking",  dims: [55, 45, 35, 12] },
-    "8" => { room: "Living Room", status: "unpacked",   dims: [60, 40, 40, 14] },
-    "9" => { room: "Kitchen",     status: "packing",    dims: [40, 30, 25, 7] },
-    "10" => { room: "Kitchen", status: "sealed", dims: [40, 30, 25, 9],
-              desc: "Clothes, Electronics, Books" }
-  }
-
-  boxes.each do |number, attrs|
+  # Boxes across every lifecycle state (packing/sealed/in_transit/unpacking/
+  # unpacked), a full/partial/no dimension spread, a roomless box (the
+  # seal-requires-room guard) and repeated sizes (the Add Box "Reuse dimensions"
+  # chips) — see SeedData::BOXES. This spread also exercises the Menu's "Bulk box
+  # steps" surface (Phase 44). `desc` exercises the contents-description surface;
+  # packing boxes 2/6/9 deliberately have none so the ✨ AI-suggest field and the
+  # seal-time "describe before sealing" modal are demoable.
+  SeedData::BOXES.each do |attrs|
     length, width, height, weight = attrs[:dims]
-    box = move.boxes.find_or_create_by!(number: number) do |b|
+    box = move.boxes.find_or_create_by!(number: attrs[:number]) do |b|
       b.qr_token = SecureRandom.urlsafe_base64(16)
       b.room = attrs[:room] && rooms[attrs[:room]]
       b.status = attrs[:status]
@@ -182,160 +161,96 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
       b.height_cm = height
       b.weight_kg = weight
     end
-    # Backfill the showcase description onto a box seeded before this feature
-    # existed, so an already-seeded demo tenant shows it after a plain re-seed
-    # (the create block runs only on first insert). Only fills a blank, so a
-    # developer's own edits and the box's lifecycle state are left untouched.
+    # Backfill a showcase description onto a box seeded before this feature
+    # existed, so a re-seed shows it (the create block runs only on first insert).
+    # Only fills a blank, leaving developer edits and lifecycle state untouched.
     box.update!(description: attrs[:desc]) if attrs[:desc].present? && box.description.blank?
   end
 
-  # Box 1 is the review showcase: several photos, each with a handful of detections
-  # spanning the confidence bands and review states, so the per-photo review walk
-  # (PHOTO X OF Y → "Next Photo" → "Finish review") is demoable end to end — edit a
-  # name inline, remove a wrong detection, add a missed item, page to the next
-  # photo. Records are seeded directly (not via the live pipeline) so db:seed stays
-  # deterministic. (Conflict detections aren't surfaced by the per-photo UI; their
-  # seeding returns once #145 settles conflict handling in the new model.)
-  #
-  # [name, confidence 0-1, review_state] per photo, ordered as the walk visits them.
-  review_photos = {
-    "Kitchen counter" => [
-      ["Coffee maker", 0.97, "auto_confirmed"],
-      ["Stack of books", 0.88, "auto_confirmed"],
-      ["Set of mugs", 0.62, "pending_review"],
-      ["Table lamp", 0.55, "pending_review"],
-      ["Picture frame", 0.41, "pending_review"]
-    ],
-    "Open shelving" => [
-      ["Throw blanket", 0.68, "pending_review"],
-      ["Decorative vase", 0.47, "pending_review"],
-      ["Wall art", 0.53, "pending_review"],
-      ["Bookshelf", 0.44, "pending_review"],
-      ["Magazines", 0.58, "needs_correction"]
-    ],
-    "Floor corner" => [
-      ["Area rug", 0.58, "pending_review"],
-      ["Floor lamp", 0.62, "pending_review"],
-      ["Coffee table", 0.52, "pending_review"],
-      ["Floor vase", 0.51, "pending_review"],
-      ["Wall clock", 0.54, "pending_review"]
-    ]
-  }
-
-  demo_box = move.boxes.find_by(number: "1")
-  if demo_box&.media&.none?
-    review_photos.each_with_index do |(label, detections), idx|
-      media = demo_box.media.new(
-        move: move, media_type: "image", captured_via: "web",
-        # Stagger capture times so the walk orders the photos as listed above.
-        captured_at: (review_photos.size - idx).minutes.ago
-      )
-      # Attach before save — Media validates image presence.
-      media.image.attach(
-        io: Rails.public_path.join("icon.png").open,
-        filename: "#{label.parameterize}.png", content_type: "image/png"
-      )
-      media.save!
-      run = demo_box.recognition_runs.create!(
-        move: move, media: media, provider: "fake", provider_model: "fake-1", status: "succeeded",
-        started_at: 1.minute.ago, completed_at: Time.current,
-        metadata: { "item_count" => detections.size, "provider" => "fake" }
-      )
-      detections.each do |name, conf, review_state|
-        suggestion = run.recognition_suggestions.create!(
-          move: move, box: demo_box, media: media, proposed_name: name, proposed_quantity: 1,
-          confidence_score: conf, state: review_state == "auto_confirmed" ? "auto_accepted" : "pending"
-        )
-        item = demo_box.items.create!(
-          move: move, source_media: media, source_recognition_suggestion_id: suggestion.id,
-          name: name, quantity: 1, confidence_score: conf, created_via: "recognition",
-          review_state: review_state
-        )
-        suggestion.update!(item: item)
-      end
-    end
-  end
-
-  # Recovery demo: two orphaned photos in the demo box — one whose recognition
-  # FAILED (quota) and one that SUCCEEDED with zero detections. Both have no item,
-  # so the gallery shows tappable recovery tiles and the recovery screen is
-  # showcase-ready (Retry + Add item manually). Idempotent: the absence of any
-  # failed run gates the whole block.
-  if demo_box && demo_box.recognition_runs.where(status: "failed").none?
-    attach_demo_image = lambda do |media, label|
-      media.image.attach(
-        io: Rails.public_path.join("icon.png").open,
-        filename: "#{label.parameterize}.png", content_type: "image/png"
-      )
-      media.save!
-    end
-
-    failed_media = demo_box.media.new(
-      move: move, media_type: "image", captured_via: "web", captured_at: 30.seconds.ago
-    )
-    attach_demo_image.call(failed_media, "recovery-failed")
-    demo_box.recognition_runs.create!(
-      move: move, media: failed_media, provider: "openai", provider_model: "gpt-5-mini",
-      status: "failed", started_at: 1.minute.ago, completed_at: Time.current,
-      error_code: "ProviderHttp::Error",
-      error_message: "RecognitionProviders::Openai request failed (429): " \
-                     "You exceeded your current quota, please check your plan and billing details."
-    )
-
-    empty_media = demo_box.media.new(
-      move: move, media_type: "image", captured_via: "web", captured_at: 20.seconds.ago
-    )
-    attach_demo_image.call(empty_media, "recovery-empty")
-    demo_box.recognition_runs.create!(
-      move: move, media: empty_media, provider: "fake", provider_model: "fake-1",
-      status: "succeeded", started_at: 1.minute.ago, completed_at: Time.current,
-      metadata: { "item_count" => 0, "provider" => "fake" }
-    )
-  end
-
-  # --- D5/D7: managed vocabularies (categories, tags, rooms) ------------------
-  # The curated defaults were seeded above via Moves::DefaultVocabularies and
-  # already leave several *unused* values (Tools / Seasonal / Attic / Decor / …)
-  # so the non-in-use remove path stays showcase-ready, alongside in-use values
-  # for the remove-with-confirm path. Add the demo-only "Everyday Use" tag the
-  # manual items below reference (it is not part of the curated default set).
+  # The demo-only "Everyday Use" tag the items below reference (not part of the
+  # curated default set). The indices resolve catalog category/tag names → records.
   everyday = move.tags.find_or_initialize_by(name: "Everyday Use")
   everyday.applies_to = "item"
   everyday.save!
   categories = move.categories.index_by(&:name)
   tags = move.tags.index_by(&:name)
 
-  # Manual items spanning the review axis (confirmed / needs_correction) and the
-  # presence axis (in_box / removed), some categorised and tagged. Keyed on name
-  # within a box so re-running never duplicates.
-  manual_items = [
-    { box: "2", name: "Espresso Machine", qty: 1, fragile: true,
-      category: "Electronics", tags: ["Heavy"], review: "confirmed", presence: "in_box" },
-    { box: "2", name: "Dinner Plates", qty: 8, fragile: true,
-      category: "Kitchenware", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
-    { box: "4", name: "Paperback Novels", qty: 12, fragile: false,
-      category: "Books", tags: ["Heavy"], review: "needs_correction", presence: "in_box" },
-    { box: "4", name: "Winter Coat", qty: 1, fragile: false,
-      category: "Clothing", tags: [], review: "confirmed", presence: "removed" },
-    # D8 search demo: a confirmed "Hair dryer" so a semantic/fuzzy query like
-    # "blow dryer" recovers it (shared "dryer" + embedding proximity).
-    { box: "5", name: "Hair dryer", qty: 1, fragile: false,
-      category: "Electronics", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
-    # D10 unpacking demo: box #7 is `unpacking`, seeded with a mix of remaining
-    # (in_box) and already-unpacked (removed) items so the E3 checklist shows both
-    # the "Remaining Items" tap-targets and the dimmed "Unpacked" section.
-    { box: "7", name: "Bedside Lamp", qty: 1, fragile: true,
-      category: "Electronics", tags: ["Important"], review: "confirmed", presence: "in_box" },
-    { box: "7", name: "Folded Bedsheets", qty: 4, fragile: false,
-      category: "Clothing", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
-    { box: "7", name: "Alarm Clock", qty: 1, fragile: false,
-      category: "Electronics", tags: [], review: "confirmed", presence: "in_box" },
-    { box: "7", name: "Throw Pillows", qty: 2, fragile: false,
-      category: "Clothing", tags: [], review: "confirmed", presence: "removed" },
-    { box: "7", name: "Reading Glasses", qty: 1, fragile: true,
-      category: nil, tags: ["Important"], review: "confirmed", presence: "removed" }
-  ]
-  manual_items.each do |attrs|
+  # Attach the generated 1:1 demo photo for a slug once it's been generated and
+  # committed (db/seed_images/<slug>.jpg via `rails seed_images:generate`); else
+  # fall back to the placeholder icon so db:seed works offline / on a fresh DB / CI.
+  seed_image_attachable = lambda do |slug|
+    path = Rails.root.join("db/seed_images/#{slug}.jpg")
+    if path.exist?
+      { io: path.open, filename: "#{slug}.jpg", content_type: "image/jpeg" }
+    else
+      { io: Rails.public_path.join("icon.png").open, filename: "#{slug}.png", content_type: "image/png" }
+    end
+  end
+
+  # Photos → one Media + one generated image each (SeedData::PHOTOS). Covers the
+  # per-photo review walk (box 1: PHOTO X OF Y → "Next Photo" → "Finish review"
+  # across the confidence/review-state bands — edit a name inline, remove a wrong
+  # detection, add a missed item, page on), the recovery tiles (a FAILED run + a
+  # SUCCEEDED-with-zero-detections run = orphaned photos showing Retry / Add item
+  # manually), and the phase-aware removal demo (#288: box 9 photo sourcing two
+  # in-box items; box 7 photo whose items are all already unpacked → "Unpacked"
+  # badge). Seeded directly (not via the live pipeline) so db:seed stays
+  # deterministic. Idempotent per box: skipped once the box already has any media.
+  SeedData::PHOTOS.group_by { |photo| photo[:box] }.each do |box_number, photos|
+    box = move.boxes.find_by(number: box_number)
+    next unless box&.media&.none?
+
+    photos.each do |photo|
+      media = box.media.new(
+        move: move, media_type: "image", captured_via: "web",
+        # Stagger capture times so the box-1 walk orders the photos as listed.
+        captured_at: photo[:captured_at].seconds.ago
+      )
+      # Attach before save — Media validates image presence.
+      media.image.attach(seed_image_attachable.call(photo[:slug]))
+      media.save!
+
+      run_attrs = { move: move, media: media, provider: photo[:provider],
+                    provider_model: photo[:provider_model],
+                    started_at: 1.minute.ago, completed_at: Time.current }
+      if photo[:status] == "failed"
+        box.recognition_runs.create!(run_attrs.merge(
+                                       status: "failed", error_code: photo[:error_code],
+                                       error_message: photo[:error_message]
+                                     ))
+        next
+      end
+
+      run = box.recognition_runs.create!(run_attrs.merge(
+                                           status: "succeeded",
+                                           metadata: { "item_count" => photo[:items].size,
+                                                       "provider" => photo[:provider] }
+                                         ))
+      photo[:items].each do |attrs|
+        suggestion = run.recognition_suggestions.create!(
+          move: move, box: box, media: media, proposed_name: attrs[:name],
+          proposed_quantity: attrs[:qty] || 1, confidence_score: attrs[:confidence],
+          state: attrs[:review] == "auto_confirmed" ? "auto_accepted" : "pending"
+        )
+        item = box.items.create!(
+          move: move, source_media: media, source_recognition_suggestion_id: suggestion.id,
+          name: attrs[:name], quantity: attrs[:qty] || 1, fragile: attrs[:fragile] || false,
+          confidence_score: attrs[:confidence], created_via: "recognition",
+          review_state: attrs[:review], presence_state: attrs[:presence] || "in_box",
+          category: categories[attrs[:category]], tags: (attrs[:tags] || []).filter_map { |name| tags[name] }
+        )
+        suggestion.update!(item: item)
+      end
+    end
+  end
+
+  # Manual items with NO photo (SeedData::MANUAL_ITEMS) spanning the review axis
+  # (confirmed / needs_correction) and presence axis (in_box / removed), some
+  # categorised and tagged. Keyed on name within a box so re-running never
+  # duplicates. The curated default vocabularies above already leave several
+  # *unused* values (Tools / Seasonal / Attic / …) so the non-in-use remove path
+  # stays showcase-ready, alongside these in-use values for remove-with-confirm.
+  SeedData::MANUAL_ITEMS.each do |attrs|
     box = move.boxes.find_by(number: attrs[:box])
     next unless box
 
@@ -346,55 +261,10 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
       move: move, quantity: attrs[:qty], fragile: attrs[:fragile],
       category: categories[attrs[:category]], created_via: "manual",
       review_state: attrs[:review], presence_state: attrs[:presence],
-      tags: attrs[:tags].map { |name| tags[name] }
+      tags: attrs[:tags].filter_map { |name| tags[name] }
     )
     item.save!
   end
-
-  # (D6 review items are seeded with their photos in the box-1 walk above.)
-
-  # Phase-aware item removal demo (#288): give both removal surfaces a
-  # photo-backed item so they're showcase-ready.
-  #  - Box #9 (packing): a photo that sourced TWO items. Open either item's C3 to
-  #    see "Delete from box" — delete one and the photo stays (its sibling still
-  #    uses it); delete both and the photo goes with the last item. Restore either
-  #    from the activity feed.
-  #  - Box #7 (unpacking): a photo whose items are all already unpacked, so its
-  #    gallery thumbnail carries the "Unpacked" badge.
-  seed_removal_photo = lambda do |box, label, detections|
-    next unless box&.media&.none?
-
-    media = box.media.new(
-      move: move, media_type: "image", captured_via: "web", captured_at: 2.minutes.ago
-    )
-    media.image.attach(
-      io: Rails.public_path.join("icon.png").open,
-      filename: "#{label.parameterize}.png", content_type: "image/png"
-    )
-    media.save!
-    run = box.recognition_runs.create!(
-      move: move, media: media, provider: "fake", provider_model: "fake-1", status: "succeeded",
-      started_at: 1.minute.ago, completed_at: Time.current,
-      metadata: { "item_count" => detections.size, "provider" => "fake" }
-    )
-    detections.each do |name, presence|
-      suggestion = run.recognition_suggestions.create!(
-        move: move, box: box, media: media, proposed_name: name, proposed_quantity: 1,
-        confidence_score: 0.9, state: "pending"
-      )
-      item = box.items.create!(
-        move: move, source_media: media, source_recognition_suggestion_id: suggestion.id,
-        name: name, quantity: 1, confidence_score: 0.9, created_via: "recognition",
-        review_state: "confirmed", presence_state: presence
-      )
-      suggestion.update!(item: item)
-    end
-  end
-
-  seed_removal_photo.call(move.boxes.find_by(number: "9"), "Skillet and bowls",
-                          [["Cast Iron Skillet", "in_box"], ["Mixing Bowls", "in_box"]])
-  seed_removal_photo.call(move.boxes.find_by(number: "7"), "Bedside shelf",
-                          [["Phone Charger", "removed"], ["Paperback", "removed"]])
 
   # --- Phase 43: a completed bulk label-print run so the E1 progress/download page
   # is showcase-ready without generating live (the form starts a fresh run). The PDF
