@@ -55,17 +55,6 @@ module Views
       def app_name
         Rails.application.config.x.brand_name
       end
-
-      # Stimulus controllers for the <body>. `theme` always; `one-tap-reset` only
-      # while signed in — it clears the Google One Tap suppression flag so a later
-      # sign-out re-enables the prompt. It must NOT run logged-out, or it would
-      # clear the flag on the /login?via=google bridge page and let auto_select
-      # loop (One Tap → no_account → redirect).
-      def body_controllers
-        controllers = ["theme"]
-        controllers << "one-tap-reset" if view_context.rodauth.logged_in?
-        controllers.join(" ")
-      end
     end
   end
 end

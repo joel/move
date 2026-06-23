@@ -12,7 +12,7 @@ module Views
           render_head
           body(
             class: "min-h-screen bg-page text-text-warm antialiased",
-            data: { controller: body_controllers }
+            data: { controller: "theme" }
           ) do
             render Components::FlashToasts.new
             render Components::GoogleOneTap.new
