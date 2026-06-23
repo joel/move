@@ -1,0 +1,59 @@
+{
+  "slug": "bedside-shelf",
+  "provider": "openai",
+  "provider_model": "gpt-5-mini",
+  "objects": [
+    {
+      "label": "Smartphone",
+      "confidence": 0.99,
+      "count": 1,
+      "category": "Electronics",
+      "fragile": true,
+      "tags": [
+        "Everyday Use",
+        "Valuable"
+      ]
+    },
+    {
+      "label": "Charging cable",
+      "confidence": 0.95,
+      "count": 1,
+      "category": "Electronics",
+      "fragile": true,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "USB wall charger / power adapter",
+      "confidence": 0.9,
+      "count": 1,
+      "category": "Electronics",
+      "fragile": true,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "Paperback book",
+      "confidence": 0.92,
+      "count": 1,
+      "category": "Books",
+      "fragile": false,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "Nightstand / bedside table",
+      "confidence": 0.9,
+      "count": 1,
+      "category": "Furniture",
+      "fragile": false,
+      "tags": [
+        "Heavy",
+        "Everyday Use"
+      ]
+    }
+  ]
+}

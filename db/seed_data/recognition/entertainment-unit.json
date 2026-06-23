@@ -1,0 +1,54 @@
+{
+  "slug": "entertainment-unit",
+  "provider": "openai",
+  "provider_model": "gpt-5-mini",
+  "objects": [
+    {
+      "label": "Board game / puzzle boxes (colorful, stacked)",
+      "confidence": 0.95,
+      "count": 4,
+      "category": "Toys",
+      "fragile": false,
+      "tags": []
+    },
+    {
+      "label": "DVD / Blu‑ray cases (vertical stack)",
+      "confidence": 0.9,
+      "count": 4,
+      "category": "Books",
+      "fragile": false,
+      "tags": []
+    },
+    {
+      "label": "Remote control",
+      "confidence": 0.98,
+      "count": 1,
+      "category": "Electronics",
+      "fragile": true,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "White game console (likely Xbox Series S)",
+      "confidence": 0.92,
+      "count": 1,
+      "category": "Electronics",
+      "fragile": true,
+      "tags": [
+        "Valuable",
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "Black flat media device / external drive (lower shelf)",
+      "confidence": 0.7,
+      "count": 1,
+      "category": "Electronics",
+      "fragile": true,
+      "tags": [
+        "Valuable"
+      ]
+    }
+  ]
+}

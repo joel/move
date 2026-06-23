@@ -1,0 +1,81 @@
+{
+  "slug": "floor-corner",
+  "provider": "openai",
+  "provider_model": "gpt-5-mini",
+  "objects": [
+    {
+      "label": "rolled area rug",
+      "confidence": 0.92,
+      "count": 1,
+      "category": "Decor",
+      "fragile": false,
+      "tags": [
+        "Heavy",
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "ceramic vase",
+      "confidence": 0.94,
+      "count": 1,
+      "category": "Decor",
+      "fragile": true,
+      "tags": [
+        "Decorative"
+      ]
+    },
+    {
+      "label": "floor lamp",
+      "confidence": 0.97,
+      "count": 1,
+      "category": "Furniture",
+      "fragile": false,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "sofa",
+      "confidence": 0.98,
+      "count": 1,
+      "category": "Furniture",
+      "fragile": false,
+      "tags": [
+        "Heavy",
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "wooden coffee table",
+      "confidence": 0.96,
+      "count": 1,
+      "category": "Furniture",
+      "fragile": false,
+      "tags": [
+        "Heavy",
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "area rug (on floor)",
+      "confidence": 0.93,
+      "count": 1,
+      "category": "Decor",
+      "fragile": false,
+      "tags": [
+        "Heavy",
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "curtains",
+      "confidence": 0.9,
+      "count": 1,
+      "category": "Decor",
+      "fragile": false,
+      "tags": [
+        "Everyday Use"
+      ]
+    }
+  ]
+}

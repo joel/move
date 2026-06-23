@@ -1,0 +1,47 @@
+{
+  "slug": "camping-gear",
+  "provider": "openai",
+  "provider_model": "gpt-5-mini",
+  "objects": [
+    {
+      "label": "Duffel bag",
+      "confidence": 0.9,
+      "count": 1,
+      "category": "Outdoor Gear",
+      "fragile": false,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "Rolled sleeping bag",
+      "confidence": 0.9,
+      "count": 1,
+      "category": "Outdoor Gear",
+      "fragile": false,
+      "tags": [
+        "Seasonal"
+      ]
+    },
+    {
+      "label": "Bicycle helmet",
+      "confidence": 0.95,
+      "count": 1,
+      "category": "Outdoor Gear",
+      "fragile": false,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "Hand/ floor pump",
+      "confidence": 0.95,
+      "count": 1,
+      "category": "Tools",
+      "fragile": false,
+      "tags": [
+        "Everyday Use"
+      ]
+    }
+  ]
+}

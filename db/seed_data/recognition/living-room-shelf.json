@@ -1,0 +1,49 @@
+{
+  "slug": "living-room-shelf",
+  "provider": "openai",
+  "provider_model": "gpt-5-mini",
+  "objects": [
+    {
+      "label": "Books (hardcover/paperback)",
+      "confidence": 0.95,
+      "count": 6,
+      "category": "Books",
+      "fragile": false,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "Wooden photo frames (with family photos)",
+      "confidence": 0.98,
+      "count": 2,
+      "category": "Decor",
+      "fragile": true,
+      "tags": [
+        "Important",
+        "Valuable"
+      ]
+    },
+    {
+      "label": "Folded blankets/throws",
+      "confidence": 0.9,
+      "count": 2,
+      "category": "Decor",
+      "fragile": false,
+      "tags": [
+        "Everyday Use",
+        "Seasonal"
+      ]
+    },
+    {
+      "label": "Vinyl records (stack)",
+      "confidence": 0.8,
+      "count": 8,
+      "category": "Media",
+      "fragile": true,
+      "tags": [
+        "Valuable"
+      ]
+    }
+  ]
+}

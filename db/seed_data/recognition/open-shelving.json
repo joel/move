@@ -1,0 +1,43 @@
+{
+  "slug": "open-shelving",
+  "provider": "openai",
+  "provider_model": "gpt-5-mini",
+  "objects": [
+    {
+      "label": "folded throw blanket",
+      "confidence": 0.95,
+      "count": 1,
+      "category": "Decor",
+      "fragile": false,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "ceramic vase",
+      "confidence": 0.95,
+      "count": 1,
+      "category": "Decor",
+      "fragile": true,
+      "tags": []
+    },
+    {
+      "label": "framed art (matted print)",
+      "confidence": 0.94,
+      "count": 1,
+      "category": "Decor",
+      "fragile": true,
+      "tags": []
+    },
+    {
+      "label": "stack of magazines/books",
+      "confidence": 0.9,
+      "count": 1,
+      "category": "Books",
+      "fragile": false,
+      "tags": [
+        "Everyday Use"
+      ]
+    }
+  ]
+}

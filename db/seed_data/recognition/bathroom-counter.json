@@ -1,0 +1,49 @@
+{
+  "slug": "bathroom-counter",
+  "provider": "openai",
+  "provider_model": "gpt-5-mini",
+  "objects": [
+    {
+      "label": "folded bath towels",
+      "confidence": 0.98,
+      "count": 3,
+      "category": "Clothing",
+      "fragile": false,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "toiletry/travel dopp kit (zippered pouch)",
+      "confidence": 0.9,
+      "count": 1,
+      "category": "Toiletries",
+      "fragile": false,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "electric toothbrush with charging base",
+      "confidence": 0.95,
+      "count": 1,
+      "category": "Electronics",
+      "fragile": true,
+      "tags": [
+        "Everyday Use",
+        "Valuable"
+      ]
+    },
+    {
+      "label": "liquid soap dispenser (pump bottle)",
+      "confidence": 0.92,
+      "count": 1,
+      "category": "Toiletries",
+      "fragile": true,
+      "tags": [
+        "Liquid",
+        "Everyday Use"
+      ]
+    }
+  ]
+}

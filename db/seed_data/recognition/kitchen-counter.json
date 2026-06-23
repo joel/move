@@ -1,0 +1,36 @@
+{
+  "slug": "kitchen-counter",
+  "provider": "openai",
+  "provider_model": "gpt-5-mini",
+  "objects": [
+    {
+      "label": "drip coffee maker (with glass carafe)",
+      "confidence": 0.95,
+      "count": 1,
+      "category": "Appliances",
+      "fragile": true,
+      "tags": [
+        "Everyday Use",
+        "Liquid"
+      ]
+    },
+    {
+      "label": "paperback/hardcover books (stack)",
+      "confidence": 0.9,
+      "count": 4,
+      "category": "Books",
+      "fragile": false,
+      "tags": []
+    },
+    {
+      "label": "ceramic coffee mugs",
+      "confidence": 0.95,
+      "count": 4,
+      "category": "Kitchenware",
+      "fragile": true,
+      "tags": [
+        "Everyday Use"
+      ]
+    }
+  ]
+}
