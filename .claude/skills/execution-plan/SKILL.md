@@ -530,8 +530,12 @@ For each comment, decide one of three responses:
 
 #### 11c: Reply to each comment
 
+The reply endpoint **requires the PR number** — omitting it
+(`repos/<owner>/<repo>/pulls/comments/<COMMENT_ID>/replies`) returns
+`HTTP 404: Not Found`:
+
 ```bash
-gh api repos/<owner>/<repo>/pulls/comments/<COMMENT_ID>/replies \
+gh api repos/<owner>/<repo>/pulls/<PR_NUMBER>/comments/<COMMENT_ID>/replies \
   -X POST \
   -f body='**Fixed in <commit-sha>.** <explanation of what was changed and why>'
 ```
