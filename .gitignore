@@ -43,3 +43,4 @@
 
 # Ignore locally-installed gems.
 /vendor/bundle/
+.code-graph/
