@@ -207,7 +207,7 @@ GEM
     hana (1.3.7)
     hashie (5.1.0)
       logger
-    i18n (1.14.8)
+    i18n (1.15.2)
       concurrent-ruby (~> 1.0)
     image_processing (2.0.2)
     importmap-rails (2.2.3)
@@ -222,7 +222,7 @@ GEM
       rdoc (>= 4.0.0)
       reline (>= 0.4.2)
     jmespath (1.6.2)
-    json (2.19.9)
+    json (2.20.0)
     json_schemer (2.5.0)
       bigdecimal
       hana (~> 1.3)
@@ -349,7 +349,7 @@ GEM
     phlex-testing-capybara (0.1.0)
       capybara (~> 3.38)
       phlex (>= 0.5)
-    pp (0.6.3)
+    pp (0.6.4)
       prettyprint
     prawn (2.5.0)
       matrix (~> 0.4)
@@ -567,7 +567,7 @@ GEM
     stimulus-rails (1.3.4)
       railties (>= 6.0.0)
     stringio (3.2.0)
-    tailwindcss-rails (4.5.0)
+    tailwindcss-rails (4.6.0)
       railties (>= 7.0.0)
       tailwindcss-ruby (~> 4.0)
     tailwindcss-ruby (4.3.1)
