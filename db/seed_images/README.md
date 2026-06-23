@@ -54,8 +54,16 @@ OPENAI_API_KEY=sk-… bin/rails seed_data:refresh   # images, then recognition
    `prompt`, and authored fallback `items:`).
 2. Run `seed_data:refresh` (or the two tasks individually), review the JPEGs here
    and the JSON in `db/seed_data/recognition/`, then commit both.
-3. `bin/rails db:seed` — items light up with real photos **and** real recorded
-   detections. No reset needed; the seed upgrades placeholders in place.
+3. Re-seed:
+   - On a **fresh** DB (`bin/reset`), items show the real photos **and** the
+     real recorded detections.
+   - On an **already-seeded** tenant, a plain `bin/rails db:seed` upgrades the
+     photo *blobs* in place (placeholder → real JPEG), but swapping the
+     *detection content* (authored fallback → recorded, or changed recordings)
+     needs a from-scratch reseed (`bin/reset`) — re-materializing recognition on
+     an existing tenant would discard any review edits, so it's intentionally
+     reset-only. The canonical refresh flow is therefore: refresh artifacts →
+     commit → `bin/reset`.
 
 Until a slug's JPEG exists here, `db:seed` falls back to `public/icon.png` for
 that photo; until its recognition JSON exists, it falls back to the authored
