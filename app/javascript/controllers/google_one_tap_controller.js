@@ -1,6 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-
-const NO_ACCOUNT_KEY = "google_one_tap_no_account"
+import { NO_ACCOUNT_KEY } from "controllers/one_tap_constants"
 
 export default class extends Controller {
   static values = {
@@ -60,12 +59,19 @@ export default class extends Controller {
       .then((res) => res.json())
       .then((data) => {
         if (data.ok) {
+          // Signed in — drop any stale suppression so a later sign-out
+          // re-enables One Tap.
+          sessionStorage.removeItem(NO_ACCOUNT_KEY)
           window.location.replace(data.redirect || "/")
         } else if (data.error === "no_account") {
-          // Suppress One Tap for the rest of this browser session
-          // to avoid auto_select → no_account → redirect loops.
+          // No account yet. Set the suppression flag FIRST so auto_select can't
+          // re-fire One Tap → no_account → redirect in a loop on the bridge page
+          // (or if the user bounces back without finishing OAuth). The flag is
+          // cleared on sign-in (above) and while signed in (one-tap-reset
+          // controller), so One Tap returns after a real sign-out. Then bridge
+          // into the account-creating OAuth flow.
           sessionStorage.setItem(NO_ACCOUNT_KEY, "1")
-          window.google.accounts.id.cancel()
+          window.location.replace(data.redirect || "/create-account")
         }
       })
   }

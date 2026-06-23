@@ -80,11 +80,13 @@ RSpec.describe "POST /auth/google/one_tap" do
     end
   end
 
-  context "with no matching account" do
+  context "with no matching account (OAuth redirect flow unavailable)" do
     before do
       stub_google_tokeninfo(google_payload.merge("email" => "unknown@example.com"))
     end
 
+    # Only GOOGLE_CLIENT_ID is configured here (no secret), so the account-
+    # creating OAuth button isn't available — fall back to self-service signup.
     it "returns no_account error pointing at self-service signup" do
       post "/auth/google/one_tap",
            params: { credential: "valid-jwt" }, as: :json
@@ -93,6 +95,26 @@ RSpec.describe "POST /auth/google/one_tap" do
       body = response.parsed_body
       expect(body["error"]).to eq("no_account")
       expect(body["redirect"]).to eq("/create-account")
+    end
+  end
+
+  context "with no matching account and full Google OAuth configured" do
+    before do
+      allow(ENV).to receive(:[]).with("GOOGLE_CLIENT_SECRET")
+                                .and_return("test-google-client-secret")
+      stub_google_tokeninfo(google_payload.merge("email" => "unknown@example.com"))
+    end
+
+    # One Tap is login-only; a new user is bridged into the account-creating
+    # OAuth flow (apex /login?via=google auto-submits to /auth/google).
+    it "bridges new users into the account-creating OAuth flow" do
+      post "/auth/google/one_tap",
+           params: { credential: "valid-jwt" }, as: :json
+
+      expect(response).to have_http_status(:unprocessable_content)
+      body = response.parsed_body
+      expect(body["error"]).to eq("no_account")
+      expect(body["redirect"]).to eq("/login?via=google")
     end
   end
 
