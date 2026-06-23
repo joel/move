@@ -1,23 +1,25 @@
 /generate-prp
 
-# PREPARATION - Next Phase: Image Optimisation
+# PREPARATION - Next Phase: Number of printing Labels
 
-Phase 42 Image Optimisation.md
+Phase 45 Box Number of printing Labels UX Improvements.md
 
 Context:
 
-Image full resolutions
+Number of printing Labels
 
-It appears that images are served at a higher resolution on desktop devices. We should never serve phone images in their original format, and we should not store them in this format either. Instead, we should optimise storage by retaining only a decent version without loss of quality, while discarding the larger phone version that takes up X MB.
+Add in Settings per move the number of labels the user wants to print per box, so instead of a fixed number like now, the user can choose 1, 2, maybe 5 per box. This must be reflected in the print at once.
+
+- Write down the PLAN `doc/ai/v0.2/prompts/Phase 45 Box Number of printing Labels UX Improvements`
 
 Steps:
 - Read `./llms-full.txt`
-- Write down the PLAN `doc/ai/v0.2/prompts/Phase 42 Image Optimisation.md`
+- Write down the PLAN `doc/ai/v0.2/prompts/Phase 45 Box Number of printing Labels UX Improvements`
 - Stop, do not start coding, wait for my approval before starting any work.
 
 # EXECUTION - Phase Implemenation Action
 
 Steps:
 - Read `./llms-full.txt`
-- Use the project skill /execution-plan to execute the PLAN: `doc/ai/v0.2/prompts/Phase 42 Image Optimisation.md`
+- Use the project skill /execution-plan to execute the PLAN: `doc/ai/v0.2/prompts/Phase 45 Box Number of printing Labels UX Improvements`
 
