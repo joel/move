@@ -244,6 +244,24 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     end
   end
 
+  # Upgrade placeholder photos in place once the real generated image is
+  # committed. The per-box gate above only attaches images when a box has NO
+  # media yet, so a tenant first seeded with the icon fallback would keep the
+  # placeholders forever on a plain re-seed (Codex #323). This idempotent pass
+  # re-attaches the real db/seed_images/<slug>.jpg onto its placeholder media
+  # (matched by the slug-named blob), so `db:seed` picks up newly-generated
+  # photos without a full DB reset. Skips media already on the real JPEG.
+  SeedData::PHOTOS.each do |photo|
+    real_image = Rails.root.join("db/seed_images/#{photo[:slug]}.jpg")
+    next unless real_image.exist?
+
+    box = move.boxes.find_by(number: photo[:box])
+    media = box&.media&.find { |m| m.image.blob&.filename.to_s.start_with?("#{photo[:slug]}.") }
+    next if media.nil? || media.image.blob&.content_type == "image/jpeg"
+
+    media.image.attach(io: real_image.open, filename: "#{photo[:slug]}.jpg", content_type: "image/jpeg")
+  end
+
   # Manual items with NO photo (SeedData::MANUAL_ITEMS) spanning the review axis
   # (confirmed / needs_correction) and presence axis (in_box / removed), some
   # categorised and tagged. Keyed on name within a box so re-running never
