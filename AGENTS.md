@@ -16,6 +16,14 @@ This document provides instructions and protocols for AI Agents interacting with
 
 **The visual design lives in Google Stitch, reached through the Stitch MCP server — not in the codebase or your imagination.** Before building or changing any **customer-facing** screen, you MUST open the real design and build against it. Never guess a layout, colour, spacing, radius, or type value.
 
+> **Exception — the `/execution-plan` design pass.** When UI work runs through the
+> `execution-plan` skill, its design pass intentionally **inverts this rule**: the
+> `frontend-design` plugin *leads* the visual direction and Stitch becomes a
+> *secondary reference*, with the settled design pushed back into Stitch afterward.
+> Everywhere else (and for the build substrate — Phase D0 tokens + Phlex components),
+> Stitch remains the source of truth as described here. See
+> `.claude/skills/execution-plan/SKILL.md` § "Design Phase".
+
 - **Project:** `Move Design` → `projects/13869765800416404511` (a separate `Move Inventory Manager` project also exists — do not confuse them).
 - **Design system (tokens):** `mcp__stitch__get_project name=projects/13869765800416404511` → `designTheme.designMd`. This is the authoritative colour/typography/spacing/radius/component sheet. It is mirrored in `doc/phases/Phase D0 - Design Foundation.md`.
 - **Screens:** `mcp__stitch__list_screens projectId=13869765800416404511`, then `mcp__stitch__get_screen name=projects/13869765800416404511/screens/<id>` for the HTML + screenshot. (`list_projects`/`list_screens` outputs are large — they spill to a file you can `jq`.)
