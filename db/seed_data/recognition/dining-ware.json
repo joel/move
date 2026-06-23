@@ -1,0 +1,38 @@
+{
+  "slug": "dining-ware",
+  "provider": "openai",
+  "provider_model": "gpt-5-mini",
+  "objects": [
+    {
+      "label": "Dinner plates (stack)",
+      "confidence": 0.96,
+      "count": 8,
+      "category": "Kitchenware",
+      "fragile": true,
+      "tags": [
+        "Heavy",
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "Wine glasses",
+      "confidence": 0.93,
+      "count": 6,
+      "category": "Kitchenware",
+      "fragile": true,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "Serving bowl",
+      "confidence": 0.9,
+      "count": 1,
+      "category": "Kitchenware",
+      "fragile": true,
+      "tags": [
+        "Everyday Use"
+      ]
+    }
+  ]
+}

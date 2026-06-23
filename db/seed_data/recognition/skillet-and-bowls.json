@@ -1,0 +1,28 @@
+{
+  "slug": "skillet-and-bowls",
+  "provider": "openai",
+  "provider_model": "gpt-5-mini",
+  "objects": [
+    {
+      "label": "cast iron skillet",
+      "confidence": 0.98,
+      "count": 1,
+      "category": "Kitchenware",
+      "fragile": false,
+      "tags": [
+        "Heavy",
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "stainless steel mixing bowls",
+      "confidence": 0.96,
+      "count": 3,
+      "category": "Kitchenware",
+      "fragile": false,
+      "tags": [
+        "Everyday Use"
+      ]
+    }
+  ]
+}

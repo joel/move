@@ -1,0 +1,52 @@
+{
+  "slug": "garage-power-tools",
+  "provider": "openai",
+  "provider_model": "gpt-5-mini",
+  "objects": [
+    {
+      "label": "Cordless drill",
+      "confidence": 0.96,
+      "count": 1,
+      "category": "Tools",
+      "fragile": false,
+      "tags": [
+        "Heavy",
+        "Everyday Use",
+        "Valuable"
+      ]
+    },
+    {
+      "label": "Extension cord (orange)",
+      "confidence": 0.95,
+      "count": 1,
+      "category": "Tools",
+      "fragile": false,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "Socket set with ratchet (in case)",
+      "confidence": 0.98,
+      "count": 1,
+      "category": "Tools",
+      "fragile": false,
+      "tags": [
+        "Heavy",
+        "Valuable",
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "Clear safety goggles",
+      "confidence": 0.9,
+      "count": 1,
+      "category": "Tools",
+      "fragile": true,
+      "tags": [
+        "Important",
+        "Everyday Use"
+      ]
+    }
+  ]
+}

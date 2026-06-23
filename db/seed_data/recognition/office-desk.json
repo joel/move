@@ -1,0 +1,58 @@
+{
+  "slug": "office-desk",
+  "provider": "openai",
+  "provider_model": "gpt-5-mini",
+  "objects": [
+    {
+      "label": "Computer monitor",
+      "confidence": 0.96,
+      "count": 1,
+      "category": "Electronics",
+      "fragile": true,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "Keyboard",
+      "confidence": 0.95,
+      "count": 1,
+      "category": "Electronics",
+      "fragile": true,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "Laptop (closed)",
+      "confidence": 0.98,
+      "count": 1,
+      "category": "Electronics",
+      "fragile": true,
+      "tags": [
+        "Everyday Use",
+        "Valuable"
+      ]
+    },
+    {
+      "label": "Desk lamp",
+      "confidence": 0.93,
+      "count": 1,
+      "category": "Appliances",
+      "fragile": true,
+      "tags": [
+        "Everyday Use"
+      ]
+    },
+    {
+      "label": "Stack of notebooks",
+      "confidence": 0.92,
+      "count": 1,
+      "category": "Books",
+      "fragile": false,
+      "tags": [
+        "Everyday Use"
+      ]
+    }
+  ]
+}
