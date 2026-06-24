@@ -83,6 +83,18 @@ RSpec.describe "Boxes" do
       expect(body.index("Box 01")).to be < body.index("Box 03")
     end
 
+    it "orders by volume (largest first, dimensionless last) when ?sort=size" do
+      create(:box, move:, number: "1", length_cm: 10, width_cm: 10, height_cm: 10) # 1000
+      create(:box, move:, number: "2", length_cm: 20, width_cm: 20, height_cm: 20) # 8000
+      create(:box, move:, number: "3") # no dimensions → NULLS LAST
+
+      get move_boxes_path(move, sort: "size")
+
+      body = response.body
+      expect(body.index("Box 02")).to be < body.index("Box 01")
+      expect(body.index("Box 01")).to be < body.index("Box 03")
+    end
+
     it "falls back to the default order for an unknown ?sort=" do
       create(:box, move:, number: "1")
 
@@ -90,6 +102,18 @@ RSpec.describe "Boxes" do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Box 01")
+    end
+
+    it "keeps the room filter chips when a filtered room has no boxes" do
+      create(:room, move:, name: "Kitchen")
+      empty_room = create(:room, move:, name: "Attic")
+      create(:box, move:, number: "1", room: create(:room, move:, name: "Garage"))
+
+      get move_boxes_path(move, room_id: empty_room.id)
+
+      # The empty filtered result still offers the room chips to switch rooms.
+      expect(response.body).to include("Kitchen").and include("Attic")
+      expect(response.body).to include(I18n.t("boxes.empty.filtered_title"))
     end
   end
 

@@ -23,9 +23,10 @@ module Views
       end
 
       def view_template
+        @boxes.load # one query, reused by the any?/each calls below
         header
         progress_summary
-        controls if @boxes.any?
+        controls
         @boxes.any? ? grid : empty_state
       end
 
@@ -75,12 +76,17 @@ module Views
         end
       end
 
-      # Room filter (left) + sort control (right). Both drive GET query params, so
-      # the active room and sort survive each other and stay bookmarkable.
+      # Room filter (left) + sort control (right), both GET-param driven so the
+      # active room and sort survive each other and stay bookmarkable. Filters show
+      # whenever the Move has rooms — even on an empty filtered result, so the user
+      # can always switch rooms; the sort control only when there are boxes to sort.
+      # `ml-auto` right-aligns the sort without a spacer element.
       def controls
-        div(class: "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between") do
-          @rooms.any? ? filters : div
-          sort_control
+        return unless @rooms.any? || @boxes.any?
+
+        div(class: "flex flex-col gap-3 sm:flex-row sm:items-center") do
+          filters if @rooms.any?
+          div(class: "sm:ml-auto") { sort_control } if @boxes.any?
         end
       end
 

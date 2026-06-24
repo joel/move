@@ -11,21 +11,23 @@ module Components
     # full reload. The container always renders (even empty) so the target exists.
     ID = "flash-toasts"
 
-    # Flash keys carrying toast *metadata* rather than their own message: an
-    # optional call-to-action link on the success toast (e.g. "View" a created
-    # record) and the just-created id the page highlights. Skipped here so they
-    # never render as stray error toasts.
-    META_KEYS = %w[action_href action_label highlight_box_id].freeze
+    # Allow-list of flash keys that carry a user-facing toast *message*. Anything
+    # else in the flash — the action-link metadata below, a page-specific
+    # highlight id, any future out-of-band key — is not a toast and is skipped.
+    # (An allow-list, not a deny-list, so a new metadata key can never render as a
+    # stray toast by omission.)
+    TOAST_VARIANTS = { "notice" => :success, "alert" => :error, "error" => :error }.freeze
 
     def view_template
       div(id: ID, class: "pointer-events-none fixed right-6 top-20 md:top-6 z-50 " \
                          "flex w-[calc(100vw-3rem)] max-w-sm flex-col gap-3") do
         flash.each do |type, message|
-          next if META_KEYS.include?(type.to_s)
+          variant = TOAST_VARIANTS[type.to_s]
+          next unless variant
 
-          variant = type.to_s == "notice" ? :success : :error
           render Components::Ui::Toast.new(
             variant: variant, message: message,
+            # The "View" link rides along only with a success toast (the create flow).
             action_href: (flash[:action_href] if variant == :success),
             action_label: (flash[:action_label] if variant == :success)
           )
