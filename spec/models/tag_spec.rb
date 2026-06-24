@@ -51,4 +51,19 @@ RSpec.describe Tag do
     expect(tag.items).to include(item)
     expect(item.tags).to include(tag)
   end
+
+  describe ".by_usage" do
+    it "orders most-used first, then alphabetically, keeping unused tags (last)" do
+      move = create(:move)
+      popular = create(:tag, move:, name: "Fragile") # 3 items
+      rare = create(:tag, move:, name: "Books")        # 1 item
+      create(:tag, move:, name: "Bulky")               # 0 items
+      create(:tag, move:, name: "Awkward")             # 0 items
+
+      3.times { create(:item_tag, tag: popular, item: create(:item, move:)) }
+      create(:item_tag, tag: rare, item: create(:item, move:))
+
+      expect(move.tags.by_usage.map(&:name)).to eq(%w[Fragile Books Awkward Bulky])
+    end
+  end
 end
