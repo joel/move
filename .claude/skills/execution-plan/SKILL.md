@@ -120,11 +120,34 @@ Run the design agents in proportion to the work — don't over-process a one-lin
      > source of truth / never invent visual values" rule for the design pass — by
      > explicit instruction. Keep the project's design *tokens* (Phase D0) and Phlex
      > component library as the build substrate regardless.
-  4. Launch **2–3 `feature-dev:code-architect`** agents in parallel (minimal-change,
+  4. **For any user-facing change (not just visual), do an interaction/UX pass**
+     against `doc/project/ux-conventions.md` — the behavioural counterpart to the
+     Phase D0 visual system. `frontend-design` (step 3) covers how it *looks*; this
+     covers how it *behaves*. Walk that doc's planning checklist for **every user
+     journey** the change touches and decide, explicitly:
+     - **Default ordering** — the most *useful* order for the task (recency / weight /
+       count / priority), not insertion order or alphabetical.
+     - **After each action** — where the user lands, that the new/changed item is
+       visible without scrolling (scroll-to / highlight / top-insert + a linking
+       toast), and where focus goes.
+     - **Every state** — empty / sparse / loading / processing / error; and hide any
+       element that is useless in a given state (e.g. zero-count facets, tags with no
+       records).
+     - **Memory** — whether the surface should remember the user's last useful
+       input/result instead of resetting to a placeholder.
+
+     These are **requirements the architect blueprint must encode**, not
+     afterthoughts — the class of papercut (new record hidden off-screen, useless
+     alphabetical sort, dead facets, forgetful search) comes from deciding them ad
+     hoc per surface. New rules discovered here get added to `ux-conventions.md` and
+     mirrored into `AGENTS.md` so the `/code-review` CR loop (Step 5c) enforces them;
+     there is **no official UX-review plugin**, so UI-heavy changes also warrant a
+     focused UX-critic agent run (`ux-conventions.md` as the rubric).
+  5. Launch **2–3 `feature-dev:code-architect`** agents in parallel (minimal-change,
      clean-architecture, pragmatic-balance). Pick one, with reasoning; confirm the
      approach with the user.
-  5. Feed the chosen blueprint (and UI direction) into the issue plan (Step 1) and
-     the implementation (Step 5).
+  6. Feed the chosen blueprint (UI **and** UX decisions) into the issue plan (Step 1)
+     and the implementation (Step 5).
 
 > The full interactive `/feature-dev` *command* is a separate top-level flow that is
 > blind to this project's governance (issues, Kanban, Codex, releases). Do **not**
