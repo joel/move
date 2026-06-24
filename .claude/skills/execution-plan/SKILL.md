@@ -70,17 +70,18 @@ If your project keeps a running steps/audit log per effort (e.g. a per-effort `S
 
 ## Design Phase (delegated to the `feature-dev` plugin)
 
-The *understand-and-design* inner loop is owned by Anthropic's official plugins, not
-duplicated here. The `feature-dev` subagents are registered in this session and
-invoked by `subagent_type` via the Agent tool; `frontend-design` is a skill invoked
-via the Skill tool — there is nothing to copy:
+The *understand-and-design* inner loop (and the pre-push review) are owned by
+Anthropic's official plugins, not duplicated here. The `feature-dev` subagents are
+registered in this session and invoked by `subagent_type` via the Agent tool;
+`frontend-design` and `/code-review` are skills invoked via the Skill tool — there is
+nothing to copy:
 
 | Capability | Kind | Use it to |
 |---|---|---|
 | `feature-dev:code-explorer` | agent (`subagent_type`) | Trace how the relevant area works before you plan (P2) |
 | `feature-dev:code-architect` | agent (`subagent_type`) | Get an implementation blueprint grounded in real patterns (P4) |
-| `feature-dev:code-reviewer` | agent (`subagent_type`) | Local pre-push review, complements the remote Codex loop (P6) |
 | `frontend-design` | skill (Skill tool) | Visual/UI direction — palette, type, layout, signature — for customer-facing surfaces |
+| `/code-review` | skill (Skill tool) | The pre-push **Code Review (CR) loop** — see Step 5c. Our own review before the PR exists, so it front-runs (and shortens) the remote Codex loop |
 
 The plugins stay the upstream source of truth — when Anthropic updates them, this
 skill inherits the change for free. The skill keeps only the project-specific
@@ -223,23 +224,48 @@ Extend `db/seeds.rb` so that after `bin/reset` a developer can sign in and **imm
 - **Loginable** — seeded sign-in accounts need a verified status; note the demo email + org subdomain in a comment.
 - **Verify** — run `bin/rails db:seed` twice **against the same database** (idempotency: `bin/reset` drops/recreates the DB, so re-running it can't catch non-idempotent seeds — it masks them), and confirm the records render during Step 8 (`/product-review`).
 
-### Step 5c: Local Code Review (delegated — feature/multi-file work)
+### Step 5c: Code Review (CR) — internal review loop before push
 
-Before the mechanical lint/test gate, run a **local** review pass so quality issues
-are caught *before* you push — this complements, and front-runs, the remote Codex
-loop (Step 10b). Skip for trivial changes.
+**Goal: review our own code *before* the PR exists, so the remote Codex loop
+(Step 10b) opens on already-clean code instead of becoming the first reviewer.**
+Most Codex round-trips are findings we could have caught locally; this phase exists
+specifically to absorb them in a cheap local loop and keep the expensive
+PR → CI → Codex loop short. Skip only for trivial changes.
 
-Launch **3 `feature-dev:code-reviewer`** agents in parallel (feature-dev P6), each
-with a different focus, scoped to your diff:
+Use the official Anthropic **`/code-review`** skill on your working-tree diff (it
+runs confidence-scored, multi-agent passes over the current diff, reads
+`CLAUDE.md`/`AGENTS.md`, and surfaces only high-confidence issues):
 
-- simplicity / DRY / elegance
-- bugs / functional correctness
-- project conventions & abstractions (it reads `CLAUDE.md`/`AGENTS.md`; it reports
-  only issues with confidence ≥ 80)
+```
+/code-review            # scale effort to the change — default for most work
+/code-review high       # high→max for security / auth / concurrency / wide blast radius
+```
 
-Consolidate the findings, fix the high-severity ones now (fold fixes into the relevant
-atomic commit), and note anything deliberately deferred. Catching these locally turns
-later Codex rounds into confirmations rather than rework.
+**The loop:**
+
+1. **Run `/code-review`** (optionally `--fix` to apply mechanical fixes to the working
+   tree; `--comment` is for PR mode — not used here, pre-push).
+2. **Triage each finding exactly like a Codex comment (Step 11b):** fix the real ones
+   (fold into the relevant atomic commit); for a suspected false positive,
+   reproduce-before-dismissing; defer to a tracked issue only when genuinely justified.
+3. **Re-run** after the fixes and repeat **until a round comes back clean** (or the only
+   remainder is explicitly deferred).
+
+> **Round until satisfied — but heed the SAME stop rule as Step 10b:
+> "Know when to stop — findings have diminishing returns on mature code."** Read that
+> section; it governs this loop too. The CR loop converges in *severity*: early rounds
+> catch real bugs (correctness, ordering, security), later rounds shrink to contrived
+> nitpicks on already-correct code. So:
+> - When findings degrade to cosmetic nits, or each needs a more elaborate/unlikely
+>   condition to trigger, **stop and push** — don't spend a full extra cycle on a nit.
+> - Prefer **one principled fix** (a small invariant/state machine) over patching each
+>   adjacent edge case; one correct model ends the whack-a-mole.
+> - "Clean" on living code isn't guaranteed on any finite round — **two substantive
+>   rounds that converge is enough.** The aim is to ship correct code, not to chase a
+>   perfect verdict locally any more than remotely.
+
+Catching findings here turns later Codex rounds into confirmations rather than rework —
+that is the whole point of the phase.
 
 ### Step 6: Pre-Commit Validation
 
@@ -623,7 +649,7 @@ gh release view <tag> --repo <owner>/<repo> >/dev/null 2>&1 \
 4.  git checkout -b feature/                           → Create branch
 5.  <implement the architect blueprint>                → Write code
 5b. extend db/seeds.rb (+ bundle exec rails db:seed)   → Showcase-ready demo data
-5c. feature-dev:code-reviewer (×3)                     → Local review before push (skip if trivial)
+5c. /code-review (loop until clean; mind the stop rule) → Internal CR before push (skip if trivial)
 6.  bundle exec rake                                   → Lint + tests + system tests
 7.  git commit (+ append sha to audit log)             → Overcommit hooks validate
 8.  /product-review                                    → Live browser verification
