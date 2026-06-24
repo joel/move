@@ -40,6 +40,30 @@ This document provides instructions and protocols for AI Agents interacting with
 
 **Design-led phase plan:** `doc/phases/` re-organises the v0.2 work around screens so each customer-facing surface ships against a real design. `Phase D0` (design foundation) must land before any other UI phase. The domain-led companion plan is `doc/ai/v0.2/prompts/`.
 
+### UX / interaction conventions (MUST follow for user-facing changes)
+
+Phase D0 / Stitch govern how surfaces **look**; these govern how they **behave**.
+The full rubric (principles, rules table, planning checklist) lives in
+[`doc/project/ux-conventions.md`](doc/project/ux-conventions.md) and is applied at
+plan-time by the `/execution-plan` design pass. The non-negotiable rules — review
+(`/code-review`) flags violations on any user-facing change:
+
+1. **Make the result of an action visible.** After create/edit/move, the affected
+   record must be visible without scrolling (insert at its sorted position with a
+   scroll-to + transient highlight, or top when order is recency) plus a linking
+   confirmation toast. **Never silently append a new record off-screen.**
+2. **Default to the most *useful* order, not insertion or alphabetical.** Choose the
+   order that serves the task (recency / weight / count / priority); make the active
+   sort visible and changeable.
+3. **Hide what doesn't earn its place.** No zero-value chrome — empty facets, tags
+   with no attached records, zero-count filters, always-blank columns.
+4. **Remember the user's context.** Prefer the user's last useful input/result over a
+   generic placeholder or reset (recent searches, last-used room/filter).
+5. **Cover every state deliberately** (empty / sparse / loading / processing / error)
+   and **preserve focus + scroll** across actions and Turbo Stream updates.
+
+New papercuts become a rule in `ux-conventions.md`; if it recurs, mirror it here.
+
 ### Architecture & engineering conventions (MUST follow)
 
 These are non-negotiable for all domain work. Do not reinvent these wheels.
