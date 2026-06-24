@@ -29,7 +29,8 @@ class BoxesController < MoveScopedController
       summary: move_summary,
       selected_room_id: selected_room&.id,
       item_counts: @move.items.in_box.group(:box_id).count,
-      editable: editable_move?
+      editable: editable_move?,
+      highlight_box_id: flash[:highlight_box_id]
     )
   end
 
@@ -77,6 +78,12 @@ class BoxesController < MoveScopedController
 
     case result
     in Dry::Monads::Success(box)
+      # Land back on the list (default recency order → the new box is at the top)
+      # and make it unmissable: a "View" link in the toast + a one-time highlight
+      # on its card (#336).
+      flash[:action_href] = move_box_path(@move, box)
+      flash[:action_label] = t("boxes.index.view_box")
+      flash[:highlight_box_id] = box.id
       redirect_to move_boxes_path(@move), notice: t(".created", number: box.number)
     in Dry::Monads::Failure(errors)
       box = @move.boxes.new(box_params)

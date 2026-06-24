@@ -138,6 +138,16 @@ RSpec.describe "Boxes" do
       expect(move.boxes.last.room.name).to eq("Kitchen")
     end
 
+    it "highlights the new box and offers a View link after create (#336)" do
+      post move_boxes_path(move), params: { box: { room_name: "Kitchen" } }
+      follow_redirect!
+
+      box = move.boxes.order(:created_at).last
+      expect(response.body).to include("box-added-highlight")
+      expect(response.body).to include(I18n.t("boxes.index.view_box"))
+      expect(response.body).to include(move_box_path(move, box))
+    end
+
     it "re-renders the form with errors for an invalid number" do
       expect do
         post move_boxes_path(move), params: { box: { number: "A1" } }

@@ -9,7 +9,8 @@ module Views
       include Phlex::Rails::Helpers::FormWith
 
       def initialize(move:, boxes:, rooms:, summary:, sort_key: Box::DEFAULT_SORT,
-                     selected_room_id: nil, item_counts: {}, editable: false)
+                     selected_room_id: nil, item_counts: {}, editable: false,
+                     highlight_box_id: nil)
         @move = move
         @boxes = boxes
         @rooms = rooms
@@ -18,6 +19,7 @@ module Views
         @selected_room_id = selected_room_id
         @item_counts = item_counts
         @editable = editable
+        @highlight_box_id = highlight_box_id
       end
 
       def view_template
@@ -130,7 +132,12 @@ module Views
       # keeps its own Add CTA.
       def grid
         div(class: "grid grid-cols-1 gap-stack-gap sm:grid-cols-2 lg:grid-cols-3") do
-          @boxes.each { |box| render Components::BoxCard.new(box: box, item_count: @item_counts[box.id].to_i) }
+          @boxes.each do |box|
+            render Components::BoxCard.new(
+              box: box, item_count: @item_counts[box.id].to_i,
+              highlight: box.id == @highlight_box_id
+            )
+          end
         end
       end
 
