@@ -6,11 +6,15 @@ module Views
     # filter, and the box grid (with a "Start New Box" tile). Renders inside the
     # AppLayout sidebar shell (see AppShellLayout).
     class Index < Views::Base
-      def initialize(move:, boxes:, rooms:, summary:, selected_room_id: nil, item_counts: {}, editable: false)
+      include Phlex::Rails::Helpers::FormWith
+
+      def initialize(move:, boxes:, rooms:, summary:, sort_key: Box::DEFAULT_SORT,
+                     selected_room_id: nil, item_counts: {}, editable: false)
         @move = move
         @boxes = boxes
         @rooms = rooms
         @summary = summary
+        @sort_key = sort_key
         @selected_room_id = selected_room_id
         @item_counts = item_counts
         @editable = editable
@@ -19,7 +23,7 @@ module Views
       def view_template
         header
         progress_summary
-        filters if @rooms.any?
+        controls if @boxes.any?
         @boxes.any? ? grid : empty_state
       end
 
@@ -69,11 +73,47 @@ module Views
         end
       end
 
+      # Room filter (left) + sort control (right). Both drive GET query params, so
+      # the active room and sort survive each other and stay bookmarkable.
+      def controls
+        div(class: "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between") do
+          @rooms.any? ? filters : div
+          sort_control
+        end
+      end
+
       def filters
         div(class: "flex gap-3 overflow-x-auto pb-1") do
           chip_link(I18n.t("boxes.filters.all"), move_boxes_path(@move), @selected_room_id.nil?)
           @rooms.each do |room|
             chip_link(room.name, move_boxes_path(@move, room_id: room.id), @selected_room_id == room.id)
+          end
+        end
+      end
+
+      # Auto-submitting GET select (Phlex blocks inline on* handlers, so the
+      # submit is driven by the `auto-submit` Stimulus controller — same pattern as
+      # Settings labels-per-box). Carries the active room filter through.
+      def sort_control
+        form_with(url: move_boxes_path(@move), method: :get,
+                  data: { controller: "auto-submit" }) do
+          input(type: "hidden", name: "room_id", value: @selected_room_id) if @selected_room_id
+          label(class: "flex items-center gap-2 text-label-caps uppercase text-muted") do
+            span { I18n.t("boxes.index.sort.label") }
+            select(
+              name: "sort",
+              aria_label: I18n.t("boxes.index.sort.label"),
+              data: { action: "change->auto-submit#submit" },
+              class: "rounded-full border border-card-border bg-card px-4 py-2 text-body-md " \
+                     "normal-case tracking-normal text-text-warm focus:outline-none " \
+                     "focus:ring-2 focus:ring-accent-sage/40"
+            ) do
+              Box::SORTS.each_key do |key|
+                option(value: key, selected: key == @sort_key) do
+                  I18n.t("boxes.index.sort.#{key}")
+                end
+              end
+            end
           end
         end
       end

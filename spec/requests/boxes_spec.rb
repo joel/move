@@ -51,6 +51,46 @@ RSpec.describe "Boxes" do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Box 01")
     end
+
+    it "defaults to recency order so the newest box is first (#336)" do
+      create(:box, move:, number: "5", created_at: 2.days.ago) # older
+      create(:box, move:, number: "1") # created now → newer
+
+      get move_boxes_path(move)
+
+      # The newer box (Box 01) sorts above the older one despite its lower number.
+      expect(response.body.index("Box 01")).to be < response.body.index("Box 05")
+    end
+
+    it "orders by box number ascending when ?sort=number" do
+      create(:box, move:, number: "2")
+      create(:box, move:, number: "1")
+
+      get move_boxes_path(move, sort: "number")
+
+      expect(response.body.index("Box 01")).to be < response.body.index("Box 02")
+    end
+
+    it "orders by weight (heaviest first, unweighed last) when ?sort=weight" do
+      create(:box, move:, number: "1", weight_kg: 5)
+      create(:box, move:, number: "2", weight_kg: 20)
+      create(:box, move:, number: "3") # no weight → NULLS LAST
+
+      get move_boxes_path(move, sort: "weight")
+
+      body = response.body
+      expect(body.index("Box 02")).to be < body.index("Box 01")
+      expect(body.index("Box 01")).to be < body.index("Box 03")
+    end
+
+    it "falls back to the default order for an unknown ?sort=" do
+      create(:box, move:, number: "1")
+
+      get move_boxes_path(move, sort: "nonsense")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Box 01")
+    end
   end
 
   describe "GET /moves/:move_id/boxes/new" do

@@ -71,6 +71,24 @@ class Box < ApplicationRecord
   validates :description, length: { maximum: DESCRIPTION_MAX_LENGTH }, allow_blank: true
 
   scope :ordered, -> { order(Arel.sql("number::bigint")) }
+
+  # Selectable orderings for the Boxes Home list (#336). Keys are the permitted
+  # `?sort=` values (a whitelist — never feed params straight to `order`). The
+  # default is recency so a just-added box lands at the TOP and is never hidden
+  # off-screen. All clauses are SQL-only (AGENTS.md §1 #5); `NULLS LAST` keeps
+  # dimensionless / unweighed boxes (a brand-new box) from floating above
+  # measured ones, and `number::bigint` is the stable tiebreaker.
+  SORTS = {
+    "recent" => Arel.sql("created_at DESC, number::bigint DESC"),
+    "number" => Arel.sql("number::bigint ASC"),
+    "weight" => Arel.sql("weight_kg DESC NULLS LAST, number::bigint ASC"),
+    "size" => Arel.sql("length_cm * width_cm * height_cm DESC NULLS LAST, number::bigint ASC")
+  }.freeze
+  DEFAULT_SORT = "recent"
+
+  # Order by a permitted sort key, falling back to the default for anything
+  # unknown (so a stray `?sort=` can neither raise nor inject SQL).
+  scope :sorted_by, ->(key) { order(SORTS.fetch(key.to_s, SORTS[DEFAULT_SORT])) }
   # Boxes whose numeric label falls in [from, to], in print order. The DB compares
   # number::bigint (the column is a string), so the range is numeric, not lexical
   # — shared by the label-print form, action, and the generation job (#303).

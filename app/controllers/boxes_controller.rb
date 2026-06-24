@@ -23,7 +23,8 @@ class BoxesController < MoveScopedController
 
     render Views::Boxes::Index.new(
       move: @move,
-      boxes: scope.ordered,
+      boxes: scope.sorted_by(sort_key),
+      sort_key: sort_key,
       rooms: @move.rooms.order(:name),
       summary: move_summary,
       selected_room_id: selected_room&.id,
@@ -223,6 +224,13 @@ class BoxesController < MoveScopedController
 
   def selected_room_id
     params[:room_id].presence
+  end
+
+  # Permitted `?sort=` key for the Boxes list; defaults to "recent" (newest
+  # first) so a freshly added box lands at the top (#336). Unknown values fall
+  # back to the default rather than raising or reaching `order` directly.
+  def sort_key
+    @sort_key ||= Box::SORTS.key?(params[:sort]) ? params[:sort] : Box::DEFAULT_SORT
   end
 
   # Move-wide progress, independent of any room filter. Item / pending-review
