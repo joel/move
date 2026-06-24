@@ -43,10 +43,20 @@ RSpec.describe Searches::RecentSearches do
     expect(recent.list).not_to include("query 1", "query 2")
   end
 
-  it "clamps an over-long query to MAX_LENGTH chars" do
-    recent.record("x" * (described_class::MAX_LENGTH + 50))
+  it "clamps an over-long query to MAX_BYTES bytes" do
+    recent.record("x" * (described_class::MAX_BYTES + 50))
 
-    expect(recent.list.first.length).to eq(described_class::MAX_LENGTH)
+    expect(recent.list.first.bytesize).to eq(described_class::MAX_BYTES)
+  end
+
+  it "clamps multibyte queries by bytes without splitting a character" do
+    # "🔦" is 4 bytes; clamping must keep whole codepoints and valid UTF-8.
+    recent.record("🔦" * described_class::MAX_BYTES)
+    stored = recent.list.first
+
+    expect(stored).to be_valid_encoding
+    expect(stored.bytesize).to be <= described_class::MAX_BYTES
+    expect(stored.bytesize % 4).to eq(0)
   end
 
   it "tracks at most MAX_MOVES Moves, evicting the least-recently-used" do
@@ -81,9 +91,21 @@ RSpec.describe Searches::RecentSearches do
     expect(described_class.new(session, other_move).list).to eq(["garage"])
   end
 
-  it "persists into the shared session store" do
+  it "persists into the shared session store under a tenant-scoped key" do
     recent.record("kitchen")
 
-    expect(session[described_class::SESSION_KEY]).to eq("42" => ["kitchen"])
+    key = "#{Apartment::Tenant.current}:42"
+    expect(session[described_class::SESSION_KEY]).to eq(key => ["kitchen"])
+  end
+
+  it "scopes the key by tenant so a shared cookie can't leak across orgs" do
+    allow(Apartment::Tenant).to receive(:current).and_return("acme")
+    recent.record("acme secret")
+
+    allow(Apartment::Tenant).to receive(:current).and_return("globex")
+    expect(described_class.new(session, move).list).to eq([])
+
+    allow(Apartment::Tenant).to receive(:current).and_return("acme")
+    expect(described_class.new(session, move).list).to eq(["acme secret"])
   end
 end

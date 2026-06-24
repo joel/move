@@ -10,13 +10,20 @@ module Searches
   # MAX queries per Move, most-recent-first, deduped case-insensitively.
   #
   # Bounded on every axis so it can never overflow the 4KB cookie session
-  # (#338): queries longer than MAX_LENGTH are clamped, at most MAX per Move, and
+  # (#338): queries longer than MAX_BYTES are clamped, at most MAX per Move, and
   # at most MAX_MOVES Moves are tracked (least-recently-used Move evicted first).
+  # Worst case MAX_MOVES * MAX * MAX_BYTES bytes of query text.
+  #
+  # The key includes the current tenant because the session cookie is shared
+  # across org subdomains (config.x.cookie_domain); Move ids are globally-unique
+  # UUIDs so a cross-tenant collision can't actually occur, but scoping by tenant
+  # keeps one org's terms structurally unreachable from another (defense-in-depth
+  # matching the schema-per-tenant isolation posture).
   class RecentSearches
     SESSION_KEY = "recent_searches"
     MAX = 5            # queries kept per Move
     MAX_MOVES = 3      # Moves tracked at once (LRU-evicted)
-    MAX_LENGTH = 80    # chars kept per query
+    MAX_BYTES = 80     # bytes kept per query (byte-, not char-, bounded)
 
     def initialize(session, move)
       @session = session
@@ -34,7 +41,7 @@ module Searches
     # the oldest Move beyond MAX_MOVES. Blank queries are ignored. Returns the
     # updated list.
     def record(query)
-      q = query.to_s.strip.slice(0, MAX_LENGTH)
+      q = clamp(query)
       return list if q.blank?
 
       data = store
@@ -48,8 +55,17 @@ module Searches
 
     private
 
+    # Strip, then clamp to a byte budget on a character boundary — `byteslice`
+    # alone can split a multibyte char, so `scrub("")` drops the dangling bytes.
+    def clamp(query)
+      q = query.to_s.strip
+      return q if q.bytesize <= MAX_BYTES
+
+      q.byteslice(0, MAX_BYTES).scrub("")
+    end
+
     def move_key
-      @move.id.to_s
+      "#{Apartment::Tenant.current}:#{@move.id}"
     end
 
     def store
