@@ -196,8 +196,9 @@ class ItemsController < MoveScopedController
   # The category/tag pickers offer only the Move's managed vocabularies (D5
   # selection-only; management is D7).
   def vocabulary
-    # Box-only tags are excluded from the item picker (applies-to facet).
-    { categories: @move.categories.ordered, tags: @move.tags.for_items.ordered }
+    # Box-only tags are excluded from the item picker (applies-to facet); tags are
+    # ordered most-used-first so the common ones are quickest to reach (#337).
+    { categories: @move.categories.ordered, tags: @move.tags.for_items.by_usage }
   end
 
   def move_error(reason)

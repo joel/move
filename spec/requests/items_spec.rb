@@ -20,6 +20,16 @@ RSpec.describe "Items" do
       expect(response.body).to include(I18n.t("items.new.title"))
       expect(response.body).to include(I18n.t("items.form.name"))
     end
+
+    it "lists tags most-used first, not alphabetically (#337)" do
+      common = create(:tag, move:, name: "Zebra")  # used → should lead
+      create(:tag, move:, name: "Apple")           # unused → trails despite A–Z
+      create(:item_tag, tag: common, item: create(:item, move:, box:))
+
+      get new_move_box_item_path(move, box)
+
+      expect(response.body.index("Zebra")).to be < response.body.index("Apple")
+    end
   end
 
   describe "POST /moves/:move_id/boxes/:box_id/items" do
