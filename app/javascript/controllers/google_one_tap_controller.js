@@ -1,6 +1,17 @@
 import { Controller } from "@hotwired/stimulus"
 
+// sessionStorage key holding the timestamp of the last `no_account` result, used
+// to briefly suppress One Tap.
 const NO_ACCOUNT_KEY = "google_one_tap_no_account"
+
+// How long to suppress One Tap after a no_account result — just long enough to
+// ride through the OAuth bridge redirect (/login?via=google → /auth/google)
+// without auto_select re-firing no_account → redirect in a loop. It then
+// self-expires so One Tap re-prompts later (e.g. after a sign-out). We can't
+// clear it on sign-out instead: sessionStorage is origin-scoped to the apex
+// where One Tap runs, but sign-in/out happens on the org subdomain (a different
+// origin), so a time-box is the only same-origin way to re-enable it.
+const SUPPRESS_MS = 60_000
 
 export default class extends Controller {
   static values = {
@@ -9,7 +20,7 @@ export default class extends Controller {
   }
 
   connect() {
-    if (sessionStorage.getItem(NO_ACCOUNT_KEY)) return
+    if (this.suppressed) return
 
     this.loadScript().then(() => this.initializeOneTap())
   }
@@ -18,6 +29,16 @@ export default class extends Controller {
     if (window.google?.accounts?.id) {
       window.google.accounts.id.cancel()
     }
+  }
+
+  // True while the recent no_account suppression window is still open; clears the
+  // key once it has expired so the next visit can prompt again.
+  get suppressed() {
+    const since = Number(sessionStorage.getItem(NO_ACCOUNT_KEY))
+    if (since && Date.now() - since < SUPPRESS_MS) return true
+
+    sessionStorage.removeItem(NO_ACCOUNT_KEY)
+    return false
   }
 
   loadScript() {
@@ -60,12 +81,14 @@ export default class extends Controller {
       .then((res) => res.json())
       .then((data) => {
         if (data.ok) {
+          sessionStorage.removeItem(NO_ACCOUNT_KEY)
           window.location.replace(data.redirect || "/")
         } else if (data.error === "no_account") {
-          // Suppress One Tap for the rest of this browser session
-          // to avoid auto_select → no_account → redirect loops.
-          sessionStorage.setItem(NO_ACCOUNT_KEY, "1")
-          window.google.accounts.id.cancel()
+          // Briefly suppress (so auto_select can't loop on the bridge page), then
+          // bridge into the account-creating OAuth flow. The window self-expires
+          // so One Tap returns later — see SUPPRESS_MS.
+          sessionStorage.setItem(NO_ACCOUNT_KEY, String(Date.now()))
+          window.location.replace(data.redirect || "/create-account")
         }
       })
   }

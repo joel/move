@@ -25,14 +25,28 @@ class GoogleOneTapSessionsController < ApplicationController
 
     return login_and_respond(user, payload) if user
 
-    # No matching account: send them to self-service signup.
+    # No matching account. One Tap is login-only; bridge new users into the
+    # account-creating OAuth flow (see #signup_redirect).
     render json: {
       error: "no_account",
-      redirect: rodauth.create_account_path
+      redirect: signup_redirect
     }, status: :unprocessable_content
   end
 
   private
+
+  # One Tap deliberately never creates accounts (it trusts only a tokeninfo
+  # lookup, not the full OAuth code exchange). Send a new user into the trusted
+  # account-creating path instead: the apex /login?via=google page auto-submits
+  # the "Sign in with Google" button to /auth/google, whose OmniAuth callback
+  # creates the account (omniauth_create_account?) and lands them on their org
+  # subdomain. That bridge only exists when full OAuth creds are configured;
+  # otherwise fall back to the self-service signup form.
+  def signup_redirect
+    return rodauth.create_account_path unless google_credentials_present?
+
+    "#{rodauth.login_path}?via=google"
+  end
 
   def verify_google_token(token)
     return nil if token.blank?
