@@ -55,8 +55,10 @@ plan-time by the `/execution-plan` design pass. The non-negotiable rules — rev
 2. **Default to the most *useful* order, not insertion or alphabetical.** Choose the
    order that serves the task (recency / weight / count / priority); make the active
    sort visible and changeable.
-3. **Hide what doesn't earn its place.** No zero-value chrome — empty facets, tags
-   with no attached records, zero-count filters, always-blank columns.
+3. **Hide what doesn't earn its place.** No zero-value chrome in **read-only**
+   surfaces — empty facets, zero-count filters, always-blank columns. (Does **not**
+   apply to *selection* surfaces: a picker/management list keeps unused options
+   selectable; order them most-used-first instead.)
 4. **Remember the user's context.** Prefer the user's last useful input/result over a
    generic placeholder or reset (recent searches, last-used room/filter).
 5. **Cover every state deliberately** (empty / sparse / loading / processing / error)

@@ -66,7 +66,8 @@ papercut is found.
 |---|---|---|
 | Add a box (`/boxes`) | The new box lands where the user can see it — at its sorted position with a scroll-to + transient highlight (or at the top when order is recency); never silently appended off-screen. | 1 |
 | Boxes list — default order | Order by the most decision-useful key (e.g. weight/size for packing & loading), not insertion order. Surface the active sort and let the user change it. | 2 |
-| Tag / facet list (`/boxes`) | Show only tags with ≥ 1 attached box; order by count/weight (most-used first), not alphabetically. | 2, 3 |
+| Tag picker (item form, in the box flow) | Order most-used first (alphabetical tiebreak), not A–Z. **Keep all tags selectable** — a *selection* surface must let you apply a not-yet-used tag, and a fresh Move has none used, so "hide unused" does **not** apply here. | 2 |
+| Read-only tag/room *facet* (a filter that lists used values) | Hide entries with zero attached records and order by count — "hide unused" applies only to read-only facets, not to pickers/management lists. (No tag facet exists on `/boxes` yet.) | 2, 3 |
 | Search (`/search`) | Empty project → placeholder examples. Once the user has run a successful search, show the most recent successful search(es) in place of the static placeholders. | 4, 1 |
 
 ## Planning checklist (per user journey / action)
