@@ -51,6 +51,80 @@ RSpec.describe "Boxes" do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Box 01")
     end
+
+    it "defaults to recency order so the newest box is first (#336)" do
+      create(:box, move:, number: "5", created_at: 2.days.ago) # older
+      create(:box, move:, number: "1") # created now → newer
+
+      get move_boxes_path(move)
+
+      # The newer box (Box 01) sorts above the older one despite its lower number.
+      expect(response.body.index("Box 01")).to be < response.body.index("Box 05")
+    end
+
+    it "orders by box number ascending when ?sort=number" do
+      create(:box, move:, number: "2")
+      create(:box, move:, number: "1")
+
+      get move_boxes_path(move, sort: "number")
+
+      expect(response.body.index("Box 01")).to be < response.body.index("Box 02")
+    end
+
+    it "orders by weight (heaviest first, unweighed last) when ?sort=weight" do
+      create(:box, move:, number: "1", weight_kg: 5)
+      create(:box, move:, number: "2", weight_kg: 20)
+      create(:box, move:, number: "3") # no weight → NULLS LAST
+
+      get move_boxes_path(move, sort: "weight")
+
+      body = response.body
+      expect(body.index("Box 02")).to be < body.index("Box 01")
+      expect(body.index("Box 01")).to be < body.index("Box 03")
+    end
+
+    it "orders by volume (largest first, dimensionless last) when ?sort=size" do
+      create(:box, move:, number: "1", length_cm: 10, width_cm: 10, height_cm: 10) # 1000
+      create(:box, move:, number: "2", length_cm: 20, width_cm: 20, height_cm: 20) # 8000
+      create(:box, move:, number: "3") # no dimensions → NULLS LAST
+
+      get move_boxes_path(move, sort: "size")
+
+      body = response.body
+      expect(body.index("Box 02")).to be < body.index("Box 01")
+      expect(body.index("Box 01")).to be < body.index("Box 03")
+    end
+
+    it "falls back to the default order for an unknown ?sort=" do
+      create(:box, move:, number: "1")
+
+      get move_boxes_path(move, sort: "nonsense")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Box 01")
+    end
+
+    it "keeps the active sort when switching room filters" do
+      kitchen = create(:room, move:, name: "Kitchen")
+      create(:box, move:, number: "1", room: kitchen)
+
+      get move_boxes_path(move, sort: "weight")
+
+      # The room-filter chip links carry the non-default sort so it survives.
+      expect(response.body).to include("room_id=#{kitchen.id}").and include("sort=weight")
+    end
+
+    it "keeps the room filter chips when a filtered room has no boxes" do
+      create(:room, move:, name: "Kitchen")
+      empty_room = create(:room, move:, name: "Attic")
+      create(:box, move:, number: "1", room: create(:room, move:, name: "Garage"))
+
+      get move_boxes_path(move, room_id: empty_room.id)
+
+      # The empty filtered result still offers the room chips to switch rooms.
+      expect(response.body).to include("Kitchen").and include("Attic")
+      expect(response.body).to include(I18n.t("boxes.empty.filtered_title"))
+    end
   end
 
   describe "GET /moves/:move_id/boxes/new" do
@@ -96,6 +170,16 @@ RSpec.describe "Boxes" do
 
       expect(response).to redirect_to(move_boxes_path(move))
       expect(move.boxes.last.room.name).to eq("Kitchen")
+    end
+
+    it "highlights the new box and offers a View link after create (#336)" do
+      post move_boxes_path(move), params: { box: { room_name: "Kitchen" } }
+      follow_redirect!
+
+      box = move.boxes.order(:created_at).last
+      expect(response.body).to include("box-added-highlight")
+      expect(response.body).to include(I18n.t("boxes.index.view_box"))
+      expect(response.body).to include(move_box_path(move, box))
     end
 
     it "re-renders the form with errors for an invalid number" do

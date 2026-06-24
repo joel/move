@@ -23,12 +23,14 @@ class BoxesController < MoveScopedController
 
     render Views::Boxes::Index.new(
       move: @move,
-      boxes: scope.ordered,
+      boxes: scope.sorted_by(sort_key),
+      sort_key: sort_key,
       rooms: @move.rooms.order(:name),
       summary: move_summary,
       selected_room_id: selected_room&.id,
       item_counts: @move.items.in_box.group(:box_id).count,
-      editable: editable_move?
+      editable: editable_move?,
+      highlight_box_id: flash[:highlight_box_id]
     )
   end
 
@@ -76,6 +78,12 @@ class BoxesController < MoveScopedController
 
     case result
     in Dry::Monads::Success(box)
+      # Land back on the list (default recency order → the new box is at the top)
+      # and make it unmissable: a "View" link in the toast + a one-time highlight
+      # on its card (#336).
+      flash[:action_href] = move_box_path(@move, box)
+      flash[:action_label] = t("boxes.index.view_box")
+      flash[:highlight_box_id] = box.id
       redirect_to move_boxes_path(@move), notice: t(".created", number: box.number)
     in Dry::Monads::Failure(errors)
       box = @move.boxes.new(box_params)
@@ -223,6 +231,13 @@ class BoxesController < MoveScopedController
 
   def selected_room_id
     params[:room_id].presence
+  end
+
+  # Permitted `?sort=` key for the Boxes list; defaults to "recent" (newest
+  # first) so a freshly added box lands at the top (#336). Unknown values fall
+  # back to the default rather than raising or reaching `order` directly.
+  def sort_key
+    @sort_key ||= Box::SORTS.key?(params[:sort]) ? params[:sort] : Box::DEFAULT_SORT
   end
 
   # Move-wide progress, independent of any room filter. Item / pending-review

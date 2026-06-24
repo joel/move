@@ -6,14 +6,15 @@ module Components
   # recognition runs arrive in later phases (D5/D4); `recognition_state` is the
   # integration point — passed nil until D4 supplies runs.
   class BoxCard < Components::Base
-    def initialize(box:, item_count: 0, recognition_state: nil)
+    def initialize(box:, item_count: 0, recognition_state: nil, highlight: false)
       @box = box
       @item_count = item_count
       @recognition_state = recognition_state
+      @highlight = highlight
     end
 
     def view_template
-      a(href: move_box_path(@box.move_id, @box), class: "block") do
+      a(href: move_box_path(@box.move_id, @box), class: link_classes) do
         render Components::Ui::Card.new(interactive: true, micro_bar: micro_bar) do
           header_row
           title_block
@@ -22,6 +23,13 @@ module Components
     end
 
     private
+
+    # `rounded-card` so the one-time highlight ring (a box-shadow) follows the
+    # card's shape when this is the just-created box (#336).
+    def link_classes
+      base = "block rounded-card"
+      @highlight ? "#{base} box-added-highlight" : base
+    end
 
     def header_row
       div(class: "flex items-start justify-between gap-3") do

@@ -30,11 +30,14 @@ module Components
         }
       }.freeze
 
-      def initialize(message:, variant: :info, title: nil, timeout: 4500, **attrs)
+      def initialize(message:, variant: :info, title: nil, timeout: 4500,
+                     action_href: nil, action_label: nil, **attrs)
         @config = VARIANTS.fetch(variant.to_sym, VARIANTS[:info])
         @message = message
         @title = title || I18n.t(@config[:title_key])
         @timeout = timeout
+        @action_href = action_href
+        @action_label = action_label
         @attrs = attrs
       end
 
@@ -55,12 +58,25 @@ module Components
           div(class: "min-w-0 flex-1") do
             p(class: "text-body-md font-bold") { @title }
             p(class: "mt-1 text-body-md text-on-surface-variant") { @message }
+            render_action
           end
           render_dismiss
         end
       end
 
       private
+
+      # Optional call-to-action link in the toast body (e.g. "View" the record an
+      # action just created). Both pieces are required, else nothing renders.
+      def render_action
+        return unless @action_href && @action_label
+
+        a(
+          href: @action_href,
+          class: "mt-2 inline-block text-body-md font-semibold text-accent-sage " \
+                 "underline-offset-2 hover:underline"
+        ) { @action_label }
+      end
 
       def render_dismiss
         button(

@@ -8,6 +8,13 @@ en:
     index:
       title: "My Boxes"
       add: "Add box"
+      view_box: "View"
+      sort:
+        label: "Sort"
+        recent: "Recently added"
+        number: "Box number"
+        weight: "Heaviest first"
+        size: "Largest first"
     summary:
       packed: "Packed"
       pending_review: "Pending review"
