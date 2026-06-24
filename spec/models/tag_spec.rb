@@ -65,5 +65,19 @@ RSpec.describe Tag do
 
       expect(move.tags.by_usage.map(&:name)).to eq(%w[Fragile Books Awkward Bulky])
     end
+
+    it "ignores soft-deleted items so a tag on deleted inventory isn't 'in use'" do
+      move = create(:move)
+      kept = create(:tag, move:, name: "Kept")
+      ghost = create(:tag, move:, name: "Ghost") # only on a discarded item
+
+      create(:item_tag, tag: kept, item: create(:item, move:))
+      gone = create(:item, move:)
+      create(:item_tag, tag: ghost, item: gone)
+      gone.discard!
+
+      # "Kept" (1 live use) ranks above "Ghost" (0 live uses) despite G < K.
+      expect(move.tags.by_usage.map(&:name)).to eq(%w[Kept Ghost])
+    end
   end
 end

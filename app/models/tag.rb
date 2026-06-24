@@ -26,10 +26,17 @@ class Tag < ApplicationRecord
   # must be able to apply a not-yet-used tag, and a fresh Move has none used),
   # they just sort last. Usage is counted in SQL via a correlated subquery (no
   # GROUP BY, so the relation still behaves like a normal one for the view's
-  # any?/each; AGENTS.md §1 #5). `item_tags` is a tenant table — no schema prefix.
+  # any?/each; AGENTS.md §1 #5). Joins `items` and filters `discarded_at IS NULL`
+  # so a tag left only on soft-deleted inventory doesn't rank as in-use (Item's
+  # `default_scope { kept }` doesn't reach a raw subquery). Both tables are
+  # per-tenant — no schema prefix.
   scope :by_usage, lambda {
     order(
-      Arel.sql("(SELECT COUNT(*) FROM item_tags WHERE item_tags.tag_id = tags.id) DESC"),
+      Arel.sql(
+        "(SELECT COUNT(*) FROM item_tags " \
+        "JOIN items ON items.id = item_tags.item_id " \
+        "WHERE item_tags.tag_id = tags.id AND items.discarded_at IS NULL) DESC"
+      ),
       :name
     )
   }
