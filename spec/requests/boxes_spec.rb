@@ -104,6 +104,16 @@ RSpec.describe "Boxes" do
       expect(response.body).to include("Box 01")
     end
 
+    it "keeps the active sort when switching room filters" do
+      kitchen = create(:room, move:, name: "Kitchen")
+      create(:box, move:, number: "1", room: kitchen)
+
+      get move_boxes_path(move, sort: "weight")
+
+      # The room-filter chip links carry the non-default sort so it survives.
+      expect(response.body).to include("room_id=#{kitchen.id}").and include("sort=weight")
+    end
+
     it "keeps the room filter chips when a filtered room has no boxes" do
       create(:room, move:, name: "Kitchen")
       empty_room = create(:room, move:, name: "Attic")

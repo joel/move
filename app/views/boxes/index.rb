@@ -92,11 +92,18 @@ module Views
 
       def filters
         div(class: "flex gap-3 overflow-x-auto pb-1") do
-          chip_link(I18n.t("boxes.filters.all"), move_boxes_path(@move), @selected_room_id.nil?)
+          chip_link(I18n.t("boxes.filters.all"), boxes_path_with(room_id: nil), @selected_room_id.nil?)
           @rooms.each do |room|
-            chip_link(room.name, move_boxes_path(@move, room_id: room.id), @selected_room_id == room.id)
+            chip_link(room.name, boxes_path_with(room_id: room.id), @selected_room_id == room.id)
           end
         end
+      end
+
+      # Filter links keep the active non-default sort so switching rooms doesn't
+      # reset it — the mirror of the sort control carrying room_id (#336 review).
+      def boxes_path_with(room_id:)
+        query = { room_id: room_id, sort: (@sort_key unless @sort_key == Box::DEFAULT_SORT) }
+        move_boxes_path(@move, query.compact)
       end
 
       # Auto-submitting GET select (Phlex blocks inline on* handlers, so the
