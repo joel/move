@@ -40,10 +40,12 @@ Metrics/BlockLength:
 # Offense count: 6
 # Configuration parameters: CountComments, CountAsOne.
 # Ceiling tracks app/misc/rodauth_main.rb (the largest class — an inherently large
-# Rodauth config). Bumped 233 -> 238 for the #346 origin-aware handoff after the
-# query logic was already extracted to Organization + SessionHandoffs::TargetResolver.
+# Rodauth config). Bumped 233 -> 238 (#346) -> 239 (#353 email-auth link host).
+# Query logic already lives in Organization + SessionHandoffs::TargetResolver; the
+# config blocks themselves keep the class large. TODO: extract the auth_class_eval
+# helpers into a module/concern to bring this back under a tighter ceiling.
 Metrics/ClassLength:
-  Max: 238
+  Max: 239
 
 # Offense count: 96
 # Configuration parameters: CountComments, CountAsOne, AllowedMethods, AllowedPatterns.
