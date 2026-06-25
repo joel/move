@@ -46,5 +46,19 @@ RSpec.describe RodauthMain do
         expect(rodauth).not_to have_received(:clear_session)
       end
     end
+
+    context "when the token insert raises a DB error (#351)" do
+      before do
+        allow(SessionHandoffToken).to receive(:create!)
+          .and_raise(ActiveRecord::StatementInvalid.new("PG::ConnectionBad"))
+      end
+
+      it "stays on the apex root without 500-ing the post-auth redirect" do
+        url = nil
+        expect { url = rodauth.tenant_handoff_url("demo") }.not_to raise_error
+        expect(url).to eq("/")
+        expect(rodauth).not_to have_received(:clear_session)
+      end
+    end
   end
 end

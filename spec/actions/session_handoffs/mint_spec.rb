@@ -34,4 +34,14 @@ RSpec.describe SessionHandoffs::Mint do
     expect(a).not_to eq(b)
     expect(SessionHandoffToken.count).to eq(2)
   end
+
+  it "fails soft (Failure, never raises) when the insert hits a DB error (#351)" do
+    allow(SessionHandoffToken).to receive(:create!)
+      .and_raise(ActiveRecord::StatementInvalid.new("PG::ConnectionBad"))
+
+    result = nil
+    expect { result = described_class.new.call(user:, organization_slug: "acme") }
+      .not_to raise_error
+    expect(result).to be_failure
+  end
 end
