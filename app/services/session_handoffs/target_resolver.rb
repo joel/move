@@ -37,7 +37,11 @@ module SessionHandoffs
     def originating_slug
       return @current_tenant if @current_tenant.present? && !apex_tenant?
 
-      @omniauth_org.presence
+      # Only a scalar string is a usable slug. Rack params can arrive as arrays
+      # (`org[]=globex`) or hashes; left unguarded, an array would pass the
+      # `slug IN (...)` membership check and then be returned verbatim, producing a
+      # malformed handoff URL/token (#355). A non-string origin → fall through.
+      @omniauth_org.presence if @omniauth_org.is_a?(String)
     end
 
     # The apex has no originating org. Match ApplicationController#current_tenant:
