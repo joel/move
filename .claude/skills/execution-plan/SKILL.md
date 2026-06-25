@@ -393,17 +393,26 @@ Then use `agent-browser` to verify all pages render without errors. Fix any issu
 > cross-host/tenant auth (e.g. host-only cookies, an apex↔subdomain handoff),
 > inspect the **raw `Set-Cookie` headers** with `curl` and a cookie jar — it proves
 > the security property far more rigorously than a visual review:
-> ```bash
-> # Does the cookie's Domain match the EXACT host (host-only), not the parent zone?
+ ```bash
+> # Capture cookies. Netscape jar fields (TAB-separated):
+> #   1=domain  2=include_subdomains(TRUE/FALSE)  3=path  4=secure  5=expiry  6=name  7=value
 > curl -sk -c jar.txt -o /dev/null -w "%{http_code} %{redirect_url}\n" "<url>"
-> grep -E "_session|_remember" jar.txt | awk '{print $1, $6}'   # col1 = #HttpOnly_<host>, col6 = name
+> grep -E "_session|_remember" jar.txt | awk -F'\t' '{print $6": domain="$1" include_subdomains="$2}'
+> ```
+> **Host-only is field 2 == `FALSE`, NOT the domain string.** Host-only means the
+> `Domain` attribute is *omitted*; an explicit `Domain=<current-host>` (even when it
+> equals the request host) still records `include_subdomains=TRUE` and is therefore
+> **not** host-only — it would also be sent to deeper subdomains. So checking `$1`
+> alone (the domain) can falsely pass; assert `$2` is `FALSE` for every auth cookie.
+> ```bash
 > # Isolation: a cookie set on host A must NOT authenticate host B.
 > curl -sk -b jar.txt -o /dev/null -w "%{http_code}\n" "<other-host>/<authed-path>"  # expect 401
 > # Single-use / expiry: replay the same token/URL → expect rejection.
 > ```
-> Assert the four things specs can't easily see: the `Domain` is the exact host;
-> the cookie does **not** authenticate a different host; single-use tokens reject on
-> replay; and expired/garbage tokens land on the failure page.
+> Assert the four things specs can't easily see: every auth cookie is host-only
+> (jar field 2 == `FALSE`); the cookie does **not** authenticate a different host;
+> single-use tokens reject on replay; and expired/garbage tokens land on the
+> failure page.
 
 ### Step 8b: Update documentation + diagrams (Mandatory for cross-cutting work)
 
