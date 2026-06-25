@@ -21,6 +21,17 @@ RSpec.describe Captures::Create do
     expect(box.items.count).to eq(3)
   end
 
+  it "enqueues background variant pre-warming for the captured photo (#316)" do
+    # Exercises the real media.captured → MediaVariants::PrewarmSubscriber wiring
+    # (the Rails.event subscriber dispatches synchronously inside emit_event).
+    allow(MediaVariants::PrewarmJob).to receive(:perform_later)
+
+    media = described_class.new.call(box:, file: upload, captured_by: user).value!
+
+    expect(MediaVariants::PrewarmJob).to have_received(:perform_later)
+      .with(media.id, tenant: Apartment::Tenant.current)
+  end
+
   it "blocks capture into a sealed box" do
     sealed = create(:box, :with_room, move:, status: "sealed")
     result = described_class.new.call(box: sealed, file: upload, captured_by: user)
