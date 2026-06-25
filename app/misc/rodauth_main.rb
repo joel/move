@@ -256,12 +256,16 @@ class RodauthMain < Rodauth::Rails::Auth
         # token is url-safe base64, so it needs no escaping. Falls back to the
         # bare tenant home if minting fails (the user re-authenticates).
         def tenant_handoff_url(slug)
-          base = tenant_home_url(slug)
           # find_by (not find!) so a deleted/absent account never raises out of
-          # the login_redirect block into a 500 — just fall back to the bare home.
+          # the login_redirect block into a 500.
           user = ::User.find_by(id: account_id)
           raw = user && SessionHandoffs::Mint.new.call(user:, organization_slug: slug).value_or(nil)
-          return base unless raw
+          # Couldn't mint a token (no account, or a DB error on the token row):
+          # stay on the apex with the session INTACT (don't clear_session below),
+          # rather than redirecting the user — unauthenticated — to the tenant home
+          # where they'd hit a 401/redirect loop. The broker only clears + hands off
+          # on success, so the failure path stays coherent (#349).
+          return "/" unless raw
 
           # The apex is a pure auth broker (#280): once it has handed the session
           # to the subdomain via the token, it must NOT keep a parallel apex login.
@@ -270,7 +274,7 @@ class RodauthMain < Rodauth::Rails::Auth
           # logout regression. Clear it here; the subdomain establishes (and
           # remembers) its own session when it consumes the token.
           clear_session
-          "#{base}session/handoff?token=#{raw}"
+          "#{tenant_home_url(slug)}session/handoff?token=#{raw}"
         end
 
         def organization_name_for(user)
