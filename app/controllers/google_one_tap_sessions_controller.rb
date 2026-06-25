@@ -126,7 +126,9 @@ class GoogleOneTapSessionsController < ApplicationController
 
   def org_home_redirect
     org = rodauth.primary_organization
-    org ? rodauth.tenant_home_url(org.slug) : "/"
+    # Host-only cookies (#280): hand the session to the subdomain via a single-use
+    # token rather than relying on the apex session cookie traveling there.
+    org ? rodauth.tenant_handoff_url(org.slug) : "/"
   end
 
   def backfill_name(user, payload)

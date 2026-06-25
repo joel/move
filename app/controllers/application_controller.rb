@@ -54,8 +54,14 @@ class ApplicationController < ActionController::Base
   # also resolve to the public tenant, so a host check — not just
   # current_tenant.nil? — is what keeps Google off non-canonical hosts.
   def on_apex_host?
-    apex = Rails.application.config.action_mailer.default_url_options&.dig(:host)
-    apex.present? && request.host == apex
+    apex_host.present? && request.host == apex_host
+  end
+
+  # The canonical apex host this app generates links for (move-easy.org in prod,
+  # move.workeverywhere.docker in dev). Single source of truth for on_apex_host?
+  # and the session-handoff failure's apex login URL (#280).
+  def apex_host
+    Rails.application.config.action_mailer.default_url_options&.dig(:host)
   end
 
   # Both Google credentials are required for the OAuth redirect flow (the code

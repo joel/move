@@ -14,11 +14,11 @@ module Searches
   # at most MAX_MOVES Moves are tracked (least-recently-used Move evicted first).
   # Worst case MAX_MOVES * MAX * MAX_BYTES bytes of query text.
   #
-  # The key includes the current tenant because the session cookie is shared
-  # across org subdomains (config.x.cookie_domain); Move ids are globally-unique
-  # UUIDs so a cross-tenant collision can't actually occur, but scoping by tenant
-  # keeps one org's terms structurally unreachable from another (defense-in-depth
-  # matching the schema-per-tenant isolation posture).
+  # The key includes the current tenant for defense-in-depth. As of #280 the
+  # session cookie is host-only, so a subdomain's session is no longer visible to
+  # other subdomains — but Move ids are globally-unique UUIDs and tenant-scoping
+  # keeps one org's terms structurally unreachable from another regardless of the
+  # cookie scope, matching the schema-per-tenant isolation posture.
   class RecentSearches
     SESSION_KEY = "recent_searches"
     MAX = 5            # queries kept per Move

@@ -72,10 +72,9 @@ Rails.application.configure do
   config.action_mailer.asset_host = "https://move-easy.org"
 
   # Multi-tenancy: the apex move-easy.org is the marketing/login host; org
-  # subdomains are <slug>.move-easy.org. The shared cookie domain lets the apex
-  # login session carry to every org subdomain.
+  # subdomains are <slug>.move-easy.org. Cookies are host-only (#280) — the apex
+  # session does not carry to subdomains; the post-login handoff token bridges it.
   config.x.tenant_zone = "move-easy.org"
-  config.x.cookie_domain = ".move-easy.org"
 
   # Action Cable (#239): the settings page lives on an org subdomain, so the live
   # indexing-progress WebSocket opens from https://<slug>.move-easy.org. Allow the

@@ -76,7 +76,9 @@ RSpec.describe "POST /auth/google/one_tap" do
       slug = Organization.joins(:organization_memberships)
                          .find_by(organization_memberships: { user_id: user.id })
                          .slug
-      expect(response.parsed_body["redirect"]).to include(slug)
+      # #280 — One Tap now hands off to the subdomain via a single-use token
+      # rather than relying on a shared cookie traveling cross-host.
+      expect(response.parsed_body["redirect"]).to include(slug, "session/handoff?token=")
     end
   end
 
