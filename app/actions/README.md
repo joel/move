@@ -181,6 +181,7 @@ action emits and returns; it **never** calls a subscriber directly.
 | `manifest` | `viewed` | `box_id, move_id, actor_id` | A (low-signal), **M** |
 | `qr` | `resolved` | `box_id, move_id, actor_id` | A (low-signal) |
 | `recognition_run` | `queued` `processing` `succeeded` `failed` | `recognition_run_id, box_id` (+ `item_count`/`error_code`) | — (drives run state / UI) |
+| `session_handoff` | `minted` `consumed` | `token_id, user_id, organization_slug` | — (audit trail; apex→subdomain handoff, #280) |
 
 > **Rails 8.1 events.** Subscribers respond to `#emit(event)` (not `#call`); the
 > event is a hash — `event[:name]`, `event[:payload]`. See root `AGENTS.md` §4.
@@ -244,6 +245,7 @@ app/actions/
 ├── recognition_runs/   enqueue · process · retry
 ├── reviews/        mark_photo_reviewed
 ├── search/         items · refresh_document · reindexing
+├── session_handoffs/   mint · consume   # apex→subdomain single-use token (#280)
 └── vocabularies/   create · update · remove
 ```
 

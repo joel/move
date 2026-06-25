@@ -142,9 +142,44 @@ sequenceDiagram
   end
 ```
 
-The session + Rodauth-remember cookies are scoped to `.example.org`
-(`config.x.cookie_domain`), so the apex login session carries to every org
-subdomain (no redirect loop). The login UI is apex-only; subdomains are post-auth.
+### Cookies are host-only; the apex hands off to subdomains by token (#280)
+
+The session and Rodauth-remember cookies are **host-only** — each host (the apex
+`example.org` and every `<slug>.example.org`) holds its own, independent session.
+There is no shared `.example.org` cookie, so an apex session does **not** travel
+to a subdomain. (apex and subdomain are the same *site*, so this is a cross-*host*
+boundary, not a SameSite one.) The login UI is apex-only; subdomains are post-auth.
+
+Crossing from the apex to a subdomain after authentication therefore goes through
+a **single-use handoff token**, never a shared cookie:
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant AP as Apex (example.org)
+  participant DB as public.session_handoff_tokens
+  participant SD as Subdomain (acme.example.org)
+  B->>AP: authenticate (email-link / passkey / Google)
+  AP->>DB: SessionHandoffs::Mint → row {digest, user, slug, expires_at(60s)}
+  AP-->>B: 302 https://acme.example.org/session/handoff?token=<raw>
+  B->>SD: GET /session/handoff?token=<raw>
+  SD->>DB: SessionHandoffs::Consume → validate (fresh, unused, slug==tenant) + atomic claim
+  alt valid
+    SD->>SD: establish host-only session + remember_login
+    SD-->>B: 302 / → moves
+  else expired / reused / wrong tenant
+    SD-->>B: 401 "Sign-in link expired" → apex /login
+  end
+```
+
+The token is unguessable (32 url-safe bytes; only its SHA-256 digest is stored),
+single-use (an atomic `UPDATE … WHERE consumed_at IS NULL`), short-lived (60s
+TTL), and tenant-bound (a token minted for one org is rejected on another's
+subdomain). `SessionHandoffToken` is an **excluded Apartment model** (public-only,
+like `Organization`) so the apex (no tenant) mints it and a subdomain (tenant
+active) consumes it against the same rows. Spent rows are swept daily
+(`PurgeStaleSessionHandoffTokensJob`). `WEBAUTHN_RP_ID` stays the apex parent, so
+passkeys remain an apex-login concern and the handoff carries the result onward.
 
 ---
 
@@ -216,7 +251,8 @@ admin. New-user email invitations are deferred.
 | Label print (async) | `app/models/label_print_run.rb`, `app/actions/label_print_runs/*`, `app/jobs/label_print_runs/generate_job.rb` (#303) | Bulk label generation is a background job with a **live progress bar** over ActionCable/Turbo Streams (same no-polling pattern as the indexing bar, #239), not a synchronous request-blocking render. `LabelPrintRuns::Start` SQL-counts the box range and enqueues; `GenerateJob` builds `BoxLabelsPdf` box-by-box, reporting progress via `RecordProgress` (atomic SQL set + rescued `broadcast_replace_to(run, :progress)`), attaches the PDF to the run, and the run page (`turbo_stream_from(@run, :progress)`) flips to a Download. QR scan URLs use the request `host`/`protocol` passed at enqueue (a job has no request). `PurgeStaleLabelPrintRunsJob` reaps old run PDFs daily, per tenant |
 | Recognition | `app/services/recognition_providers/*` | Provider-agnostic adapter interface (`fake`/`openai`/`anthropic` via `RECOGNITION_PROVIDER`); normalized `label/confidence/count` only — no raw vendor data or bounding boxes. Vendor adapters POST via shared `provider_http.rb`, which raises on non-2xx so a rate-limited/unauthorized call fails the run loudly instead of a phantom empty `succeeded`. Enabling openai in prod: [`ai-providers.md`](ai-providers.md) |
 | Deterministic dump | `config/initializers/structure_sql.rb` | exclude tenant schemas + normalize search_path |
-| Per-env tenancy | `config/environments/*.rb` | `tenant_zone`, `cookie_domain`, `config.hosts` |
+| Per-env tenancy | `config/environments/*.rb` | `tenant_zone`, `config.hosts` (cookies are host-only — no `cookie_domain`; see §3 #280) |
+| Session handoff | `app/controllers/session_handoffs_controller.rb`, `app/actions/session_handoffs/*`, `SessionHandoffToken` | single-use apex→subdomain token bridging host-only sessions (#280); minted in the post-auth redirects (`rodauth_main.rb#tenant_handoff_url`, One Tap) |
 | Deploy | `config/deploy.yml` | `proxy.ssl: false`, no host, forward_headers; db accessory `postgres:18` at `/var/lib/postgresql` |
 | Boot migration | `bin/docker-entrypoint` | on server start runs `db:prepare && db:migrate`; the `db:migrate` Rake task fires Apartment's `apartment:migrate` so every tenant schema is migrated (§2) |
 | Secrets | `.kamal/secrets` + Doppler `<app>/prd` | synced to GitHub Actions |
