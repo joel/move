@@ -35,13 +35,22 @@ module Components
 
     def apex_button
       button_to(
-        view_context.rodauth.omniauth_request_path(:google),
+        view_context.rodauth.omniauth_request_path(:google, **origin_org_param),
         method: :post,
         # data-turbo=false on the FORM: the response is a cross-origin 302 to
         # Google, which Turbo can't follow — force a native submit/redirect.
         form: { data: form_data },
         class: BUTTON_CLASS
       ) { contents }
+    end
+
+    # Forward the originating org (carried from the subdomain link as ?org=<slug>)
+    # into the OmniAuth request as a query param, so it survives the round-trip to
+    # Google and reaches the callback via omniauth.params (#346). Membership is
+    # validated server-side before it's honoured, so a stray value is harmless.
+    def origin_org_param
+      slug = view_context.params[:org].to_s
+      slug.present? ? { org: slug } : {}
     end
 
     # When routed here from a subdomain (?via=google), auto-submit on connect.
@@ -62,9 +71,15 @@ module Components
       end
     end
 
+    # Carry the originating org slug to the apex so the post-auth handoff can
+    # target THIS subdomain, not the user's primary org (#346). The apex forwards
+    # it through OmniAuth; membership is validated before it's honoured.
     def apex_google_url
       host = Rails.application.config.action_mailer.default_url_options&.dig(:host)
-      "https://#{host}/login?via=google"
+      url = "https://#{host}/login?via=google"
+      slug = view_context.current_tenant
+      # Escape defensively even though slugs are format-validated (DNS-label safe).
+      slug.present? ? "#{url}&org=#{CGI.escape(slug)}" : url
     end
 
     def contents

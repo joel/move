@@ -240,9 +240,19 @@ class RodauthMain < Rodauth::Rails::Auth
         end
 
         def primary_organization
-          Organization
-            .joins(:organization_memberships)
-            .find_by(organization_memberships: { user_id: account_id })
+          Organization.primary_for(account_id)
+        end
+
+        # Where to land after auth (#280/#346): the org the login started from
+        # (subdomain tenant, or the Google-bridge `org` param) when the account is
+        # a member, else the primary org. Logic lives in the resolver service.
+        def handoff_target_slug
+          SessionHandoffs::TargetResolver.new(
+            account_id: account_id,
+            current_tenant: Apartment::Tenant.current,
+            omniauth_org: omniauth_params&.dig("org"),
+            primary_slug: primary_organization&.slug
+          ).call
         end
 
         def tenant_home_url(slug)
@@ -398,9 +408,11 @@ class RodauthMain < Rodauth::Rails::Auth
       # Route authenticated users to their Organization subdomain (the A1 Move
       # list) via a single-use handoff token (#280): cookies are host-only, so
       # the apex session does not travel — the token establishes the subdomain's
-      # own session. Falls back to the apex when the user has no Organization yet.
+      # own session. The target is the org the login started from when applicable
+      # (#346, membership-validated). Falls back to the apex when the user has no
+      # Organization yet.
       login_redirect do
-        (org = primary_organization) ? tenant_handoff_url(org.slug) : "/"
+        (slug = handoff_target_slug) ? tenant_handoff_url(slug) : "/"
       end
       verify_account_redirect do
         @onboarding_slug ? tenant_handoff_url(@onboarding_slug) : login_redirect

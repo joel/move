@@ -39,8 +39,11 @@ Metrics/BlockLength:
 
 # Offense count: 6
 # Configuration parameters: CountComments, CountAsOne.
+# Ceiling tracks app/misc/rodauth_main.rb (the largest class — an inherently large
+# Rodauth config). Bumped 233 -> 238 for the #346 origin-aware handoff after the
+# query logic was already extracted to Organization + SessionHandoffs::TargetResolver.
 Metrics/ClassLength:
-  Max: 233
+  Max: 238
 
 # Offense count: 96
 # Configuration parameters: CountComments, CountAsOne, AllowedMethods, AllowedPatterns.

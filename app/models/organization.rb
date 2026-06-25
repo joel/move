@@ -14,6 +14,21 @@ class Organization < ApplicationRecord
   has_many :organization_memberships, dependent: :destroy
   has_many :users, through: :organization_memberships
 
+  # The org an account is "primarily" in (#346): oldest membership first, slug as
+  # a stable tiebreaker, so a multi-org user's fallback is deterministic.
+  def self.primary_for(user_id)
+    joins(:organization_memberships)
+      .where(organization_memberships: { user_id: user_id })
+      .order(Arel.sql("organization_memberships.created_at ASC, organizations.slug ASC"))
+      .first
+  end
+
+  # Is `user_id` a member of the org with this slug? (origin-handoff guard, #346)
+  def self.member?(user_id:, slug:)
+    joins(:organization_memberships)
+      .exists?(slug: slug, organization_memberships: { user_id: user_id })
+  end
+
   validates :name, presence: true
   validates :slug,
             presence: true,
