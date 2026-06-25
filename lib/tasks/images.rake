@@ -62,4 +62,27 @@ namespace :images do
     puts "[images:optimize] total reclaimed: " \
          "#{ActiveSupport::NumberHelper.number_to_human_size(grand_total)}"
   end
+
+  desc "Pre-generate display variants (:thumb/:detail) for existing media so first views are warm (#316)"
+  task prewarm: :environment do
+    grand_total = 0
+    # Media lives per tenant schema; switch in to find the rows, then warm each
+    # one's variants. Skip discarded media — it's never displayed, so warming it
+    # would only burn storage/CPU. MediaVariants::Prewarm is idempotent, so a
+    # re-run is a cheap existence check per variant (no re-transform).
+    Organization.pluck(:slug).each do |slug|
+      Apartment::Tenant.switch(slug) do
+        warmed = 0
+        # Eager-load the attachment + blob so the per-record attached? guard in
+        # Prewarm doesn't issue an N+1 of active_storage_attachments lookups.
+        Media.with_attached_image.find_each { |media| warmed += MediaVariants::Prewarm.call(media) }
+        grand_total += warmed
+        line = "[images:prewarm] #{slug}: #{warmed} variants warmed"
+        Rails.logger.info(line)
+        puts line
+      end
+    end
+
+    puts "[images:prewarm] total variants warmed: #{grand_total}"
+  end
 end

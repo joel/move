@@ -152,7 +152,7 @@ A business-rule failure is a symbol the controller maps to a message:
 
 ## Events & side effects
 
-Actions emit ~40 `domain.verb` events. Four subscribers (wired in
+Actions emit ~40 `domain.verb` events. Five subscribers (wired in
 `config/initializers/`) consume them by filter and do the cross-cutting work. The
 action emits and returns; it **never** calls a subscriber directly.
 
@@ -162,17 +162,18 @@ action emits and returns; it **never** calls a subscriber directly.
 |---|---|---|---|
 | `Activity::RecordSubscriber` | `activity_log.rb` | `Activity::Builder.records?` | Appends the activity-feed row (sync, in-request) |
 | `Search::IndexSubscriber` | `search_indexing.rb` | `item.*` (`created`/`updated`/`moved`) | Enqueues `Search::RefreshDocumentJob` (async) |
+| `MediaVariants::PrewarmSubscriber` | `media_variants.rb` | `media.captured` | Enqueues `MediaVariants::PrewarmJob` to warm display variants (async, #316) |
 | `Manifests::AuditSubscriber` | `manifest_audit.rb` | `manifest.*` | Logs the authenticated sensitive read |
 | `MoveMcp::AuditSubscriber` | `mcp_audit.rb` | `integration_token.` / `mcp.` | MCP / token audit trail |
 
-**Event catalog** (consumers: **A** activity · **S** search · **M** manifest · **X** MCP · **—** none):
+**Event catalog** (consumers: **A** activity · **S** search · **P** prewarm · **M** manifest · **X** MCP · **—** none):
 
 | Domain | Events | Key payload | Consumers |
 |---|---|---|---|
 | `box` | `created` `updated` `status_changed` `deleted` `restored` | `box_id, move_id, actor/editor/creator_id` (+ `to`, `discard_batch_id`) | A |
 | `box` | `description_suggested` | `box_id, source` | — (advisory) |
 | `item` | `created` `updated` `moved` `removed` `deleted` `restored` `undeleted` | `item_id, box_id, move_id` (+ `created_via`, `to_box_id`, `batch_id`) | A; **S** for `created`/`updated`/`moved` |
-| `media` | `captured` `moved` | `media_id, box_id, move_id` (+ `to_box_id` for `moved`) | A (`moved` also emits an `item.moved` per co-located item → **S**) |
+| `media` | `captured` `moved` | `media_id, box_id, move_id` (+ `to_box_id` for `moved`) | A, **P** for `captured`; (`moved` also emits an `item.moved` per co-located item → **S**) |
 | `move` | `created` `unit_system_changed` `auto_confirm_threshold_changed` `recognition_provider_changed` `recognition_model_changed` `provider_key_set` `provider_key_removed` `embedding_provider_changed` `summary_viewed` | `move_id` (+ changed value / `provider`) | A (`summary_viewed` low-signal) |
 | `move_membership` | `added` `role_changed` `removed` | `move_id, user_id, role` | A |
 | `integration_token` | `created` `revoked` | `move_id, token_id` | A, **X** |
