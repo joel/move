@@ -29,6 +29,13 @@ module SessionHandoffs
       Success(token)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
+    rescue ActiveRecord::ActiveRecordError => e
+      # Fail SOFT on any other persistence error (constraint, statement,
+      # connection): the sole caller (tenant_handoff_url, on the post-auth
+      # redirect path) turns a Failure into "stay on the apex" — never raise out
+      # of login_redirect and 500 a just-authenticated user. #349 handled the
+      # monadic-Failure path; this covers the exception path (#351).
+      Failure(e.message)
     end
 
     def emit_event(token)
