@@ -45,6 +45,13 @@ RSpec.describe SessionHandoffs::TargetResolver do
     expect(resolve(current_tenant: "public", omniauth_org: "ghost-org")).to eq("acme")
   end
 
+  it "rejects a non-string (array/hash) omniauth org param → primary (#355)" do
+    # Rack can deliver org[]=globex as an array; it must not pass the IN-clause
+    # membership check and get returned verbatim as a malformed slug.
+    expect(resolve(current_tenant: "public", omniauth_org: ["globex"])).to eq("acme")
+    expect(resolve(current_tenant: "public", omniauth_org: { "x" => "globex" })).to eq("acme")
+  end
+
   it "returns the primary slug when there is no usable origin" do
     expect(resolve(current_tenant: "public", omniauth_org: nil, primary_slug: "acme")).to eq("acme")
   end
