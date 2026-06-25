@@ -1222,6 +1222,22 @@ CREATE TABLE public.schema_migrations (
 
 
 --
+-- Name: session_handoff_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.session_handoff_tokens (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    token_digest character varying NOT NULL,
+    user_id uuid NOT NULL,
+    organization_slug public.citext NOT NULL,
+    expires_at timestamp(6) without time zone NOT NULL,
+    consumed_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: tags; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1500,6 +1516,14 @@ ALTER TABLE ONLY public.rooms
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: session_handoff_tokens session_handoff_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.session_handoff_tokens
+    ADD CONSTRAINT session_handoff_tokens_pkey PRIMARY KEY (id);
 
 
 --
@@ -2057,6 +2081,20 @@ CREATE UNIQUE INDEX index_rooms_on_move_id_and_lower_name ON public.rooms USING 
 
 
 --
+-- Name: index_session_handoff_tokens_on_expires_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_session_handoff_tokens_on_expires_at ON public.session_handoff_tokens USING btree (expires_at);
+
+
+--
+-- Name: index_session_handoff_tokens_on_token_digest; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_session_handoff_tokens_on_token_digest ON public.session_handoff_tokens USING btree (token_digest);
+
+
+--
 -- Name: index_tags_on_discard_batch_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2466,6 +2504,7 @@ ALTER TABLE ONLY public.user_remember_keys
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260625130817'),
 ('20260621180000'),
 ('20260621140000'),
 ('20260621120000'),

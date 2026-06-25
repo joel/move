@@ -71,10 +71,13 @@ you tried to login with is currently awaiting verification"*. The email verify
 
 ### 4. Remember-me persistence
 
-`after_login { remember_login }` plus `load_memory` on every request keep a user
-signed in for 30 days. To test a clean signup you must be **fully logged out**
-(clear cookies / private window) — otherwise the browser silently
-re-authenticates as the remembered account.
+Remember-me (`_move_remember`, 30 days) plus `load_memory` on every request keep a
+user signed in. As of #280 it is established **only on the org subdomain** (when
+`SessionHandoffsController` consumes the handoff token), **not** on the apex — the
+apex is a pure auth broker that clears its own session on handoff and never sets a
+remember cookie. To test a clean signup you must be **fully logged out** (clear
+cookies / private window) — otherwise the browser silently re-authenticates as the
+remembered account.
 
 ### 5. Seed users default to status 1 (unverified)
 

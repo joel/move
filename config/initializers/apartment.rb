@@ -18,8 +18,12 @@ Apartment.configure do |config|
   # Apartment initializes to `public`, so per-tenant blobs 404'd. Keeping blobs/
   # attachments/variants in `public` makes them resolve regardless of the active
   # schema; the domain Media row stays per-tenant and references them by id.
+  # SessionHandoffToken bridges identity from the apex (no tenant) to an org
+  # subdomain (tenant active) — see #280 — so it must resolve to the same public
+  # rows regardless of the active schema; excluding it pins the model to public
+  # and keeps the table out of every tenant clone.
   config.excluded_models = %w[
-    User Organization OrganizationMembership
+    User Organization OrganizationMembership SessionHandoffToken
     ActiveStorage::Blob ActiveStorage::Attachment ActiveStorage::VariantRecord
   ]
 

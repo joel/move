@@ -31,11 +31,15 @@ class RodauthMain < Rodauth::Rails::Auth
       remember_deadline_interval({ days: 30 })
       remember_period({ days: 30 })
       extend_remember_deadline? true
-      # Share the remember cookie across org subdomains (same zone as the
-      # session cookie), so persistent login survives the apex -> subdomain hop.
-      remember_cookie_options(
-        **{ same_site: :lax, domain: Rails.application.config.x.cookie_domain }.compact
-      )
+      # Host-only remember cookie (#280): like the session cookie, it is NOT shared
+      # across subdomains. Remember is set ONLY on the org subdomain (when it
+      # consumes a handoff token — see after_login below and
+      # SessionHandoffsController), so "stay signed in" works per-domain. The key
+      # is rotated (`_remember` -> `_move_remember`) so a browser still holding the
+      # old shared `.move-easy.org` remember cookie can't keep authenticating
+      # cross-subdomain; the stale cookie is never read and expires on its own.
+      remember_cookie_key "_move_remember"
+      remember_cookie_options(same_site: :lax)
 
       # ── OmniAuth (Google social login) ────────────────────────
       # Active only when GOOGLE_CLIENT_ID is configured, so the
@@ -245,6 +249,30 @@ class RodauthMain < Rodauth::Rails::Auth
           "https://#{slug}.#{Rails.application.config.x.tenant_zone}/"
         end
 
+        # Post-auth landing on the org subdomain. Cookies are host-only (#280),
+        # so the apex session does NOT carry to <slug>.<zone>; mint a single-use
+        # handoff token bound to (this account, target tenant) and carry it in the
+        # URL for the subdomain to exchange for its own host-only session. The raw
+        # token is url-safe base64, so it needs no escaping. Falls back to the
+        # bare tenant home if minting fails (the user re-authenticates).
+        def tenant_handoff_url(slug)
+          base = tenant_home_url(slug)
+          # find_by (not find!) so a deleted/absent account never raises out of
+          # the login_redirect block into a 500 — just fall back to the bare home.
+          user = ::User.find_by(id: account_id)
+          raw = user && SessionHandoffs::Mint.new.call(user:, organization_slug: slug).value_or(nil)
+          return base unless raw
+
+          # The apex is a pure auth broker (#280): once it has handed the session
+          # to the subdomain via the token, it must NOT keep a parallel apex login.
+          # Host-only cookies mean a later subdomain sign-out can't reach an apex
+          # session, so a lingering one would let the user silently re-enter — a
+          # logout regression. Clear it here; the subdomain establishes (and
+          # remembers) its own session when it consumes the token.
+          clear_session
+          "#{base}session/handoff?token=#{raw}"
+        end
+
         def organization_name_for(user)
           base = user.name.presence || user.email.to_s.split("@").first
           "#{base}'s Move"
@@ -340,8 +368,10 @@ class RodauthMain < Rodauth::Rails::Auth
       omniauth_login_failure_redirect { login_path }
 
       after_login do
-        remember_login
-
+        # NB: no apex remember_login (#280). The apex is a pure auth broker — it
+        # clears its own session on handoff (tenant_handoff_url) and never keeps a
+        # remember cookie. "Stay signed in" is established on the org subdomain
+        # when it consumes the handoff token (SessionHandoffsController).
         next unless authenticated_by&.include?("omniauth")
 
         # Google (OmniAuth) sign-in bypasses verify_account_view, so an account
@@ -361,14 +391,15 @@ class RodauthMain < Rodauth::Rails::Auth
 
       logout_redirect "/"
 
-      # Route authenticated users to their Organization subdomain (the A1
-      # Move list). Apex login UI -> tenant home; the shared cookie keeps the
-      # session. Falls back to the apex when the user has no Organization yet.
+      # Route authenticated users to their Organization subdomain (the A1 Move
+      # list) via a single-use handoff token (#280): cookies are host-only, so
+      # the apex session does not travel — the token establishes the subdomain's
+      # own session. Falls back to the apex when the user has no Organization yet.
       login_redirect do
-        (org = primary_organization) ? tenant_home_url(org.slug) : "/"
+        (org = primary_organization) ? tenant_handoff_url(org.slug) : "/"
       end
       verify_account_redirect do
-        @onboarding_slug ? tenant_home_url(@onboarding_slug) : login_redirect
+        @onboarding_slug ? tenant_handoff_url(@onboarding_slug) : login_redirect
       end
     end
   end

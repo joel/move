@@ -73,16 +73,34 @@ Each Organization = one PostgreSQL schema. Auth tables + the org registry stay i
 5. **Per-env config** (`config/environments/*.rb`):
    ```ruby
    config.x.tenant_zone   = "example.org"     # apex/login; tenants = <slug>.example.org
-   config.x.cookie_domain = ".example.org"     # share session across subdomains
    config.hosts << ".example.org"              # allowlist apex + all subdomains
    config.host_authorization = { exclude: ->(r) { r.path == "/up" } }  # let the healthcheck through
    ```
+   **Cookies are host-only** (no `cookie_domain`) — the session store
+   (`config/initializers/session_store.rb`) and Rodauth `remember_cookie_options`
+   set **no** `domain:`, so the apex and each subdomain hold separate sessions.
+   See step 7 for how login crosses that boundary (#280).
 6. **WebAuthn:** set `WEBAUTHN_RP_ID=example.org` (registrable parent) so passkeys
-   work on the apex **and** every subdomain.
-7. **Onboarding:** after account verification, auto-create a personal Organization
-   (slug from name/email, skipping reserved slugs) **outside** the verify
-   transaction, then redirect to `<slug>.<zone>`. Logins route to the user's org
-   subdomain via `login_redirect`.
+   work on the apex **and** every subdomain — passkey login stays an apex concern,
+   and the handoff (step 7) carries the authenticated session onward.
+7. **Onboarding + apex→subdomain handoff (#280):** after account verification,
+   auto-create a personal Organization (slug from name/email, skipping reserved
+   slugs) **outside** the verify transaction. Because cookies are host-only, the
+   post-auth redirects (`login_redirect`/`verify_account_redirect`/One Tap) do **not**
+   rely on a shared cookie: they call `tenant_handoff_url`, which mints a single-use
+   `SessionHandoffToken` (public-only, excluded model; 60s TTL; SHA-256 digest) and
+   redirects to `https://<slug>.<zone>/session/handoff?token=…`. `SessionHandoffsController`
+   validates it against the request's tenant, then establishes the subdomain's own
+   host-only session (+ `remember_login`). Sweep spent rows with a daily
+   `PurgeStaleSessionHandoffTokensJob` (`config/recurring.yml`).
+   - **Apex is a pure broker:** after minting, `tenant_handoff_url` calls
+     `clear_session` and `after_login` does **not** `remember_login`, so the apex
+     keeps no parallel login — this is what keeps sign-out global under host-only
+     cookies (a subdomain logout has no apex session to leave behind).
+   - **Cutover:** rotate the cookie keys when you migrate an existing deployment
+     (`session_store` key + Rodauth `remember_cookie_key`) — dropping `domain:`
+     alone doesn't stop browsers from sending the old shared `.<zone>` cookies, so
+     reading new keys makes the stale ones inert (existing users re-login once).
 
 ---
 
@@ -343,7 +361,8 @@ To enable it in production:
    - Org subdomains (`<slug>.move-easy.org`) need **no** entries: the apex host
      is matched against `config.action_mailer.default_url_options[:host]`, and
      OAuth always starts + the callback always lands on `move-easy.org`;
-     `login_redirect` then hops to the subdomain on the shared cookie. On a
+     `login_redirect` then hops to the subdomain via a single-use handoff token
+     (#280 — cookies are host-only, so there is no shared cookie to ride). On a
      subdomain the **redirect button is a link** to `https://move-easy.org/login?via=google`,
      which auto-starts the same-origin OAuth there (`Components::GoogleAuthButton`
      + the `auto-submit` controller's connect handler) — a subdomain can't POST
@@ -370,8 +389,9 @@ To enable it in production:
 ## 7. Cutover order (zero-confusion sequence)
 
 1. Buy domain → add Cloudflare zone → registrar nameservers → wait active.
-2. Set `tenant_zone`/`cookie_domain`/mailer host/`WEBAUTHN_RP_ID` to the new
-   domain; `servers.web` + db accessory `host:` → origin IP. Merge + deploy.
+2. Set `tenant_zone`/mailer host/`WEBAUTHN_RP_ID` to the new domain (cookies are
+   host-only — nothing per-domain to set); `servers.web` + db accessory `host:` →
+   origin IP. Merge + deploy.
 3. PG 18 accessory cutover (§3) if not already on the new layout; `db:prepare`.
 4. Install + configure the tunnel (§6); create the two CNAMEs.
 5. **Restart the app** (`docker restart <app>-web-<version>`) — after any DB

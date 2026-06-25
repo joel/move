@@ -1,6 +1,11 @@
 Rails.application.routes.draw do
   # Google One Tap credential endpoint (active when GOOGLE_CLIENT_ID is set)
   post "auth/google/one_tap", to: "google_one_tap_sessions#create"
+  # #280 — apex->subdomain session handoff. Cookies are host-only, so the apex
+  # session does not travel to <slug>.<zone>; the apex mints a single-use token
+  # and redirects here, where the subdomain exchanges it for its own session.
+  # Lives on the tenant subdomain (the controller validates against the tenant).
+  get "session/handoff", to: "session_handoffs#show", as: :session_handoff
   resource :account, only: %i[show update destroy]
   # D13 — MCP assistant endpoint. Tenant-scoped (resolved from the org subdomain
   # by the Apartment elevator) and authenticated by a per-Move Bearer integration
