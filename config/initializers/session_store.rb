@@ -5,4 +5,11 @@
 # hold SEPARATE sessions — no shared `.move-easy.org` cookie. Crossing from the
 # apex to a subdomain after login goes through the single-use handoff token
 # (SessionHandoffsController), never a shared cookie.
-Rails.application.config.session_store :cookie_store, key: "_move_session"
+#
+# The key is rotated (`_move_session` -> `_move_session_v2`) as part of the
+# cutover: a browser still holding the OLD shared `_move_session` cookie (scoped
+# to `.move-easy.org`) would otherwise keep authenticating cross-subdomain, since
+# dropping `domain:` only affects future Set-Cookie. Reading a new key makes the
+# stale shared cookie inert (it expires on its own), forcing a clean re-login onto
+# the host-only model.
+Rails.application.config.session_store :cookie_store, key: "_move_session_v2"

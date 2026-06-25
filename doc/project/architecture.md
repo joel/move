@@ -181,6 +181,21 @@ active) consumes it against the same rows. Spent rows are swept daily
 (`PurgeStaleSessionHandoffTokensJob`). `WEBAUTHN_RP_ID` stays the apex parent, so
 passkeys remain an apex-login concern and the handoff carries the result onward.
 
+**The apex is a pure auth broker.** It authenticates, mints the handoff, then
+**clears its own session** (`tenant_handoff_url` → `clear_session`) and never sets
+a remember cookie — the subdomain is the sole holder of the durable session +
+remember. This is what keeps **sign-out global** under host-only cookies: a
+subdomain logout (which deletes the shared `public.user_remember_keys` row) leaves
+no apex session to silently re-enter from. (Multi-org session switching, if ever
+needed, would revisit this — there are no multi-org users today.)
+
+**Cutover (one-time).** Dropping `domain:` only changes *future* `Set-Cookie`, so
+browsers already holding the old shared `.move-easy.org` cookies would keep
+authenticating cross-subdomain. The session and remember cookie **keys are rotated**
+(`_move_session`→`_move_session_v2`, `_remember`→`_move_remember`) so those stale
+cookies are never read again (they expire on their own); existing users re-login
+once onto the host-only model.
+
 ---
 
 ## 3a. Authorization: move membership & roles (D11)

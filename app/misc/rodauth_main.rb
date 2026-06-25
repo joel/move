@@ -32,9 +32,13 @@ class RodauthMain < Rodauth::Rails::Auth
       remember_period({ days: 30 })
       extend_remember_deadline? true
       # Host-only remember cookie (#280): like the session cookie, it is NOT shared
-      # across subdomains. Each host (apex and every org subdomain) holds its own
-      # remember key; the subdomain's is re-issued when it consumes a handoff token
-      # (SessionHandoffsController), so "stay signed in" works per-domain.
+      # across subdomains. Remember is set ONLY on the org subdomain (when it
+      # consumes a handoff token — see after_login below and
+      # SessionHandoffsController), so "stay signed in" works per-domain. The key
+      # is rotated (`_remember` -> `_move_remember`) so a browser still holding the
+      # old shared `.move-easy.org` remember cookie can't keep authenticating
+      # cross-subdomain; the stale cookie is never read and expires on its own.
+      remember_cookie_key "_move_remember"
       remember_cookie_options(same_site: :lax)
 
       # ── OmniAuth (Google social login) ────────────────────────
@@ -256,10 +260,17 @@ class RodauthMain < Rodauth::Rails::Auth
           # find_by (not find!) so a deleted/absent account never raises out of
           # the login_redirect block into a 500 — just fall back to the bare home.
           user = ::User.find_by(id: account_id)
-          return base unless user
+          raw = user && SessionHandoffs::Mint.new.call(user:, organization_slug: slug).value_or(nil)
+          return base unless raw
 
-          raw = SessionHandoffs::Mint.new.call(user:, organization_slug: slug).value_or(nil)
-          raw ? "#{base}session/handoff?token=#{raw}" : base
+          # The apex is a pure auth broker (#280): once it has handed the session
+          # to the subdomain via the token, it must NOT keep a parallel apex login.
+          # Host-only cookies mean a later subdomain sign-out can't reach an apex
+          # session, so a lingering one would let the user silently re-enter — a
+          # logout regression. Clear it here; the subdomain establishes (and
+          # remembers) its own session when it consumes the token.
+          clear_session
+          "#{base}session/handoff?token=#{raw}"
         end
 
         def organization_name_for(user)
@@ -357,8 +368,10 @@ class RodauthMain < Rodauth::Rails::Auth
       omniauth_login_failure_redirect { login_path }
 
       after_login do
-        remember_login
-
+        # NB: no apex remember_login (#280). The apex is a pure auth broker — it
+        # clears its own session on handoff (tenant_handoff_url) and never keeps a
+        # remember cookie. "Stay signed in" is established on the org subdomain
+        # when it consumes the handoff token (SessionHandoffsController).
         next unless authenticated_by&.include?("omniauth")
 
         # Google (OmniAuth) sign-in bypasses verify_account_view, so an account

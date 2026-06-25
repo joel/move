@@ -38,7 +38,7 @@ RSpec.describe "GET /session/handoff" do
     it "re-issues a host-only remember cookie on the subdomain" do
       get session_handoff_path(token: mint_for)
 
-      expect(response.cookies["_remember"]).to be_present
+      expect(response.cookies["_move_remember"]).to be_present
     end
 
     it "consumes the token so it cannot be replayed" do

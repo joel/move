@@ -42,11 +42,14 @@ RSpec.describe "POST /auth/google/one_tap" do
       expect(response.parsed_body).to include("ok" => true)
     end
 
-    it "sets a remember cookie for persistent sessions" do
+    it "does not keep an apex session or remember cookie (broker hands off)" do
       post "/auth/google/one_tap",
            params: { credential: "valid-jwt" }, as: :json
 
-      expect(response.cookies["_remember"]).to be_present
+      # #280: the apex is a pure broker — it mints a handoff token and clears its
+      # own session; remember is established on the subdomain, not here.
+      expect(response.cookies["_move_remember"]).to be_blank
+      expect(response.parsed_body["redirect"]).to include("session/handoff?token=")
     end
   end
 

@@ -114,7 +114,9 @@ class GoogleOneTapSessionsController < ApplicationController
     rodauth.account_from_id(user.id)
     session[rodauth.session_key] = user.id
     session[rodauth.authenticated_by_session_key] = ["google_one_tap"]
-    rodauth.remember_login
+    # No apex remember_login (#280): the apex is a pure broker. org_home_redirect
+    # mints a handoff token and clears this apex session; the subdomain establishes
+    # and remembers its own session when it consumes the token.
 
     # Provision a personal Organization if the linked account somehow has none
     # (idempotent), then land on the user's org home rather than the apex.

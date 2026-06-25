@@ -93,6 +93,14 @@ Each Organization = one PostgreSQL schema. Auth tables + the org registry stay i
    validates it against the request's tenant, then establishes the subdomain's own
    host-only session (+ `remember_login`). Sweep spent rows with a daily
    `PurgeStaleSessionHandoffTokensJob` (`config/recurring.yml`).
+   - **Apex is a pure broker:** after minting, `tenant_handoff_url` calls
+     `clear_session` and `after_login` does **not** `remember_login`, so the apex
+     keeps no parallel login — this is what keeps sign-out global under host-only
+     cookies (a subdomain logout has no apex session to leave behind).
+   - **Cutover:** rotate the cookie keys when you migrate an existing deployment
+     (`session_store` key + Rodauth `remember_cookie_key`) — dropping `domain:`
+     alone doesn't stop browsers from sending the old shared `.<zone>` cookies, so
+     reading new keys makes the stale ones inert (existing users re-login once).
 
 ---
 
