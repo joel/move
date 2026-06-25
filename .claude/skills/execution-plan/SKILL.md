@@ -366,7 +366,18 @@ marker. (See `AGENTS.md` §4 Deployment.)
 
 ### Step 8: Runtime Test Workflow
 
-After committing and before pushing, perform live verification. Use the `/product-review` skill for the full checklist, or manually:
+After committing and before pushing, perform live verification. Use the
+`/product-review` skill for the full checklist when it is available.
+
+> **Fallback when `/product-review` is not invocable.** In some sessions the
+> `product-review` skill is **not registered** under that name (the Skill tool
+> rejects it as unknown). When that happens, do **not** skip live verification —
+> drive it directly instead:
+> - the **`/verify`** skill (runs the app and observes behaviour), or
+> - the manual loop below: `agent-browser` for rendering/interaction, and
+>   `bin/rails runner` (via `docker exec -i move-app-dev bin/rails runner -`) for
+>   server-side setup (mint magic links / tokens — dev mail is unreachable from the
+>   container; see agent memory `dev-magic-link-mint`).
 
 ```bash
 bin/cli app rebuild
@@ -375,6 +386,24 @@ bin/cli mail start
 ```
 
 Then use `agent-browser` to verify all pages render without errors. Fix any issues found, commit the fix, and re-run the test suite.
+
+> **Auth / cookie / session changes — verify the wire, not just the screen.** A
+> browser snapshot shows a page rendered, but cookie **scope** and **isolation** are
+> invisible in it. For changes to cookie domains, session/remember handling, or
+> cross-host/tenant auth (e.g. host-only cookies, an apex↔subdomain handoff),
+> inspect the **raw `Set-Cookie` headers** with `curl` and a cookie jar — it proves
+> the security property far more rigorously than a visual review:
+> ```bash
+> # Does the cookie's Domain match the EXACT host (host-only), not the parent zone?
+> curl -sk -c jar.txt -o /dev/null -w "%{http_code} %{redirect_url}\n" "<url>"
+> grep -E "_session|_remember" jar.txt | awk '{print $1, $6}'   # col1 = #HttpOnly_<host>, col6 = name
+> # Isolation: a cookie set on host A must NOT authenticate host B.
+> curl -sk -b jar.txt -o /dev/null -w "%{http_code}\n" "<other-host>/<authed-path>"  # expect 401
+> # Single-use / expiry: replay the same token/URL → expect rejection.
+> ```
+> Assert the four things specs can't easily see: the `Domain` is the exact host;
+> the cookie does **not** authenticate a different host; single-use tokens reject on
+> replay; and expired/garbage tokens land on the failure page.
 
 ### Step 8b: Update documentation + diagrams (Mandatory for cross-cutting work)
 
@@ -688,7 +717,7 @@ gh release view <tag> --repo <owner>/<repo> >/dev/null 2>&1 \
 5c. /code-review (loop until clean; mind the stop rule) → Internal CR before push (skip if trivial)
 6.  bundle exec rake                                   → Lint + tests + system tests
 7.  git commit (+ append sha to audit log)             → Overcommit hooks validate
-8.  /product-review                                    → Live browser verification
+8.  /product-review (or /verify, or agent-browser+curl) → Live verification (curl Set-Cookie scope for auth/cookie changes)
 9.  git push + gh pr create                            → Push and open PR (Closes #N)
 10. gh project item-edit                               → Move to In Review
 10b. wait for + check Codex review (proactively!)      → chatgpt-codex-connector[bot]
