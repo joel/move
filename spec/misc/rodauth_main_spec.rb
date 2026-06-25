@@ -61,4 +61,46 @@ RSpec.describe RodauthMain do
       end
     end
   end
+
+  # Verifies the Rodauth wiring feeds the right context (active tenant, Google
+  # omniauth param, primary fallback) into SessionHandoffs::TargetResolver, which
+  # owns the logic (#346). Exhaustive cases live in the resolver spec.
+  describe "#handoff_target_slug" do
+    let(:rodauth) { RodauthApp.rodauth(nil).allocate }
+    let(:user) { create(:user, status: 2) }
+    let(:acme) { create(:organization, slug: "acme") }
+    let(:globex) { create(:organization, slug: "globex") }
+
+    before do
+      allow(rodauth).to receive_messages(account_id: user.id, omniauth_params: nil)
+      allow(Apartment::Tenant).to receive(:current).and_return("public")
+      create(:organization_membership, organization: acme, user:, created_at: 2.days.ago)
+      create(:organization_membership, organization: globex, user:, created_at: 1.day.ago)
+    end
+
+    it "targets the originating subdomain tenant when the user is a member" do
+      allow(Apartment::Tenant).to receive(:current).and_return("globex")
+      expect(rodauth.handoff_target_slug).to eq("globex")
+    end
+
+    it "targets the Google-bridge org param on the apex when a member" do
+      allow(rodauth).to receive(:omniauth_params).and_return({ "org" => "globex" })
+      expect(rodauth.handoff_target_slug).to eq("globex")
+    end
+
+    it "prefers the subdomain tenant over a conflicting omniauth org param" do
+      allow(Apartment::Tenant).to receive(:current).and_return("globex")
+      allow(rodauth).to receive(:omniauth_params).and_return({ "org" => "acme" })
+      expect(rodauth.handoff_target_slug).to eq("globex")
+    end
+
+    it "falls back to the deterministic primary org (oldest membership) otherwise" do
+      expect(rodauth.handoff_target_slug).to eq("acme")
+    end
+
+    it "returns nil (→ apex) when the account has no organization" do
+      OrganizationMembership.where(user_id: user.id).delete_all
+      expect(rodauth.handoff_target_slug).to be_nil
+    end
+  end
 end

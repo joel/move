@@ -196,6 +196,19 @@ authenticating cross-subdomain. The session and remember cookie **keys are rotat
 cookies are never read again (they expire on their own); existing users re-login
 once onto the host-only model.
 
+**Which org the handoff targets (#346).** `login_redirect` hands off to the org the
+login **started from** when applicable, not blindly to the user's primary org —
+resolved by `SessionHandoffs::TargetResolver` and always **membership-validated**
+(a stray/forged origin slug falls through to the primary org). The origin comes
+from: the active Apartment tenant on a **subdomain login** (passkey / email-auth
+submitted on the subdomain), or an `org` slug carried through the **Google apex
+bridge** (the subdomain link adds `?org=<slug>`, forwarded into the OmniAuth
+request → `omniauth.params`). The **email magic-link** always lands on the apex
+(its link has no per-request host) so it still targets the primary org —
+deferred (#353). The fallback `primary_organization` is **deterministic** (oldest
+membership, slug tiebreak). Moot for single-org users today; correct once a user
+belongs to more than one org.
+
 ---
 
 ## 3a. Authorization: move membership & roles (D11)
@@ -267,7 +280,7 @@ admin. New-user email invitations are deferred.
 | Recognition | `app/services/recognition_providers/*` | Provider-agnostic adapter interface (`fake`/`openai`/`anthropic` via `RECOGNITION_PROVIDER`); normalized `label/confidence/count` only — no raw vendor data or bounding boxes. Vendor adapters POST via shared `provider_http.rb`, which raises on non-2xx so a rate-limited/unauthorized call fails the run loudly instead of a phantom empty `succeeded`. Enabling openai in prod: [`ai-providers.md`](ai-providers.md) |
 | Deterministic dump | `config/initializers/structure_sql.rb` | exclude tenant schemas + normalize search_path |
 | Per-env tenancy | `config/environments/*.rb` | `tenant_zone`, `config.hosts` (cookies are host-only — no `cookie_domain`; see §3 #280) |
-| Session handoff | `app/controllers/session_handoffs_controller.rb`, `app/actions/session_handoffs/*`, `SessionHandoffToken` | single-use apex→subdomain token bridging host-only sessions (#280); minted in the post-auth redirects (`rodauth_main.rb#tenant_handoff_url`, One Tap) |
+| Session handoff | `app/controllers/session_handoffs_controller.rb`, `app/actions/session_handoffs/*`, `app/services/session_handoffs/target_resolver.rb`, `SessionHandoffToken` | single-use apex→subdomain token bridging host-only sessions (#280); minted in the post-auth redirects (`rodauth_main.rb#tenant_handoff_url`, One Tap). `TargetResolver` picks the origin org (subdomain tenant / Google `?org=` param, membership-validated) over the deterministic primary (#346) |
 | Deploy | `config/deploy.yml` | `proxy.ssl: false`, no host, forward_headers; db accessory `postgres:18` at `/var/lib/postgresql` |
 | Boot migration | `bin/docker-entrypoint` | on server start runs `db:prepare && db:migrate`; the `db:migrate` Rake task fires Apartment's `apartment:migrate` so every tenant schema is migrated (§2) |
 | Secrets | `.kamal/secrets` + Doppler `<app>/prd` | synced to GitHub Actions |
