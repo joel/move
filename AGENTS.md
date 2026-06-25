@@ -25,7 +25,7 @@ This document provides instructions and protocols for AI Agents interacting with
 > `.claude/skills/execution-plan/SKILL.md` § "Design Phase".
 
 - **Project:** `Move Design` → `projects/13869765800416404511` (a separate `Move Inventory Manager` project also exists — do not confuse them).
-- **Design system (tokens):** `mcp__stitch__get_project name=projects/13869765800416404511` → `designTheme.designMd`. This is the authoritative colour/typography/spacing/radius/component sheet. It is mirrored in `doc/phases/Phase D0 - Design Foundation.md`.
+- **Design system (tokens):** `mcp__stitch__get_project name=projects/13869765800416404511` → `designTheme.designMd`. This is the authoritative colour/typography/spacing/radius/component sheet. It is mirrored in `doc/phases/Phase D0 - Design Foundation.md` and consolidated for quick reference in [`DESIGN.md`](DESIGN.md) (the flat human reference for tokens + the `Ui::*` component library; keep it in sync per §7).
 - **Screens:** `mcp__stitch__list_screens projectId=13869765800416404511`, then `mcp__stitch__get_screen name=projects/13869765800416404511/screens/<id>` for the HTML + screenshot. (`list_projects`/`list_screens` outputs are large — they spill to a file you can `jq`.)
 - **Canonical screen ↔ phase ↔ Design-Spec map:** `doc/phases/README.md` §2.
 - **Palette rule:** the **"Refined Palette"** variants are canonical for surfaces/accent; the Material-3 token set is the semantic system for state colours. Prefer `… - Refined Palette` screens. See `doc/phases/DESIGN-DISCREPANCIES.md` §PALETTE.
@@ -445,6 +445,15 @@ diagrams** before the PR merges — code without docs is incomplete.
 - **Keep the recipe reproducible:** when you add/alter a setup step (a gem, a
   Kamal/Cloudflare/Doppler/CI setting, an install command), update
   `new-app-recipe.md` with the exact command/config so the next app is a copy-paste.
+- **Keep the design system in sync — [`DESIGN.md`](DESIGN.md).** Any change that
+  adds or alters a **design token** (`app/assets/tailwind/application.css` — the
+  `@theme` block or the `--c-*` light/dark runtime palette) **or** the **`Ui::*`
+  Phlex component library** (`app/components/ui/` — a new component, or a new
+  variant/state on an existing one) MUST update `DESIGN.md` in the **same PR**.
+  `DESIGN.md` is a hand-maintained mirror, so it drifts the moment a token/component
+  ships undocumented; `application.css` stays authoritative (the doc says so) and
+  `DESIGN.md` is the consolidated human reference. **`/code-review` flags a
+  token/`Ui::*` change whose diff doesn't also touch `DESIGN.md`.**
 - **Record hard-won gotchas** in the recipe's gotcha table and in agent memory.
 - Reference these docs from the PR description.
 

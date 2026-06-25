@@ -396,6 +396,19 @@ before pushing (see the project's `AGENTS.md` §7):
   summary of the directory's purpose, its key files, and any gotchas. This is
   especially important for directories that are not obvious from their name.
 
+**Design-system sync (so `DESIGN.md` never drifts).** Independently of the
+"cross-cutting" trigger above, if this change adds or alters a **design token**
+(`app/assets/tailwind/application.css` — the `@theme` block or the `--c-*`
+light/dark runtime palette) **or** the **`Ui::*` Phlex component library**
+(`app/components/ui/` — a new component, or a new variant/state on an existing
+one), update the root **`DESIGN.md`** in the **same PR** (project `AGENTS.md` §7).
+`application.css` stays authoritative; `DESIGN.md` is the consolidated human
+mirror, so it goes stale the moment a token/component ships undocumented. The
+`/code-review` CR loop (Step 5c) flags a token/`Ui::*` diff that doesn't also
+touch `DESIGN.md`. Read `DESIGN.md` during the Design Phase too — it is the quick
+in-repo reference for the visual system (palette/type/spacing/components) that the
+`frontend-design` pass builds on.
+
 > **Don't leave a docs-only commit as the PR tip.** Branch protection requires the
 > `lint`/`test` checks **on the HEAD sha**, but CI path-ignores `**/*.md`/`doc/**`/
 > `.claude/**` — so a docs-only HEAD never runs CI and the PR stays
