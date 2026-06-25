@@ -10,10 +10,11 @@ module Views
     class Index < Views::Base
       include Phlex::Rails::Helpers::FormWith
 
-      def initialize(move:, query:, results:)
+      def initialize(move:, query:, results:, recent_searches: [])
         @move = move
         @query = query.to_s
         @results = results
+        @recent_searches = recent_searches
       end
 
       def view_template
@@ -52,16 +53,35 @@ module Views
         end
       end
 
+      # Empty state: once the user has run a successful search, surface their own
+      # recent queries in place of the static examples (#338, ux principles 4 & 1).
       def hints
+        @recent_searches.any? ? recent_searches : examples
+      end
+
+      def examples
         div(class: "mx-auto mt-8 flex max-w-3xl flex-col items-center gap-4") do
-          p(class: "flex items-center gap-2 text-body-md text-muted") do
-            render Components::Icons::Sparkles.new(css: "h-4 w-4")
-            plain I18n.t("searches.hint")
-          end
-          div(class: "flex flex-wrap justify-center gap-3") do
-            I18n.t("searches.examples").each { |example| example_chip(example) }
-          end
+          hint_label(Components::Icons::Sparkles, I18n.t("searches.hint"))
+          chip_row { I18n.t("searches.examples").each { |example| example_chip(example) } }
         end
+      end
+
+      def recent_searches
+        div(class: "mx-auto mt-8 flex max-w-3xl flex-col items-center gap-4") do
+          hint_label(Components::Icons::Clock, I18n.t("searches.recent"))
+          chip_row { @recent_searches.each { |query| example_chip(query) } }
+        end
+      end
+
+      def hint_label(icon, text)
+        p(class: "flex items-center gap-2 text-body-md text-muted") do
+          render icon.new(css: "h-4 w-4")
+          plain text
+        end
+      end
+
+      def chip_row(&)
+        div(class: "flex flex-wrap justify-center gap-3", &)
       end
 
       def example_chip(text)

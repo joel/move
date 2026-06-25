@@ -53,6 +53,28 @@ RSpec.describe "Searches" do
       expect(response.body).not_to include("Hidden lamp")
     end
 
+    it "surfaces recent successful searches on the empty state, replacing examples" do
+      room = create(:room, move:, name: "Kitchen")
+      box = create(:box, move:, number: "1", room:)
+      create(:item, :confirmed, move:, box:, name: "Cast iron skillet")
+      index_all
+
+      get move_search_path(move, q: "skillet")
+      get move_search_path(move)
+
+      expect(response.body).to include(I18n.t("searches.recent"))
+      expect(response.body).to include("“skillet”")
+      expect(response.body).not_to include("kitchen electronics")
+    end
+
+    it "does not remember a search that found nothing" do
+      get move_search_path(move, q: "zzzznotathing")
+      get move_search_path(move)
+
+      expect(response.body).not_to include(I18n.t("searches.recent"))
+      expect(response.body).to include("kitchen electronics")
+    end
+
     it "links the sidebar Search destination to this move" do
       get move_boxes_path(move)
 

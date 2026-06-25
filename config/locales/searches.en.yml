@@ -4,6 +4,7 @@ en:
   searches:
     placeholder: "Find anything…"
     hint: "Search by name or meaning — phrasing need not match exactly."
+    recent: "Recent searches"
     examples:
       - "kitchen electronics"
       - "winter coats"

@@ -10,8 +10,19 @@ class SearchesController < MoveScopedController
   # GET /moves/:move_id/search?q=...
   def index
     query = params[:q].to_s
-    results = query.present? ? Search::Items.new.call(move: @move, query: query).value! : []
+    recent = Searches::RecentSearches.new(session, @move)
 
-    render Views::Searches::Index.new(move: @move, query: query, results: results)
+    results = []
+    recent_searches = recent.list
+    if query.present?
+      results = Search::Items.new.call(move: @move, query: query).value!
+      # Remember the query only when it actually found something, so the empty
+      # state surfaces useful re-runs rather than dead ends (#338, ux principle 4).
+      recent_searches = recent.record(query) if results.any?
+    end
+
+    render Views::Searches::Index.new(
+      move: @move, query: query, results: results, recent_searches: recent_searches
+    )
   end
 end
