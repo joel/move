@@ -25,17 +25,24 @@ module Accounts
   # the ownership-transfer feature; until it exists, deletion is limited to data
   # nobody else can see.
   #
-  # Ordering matters: the irreversible `DROP SCHEMA` runs FIRST, then the public
-  # user/org rows are deleted in one (reversible) transaction. The DROP is what
-  # makes the tenant's data and MCP tokens inaccessible, so a drop that genuinely
-  # fails aborts the whole deletion (`Failure(:tenant_drop_failed)`) with the
-  # account fully intact — never a "deleted" account sitting in front of a live,
-  # still-routable schema. Drops are gated on `schema_exists?`, so a retry after a
-  # partial failure (schema gone, rows not yet deleted) is idempotent and
-  # recovers. `Apartment::Tenant.drop` runs on a neutral connection, so it cannot
-  # share the row-deletion transaction anyway.
+  # Ordering matters, and each solo org is torn down as an irreversible unit
+  # BEFORE the account row is deleted: capture its attachment blobs, drop the
+  # schema, purge those blobs, then delete the public org row — repeated per org,
+  # then finally delete the user. Three properties fall out of this order:
+  #   - A drop that genuinely fails aborts the whole deletion
+  #     (`Failure(:tenant_drop_failed)`) — never a "deleted" account sitting in
+  #     front of a live, still-routable schema (the subdomain resolves and MCP
+  #     tokens authenticate as long as the schema exists).
+  #   - Deleting each org row immediately after its own schema drops means a
+  #     mid-loop failure never leaves an org row pointing at a missing schema;
+  #     already-torn-down orgs stay gone, so a retry resumes cleanly (drops are
+  #     gated on `schema_exists?`).
+  #   - Blobs are purged only AFTER a successful drop, so a failed drop never
+  #     strips media/label files from a tenant that survives.
+  # `Apartment::Tenant.drop` runs on a neutral connection, so it cannot share a
+  # transaction with the row deletes anyway.
   class Delete < BaseAction
-    # Tenant models whose Active Storage attachments must be purged before the
+    # Tenant models whose Active Storage attachments must be purged when the
     # schema is dropped: the attachment/blob tables are excluded into the public
     # schema (config/initializers/apartment.rb), so DROP SCHEMA removes the tenant
     # rows but would otherwise orphan their public attachments, blobs and stored
@@ -45,8 +52,8 @@ module Accounts
     def call(user:)
       snapshot = yield snapshot(user)
       yield ensure_only_solo_data(snapshot)
-      yield drop_tenants(snapshot[:dropped_slugs])
-      yield delete_records(user, snapshot)
+      yield teardown_solo_orgs(snapshot[:solo])
+      yield delete_user(user)
       yield emit_event(snapshot)
       Success(snapshot[:user_id])
     end
@@ -96,58 +103,69 @@ module Accounts
       Success()
     end
 
-    # Drop the tenant schema(s) BEFORE deleting the public user/org rows. The
-    # DROP is what makes the tenant's data and MCP tokens inaccessible (the
-    # subdomain stays routable and tokens keep authenticating as long as the
-    # schema exists), so a drop that genuinely fails must abort the whole
-    # deletion — never report success with a live schema behind a "deleted"
-    # account. Ordering is deliberate: the DROP is irreversible, the public rows
-    # are reversible, so do the irreversible step first and only commit the
-    # deletes once the data is provably gone.
-    def drop_tenants(slugs)
-      slugs.each { |slug| drop_tenant(slug) }
+    # Tear each solo org down as an irreversible unit. A genuine drop failure
+    # aborts the whole deletion; orgs already torn down stay gone, so a retry
+    # resumes from where it stopped.
+    def teardown_solo_orgs(orgs)
+      orgs.each { |org| teardown_solo_org(org) }
       Success()
     rescue ActiveRecord::ActiveRecordError, Apartment::ApartmentError => e
-      Rails.logger.error("[accounts.delete] tenant drop failed: #{e.class}: #{e.message}")
+      Rails.logger.error("[accounts.delete] solo org teardown failed: #{e.class}: #{e.message}")
       Failure(:tenant_drop_failed)
     end
 
-    def drop_tenant(slug)
-      # Idempotent: a retry after a partial failure (schema already dropped, rows
-      # not yet deleted) finds nothing to drop and proceeds to the row deletion.
-      return unless ActiveRecord::Base.connection.schema_exists?(slug)
+    def teardown_solo_org(org)
+      # Idempotent on retry: if the schema is already gone (dropped on a prior
+      # attempt that failed later), just finish removing the lingering org row.
+      return org.destroy! unless ActiveRecord::Base.connection.schema_exists?(org.slug)
 
-      purge_attachments_in(slug)
-      Apartment::Tenant.drop(slug)
+      attachment_ids = capture_attachment_ids(org.slug)
+      Apartment::Tenant.drop(org.slug)
+      purge_attachments(attachment_ids) # only after the drop succeeds — never strip a surviving tenant
+      org.destroy!                      # public row, once its schema is provably gone
     end
 
-    # Detaching blobs is best-effort cosmetic cleanup (a failure only orphans
-    # storage, never leaves a routable schema), so it must not abort the drop
-    # that follows — the sanctioned broad rescue of AGENTS.md §1#4.
-    def purge_attachments_in(slug)
-      Apartment::Tenant.switch(slug) { purge_attachments }
-    rescue StandardError => e # rubocop:disable Move/BroadRescue -- best-effort blob cleanup must not abort the drop
-      Rails.logger.error("[accounts.delete] attachment purge failed for #{slug}: #{e.class}: #{e.message}")
-    end
+    # Collect the public attachment ids backing the tenant's records while the
+    # schema (and its rows) still exist — after the DROP we can no longer
+    # enumerate the tenant Media/LabelPrintRun to find them. `unscoped` reaches
+    # soft-deleted rows too (Media's `default_scope { kept }` would otherwise hide
+    # discarded photos and orphan their blobs/files). Best-effort: a failure here
+    # only risks orphaned storage, never a routable schema, so it must not abort
+    # the drop. Accumulate into a local rather than the block's value, since the
+    # attachment rows live in the public schema regardless of the active tenant.
+    def capture_attachment_ids(slug)
+      ids = []
+      Apartment::Tenant.switch(slug) do
+        TENANT_ATTACHMENTS.each_key do |model|
+          record_ids = model.unscoped.pluck(:id)
+          next if record_ids.empty?
 
-    def delete_records(user, snapshot)
-      ActiveRecord::Base.transaction do
-        snapshot[:solo].each(&:destroy!) # registry rows + their memberships
-        user.destroy! # auth tables cascade; org memberships already gone
+          ids.concat(
+            ActiveStorage::Attachment.where(record_type: model.name, record_id: record_ids).pluck(:id)
+          )
+        end
       end
+      ids
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- best-effort capture must not abort the drop
+      Rails.logger.error("[accounts.delete] attachment capture failed for #{slug}: #{e.class}: #{e.message}")
+      ids
+    end
+
+    # Purges the captured attachments (detaching the public row and enqueuing the
+    # blob + variants + stored-file deletion) now that the tenant schema is gone.
+    # Best-effort: a failure only orphans storage and must not fail an
+    # already-dropped tenant.
+    def purge_attachments(attachment_ids)
+      ActiveStorage::Attachment.where(id: attachment_ids).find_each(&:purge_later)
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- best-effort purge must not fail an already-dropped tenant
+      Rails.logger.error("[accounts.delete] attachment purge failed: #{e.class}: #{e.message}")
+    end
+
+    def delete_user(user)
+      user.destroy! # auth tables cascade; org memberships already gone with their orgs
       Success()
     rescue ActiveRecord::RecordNotDestroyed, ActiveRecord::InvalidForeignKey => e
       Failure(e.message)
-    end
-
-    # Detaches each attachment (deletes the public attachment row) and enqueues
-    # the blob + file purge, so dropping the tenant schema leaves nothing behind.
-    # `unscoped` reaches soft-deleted rows too — Media's `default_scope { kept }`
-    # would otherwise hide discarded photos and orphan their public blobs/files.
-    def purge_attachments
-      TENANT_ATTACHMENTS.each do |model, attachment|
-        model.unscoped.find_each { |record| record.public_send(attachment).purge_later }
-      end
     end
 
     def emit_event(snapshot)

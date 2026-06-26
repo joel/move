@@ -44,9 +44,9 @@ RSpec.describe Accounts::Delete do
       )
     end
 
-    it "purges tenant Active Storage attachments before dropping the schema" do
+    it "purges the tenant's Active Storage blobs as part of deletion" do
       # Attachment/blob tables live in public, so DROP SCHEMA would otherwise
-      # orphan them. The attachment must be detached as part of deletion.
+      # orphan them. The blob (and its attachment) must be purged.
       media = create(:media)
       expect(media.image).to be_attached
 
@@ -56,7 +56,7 @@ RSpec.describe Accounts::Delete do
         .to be(false)
     end
 
-    it "also purges attachments of soft-deleted (discarded) media" do
+    it "also purges blobs of soft-deleted (discarded) media" do
       # Media's default_scope { kept } hides discarded rows, so an unscoped sweep
       # is needed or their public blobs/files would survive the DROP SCHEMA.
       media = create(:media)
@@ -69,10 +69,10 @@ RSpec.describe Accounts::Delete do
         .to be(false)
     end
 
-    it "still succeeds and drops the tenant when attachment purge fails" do
-      # Post-commit cleanup is best-effort: a purge failure (e.g. the queue
-      # backend is down) must not turn an already-committed deletion into a 500.
-      allow(Media).to receive(:find_each).and_raise(RuntimeError, "queue down")
+    it "still succeeds and drops the tenant when blob cleanup fails" do
+      # Attachment capture/purge is best-effort: a failure must not turn the
+      # deletion into a 500 once the tenant has been dropped.
+      allow(Media).to receive(:unscoped).and_raise(RuntimeError, "storage down")
 
       expect(result).to be_success
       expect(User.exists?(user.id)).to be(false)
@@ -151,15 +151,23 @@ RSpec.describe Accounts::Delete do
       allow(Apartment::Tenant).to receive(:drop).and_raise(Apartment::ApartmentError, "locked")
     end
 
-    it "aborts without deleting the account, so no data is left behind a live schema" do
+    it "aborts the deletion, leaving the account and org intact" do
       expect(result).to be_failure
       expect(result.failure).to eq(:tenant_drop_failed)
       expect(User.exists?(user.id)).to be(true)
       expect(Organization.exists?(organization.id)).to be(true)
     end
+
+    it "does not strip the surviving tenant's media (purge only after a good drop)" do
+      media = create(:media)
+
+      expect(result).to be_failure
+      expect(ActiveStorage::Attachment.exists?(record_type: "Media", record_id: media.id))
+        .to be(true)
+    end
   end
 
-  context "when the relational deletion fails" do
+  context "when the user deletion fails after the orgs are torn down" do
     let!(:organization) { create(:organization, slug: "acme") }
 
     before do
@@ -167,10 +175,9 @@ RSpec.describe Accounts::Delete do
       allow(user).to receive(:destroy!).and_raise(ActiveRecord::RecordNotDestroyed)
     end
 
-    it "rolls back the row deletion and returns Failure" do
+    it "returns Failure with the user still present (retryable)" do
       expect(result).to be_failure
       expect(User.exists?(user.id)).to be(true)
-      expect(Organization.exists?(organization.id)).to be(true)
     end
   end
 end
