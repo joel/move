@@ -53,6 +53,19 @@ RSpec.describe Accounts::Delete do
         .to be(false)
     end
 
+    it "also purges attachments of soft-deleted (discarded) media" do
+      # Media's default_scope { kept } hides discarded rows, so an unscoped sweep
+      # is needed or their public blobs/files would survive the DROP SCHEMA.
+      media = create(:media)
+      media.discard
+      expect(Media.kept).not_to include(media)
+
+      result
+
+      expect(ActiveStorage::Attachment.exists?(record_type: "Media", record_id: media.id))
+        .to be(false)
+    end
+
     it "still succeeds and drops the tenant when attachment purge fails" do
       # Post-commit cleanup is best-effort: a purge failure (e.g. the queue
       # backend is down) must not turn an already-committed deletion into a 500.

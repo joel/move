@@ -129,9 +129,11 @@ module Accounts
 
     # Detaches each attachment (deletes the public attachment row) and enqueues
     # the blob + file purge, so dropping the tenant schema leaves nothing behind.
+    # `unscoped` reaches soft-deleted rows too — Media's `default_scope { kept }`
+    # would otherwise hide discarded photos and orphan their public blobs/files.
     def purge_attachments
       TENANT_ATTACHMENTS.each do |model, attachment|
-        model.find_each { |record| record.public_send(attachment).purge_later }
+        model.unscoped.find_each { |record| record.public_send(attachment).purge_later }
       end
     end
 
