@@ -109,11 +109,13 @@ module Accounts
     end
 
     # Purge first (best-effort), then ALWAYS drop — the account and its registry
-    # rows are already committed-gone, so neither a purge nor a drop failure may
-    # report the deletion as failed; both are logged and swallowed.
+    # rows are already committed-gone, so NO failure here (a missing schema, a
+    # storage outage, a queue backend that can't enqueue the purge job) may
+    # report the deletion as failed; every error is logged and swallowed. This is
+    # the sanctioned broad rescue of AGENTS.md §1#4 (post-commit cleanup).
     def purge_and_drop(slug)
       Apartment::Tenant.switch(slug) { purge_attachments }
-    rescue ActiveRecord::ActiveRecordError, Apartment::ApartmentError => e
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- cleanup must not fail an already-deleted account
       Rails.logger.error("[accounts.delete] attachment purge failed for #{slug}: #{e.class}: #{e.message}")
     ensure
       drop_tenant(slug)
@@ -121,7 +123,7 @@ module Accounts
 
     def drop_tenant(slug)
       Apartment::Tenant.drop(slug)
-    rescue Apartment::ApartmentError => e
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- cleanup must not fail an already-deleted account
       Rails.logger.error("[accounts.delete] tenant drop failed for #{slug}: #{e.class}: #{e.message}")
     end
 

@@ -52,6 +52,16 @@ RSpec.describe Accounts::Delete do
       expect(ActiveStorage::Attachment.exists?(record_type: "Media", record_id: media.id))
         .to be(false)
     end
+
+    it "still succeeds and drops the tenant when attachment purge fails" do
+      # Post-commit cleanup is best-effort: a purge failure (e.g. the queue
+      # backend is down) must not turn an already-committed deletion into a 500.
+      allow(Media).to receive(:find_each).and_raise(RuntimeError, "queue down")
+
+      expect(result).to be_success
+      expect(User.exists?(user.id)).to be(false)
+      expect(Apartment::Tenant).to have_received(:drop).with("acme")
+    end
   end
 
   # Belonging to an org the user does not solely own is deliberately unsupported
