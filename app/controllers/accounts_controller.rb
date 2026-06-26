@@ -21,9 +21,13 @@ class AccountsController < ApplicationController
 
   # DELETE /account
   def destroy
-    @user.destroy!
-    reset_session
-    redirect_to root_path, notice: t(".notice")
+    case Accounts::Delete.new.call(user: @user)
+    in Dry::Monads::Success(_user_id)
+      reset_session
+      redirect_to root_path, notice: t(".notice")
+    in Dry::Monads::Failure(_)
+      redirect_to account_path, alert: t(".failure")
+    end
   end
 
   private

@@ -38,6 +38,7 @@ en:
       notice: "Account was successfully updated."
     destroy:
       notice: "Account was successfully deleted."
+      failure: "We couldn't delete your account. Please try again."
   hello: "Hello world"
   activerecord:
     errors:

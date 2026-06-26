@@ -28,11 +28,20 @@ RSpec.describe "/account" do
     expect(user.email).not_to eq("ignored@example.com")
   end
 
-  it "deletes the account" do
+  it "deletes the account, its organization membership and tenant" do
+    # Reproduces the production 500: the organization_memberships FK has no
+    # ON DELETE CASCADE, so a bare users DELETE was rejected (#fk_rails_57cf70d280).
+    organization = create(:organization, slug: "acme")
+    create(:organization_membership, :owner, organization: organization, user: user)
+    allow(Apartment::Tenant).to receive(:drop)
+
     expect do
       delete account_url
     end.to change(User, :count).by(-1)
+       .and change(Organization, :count).by(-1)
+
     expect(response).to redirect_to(root_url)
+    expect(Apartment::Tenant).to have_received(:drop).with("acme")
   end
 
   it "requires authentication" do
