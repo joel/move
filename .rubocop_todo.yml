@@ -39,13 +39,12 @@ Metrics/BlockLength:
 
 # Offense count: 6
 # Configuration parameters: CountComments, CountAsOne.
-# Ceiling tracks app/misc/rodauth_main.rb (the largest class — an inherently large
-# Rodauth config). Bumped 233 -> 238 (#346) -> 239 (#353 email-auth link host).
-# Query logic already lives in Organization + SessionHandoffs::TargetResolver; the
-# config blocks themselves keep the class large. TODO: extract the auth_class_eval
-# helpers into a module/concern to bring this back under a tighter ceiling.
+# Ceiling now tracks the largest class (app/views/boxes/show.rb, a Phlex view).
+# rodauth_main.rb was 239 during the #280/#346/#353 epic; #358 extracted its
+# auth_class_eval methods into RodauthMain::AuthMethods, dropping it to ~102 lines,
+# so the ceiling is back down from 239 to 233.
 Metrics/ClassLength:
-  Max: 239
+  Max: 233
 
 # Offense count: 96
 # Configuration parameters: CountComments, CountAsOne, AllowedMethods, AllowedPatterns.
