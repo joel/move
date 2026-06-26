@@ -132,5 +132,19 @@ RSpec.describe "/users" do
       delete user_url(user)
       expect(response).to redirect_to(users_url)
     end
+
+    # Admin deletion is routed through Accounts::Delete, so it inherits the
+    # shared-data guard instead of a raw destroy! that would orphan tenant rows.
+    it "refuses to delete a user who shares an organization with others" do
+      user = User.create! valid_attributes
+      organization = create(:organization, slug: "shared-org")
+      create(:organization_membership, :owner, organization: organization, user: user)
+      create(:organization_membership, organization: organization)
+
+      expect do
+        delete user_url(user)
+      end.not_to change(User, :count)
+      expect(response).to redirect_to(users_url)
+    end
   end
 end

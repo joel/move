@@ -60,6 +60,23 @@ RSpec.describe Accounts::Delete do
     end
   end
 
+  context "when the user is the sole owner but the org has other members" do
+    let!(:organization) { create(:organization, slug: "acme") }
+
+    before do
+      create(:organization_membership, :owner, organization: organization, user: user)
+      create(:organization_membership, organization: organization) # another member
+    end
+
+    it "refuses deletion rather than dropping a tenant others can see" do
+      expect(result).to be_failure
+      expect(result.failure).to eq(:owns_shared_data)
+      expect(User.exists?(user.id)).to be(true)
+      expect(Organization.exists?(organization.id)).to be(true)
+      expect(Apartment::Tenant).not_to have_received(:drop)
+    end
+  end
+
   context "when the user is a non-owner member" do
     let!(:organization) { create(:organization, slug: "acme") }
 

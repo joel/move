@@ -52,8 +52,18 @@ class UsersController < ApplicationController
 
   # DELETE /users/1
   def destroy
-    @user.destroy!
-    redirect_to users_url, notice: "User was successfully destroyed.", status: :see_other
+    # Route through Accounts::Delete so admin deletion gets the same shared-data
+    # guard and tenant cleanup as self-service deletion — never a raw destroy!
+    # that would orphan org memberships and tenant rows.
+    case Accounts::Delete.new.call(user: @user)
+    in Dry::Monads::Success(_user_id)
+      redirect_to users_url, notice: "User was successfully destroyed.", status: :see_other
+    in Dry::Monads::Failure(:owns_shared_data)
+      redirect_to users_url, status: :see_other,
+                             alert: "Can't delete a user who shares an organization with others."
+    in Dry::Monads::Failure(_)
+      redirect_to users_url, alert: "User could not be deleted.", status: :see_other
+    end
   end
 
   private

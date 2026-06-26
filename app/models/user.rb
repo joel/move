@@ -4,12 +4,12 @@
 class User < ApplicationRecord
   include Roleable
 
-  # Org memberships live in the shared `public` schema. The FK from
-  # organization_memberships has no ON DELETE CASCADE, so without this a
-  # `users` DELETE is rejected (PG::ForeignKeyViolation). Account deletion is
-  # owned by Accounts::Delete; this is the safety net that keeps user.destroy!
-  # from ever 500ing on a dangling membership.
-  has_many :organization_memberships, dependent: :destroy
+  # Org memberships live in the shared `public` schema (FK without ON DELETE
+  # CASCADE). Deleting an account is owned by Accounts::Delete, which removes
+  # memberships by destroying the user's solo orgs first. We `restrict` rather
+  # than `:destroy` so a raw `user.destroy!` can never silently orphan tenant
+  # data — it fails loudly, forcing deletion through the action.
+  has_many :organization_memberships, dependent: :restrict_with_error
   has_many :organizations, through: :organization_memberships
 
   validates :email, presence: true, uniqueness: { case_sensitive: false }
