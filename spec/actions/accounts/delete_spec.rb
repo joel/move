@@ -5,9 +5,12 @@ RSpec.describe Accounts::Delete do
 
   let(:user) { create(:user) }
 
-  # The tenant schemas aren't really provisioned in specs, so `drop` is a spy.
+  # The tenant schemas aren't really provisioned in specs, so `drop` is a spy and
+  # `switch` (used to purge tenant attachments) just yields onto the public
+  # connection where the template tables live.
   before do
     allow(Apartment::Tenant).to receive(:drop)
+    allow(Apartment::Tenant).to receive(:switch).and_yield
     allow(Rails.event).to receive(:notify)
   end
 
@@ -36,6 +39,18 @@ RSpec.describe Accounts::Delete do
         "account.deleted",
         hash_including(user_id: user.id, organizations_dropped: ["acme"])
       )
+    end
+
+    it "purges tenant Active Storage attachments before dropping the schema" do
+      # Attachment/blob tables live in public, so DROP SCHEMA would otherwise
+      # orphan them. The attachment must be detached as part of deletion.
+      media = create(:media)
+      expect(media.image).to be_attached
+
+      result
+
+      expect(ActiveStorage::Attachment.exists?(record_type: "Media", record_id: media.id))
+        .to be(false)
     end
   end
 

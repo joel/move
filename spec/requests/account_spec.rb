@@ -34,6 +34,7 @@ RSpec.describe "/account" do
     organization = create(:organization, slug: "acme")
     create(:organization_membership, :owner, organization: organization, user: user)
     allow(Apartment::Tenant).to receive(:drop)
+    allow(Apartment::Tenant).to receive(:switch).and_yield
 
     expect do
       delete account_url

@@ -32,6 +32,13 @@ module Accounts
   # post-commit only leaves an orphaned, unreferenced schema; the account is
   # already gone, which is the user's intent.
   class Delete < BaseAction
+    # Tenant models whose Active Storage attachments must be purged before the
+    # schema is dropped: the attachment/blob tables are excluded into the public
+    # schema (config/initializers/apartment.rb), so DROP SCHEMA removes the tenant
+    # rows but would otherwise orphan their public attachments, blobs and stored
+    # files forever (the abandoned-blob job only sweeps *unattached* blobs).
+    TENANT_ATTACHMENTS = { Media => :image, LabelPrintRun => :document }.freeze
+
     def call(user:)
       snapshot = yield snapshot(user)
       yield ensure_only_solo_data(snapshot)
@@ -98,11 +105,32 @@ module Accounts
     end
 
     def drop_tenants(slugs)
-      slugs.each { |slug| Apartment::Tenant.drop(slug) }
+      slugs.each { |slug| purge_and_drop(slug) }
+    end
+
+    # Purge first (best-effort), then ALWAYS drop — the account and its registry
+    # rows are already committed-gone, so neither a purge nor a drop failure may
+    # report the deletion as failed; both are logged and swallowed.
+    def purge_and_drop(slug)
+      Apartment::Tenant.switch(slug) { purge_attachments }
+    rescue ActiveRecord::ActiveRecordError, Apartment::ApartmentError => e
+      Rails.logger.error("[accounts.delete] attachment purge failed for #{slug}: #{e.class}: #{e.message}")
+    ensure
+      drop_tenant(slug)
+    end
+
+    def drop_tenant(slug)
+      Apartment::Tenant.drop(slug)
     rescue Apartment::ApartmentError => e
-      # The account and its registry rows are already committed-gone; failing to
-      # drop a now-orphaned schema must not report the deletion as failed.
-      Rails.logger.error("[accounts.delete] tenant drop failed: #{e.class}: #{e.message}")
+      Rails.logger.error("[accounts.delete] tenant drop failed for #{slug}: #{e.class}: #{e.message}")
+    end
+
+    # Detaches each attachment (deletes the public attachment row) and enqueues
+    # the blob + file purge, so dropping the tenant schema leaves nothing behind.
+    def purge_attachments
+      TENANT_ATTACHMENTS.each do |model, attachment|
+        model.find_each { |record| record.public_send(attachment).purge_later }
+      end
     end
 
     def emit_event(snapshot)
