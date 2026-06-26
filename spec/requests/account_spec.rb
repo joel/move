@@ -40,7 +40,9 @@ RSpec.describe "/account" do
     end.to change(User, :count).by(-1)
        .and change(Organization, :count).by(-1)
 
-    expect(response).to redirect_to(root_url)
+    # Redirects to the canonical apex root, never the just-dropped subdomain.
+    apex = Rails.application.config.action_mailer.default_url_options.fetch(:host)
+    expect(response).to redirect_to(root_url(host: apex))
     expect(Apartment::Tenant).to have_received(:drop).with("acme")
   end
 

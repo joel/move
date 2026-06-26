@@ -13,11 +13,15 @@ module Accounts
   #     ON DELETE CASCADE and was the cause of the 500.
   #   - For every Organization the user is the SOLE owner of, the registry row is
   #     destroyed and its Apartment tenant schema is dropped, taking its Moves,
-  #     boxes, photos and tenant-local MoveMemberships with it.
-  #   - For organizations the user merely belongs to (co-owned, or non-owner), the
-  #     org is left intact; only the user's membership and their tenant-local
-  #     MoveMemberships are removed (MoveMembership has no FK to users, so those
-  #     rows must be cleaned explicitly or they orphan).
+  #     boxes, photos and tenant-local memberships with it.
+  #
+  # Scope (today): a user is the sole owner of every organization they belong to.
+  # The multi-org case — a user who belongs to an org they do NOT solely own —
+  # is deliberately refused (`Failure(:owns_shared_data)`) rather than half-
+  # handled: deleting such a user would strand the moves they created in a
+  # surviving tenant (`Move#created_by` is required and has no FK, so the row
+  # cannot be saved afterwards). Proper handling is the ownership-transfer
+  # feature; until it exists, account deletion is limited to self-owned data.
   #
   # Ordering matters: the relational deletes run in one transaction (so a failure
   # leaves the account fully intact), and the irreversible `DROP SCHEMA`s run
@@ -28,6 +32,7 @@ module Accounts
   class Delete < BaseAction
     def call(user:)
       snapshot = yield snapshot(user)
+      yield ensure_only_self_owned_data(snapshot)
       yield purge(user, snapshot)
       yield emit_event(snapshot)
       Success(snapshot[:user_id])
@@ -38,17 +43,17 @@ module Accounts
     def snapshot(user)
       sole_owned = sole_owned_organizations(user)
       sole_owned_ids = sole_owned.map(&:id)
-      kept_slugs = Organization
-                   .where(id: OrganizationMembership.where(user_id: user.id).select(:organization_id))
-                   .where.not(id: sole_owned_ids)
-                   .pluck(:slug)
+      shared_slugs = Organization
+                     .where(id: OrganizationMembership.where(user_id: user.id).select(:organization_id))
+                     .where.not(id: sole_owned_ids)
+                     .pluck(:slug)
 
       Success(
         user_id: user.id,
         email: user.email,
         sole_owned: sole_owned,
         dropped_slugs: sole_owned.map(&:slug),
-        kept_slugs: kept_slugs
+        shared_slugs: shared_slugs
       )
     end
 
@@ -68,9 +73,18 @@ module Accounts
       Organization.where(id: sole_ids).to_a
     end
 
+    # Refuse to delete a user who belongs to an org they do not solely own (see
+    # the class note): doing so would strand their created moves in a surviving
+    # tenant. Never triggers today (single-owner orgs); it is the guard for when
+    # multi-org membership lands without ownership transfer.
+    def ensure_only_self_owned_data(snapshot)
+      return Failure(:owns_shared_data) if snapshot[:shared_slugs].any?
+
+      Success()
+    end
+
     def purge(user, snapshot)
       ActiveRecord::Base.transaction do
-        clean_move_memberships(user, snapshot[:kept_slugs])
         snapshot[:sole_owned].each(&:destroy!) # registry rows + their memberships
         user.destroy! # cascades auth tables + dependent org memberships
       end
@@ -79,17 +93,6 @@ module Accounts
       Success()
     rescue ActiveRecord::RecordNotDestroyed, ActiveRecord::InvalidForeignKey => e
       Failure(e.message)
-    end
-
-    # Tenant-local MoveMemberships have no FK to users, so deleting the user would
-    # orphan them. For kept orgs we remove them explicitly; for dropped orgs they
-    # vanish with the schema. Runs on the main connection inside the transaction.
-    def clean_move_memberships(user, kept_slugs)
-      kept_slugs.each do |slug|
-        Apartment::Tenant.switch(slug) do
-          MoveMembership.where(user_id: user.id).delete_all
-        end
-      end
     end
 
     def drop_tenants(slugs)
