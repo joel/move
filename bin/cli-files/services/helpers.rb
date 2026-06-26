@@ -249,7 +249,10 @@ module AppCLI
         output, status = Open3.capture2e("docker", "inspect", "-f", "{{ json .Config.Labels }}", name)
         return nil unless status.success?
 
-        JSON.parse(output)[key]
+        # A container with no labels inspects as the JSON literal `null` →
+        # JSON.parse yields nil, so guard before indexing (a no-label container is
+        # then treated as stale and recreated, which is correct).
+        (JSON.parse(output) || {})[key]
       rescue JSON::ParserError
         nil
       end
