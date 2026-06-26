@@ -64,7 +64,9 @@ RSpec.describe "/account" do
     failing = instance_double(Accounts::Delete,
                               call: Dry::Monads::Result::Failure.new(:tenant_drop_failed))
     allow(Accounts::Delete).to receive(:new).and_return(failing)
-    stub_current_tenant("gone-org") # current subdomain, no Organization row
+    allow(ActiveRecord::Base.connection).to receive(:schema_exists?).and_call_original
+    allow(ActiveRecord::Base.connection).to receive(:schema_exists?).with("gone-org").and_return(false)
+    stub_current_tenant("gone-org") # current subdomain whose schema was dropped
 
     delete account_url
 

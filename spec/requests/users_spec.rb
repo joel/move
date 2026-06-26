@@ -140,7 +140,9 @@ RSpec.describe "/users" do
       allow(Apartment::Tenant).to receive(:drop)
       allow(Apartment::Tenant).to receive(:switch).and_yield
       allow(ActiveRecord::Base.connection).to receive(:schema_exists?).and_call_original
-      allow(ActiveRecord::Base.connection).to receive(:schema_exists?).with("soloorg").and_return(true)
+      # exists during teardown (so it drops), gone when the controller checks
+      allow(ActiveRecord::Base.connection).to receive(:schema_exists?).with("soloorg")
+                                                                      .and_return(true, false)
       stub_current_tenant("soloorg") # admin viewing the soon-to-be-dropped subdomain
 
       delete user_url(user)
