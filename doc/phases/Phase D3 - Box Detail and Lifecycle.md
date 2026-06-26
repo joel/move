@@ -50,7 +50,7 @@ The capture camera flow (D4), review queue interior (D6), label/QR generation (D
 ## 9. Phase audit trail
 - **Issue:** #44
 - **PR:** #45 (`feature/box-lifecycle`)
-- **Verification:** `/product-review` on `acme.workeverywhere.docker` — box detail
+- **Verification:** `/product-review` on `acme.move-easy.docker` — box detail
   (identity, room/status chips, dimensions + derived volume `0.030 m³` + weight),
   live **Unseal** transition, live **seal-requires-room** guard (roomless box
   stays packing with the flash), capture hidden once sealed, archived read-only

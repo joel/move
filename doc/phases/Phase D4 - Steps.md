@@ -68,4 +68,4 @@ ever stored — only `label/confidence/count` and operational metadata.
 - **`media` inflection.** Made uncountable so `Media` maps to the `media` table.
 
 ## Verification
-See the phase doc §9. Live-verified end-to-end on `acme.workeverywhere.docker`.
+See the phase doc §9. Live-verified end-to-end on `acme.move-easy.docker`.

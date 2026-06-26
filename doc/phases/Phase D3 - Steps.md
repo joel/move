@@ -53,5 +53,5 @@ true only while `packing`); the D4 capture action will honour it.
 - **`format` is a Phlex helper** — used `Kernel.format("%03d", …)` in the view.
 
 ## Verification
-See the phase doc §9. Live-verified on `acme.workeverywhere.docker`; the
+See the phase doc §9. Live-verified on `acme.move-easy.docker`; the
 seal-requires-room guard and the unseal transition were exercised in the browser.

@@ -46,14 +46,14 @@ Rails.application.configure do
   # Ensure mailer works in development.
   config.action_mailer.delivery_method = :smtp
   config.action_mailer.raise_delivery_errors = true
-  config.action_mailer.smtp_settings = { address: "mail", port: 1025, domain: "workeverywhere.docker" }
-  config.action_mailer.default_url_options = { host: "move.workeverywhere.docker", protocol: "https" }
-  config.action_mailer.asset_host = "https://move.workeverywhere.docker"
+  config.action_mailer.smtp_settings = { address: "mail", port: 1025, domain: "move-easy.docker" }
+  config.action_mailer.default_url_options = { host: "move.move-easy.docker", protocol: "https" }
+  config.action_mailer.asset_host = "https://move.move-easy.docker"
 
-  # Multi-tenancy: org subdomains are <slug>.workeverywhere.docker (the dev TLS
+  # Multi-tenancy: org subdomains are <slug>.move-easy.docker (the dev TLS
   # cert only covers one label). Cookies are host-only (#280) — the apex session
   # does not carry to subdomains; the post-login handoff token bridges it.
-  config.x.tenant_zone = "workeverywhere.docker"
+  config.x.tenant_zone = "move-easy.docker"
 
   # Make template changes take effect immediately.
   config.action_mailer.perform_caching = false
@@ -87,11 +87,11 @@ Rails.application.configure do
 
   # Allow the local dev hosts to open the Action Cable WebSocket — the indexing
   # progress stream (#239). The settings page lives on an *org subdomain*
-  # (<slug>.workeverywhere.docker), so allow any subdomain of the dev zone, plus
+  # (<slug>.move-easy.docker), so allow any subdomain of the dev zone, plus
   # localhost subdomains for the directly-exposed Puma. Without this, ActionCable
   # rejects the WS handshake as cross-origin and the progress bar never updates.
   config.action_cable.allowed_request_origins = [
-    %r{\Ahttps?://([a-z0-9-]+\.)*workeverywhere\.docker(:\d+)?\z},
+    %r{\Ahttps?://([a-z0-9-]+\.)*move-easy\.docker(:\d+)?\z},
     %r{\Ahttps?://([a-z0-9-]+\.)*localhost(:\d+)?\z}
   ]
 

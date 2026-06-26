@@ -381,7 +381,7 @@ To enable it in production:
    to the apex and auto-starts the flow.
 
 > Local dev cannot exercise real Google: Google requires an `https` (or
-> `localhost`) origin, and the dev host is `http://<slug>.workeverywhere.docker`.
+> `localhost`) origin, and the dev host is `http://<slug>.move-easy.docker`.
 > Specs therefore mock OmniAuth / stub the token endpoint
 > (`spec/requests/google_one_tap_sessions_spec.rb`), and real end-to-end Google
 > verification is done against prod.

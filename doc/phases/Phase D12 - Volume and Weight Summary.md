@@ -45,7 +45,7 @@ MCP `get_volume_summary` (D13); export/share (deferred).
 - **Branch:** `feature/summary`. **Steps log:** `Phase D12 - Steps.md`.
 - **Unit-toggle decision:** persists `Move#unit_system` (display-only over
   canonical cm/kg; hidden on archived Moves).
-- **Verification:** live at `acme.workeverywhere.docker` — totals/per-room/box
+- **Verification:** live at `acme.move-easy.docker` — totals/per-room/box
   count, 3-box incomplete banner, metric↔imperial display-only conversion
   (canonical unchanged), archived Move read-only with no toggle; dark + light +
   mobile clean. Full suite green; lint/brakeman clean.

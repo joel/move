@@ -30,7 +30,7 @@ module AppCLI
     }.freeze
     MYSQL_CERT_DIR = File.expand_path("certs/mysql", AppCLI::ROOT)
     TRAEFIK_ROUTER = "workeverywhere".freeze
-    TRAEFIK_DOMAIN = "workeverywhere.docker".freeze
+    TRAEFIK_DOMAIN = "move-easy.docker".freeze
     SUPPORTED_ENVS = {
       "dev" => "development",
       "development" => "development",

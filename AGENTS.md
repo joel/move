@@ -10,7 +10,7 @@ This document provides instructions and protocols for AI Agents interacting with
 
 - **Ruby version manager:** This project uses **mise**. Prefix Ruby/Rails commands with `mise x --` (e.g. `mise x -- bundle exec rspec`) so the project's Ruby (`.ruby-version`) is used.
 
-- **URLs:** Local development (via `bin/cli`): `https://move.workeverywhere.docker` (mail at `https://mail.workeverywhere.docker`). Production: `https://move-easy.org` (apex/login; org subdomains `<slug>.move-easy.org`), behind Cloudflare (Full Strict, Origin CA wildcard cert served by kamal-proxy).
+- **URLs:** Local development (via `bin/cli`): `https://move.move-easy.docker` (mail at `https://mail.move-easy.docker`). Production: `https://move-easy.org` (apex/login; org subdomains `<slug>.move-easy.org`), behind Cloudflare (Full Strict, Origin CA wildcard cert served by kamal-proxy).
 
 ### Design source of truth (Google Stitch)
 
@@ -375,8 +375,8 @@ After all code changes are committed and tests pass, perform a live runtime veri
 1. **Rebuild the app:** `bin/cli app rebuild`
 2. **Restart the app:** `bin/cli app restart`
 3. **Start the mail service:** `bin/cli mail start`
-4. **Verify email delivery** at `https://mail.workeverywhere.docker/` using `agent-browser`.
-5. **Visually verify the app** at `https://move.workeverywhere.docker/` using `agent-browser`:
+4. **Verify email delivery** at `https://mail.move-easy.docker/` using `agent-browser`.
+5. **Visually verify the app** at `https://move.move-easy.docker/` using `agent-browser`:
    - Home page renders correctly (logged out and logged in states).
    - Authentication flows work (create account, verify email, sign in, sign out — Rodauth, passwordless).
    - All CRUD pages render and function (e.g. Posts, Users — index, show, new, edit).

@@ -56,7 +56,7 @@ sequenceDiagram
 Manifest read is audited: `ManifestsController` → `Manifests::Generate` emits
 `manifest.viewed` → `Manifests::AuditSubscriber` logs it (events-not-callbacks).
 
-## Live verification (/product-review on acme.workeverywhere.docker)
+## Live verification (/product-review on acme.move-easy.docker)
 - Label PDF: `application/pdf`, opaque (number/room/QR), **no contents**. ✓
 - Manifest PDF: `application/pdf`; `[manifest.audit] tenant=acme box=… actor=…`
   logged. ✓

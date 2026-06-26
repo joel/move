@@ -113,9 +113,9 @@ bin/cli services start     # app + database + mail + storage
 bin/rails db:seed          # demo org, a "Seattle Relocation" move, a demo account
 ```
 
-Then open **https://move.workeverywhere.docker** (local mail at
-**https://mail.workeverywhere.docker**), sign in passwordless as the seeded demo account,
-and you'll land on the org subdomain (`acme.workeverywhere.docker`) inside the demo move.
+Then open **https://move.move-easy.docker** (local mail at
+**https://mail.move-easy.docker**), sign in passwordless as the seeded demo account,
+and you'll land on the org subdomain (`acme.move-easy.docker`) inside the demo move.
 
 | `bin/cli …` | what it does |
 |---|---|

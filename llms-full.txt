@@ -315,9 +315,9 @@ migration). Otherwise the codebase is in a green, released state.
   re-remind.
 
 ### Local dev quick reference
-- Dev URLs: `https://move.workeverywhere.docker` (apex), org subdomain e.g.
-  `acme.workeverywhere.docker`; mail at `https://mail.workeverywhere.docker`.
-  (Per agent memory, `/product-review` access is `http://acme.workeverywhere.docker:8080`
+- Dev URLs: `https://move.move-easy.docker` (apex), org subdomain e.g.
+  `acme.move-easy.docker`; mail at `https://mail.move-easy.docker`.
+  (Per agent memory, `/product-review` access is `http://acme.move-easy.docker:8080`
   HTTP — verify against memory `dev-product-review-access`.)
 - `bin/cli services start`, `bin/rails db:seed`. Demo: `demo@example.com`, org `acme`,
   move "Seattle Relocation". Magic links are single-use.

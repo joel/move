@@ -48,7 +48,7 @@ class ApplicationController < ActionController::Base
   end
 
   # True only on the canonical apex host (the URL host this app generates links
-  # for — move-easy.org in prod, move.workeverywhere.docker in dev). Google
+  # for — move-easy.org in prod, move.move-easy.docker in dev). Google
   # OAuth/One Tap derive their callback + FedCM origin from the request host,
   # but only the apex is registered with Google; excluded labels (www, move)
   # also resolve to the public tenant, so a host check — not just
@@ -58,7 +58,7 @@ class ApplicationController < ActionController::Base
   end
 
   # The canonical apex host this app generates links for (move-easy.org in prod,
-  # move.workeverywhere.docker in dev). Single source of truth for on_apex_host?
+  # move.move-easy.docker in dev). Single source of truth for on_apex_host?
   # and the session-handoff failure's apex login URL (#280).
   def apex_host
     Rails.application.config.action_mailer.default_url_options&.dig(:host)
