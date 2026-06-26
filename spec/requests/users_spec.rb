@@ -127,10 +127,12 @@ RSpec.describe "/users" do
       end.to change(User, :count).by(-1)
     end
 
-    it "redirects to the users list" do
+    it "redirects to the users list on the canonical apex host" do
       user = User.create! valid_attributes
       delete user_url(user)
-      expect(response).to redirect_to(users_url)
+      # Apex host, since a successful deletion can drop the current subdomain.
+      apex = Rails.application.config.action_mailer.default_url_options.fetch(:host)
+      expect(response).to redirect_to(users_url(host: apex))
     end
 
     # Admin deletion is routed through Accounts::Delete, so it inherits the

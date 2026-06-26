@@ -57,7 +57,10 @@ class UsersController < ApplicationController
     # that would orphan org memberships and tenant rows.
     case Accounts::Delete.new.call(user: @user)
     in Dry::Monads::Success(_user_id)
-      redirect_to users_url, notice: "User was successfully destroyed.", status: :see_other
+      # Deletion may have dropped the tenant for the subdomain we're on, so land
+      # on the apex users list rather than 404 against a now-missing tenant.
+      redirect_to apex_users_url, allow_other_host: true, status: :see_other,
+                                  notice: "User was successfully destroyed."
     in Dry::Monads::Failure(:owns_shared_data)
       redirect_to users_url, status: :see_other,
                              alert: "Can't delete a user who shares an organization with others."
@@ -67,6 +70,12 @@ class UsersController < ApplicationController
   end
 
   private
+
+  # The users list on the canonical apex host: a successful deletion can drop the
+  # current subdomain's tenant, so a same-host redirect would 404 in the elevator.
+  def apex_users_url
+    apex_host ? users_url(host: apex_host) : users_url
+  end
 
   # Use callbacks to share common setup or constraints between actions.
   def set_user
