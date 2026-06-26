@@ -77,11 +77,6 @@ class UsersController < ApplicationController
     current_subdomain_dropped? ? users_url(host: apex_host) : users_url
   end
 
-  def current_subdomain_dropped?
-    apex_host.present? && current_tenant.present? &&
-      !Organization.exists?(slug: current_tenant)
-  end
-
   # Use callbacks to share common setup or constraints between actions.
   def set_user
     @user = User.find(params.expect(:id))

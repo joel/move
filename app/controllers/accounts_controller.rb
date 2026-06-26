@@ -29,9 +29,12 @@ class AccountsController < ApplicationController
       # signed-out user on the canonical apex root.
       redirect_to post_deletion_url, allow_other_host: true, notice: t(".notice")
     in Dry::Monads::Failure(:owns_shared_data)
+      # Refused before any drop, so the current subdomain is intact.
       redirect_to account_path, alert: t(".shared_data")
     in Dry::Monads::Failure(_)
-      redirect_to account_path, alert: t(".failure")
+      # A partial multi-org teardown may have dropped the current subdomain;
+      # fall back to the apex so the elevator doesn't 404.
+      redirect_to failure_redirect_url, allow_other_host: true, alert: t(".failure")
     end
   end
 
@@ -43,6 +46,10 @@ class AccountsController < ApplicationController
 
   def post_deletion_url
     apex_host ? root_url(host: apex_host) : root_path
+  end
+
+  def failure_redirect_url
+    current_subdomain_dropped? ? post_deletion_url : account_path
   end
 
   def account_params

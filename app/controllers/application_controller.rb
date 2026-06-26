@@ -47,6 +47,15 @@ class ApplicationController < ActionController::Base
     tenant unless tenant == Apartment.default_tenant || tenant == "public"
   end
 
+  # True when the request is on an org subdomain whose tenant was just dropped
+  # (its Organization no longer exists) — used after account/user deletion to
+  # fall back to the apex instead of routing back through a now-missing tenant
+  # (the elevator would 404). Unreachable today (a user owns a single org); it
+  # guards the multi-solo-org partial-teardown path.
+  def current_subdomain_dropped?
+    apex_host.present? && current_tenant.present? && !Organization.exists?(slug: current_tenant)
+  end
+
   # True only on the canonical apex host (the URL host this app generates links
   # for — move-easy.org in prod, move.move-easy.docker in dev). Google
   # OAuth/One Tap derive their callback + FedCM origin from the request host,

@@ -58,6 +58,20 @@ RSpec.describe "/account" do
     expect(Apartment::Tenant).to have_received(:drop).with("acme")
   end
 
+  it "redirects a failed delete to the apex when the current subdomain was dropped" do
+    # Simulate a partial multi-org teardown: the action fails after the current
+    # subdomain's tenant was already dropped, so a same-host redirect would 404.
+    failing = instance_double(Accounts::Delete,
+                              call: Dry::Monads::Result::Failure.new(:tenant_drop_failed))
+    allow(Accounts::Delete).to receive(:new).and_return(failing)
+    stub_current_tenant("gone-org") # current subdomain, no Organization row
+
+    delete account_url
+
+    apex = Rails.application.config.action_mailer.default_url_options.fetch(:host)
+    expect(response).to redirect_to(root_url(host: apex))
+  end
+
   it "requires authentication" do
     stub_current_user(nil)
     get account_url
