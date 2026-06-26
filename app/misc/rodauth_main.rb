@@ -324,8 +324,13 @@ class RodauthMain < Rodauth::Rails::Auth
         RodauthMailer.verify_account(self.class.configuration_name, account_id, verify_account_key_value)
       end
 
+      # Pass the request-time tenant (#353): when the sign-in link is requested
+      # from an org subdomain, the mailer points the magic link back at THAT
+      # subdomain (membership-validated) so login completes there and the #346
+      # handoff targets the originating org instead of the primary.
       create_email_auth_email do
-        RodauthMailer.email_auth(self.class.configuration_name, account_id, email_auth_key_value)
+        RodauthMailer.email_auth(self.class.configuration_name, account_id,
+                                 email_auth_key_value, Apartment::Tenant.current)
       end
 
       send_email do |email|

@@ -203,11 +203,14 @@ resolved by `SessionHandoffs::TargetResolver` and always **membership-validated*
 from: the active Apartment tenant on a **subdomain login** (passkey / email-auth
 submitted on the subdomain), or an `org` slug carried through the **Google apex
 bridge** (the subdomain link adds `?org=<slug>`, forwarded into the OmniAuth
-request → `omniauth.params`). The **email magic-link** always lands on the apex
-(its link has no per-request host) so it still targets the primary org —
-deferred (#353). The fallback `primary_organization` is **deterministic** (oldest
-membership, slug tiebreak). Moot for single-org users today; correct once a user
-belongs to more than one org.
+request → `omniauth.params`). The **email magic-link** (#353): when the sign-in
+link is requested from an org subdomain the user belongs to, `RodauthMailer`
+points the link **back at that subdomain** (overriding `rails_url_options` host,
+membership-validated at send time), so login completes there and the same
+subdomain-origin path applies — its query can't carry the slug because Rodauth's
+email-auth flow strips it (`redirect(r.path)`). The fallback `primary_organization`
+is **deterministic** (oldest membership, slug tiebreak). Moot for single-org users
+today; correct once a user belongs to more than one org.
 
 ---
 
