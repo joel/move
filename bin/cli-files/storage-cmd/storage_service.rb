@@ -72,11 +72,7 @@ module AppCLI
 
         if status == "running"
           shell.say("Storage service already running.")
-          wait_for_s3_ready
-          wait_for_web_ui_ready
-          ensure_bucket
-          ensure_cors
-          return
+          return await_ready_and_provision
         end
 
         if status != "missing"
@@ -85,6 +81,11 @@ module AppCLI
         end
 
         runner.run(storage_run_command)
+        await_ready_and_provision
+      end
+
+      # Block until S3 + the web UI answer, then provision the bucket and CORS.
+      def await_ready_and_provision
         wait_for_s3_ready
         wait_for_web_ui_ready
         ensure_bucket
@@ -164,9 +165,14 @@ module AppCLI
 
       def runtime_config_current?
         labels = container_labels
+        # Compare the Traefik Host(...) rules too, not just service/port/args — a
+        # domain rename (#360) changes only the host, so without this a stale
+        # container reports "current" and keeps routing the old host.
         labels["traefik.http.routers.#{WEB_UI_ROUTER}.service"] == WEB_UI_ROUTER &&
+          labels["traefik.http.routers.#{WEB_UI_ROUTER}.rule"] == "Host(`#{STORAGE_HOST}`)" &&
           labels["traefik.http.services.#{WEB_UI_ROUTER}.loadbalancer.server.port"] == WEB_UI_PORT &&
           labels["traefik.http.routers.#{BUCKET_ROUTER}.service"] == S3_ROUTER &&
+          labels["traefik.http.routers.#{BUCKET_ROUTER}.rule"] == "Host(`#{BUCKET_HOST}`)" &&
           labels["traefik.http.services.#{S3_ROUTER}.loadbalancer.server.port"] == S3_PORT &&
           container_args == SERVER_ARGS
       end
