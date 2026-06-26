@@ -55,8 +55,13 @@ module AppCLI
         prepare
 
         if runner.container_running?(env_config.app_container)
-          shell.say("Application already running.")
-          return
+          return shell.say("Application already running.") if app_traefik_host_current?
+
+          # Stale Traefik host (a domain rename, #362) — recreate so it routes the
+          # current host. `rm -f` removes it synchronously (the container is --rm,
+          # so a bare `stop` would remove it asynchronously and race the run below).
+          shell.say("Recreating app to apply updated host (#{env_config.traefik_host}).")
+          runner.run("docker rm -f #{env_config.app_container}", allow_failure: true)
         end
 
         FileUtils.rm_f(File.join(AppCLI::ROOT, "tmp/pids/server.pid"))
@@ -238,6 +243,14 @@ module AppCLI
 
       def network_flags
         ["--network #{env_config.network_name}"]
+      end
+
+      # Whether the running container's apex Traefik Host rule matches the current
+      # traefik_host. A bare running-check would miss a host-only change (#362).
+      def app_traefik_host_current?
+        runner.container_label(
+          env_config.app_container, "traefik.http.routers.#{env_config.traefik_router}.rule"
+        ) == "Host(`#{env_config.traefik_host}`)"
       end
 
       def traefik_flags

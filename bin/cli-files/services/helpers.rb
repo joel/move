@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
 require "open3"
+require "json"
 require "shellwords"
 require "thor"
 require "active_support/core_ext/module/delegation"
@@ -239,6 +240,18 @@ module AppCLI
 
       def container_running?(name)
         container_status(name) == "running"
+      end
+
+      # A single Docker/Traefik label value off a running container, or nil. Lets
+      # services detect a host-only config change (a domain rename) that a bare
+      # running-check would miss (#360/#362).
+      def container_label(name, key)
+        output, status = Open3.capture2e("docker", "inspect", "-f", "{{ json .Config.Labels }}", name)
+        return nil unless status.success?
+
+        JSON.parse(output)[key]
+      rescue JSON::ParserError
+        nil
       end
 
       def ensure_network(name = NETWORK_NAME)
