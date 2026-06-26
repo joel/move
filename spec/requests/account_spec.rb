@@ -16,6 +16,15 @@ RSpec.describe "/account" do
     expect(response.body).to include('aria-label="Account name"') # labelled inline field
   end
 
+  it "submits the delete form natively (turbo:false) with a Stimulus confirm" do
+    # Deletion ends in a cross-host redirect Turbo won't follow; the form must
+    # submit natively and confirm via the `confirm` controller, not turbo-confirm.
+    get account_url
+    expect(response.body).to include('data-turbo="false"')
+    expect(response.body).to include('data-controller="confirm"')
+    expect(response.body).to include("submit-&gt;confirm#confirm")
+  end
+
   it "no longer exposes a separate edit route" do
     expect { edit_account_path }.to raise_error(NameError)
   end

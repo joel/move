@@ -69,11 +69,23 @@ module Views
                   plain "Permanently remove your account and all of its data."
                 end
               end
+              # turbo: false — deletion ends in a cross-host redirect to the apex
+              # (the current subdomain's tenant may have just been dropped), which
+              # Turbo will not follow via fetch; a native submit lets the browser
+              # follow the redirect. That also disables data-turbo-confirm, so the
+              # confirmation is driven by the `confirm` Stimulus controller.
               button_to("Delete account", view_context.account_path,
                         method: :delete,
                         class: "ha-button ha-button-danger",
-                        form: { class: "inline-flex" },
-                        data: { turbo_confirm: "Delete your account permanently?" })
+                        form: {
+                          class: "inline-flex",
+                          data: {
+                            turbo: false,
+                            controller: "confirm",
+                            confirm_message_value: "Delete your account permanently?",
+                            action: "submit->confirm#confirm"
+                          }
+                        })
             end
           end
         end
