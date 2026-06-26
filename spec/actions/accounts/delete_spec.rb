@@ -5,12 +5,15 @@ RSpec.describe Accounts::Delete do
 
   let(:user) { create(:user) }
 
-  # The tenant schemas aren't really provisioned in specs, so `drop` is a spy and
+  # The tenant schemas aren't really provisioned in specs, so `drop` is a spy,
   # `switch` (used to purge tenant attachments) just yields onto the public
-  # connection where the template tables live.
+  # connection, and `schema_exists?` reports the tenant as present so the drop
+  # path runs.
   before do
     allow(Apartment::Tenant).to receive(:drop)
     allow(Apartment::Tenant).to receive(:switch).and_yield
+    allow(ActiveRecord::Base.connection).to receive(:schema_exists?).and_call_original
+    allow(ActiveRecord::Base.connection).to receive(:schema_exists?).with("acme").and_return(true)
     allow(Rails.event).to receive(:notify)
   end
 
@@ -140,6 +143,22 @@ RSpec.describe Accounts::Delete do
     end
   end
 
+  context "when the tenant drop fails" do
+    let!(:organization) { create(:organization, slug: "acme") }
+
+    before do
+      create(:organization_membership, :owner, organization: organization, user: user)
+      allow(Apartment::Tenant).to receive(:drop).and_raise(Apartment::ApartmentError, "locked")
+    end
+
+    it "aborts without deleting the account, so no data is left behind a live schema" do
+      expect(result).to be_failure
+      expect(result.failure).to eq(:tenant_drop_failed)
+      expect(User.exists?(user.id)).to be(true)
+      expect(Organization.exists?(organization.id)).to be(true)
+    end
+  end
+
   context "when the relational deletion fails" do
     let!(:organization) { create(:organization, slug: "acme") }
 
@@ -148,11 +167,10 @@ RSpec.describe Accounts::Delete do
       allow(user).to receive(:destroy!).and_raise(ActiveRecord::RecordNotDestroyed)
     end
 
-    it "returns Failure and leaves the account and org intact, dropping nothing" do
+    it "rolls back the row deletion and returns Failure" do
       expect(result).to be_failure
       expect(User.exists?(user.id)).to be(true)
       expect(Organization.exists?(organization.id)).to be(true)
-      expect(Apartment::Tenant).not_to have_received(:drop)
     end
   end
 end

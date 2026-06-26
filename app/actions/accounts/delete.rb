@@ -25,12 +25,15 @@ module Accounts
   # the ownership-transfer feature; until it exists, deletion is limited to data
   # nobody else can see.
   #
-  # Ordering matters: the relational deletes run in one transaction (so a failure
-  # leaves the account fully intact), and the irreversible `DROP SCHEMA`s run
-  # AFTER it commits — `Apartment::Tenant.drop` executes on a neutral connection
-  # outside the transaction, so a rollback could not undo them. A drop that fails
-  # post-commit only leaves an orphaned, unreferenced schema; the account is
-  # already gone, which is the user's intent.
+  # Ordering matters: the irreversible `DROP SCHEMA` runs FIRST, then the public
+  # user/org rows are deleted in one (reversible) transaction. The DROP is what
+  # makes the tenant's data and MCP tokens inaccessible, so a drop that genuinely
+  # fails aborts the whole deletion (`Failure(:tenant_drop_failed)`) with the
+  # account fully intact — never a "deleted" account sitting in front of a live,
+  # still-routable schema. Drops are gated on `schema_exists?`, so a retry after a
+  # partial failure (schema gone, rows not yet deleted) is idempotent and
+  # recovers. `Apartment::Tenant.drop` runs on a neutral connection, so it cannot
+  # share the row-deletion transaction anyway.
   class Delete < BaseAction
     # Tenant models whose Active Storage attachments must be purged before the
     # schema is dropped: the attachment/blob tables are excluded into the public
@@ -42,7 +45,8 @@ module Accounts
     def call(user:)
       snapshot = yield snapshot(user)
       yield ensure_only_solo_data(snapshot)
-      yield purge(user, snapshot)
+      yield drop_tenants(snapshot[:dropped_slugs])
+      yield delete_records(user, snapshot)
       yield emit_event(snapshot)
       Success(snapshot[:user_id])
     end
@@ -92,39 +96,48 @@ module Accounts
       Success()
     end
 
-    def purge(user, snapshot)
+    # Drop the tenant schema(s) BEFORE deleting the public user/org rows. The
+    # DROP is what makes the tenant's data and MCP tokens inaccessible (the
+    # subdomain stays routable and tokens keep authenticating as long as the
+    # schema exists), so a drop that genuinely fails must abort the whole
+    # deletion — never report success with a live schema behind a "deleted"
+    # account. Ordering is deliberate: the DROP is irreversible, the public rows
+    # are reversible, so do the irreversible step first and only commit the
+    # deletes once the data is provably gone.
+    def drop_tenants(slugs)
+      slugs.each { |slug| drop_tenant(slug) }
+      Success()
+    rescue ActiveRecord::ActiveRecordError, Apartment::ApartmentError => e
+      Rails.logger.error("[accounts.delete] tenant drop failed: #{e.class}: #{e.message}")
+      Failure(:tenant_drop_failed)
+    end
+
+    def drop_tenant(slug)
+      # Idempotent: a retry after a partial failure (schema already dropped, rows
+      # not yet deleted) finds nothing to drop and proceeds to the row deletion.
+      return unless ActiveRecord::Base.connection.schema_exists?(slug)
+
+      purge_attachments_in(slug)
+      Apartment::Tenant.drop(slug)
+    end
+
+    # Detaching blobs is best-effort cosmetic cleanup (a failure only orphans
+    # storage, never leaves a routable schema), so it must not abort the drop
+    # that follows — the sanctioned broad rescue of AGENTS.md §1#4.
+    def purge_attachments_in(slug)
+      Apartment::Tenant.switch(slug) { purge_attachments }
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- best-effort blob cleanup must not abort the drop
+      Rails.logger.error("[accounts.delete] attachment purge failed for #{slug}: #{e.class}: #{e.message}")
+    end
+
+    def delete_records(user, snapshot)
       ActiveRecord::Base.transaction do
         snapshot[:solo].each(&:destroy!) # registry rows + their memberships
         user.destroy! # auth tables cascade; org memberships already gone
       end
-
-      drop_tenants(snapshot[:dropped_slugs]) # irreversible — only after the commit
       Success()
     rescue ActiveRecord::RecordNotDestroyed, ActiveRecord::InvalidForeignKey => e
       Failure(e.message)
-    end
-
-    def drop_tenants(slugs)
-      slugs.each { |slug| purge_and_drop(slug) }
-    end
-
-    # Purge first (best-effort), then ALWAYS drop — the account and its registry
-    # rows are already committed-gone, so NO failure here (a missing schema, a
-    # storage outage, a queue backend that can't enqueue the purge job) may
-    # report the deletion as failed; every error is logged and swallowed. This is
-    # the sanctioned broad rescue of AGENTS.md §1#4 (post-commit cleanup).
-    def purge_and_drop(slug)
-      Apartment::Tenant.switch(slug) { purge_attachments }
-    rescue StandardError => e # rubocop:disable Move/BroadRescue -- cleanup must not fail an already-deleted account
-      Rails.logger.error("[accounts.delete] attachment purge failed for #{slug}: #{e.class}: #{e.message}")
-    ensure
-      drop_tenant(slug)
-    end
-
-    def drop_tenant(slug)
-      Apartment::Tenant.drop(slug)
-    rescue StandardError => e # rubocop:disable Move/BroadRescue -- cleanup must not fail an already-deleted account
-      Rails.logger.error("[accounts.delete] tenant drop failed for #{slug}: #{e.class}: #{e.message}")
     end
 
     # Detaches each attachment (deletes the public attachment row) and enqueues

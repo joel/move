@@ -35,6 +35,8 @@ RSpec.describe "/account" do
     create(:organization_membership, :owner, organization: organization, user: user)
     allow(Apartment::Tenant).to receive(:drop)
     allow(Apartment::Tenant).to receive(:switch).and_yield
+    allow(ActiveRecord::Base.connection).to receive(:schema_exists?).and_call_original
+    allow(ActiveRecord::Base.connection).to receive(:schema_exists?).with("acme").and_return(true)
 
     expect do
       delete account_url
