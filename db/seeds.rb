@@ -28,7 +28,7 @@ require Rails.root.join("db/seed_data/catalog").to_s
 
 # --- Demo accounts + organization (tenant) ----------------------------------
 # Sign in (passwordless) with these emails on the org subdomain
-# `<slug>.<tenant_zone>` (dev: acme.workeverywhere.docker). The first three are
+# `<slug>.<tenant_zone>` (dev: acme.move-easy.docker). The first three are
 # members of the demo Move across all three D11 roles; the fourth is an
 # Organization member NOT on the Move, so the F1 "Add member" form has a
 # candidate to showcase:
@@ -39,7 +39,7 @@ require Rails.root.join("db/seed_data/catalog").to_s
 #
 # D13 — the demo Move's "Main Assistant" MCP token is the fixed dev value below,
 # so you can call the assistant endpoint immediately:
-#   curl -s https://acme.workeverywhere.docker/mcp \
+#   curl -s https://acme.move-easy.docker/mcp \
 #     -H "Authorization: Bearer mcp_demo_seattle_relocation_dev_token" \
 #     -H "Content-Type: application/json" \
 #     -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_boxes","arguments":{}}}'

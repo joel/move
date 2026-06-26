@@ -8,7 +8,7 @@ module AppCLI
       MAIL_CONTAINER = "mail".freeze
       MAIL_IMAGE = "isms/mailcatcher:0.10.0".freeze
       MAIL_PORT = "1080".freeze
-      MAIL_HOST = "mail.workeverywhere.docker".freeze
+      MAIL_HOST = "mail.move-easy.docker".freeze
       MAIL_ROUTER = "isms-mailcatcher".freeze
 
       def initialize(shell:)
@@ -21,7 +21,7 @@ module AppCLI
       #   --publish 1080:1080 \
       #   --network network.docker-shared-services \
       #   --label traefik.enable=true \
-      #   --label "traefik.http.routers.isms-mailcatcher.rule=Host(`mail.workeverywhere.docker`)" \
+      #   --label "traefik.http.routers.isms-mailcatcher.rule=Host(`mail.move-easy.docker`)" \
       #   --label traefik.http.routers.isms-mailcatcher.entrypoints=websecure \
       #   --label traefik.http.routers.isms-mailcatcher.tls=true \
       #   --label traefik.http.services.isms-mailcatcher.loadbalancer.server.port=1080 \

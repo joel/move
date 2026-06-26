@@ -55,7 +55,7 @@ The review UX itself (D6), search indexing of confirmed items (D8), MCP `add_med
 ## 9. Phase audit trail
 - **Issue:** #46
 - **PR:** #47 (`feature/capture-recognition`)
-- **Verification:** `/product-review` on `acme.workeverywhere.docker` with the fake
+- **Verification:** `/product-review` on `acme.move-easy.docker` with the fake
   provider — captured an image into box 2: media created, recognition ran async
   (in-Puma/async Solid Queue), session went **Processing → ✓ Recognized**, and
   **3 items landed split 2 auto-confirmed / 1 pending-review**. Box detail shows

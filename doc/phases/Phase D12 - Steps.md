@@ -48,7 +48,7 @@ the screen↔phase map.
 ## 8. Runtime verification
 Reset dev seed; rebuilt Tailwind (`tailwindcss:build`) + cleared precompiled
 `public/assets` so the new view's utilities compile, then restarted. Verified
-live at `https://acme.workeverywhere.docker` (signed in as `demo@example.com`):
+live at `https://acme.move-easy.docker` (signed in as `demo@example.com`):
 - Nav **Summary** link resolves; page renders dark (default) and light.
 - Seattle Relocation: **Total Volume 0.55 m³**, **Est. Weight 77 kg**, **8 boxes
   / 4 rooms**; incomplete-data banner reports **3 boxes** (#2/#4/#6); rooms

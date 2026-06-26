@@ -9,8 +9,8 @@ Flight-recorder for the tenancy + Moves effort. Append-only; factual.
 
 ## Confirmed decisions (maintainer)
 
-1. **Apex-only login UI** at `move.workeverywhere.docker`; **session + remember cookie shared on `.workeverywhere.docker`** (env-configurable) so the session carries to org subdomains with no redirect loop. Tenant subdomains are post-auth.
-2. **Auto-create a personal Organization (tenant) on account verification**; slug derived from name/email → provision tenant → redirect to `<slug>.workeverywhere.docker`.
+1. **Apex-only login UI** at `move.move-easy.docker`; **session + remember cookie shared on `.move-easy.docker`** (env-configurable) so the session carries to org subdomains with no redirect loop. Tenant subdomains are post-auth.
+2. **Auto-create a personal Organization (tenant) on account verification**; slug derived from name/email → provision tenant → redirect to `<slug>.move-easy.docker`.
 3. **Keep verify-before-login** in all envs (prod parity).
 4. **Rodauth tables schema-qualified to `public`** + `persistent_schemas: ["public"]` + `excluded_models` → auth immune to tenant switching (Rodauth shares the AR connection via sequel-activerecord_connection).
 5. **Prerequisite:** app image `pg_dump` was 17.10 vs PG 18.0 server → aborts. Fix: PGDG `postgresql-client-18` in both Dockerfiles + pin `DB_IMAGES` postgresql to `postgres:18`. Both `:sql` dumps and Apartment `use_sql` cloning depend on it.
@@ -86,7 +86,7 @@ Flight-recorder for the tenancy + Moves effort. Append-only; factual.
 - Custom `MoveTenantElevator` (zone-based; `.docker` isn't a public suffix so
   Apartment's Subdomain elevator can't parse it), 404 on unknown tenant.
 - Session + Rodauth remember cookie shared on `config.x.cookie_domain`
-  (`.workeverywhere.docker` dev / `.app` prod); `tenant_zone` per env.
+  (`.move-easy.docker` dev / `.app` prod); `tenant_zone` per env.
 - Traefik low-priority `HostRegexp` router for `<slug>.<domain>` in `app_service.rb`.
 - **Verified live:** DNS `acme.…docker` → 200 with `search_path TO "acme","public"`;
   unknown subdomain → 404; **apex login session carries to `acme` subdomain (no

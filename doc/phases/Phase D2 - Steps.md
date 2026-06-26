@@ -32,5 +32,5 @@ Append-only log of how the work unfolded. Companion to `Phase D2 - Boxes Home.md
   tables clone into tenant schemas; `structure.sql` holds the public template.
 
 ## Verification
-See the audit trail in the phase doc §9. Live-verified on `joel.workeverywhere.docker`,
+See the audit trail in the phase doc §9. Live-verified on `joel.move-easy.docker`,
 desktop + mobile, screenshot-matched to the Refined-Palette Stitch screen.

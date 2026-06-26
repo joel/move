@@ -51,7 +51,7 @@ Box detail interior (D3), real capture pipeline (D4), search results (D8), summa
 ## 9. Phase audit trail
 - **Issue:** #42
 - **PR:** #43 (`feature/boxes-home`)
-- **Verification:** `/product-review` on `joel.workeverywhere.docker` — empty state,
+- **Verification:** `/product-review` on `joel.move-easy.docker` — empty state,
   add-box journey (auto number + room find-or-create), per-box status + missing-
   dimensions warning, compact progress indicator (packed/pending/missing), room
   filter, archived read-only (new redirects), dark default, mobile (393×852, no
