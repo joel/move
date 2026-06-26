@@ -57,10 +57,8 @@ class UsersController < ApplicationController
     # that would orphan org memberships and tenant rows.
     case Accounts::Delete.new.call(user: @user)
     in Dry::Monads::Success(_user_id)
-      # Deletion may have dropped the tenant for the subdomain we're on, so land
-      # on the apex users list rather than 404 against a now-missing tenant.
-      redirect_to apex_users_url, allow_other_host: true, status: :see_other,
-                                  notice: "User was successfully destroyed."
+      redirect_to post_delete_users_url, allow_other_host: true, status: :see_other,
+                                         notice: "User was successfully destroyed."
     in Dry::Monads::Failure(:owns_shared_data)
       redirect_to users_url, status: :see_other,
                              alert: "Can't delete a user who shares an organization with others."
@@ -71,10 +69,17 @@ class UsersController < ApplicationController
 
   private
 
-  # The users list on the canonical apex host: a successful deletion can drop the
-  # current subdomain's tenant, so a same-host redirect would 404 in the elevator.
-  def apex_users_url
-    apex_host ? users_url(host: apex_host) : users_url
+  # Stay on the current host unless the delete dropped THIS subdomain's tenant —
+  # only then would a same-host redirect 404 in the elevator. Bouncing to apex
+  # otherwise would land the admin without their host-only subdomain session
+  # (#280), i.e. on an unauthenticated page. On the apex, current_tenant is nil.
+  def post_delete_users_url
+    current_subdomain_dropped? ? users_url(host: apex_host) : users_url
+  end
+
+  def current_subdomain_dropped?
+    apex_host.present? && current_tenant.present? &&
+      !Organization.exists?(slug: current_tenant)
   end
 
   # Use callbacks to share common setup or constraints between actions.

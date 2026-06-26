@@ -127,10 +127,24 @@ RSpec.describe "/users" do
       end.to change(User, :count).by(-1)
     end
 
-    it "redirects to the users list on the canonical apex host" do
-      user = User.create! valid_attributes
+    it "stays on the current host when the current subdomain is not dropped" do
+      user = User.create! valid_attributes # no org → nothing dropped
       delete user_url(user)
-      # Apex host, since a successful deletion can drop the current subdomain.
+      expect(response).to redirect_to(users_url)
+    end
+
+    it "redirects to the apex when the delete drops the current subdomain's tenant" do
+      user = User.create! valid_attributes
+      org = create(:organization, slug: "soloorg")
+      create(:organization_membership, :owner, organization: org, user: user)
+      allow(Apartment::Tenant).to receive(:drop)
+      allow(Apartment::Tenant).to receive(:switch).and_yield
+      allow(ActiveRecord::Base.connection).to receive(:schema_exists?).and_call_original
+      allow(ActiveRecord::Base.connection).to receive(:schema_exists?).with("soloorg").and_return(true)
+      stub_current_tenant("soloorg") # admin viewing the soon-to-be-dropped subdomain
+
+      delete user_url(user)
+
       apex = Rails.application.config.action_mailer.default_url_options.fetch(:host)
       expect(response).to redirect_to(users_url(host: apex))
     end
