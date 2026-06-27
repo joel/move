@@ -120,6 +120,11 @@ class BoxesController < MoveScopedController
   end
 
   # PATCH /moves/:move_id/boxes/:id/transition
+  # A lifecycle change re-renders the header bento in place (status chip, action
+  # buttons, capture/unpacking visibility, contents) with a toast — no reload. The
+  # seal-with-description modal form breaks out to `_top`, so it lands on the HTML
+  # redirect below (a full visit, which also dismisses the native <dialog>); every
+  # plain (non-modal) transition streams.
   def transition
     result = Boxes::TransitionStatus.new.call(
       box: @box, to: params[:to], actor: current_user, description: seal_description
@@ -127,10 +132,14 @@ class BoxesController < MoveScopedController
 
     case result
     in Dry::Monads::Success(box)
-      redirect_to move_box_path(@move, box),
-                  notice: t(".transitioned", status: t("boxes.status.#{box.status}"))
+      respond_with_streams([header_bento_stream(box)], redirect: move_box_path(@move, box), toast: true) do
+        [:notice, t(".transitioned", status: t("boxes.status.#{box.status}"))]
+      end
     in Dry::Monads::Failure(reason)
-      redirect_to move_box_path(@move, @box), alert: transition_error(reason)
+      respond_with_streams([], redirect: move_box_path(@move, @box),
+                               toast: true, status: :unprocessable_content) do
+        [:alert, transition_error(reason)]
+      end
     end
   end
 
@@ -224,6 +233,13 @@ class BoxesController < MoveScopedController
     @box = authorized_scope(@move.boxes).find(params.expect(:id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
+  end
+
+  def header_bento_stream(box)
+    turbo_stream.replace(
+      Components::Boxes::HeaderBento::ID,
+      view_context.render(Components::Boxes::HeaderBento.new(move: @move, box: box, editable: editable_move?))
+    )
   end
 
   def transition_error(reason)

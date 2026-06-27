@@ -377,6 +377,46 @@ RSpec.describe "Boxes" do
       expect(response.body).to include(I18n.t("boxes.transition.room_required"))
     end
 
+    context "when responding as a Turbo Stream (no reload)" do
+      it "streams the header bento in its new state with a toast on a plain seal" do
+        box = create(:box, :with_room, move:, number: "1", status: "packing") # no items → plain seal
+
+        patch transition_move_box_path(move, box), params: { to: "sealed" }, as: :turbo_stream
+
+        expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+        expect(response.body)
+          .to include(%(action="replace" target="#{Components::Boxes::HeaderBento::ID}"))
+          .and include(I18n.t("boxes.status.sealed"))
+          .and include(I18n.t("boxes.actions.unseal")) # the action set now offers Unseal
+          .and include(I18n.t("boxes.transition.transitioned", status: I18n.t("boxes.status.sealed")))
+        expect(box.reload.status).to eq("sealed")
+      end
+
+      it "streams the header bento back to packing on an unseal" do
+        box = create(:box, :with_room, move:, number: "1", status: "sealed")
+
+        patch transition_move_box_path(move, box), params: { to: "packing" }, as: :turbo_stream
+
+        expect(response.body)
+          .to include(%(action="replace" target="#{Components::Boxes::HeaderBento::ID}"))
+          .and include(I18n.t("boxes.status.packing"))
+        expect(box.reload.status).to eq("packing")
+      end
+
+      it "streams an alert toast (no header change) when a roomless seal is refused" do
+        box = create(:box, move:, number: "1", status: "packing", room: nil)
+
+        patch transition_move_box_path(move, box), params: { to: "sealed" }, as: :turbo_stream
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body)
+          .to include(%(target="#{Components::FlashToasts::ID}"))
+          .and include(I18n.t("boxes.transition.room_required"))
+        expect(response.body).not_to include(%(target="#{Components::Boxes::HeaderBento::ID}"))
+        expect(box.reload.status).to eq("packing")
+      end
+    end
+
     it "rejects an illegal transition" do
       box = create(:box, :with_room, move:, number: "1", status: "packing")
 
