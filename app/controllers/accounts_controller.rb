@@ -2,6 +2,11 @@
 
 class AccountsController < ApplicationController
   before_action :require_authenticated_user!
+  # The terms-agreement gate (#369) applies to account management too — a
+  # not-yet-agreed account must not view or edit its profile. `destroy` is
+  # exempt: deleting the account is the legitimate "remove me instead of
+  # accepting" exit, so it must never be blocked by the gate.
+  before_action :require_terms_agreement!, except: :destroy
   before_action :set_user
 
   # GET /account

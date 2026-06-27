@@ -1,0 +1,6 @@
+---
+en:
+  agreements:
+    accept:
+      accepted: "Thanks — you're all set. Welcome aboard."
+      failed: "Sorry, we couldn't record your acceptance. Please try again."

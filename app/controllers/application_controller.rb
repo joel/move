@@ -97,4 +97,23 @@ class ApplicationController < ActionController::Base
       format.any { head :unauthorized }
     end
   end
+
+  # The terms-agreement gate (#369): every authenticated account must accept the
+  # current terms version before reaching a tenant surface. Declared as a
+  # `before_action` by each gated controller (TenantController, AccountsController);
+  # AgreementsController skips it (it IS the gate). Runs only after
+  # `require_authenticated_user!`, so `current_user` is present. Acceptance is
+  # identity-level, so the gate holds whatever path (email or Google) created the
+  # account.
+  def require_terms_agreement!
+    return if terms_accepted?
+
+    redirect_to agreement_path
+  end
+
+  # Single source of truth for "has the account accepted the live terms version".
+  # Indexed `exists?` — no rows are loaded into Ruby.
+  def terms_accepted?
+    current_user.terms_acceptances.exists?(terms_version: Terms::CURRENT_VERSION)
+  end
 end
