@@ -99,4 +99,56 @@ RSpec.describe "Members" do
       expect(response).to redirect_to(move_members_path(move))
     end
   end
+
+  describe "Turbo Stream responses (no reload)" do
+    it "POST streams the new member into the highlighted roster and refreshes the add form" do
+      post move_members_path(move),
+           params: { member: { user_id: candidate.id, role: "viewer" } }, as: :turbo_stream
+
+      membership = move.move_memberships.find_by(user: candidate)
+      expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+      expect(response.body)
+        .to include(%(action="replace" target="#{Components::Members::List::ID}"))
+        .and include(Components::Members::Row.dom_id(membership))
+        .and include("highlight")
+        .and include(%(action="replace" target="#{Components::Members::AddForm::ID}"))
+        .and include(I18n.t("members.create.added"))
+    end
+
+    it "PATCH update_role success streams the re-sorted, highlighted roster with a toast" do
+      membership = create(:move_membership, move:, user: candidate, role: "viewer")
+
+      patch update_role_move_member_path(move, membership),
+            params: { member: { role: "contributor" } }, as: :turbo_stream
+
+      expect(response.body)
+        .to include(%(action="replace" target="#{Components::Members::List::ID}"))
+        .and include(I18n.t("members.update_role.role_changed"))
+      expect(membership.reload.role).to eq("contributor")
+    end
+
+    it "PATCH update_role re-streams just the reverted row on the last-admin guard" do
+      admin_membership = move.move_memberships.find_by(user: admin)
+
+      patch update_role_move_member_path(move, admin_membership),
+            params: { member: { role: "viewer" } }, as: :turbo_stream
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body)
+        .to include(%(action="replace" target="#{Components::Members::Row.dom_id(admin_membership)}"))
+        .and include(I18n.t("members.update_role.last_admin"))
+      expect(admin_membership.reload.role).to eq("admin")
+    end
+
+    it "DELETE streams the row out and refreshes the add form (the user rejoins the pool)" do
+      membership = create(:move_membership, move:, user: candidate, role: "viewer")
+
+      delete move_member_path(move, membership), as: :turbo_stream
+
+      expect(response.body)
+        .to include(%(action="remove" target="#{Components::Members::Row.dom_id(membership)}"))
+        .and include(%(action="replace" target="#{Components::Members::AddForm::ID}"))
+        .and include(I18n.t("members.destroy.removed"))
+    end
+  end
 end
