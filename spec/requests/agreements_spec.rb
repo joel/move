@@ -104,5 +104,15 @@ RSpec.describe "Terms agreement gate" do
       post accept_agreement_path # same session → consumes the remembered path
       expect(response).to redirect_to(account_path)
     end
+
+    it "does not remember the tenant root (it bounces and would sweep the flash)" do
+      stub_current_user(user, accept_terms: false)
+
+      get "/" # welcome#home → gated; '/' would redirect onward to /moves
+      expect(response).to redirect_to(agreement_path)
+
+      post accept_agreement_path
+      expect(response).to redirect_to(moves_path) # app home directly, flash intact
+    end
   end
 end

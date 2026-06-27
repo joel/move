@@ -142,12 +142,20 @@ class ApplicationController < ActionController::Base
   def remember_terms_return_path
     # Only safe, idempotent navigations (GET/HEAD) — never a POST/PATCH/DELETE
     # target, which we could not legitimately replay as a GET after acceptance.
-    return unless request.get? || request.head?
+    return unless safe_navigation_request?
+    # Skip paths that themselves redirect onward (root → welcome#home → moves):
+    # returning there after accept would bounce once more and sweep the success
+    # flash. They are not real deep links anyway — fall back to the app home.
+    return if request.path == "/" || request.path.start_with?("/welcome")
 
     path = request.fullpath
     return unless path.start_with?("/") && !path.start_with?("//")
     return if path.start_with?(agreement_path)
 
     session[:terms_return_to] = path
+  end
+
+  def safe_navigation_request?
+    request.get? || request.head?
   end
 end
