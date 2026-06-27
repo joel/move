@@ -284,6 +284,49 @@ RSpec.describe "Items" do
     end
   end
 
+  describe "PATCH mark_removed / restore as Turbo Stream (no reload)" do
+    it "streams the badges + footer controls when marking an item removed" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: "unpacking"))
+
+      patch mark_removed_move_item_path(move, item), as: :turbo_stream
+
+      expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+      expect(response.body)
+        .to include(%(action="replace" target="#{Components::Items::StateBadges::ID}"))
+        .and include(%(action="replace" target="#{Components::Items::PresenceControls::ID}"))
+        .and include(I18n.t("items.presence.removed"))   # the "Removed" chip appears
+        .and include(I18n.t("items.show.restore"))       # the footer now offers Restore
+        .and include(I18n.t("items.mark_removed.removed"))
+      expect(item.reload.presence_state).to eq("removed")
+    end
+
+    it "streams the badges + footer controls back when restoring an item" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: "unpacking"),
+                                    presence_state: "removed")
+
+      patch restore_move_item_path(move, item), as: :turbo_stream
+
+      expect(response.body)
+        .to include(%(action="replace" target="#{Components::Items::StateBadges::ID}"))
+        .and include(%(action="replace" target="#{Components::Items::PresenceControls::ID}"))
+        .and include(I18n.t("items.show.mark_unpacked")) # in-box on an unpacking box
+        .and include(I18n.t("items.restore.restored"))
+      expect(item.reload.presence_state).to eq("in_box")
+    end
+
+    it "streams an alert toast (no DOM change) when mark_removed hits the wrong phase" do
+      item = create(:item, :manual, move:, box: create(:box, move:, status: "packing"))
+
+      patch mark_removed_move_item_path(move, item), as: :turbo_stream
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body)
+        .to include(%(target="#{Components::FlashToasts::ID}"))
+        .and include(I18n.t("items.mark_removed.wrong_phase"))
+      expect(response.body).not_to include(%(target="#{Components::Items::PresenceControls::ID}"))
+    end
+  end
+
   describe "archived Move (viewer cannot mutate)" do
     let(:move) { create(:move, :archived, created_by: user) }
 
