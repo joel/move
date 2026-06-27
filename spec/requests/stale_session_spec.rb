@@ -31,6 +31,7 @@ RSpec.describe "Stale session for a deleted account" do
 
   it "leaves a valid session intact" do
     user = create(:user)
+    Terms::Accept.new.call(user:) # past the #369 gate — probing session auth, not the gate
     get "/test/login", params: { user_id: user.id }
 
     get account_url
