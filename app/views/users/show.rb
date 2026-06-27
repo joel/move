@@ -34,10 +34,21 @@ module Views
                   class: "ha-button ha-button-secondary")
         end
         if view_context.allowed_to?(:destroy?, @user)
+          # turbo: false + the `confirm` controller — same as the account danger
+          # zone: deletion ends in a cross-host redirect to the apex users list
+          # that Turbo won't follow, so submit natively and confirm via Stimulus.
           button_to("Delete", view_context.user_path(@user),
                     method: :delete,
                     class: "ha-button ha-button-danger",
-                    form: { class: "inline-flex" })
+                    form: {
+                      class: "inline-flex",
+                      data: {
+                        turbo: false,
+                        controller: "confirm",
+                        confirm_message_value: "Delete this user permanently?",
+                        action: "submit->confirm#confirm"
+                      }
+                    })
         end
         link_to("Back to users", view_context.users_path,
                 class: "ha-button ha-button-secondary")

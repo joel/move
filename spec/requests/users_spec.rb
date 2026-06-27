@@ -127,9 +127,41 @@ RSpec.describe "/users" do
       end.to change(User, :count).by(-1)
     end
 
-    it "redirects to the users list" do
-      user = User.create! valid_attributes
+    it "stays on the current host when the current subdomain is not dropped" do
+      user = User.create! valid_attributes # no org → nothing dropped
       delete user_url(user)
+      expect(response).to redirect_to(users_url)
+    end
+
+    it "redirects to the apex when the delete drops the current subdomain's tenant" do
+      user = User.create! valid_attributes
+      org = create(:organization, slug: "soloorg")
+      create(:organization_membership, :owner, organization: org, user: user)
+      allow(Apartment::Tenant).to receive(:drop)
+      allow(Apartment::Tenant).to receive(:switch).and_yield
+      allow(ActiveRecord::Base.connection).to receive(:schema_exists?).and_call_original
+      # exists during teardown (so it drops), gone when the controller checks
+      allow(ActiveRecord::Base.connection).to receive(:schema_exists?).with("soloorg")
+                                                                      .and_return(true, false)
+      stub_current_tenant("soloorg") # admin viewing the soon-to-be-dropped subdomain
+
+      delete user_url(user)
+
+      apex = Rails.application.config.action_mailer.default_url_options.fetch(:host)
+      expect(response).to redirect_to(users_url(host: apex))
+    end
+
+    # Admin deletion is routed through Accounts::Delete, so it inherits the
+    # shared-data guard instead of a raw destroy! that would orphan tenant rows.
+    it "refuses to delete a user who shares an organization with others" do
+      user = User.create! valid_attributes
+      organization = create(:organization, slug: "shared-org")
+      create(:organization_membership, :owner, organization: organization, user: user)
+      create(:organization_membership, organization: organization)
+
+      expect do
+        delete user_url(user)
+      end.not_to change(User, :count)
       expect(response).to redirect_to(users_url)
     end
   end
