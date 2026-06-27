@@ -55,6 +55,9 @@ RSpec.describe "Per-photo review" do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Coffee machine").and include("Fruit bowl")
       expect(response.body).to include(I18n.t("reviews.photo.progress", position: 1, total: 1))
+      # The add-form clears + refocuses after a streamed add (Turbo doesn't reset a
+      # stream-responding form) — keep that wiring so rapid entry stays usable.
+      expect(response.body).to include("reset-form")
     end
 
     it "marks the photo's unreviewed items confirmed when shown" do

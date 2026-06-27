@@ -105,6 +105,7 @@ module Views
       # photo. Server-side create keeps it robust (no client-only rows to lose).
       def add_form
         form_with(url: move_box_review_add_item_path(@move, @box, @media), method: :post,
+                  data: { controller: "reset-form", action: "turbo:submit-end->reset-form#reset" },
                   class: "mt-stack-gap flex items-center gap-2 rounded-card border border-dashed " \
                          "border-card-border bg-card p-2 focus-within:border-accent-sage") do
           span(class: "pl-2 text-muted") { render Components::Icons::Plus.new(css: "h-5 w-5") }

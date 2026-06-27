@@ -80,7 +80,9 @@ class ReviewsController < MoveScopedController
     in Dry::Monads::Success(item)
       add_item_success(item)
     in Dry::Monads::Failure(_)
-      respond_with_streams([], redirect: move_box_review_photo_path(@move, @box, @media), toast: true) do
+      # Non-2xx so the reset-form controller leaves the typed name intact for a retry.
+      respond_with_streams([], redirect: move_box_review_photo_path(@move, @box, @media),
+                               toast: true, status: :unprocessable_content) do
         [:alert, t("reviews.flash.add_failed")]
       end
     end
