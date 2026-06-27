@@ -211,6 +211,19 @@ RSpec.describe "Items" do
       expect(item.reload).to have_attributes(name: "New", quantity: 4)
     end
 
+    it "refreshes the state chip to Confirmed when an auto_confirmed item is edited" do
+      item = create(:item, :auto_confirmed, move:, box:, name: "Old")
+
+      patch move_item_path(move, item), params: { item: { name: "New", quantity: "1" } }, as: :turbo_stream
+
+      expect(response).to have_http_status(:ok)
+      # The overlaid review-state chip is streamed alongside the save status so the
+      # promotion to confirmed shows without a reload.
+      expect(response.body).to include(Components::ItemStateBadge.dom_id(item))
+      expect(response.body).to include(I18n.t("items.state.confirmed"))
+      expect(item.reload.review_state).to eq("confirmed")
+    end
+
     it "returns an error badge stream (422) on a validation failure" do
       item = create(:item, :manual, move:, box:, name: "Old")
 

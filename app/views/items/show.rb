@@ -91,9 +91,9 @@ module Views
 
       def state_badges
         div(class: "absolute left-3 top-3 z-10 flex flex-wrap gap-2") do
-          render Components::Ui::Chip.new(
-            label: I18n.t("items.state.#{@item.review_state}"), kind: review_kind
-          )
+          # Stable-id chip so items#update can Turbo-replace it live when an edit
+          # promotes the item to `confirmed` (see Components::ItemStateBadge).
+          render Components::ItemStateBadge.new(item: @item)
           render Components::Ui::Chip.new(label: I18n.t("items.presence.removed"), kind: :tag) if @item.removed?
         end
       end
@@ -227,10 +227,6 @@ module Views
         number = Kernel.format("%03d", box.number.to_i)
         room = box.room&.name
         room ? "#{I18n.t("items.box", number:)} · #{room}" : I18n.t("items.box", number:)
-      end
-
-      def review_kind
-        @item.review_state == "pending_review" ? :tag : :room
       end
     end
   end
