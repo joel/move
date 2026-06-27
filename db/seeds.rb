@@ -94,6 +94,16 @@ end
   organization.organization_memberships.find_or_create_by!(user: user) { |om| om.role = "member" }
 end
 
+# #369 — the terms-agreement gate redirects any account that hasn't accepted the
+# current terms version. Pre-accept for every demo account (via the same action
+# the app uses, so it stays in sync) so `/product-review` lands straight in the
+# app instead of the agreement wall. Runs after the org is provisioned so a
+# failed org create never leaves stray acceptances. Idempotent — Terms::Accept is
+# a no-op on a second run.
+[owner, member, viewer, invitee].each do |user|
+  Terms::Accept.new.call(user: user)
+end
+
 # --- Tenant-scoped demo: a Move with rooms and boxes in varied states --------
 Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLength
   move = Move.find_or_create_by!(name: "Seattle Relocation") do |m|
