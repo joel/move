@@ -1,0 +1,128 @@
+// Move — Service Worker. Served by rails/pwa#service_worker (an ERB template, so
+// it can inject the cache version). Plain ES2020 — no Workbox / build step
+// (importmap + Propshaft).
+//
+// Caching strategy:
+//   Navigations (HTML documents)    → network-first → /offline.html fallback
+//   Fingerprinted assets (/assets/) → cache-first   → CACHE_ASSETS
+//   Static icons (/icon*.png|.svg)  → cache-first   → CACHE_STATIC
+//   Everything else                 → network-only  (pass through)
+//
+// NEVER cached — the app's auth is fragile (passwordless Rodauth + the Apartment
+// tenant elevator + cross-host session handoff), so a cached authed/unauthed
+// shell would be a landmine:
+//   - navigations are never cached (always fetched fresh, with live auth state)
+//   - auth endpoints, Turbo Stream responses, /cable, /manifest and the SW
+//     itself are network-only
+//   - only immutable fingerprinted assets and the static icons are cached
+//
+// Cache version is tied to the Propshaft asset pipeline version, so a deploy
+// that bumps config.assets.version wipes the old caches on activation.
+const CACHE_VERSION = "<%= Rails.application.config.assets.version %>"
+const CACHE_ASSETS = `move-assets-${CACHE_VERSION}`
+const CACHE_STATIC = `move-static-${CACHE_VERSION}`
+const OFFLINE_URL = "/offline.html"
+const MANAGED_CACHES = [CACHE_ASSETS, CACHE_STATIC]
+
+// Install: precache only the offline fallback (never the app shell — it's
+// tenant-scoped, auth-gated HTML).
+self.addEventListener("install", (event) => {
+  event.waitUntil(caches.open(CACHE_STATIC).then((cache) => cache.add(OFFLINE_URL)))
+  self.skipWaiting()
+})
+
+// Activate: drop caches owned by a previous SW version, then take control.
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((names) =>
+        Promise.all(
+          names
+            .filter((name) => name.startsWith("move-") && !MANAGED_CACHES.includes(name))
+            .map((name) => caches.delete(name))
+        )
+      )
+      .then(() => self.clients.claim())
+  )
+})
+
+self.addEventListener("fetch", (event) => {
+  const { request } = event
+  const url = new URL(request.url)
+
+  // Only handle same-origin GETs; everything else passes through to the network.
+  if (url.origin !== self.location.origin) return
+  if (request.method !== "GET") return
+  if (isNetworkOnly(url)) return
+
+  // Turbo Stream responses carry live HTML mutations — never cache or replay.
+  if (request.headers.get("Accept")?.includes("text/vnd.turbo-stream.html")) return
+
+  if (isDigestedAsset(url)) {
+    event.respondWith(cacheFirst(request, CACHE_ASSETS))
+  } else if (isStaticIcon(url)) {
+    event.respondWith(cacheFirst(request, CACHE_STATIC))
+  } else if (request.mode === "navigate") {
+    event.respondWith(networkFirstWithOfflineFallback(request))
+  }
+  // else: network-only (no respondWith) — API/XHR/form GETs handled by the browser.
+})
+
+// The SW must never intercept its own update check, the manifest the browser
+// reads to install, the health probe, the ActionCable upgrade, or the Rodauth
+// auth endpoints (login / email-auth / verify / logout / handoff).
+function isNetworkOnly(url) {
+  const path = url.pathname
+  return (
+    path === "/service-worker.js" ||
+    path === "/service-worker" ||
+    path === "/manifest" ||
+    path === "/manifest.json" ||
+    path === "/up" ||
+    path.startsWith("/cable") ||
+    path.startsWith("/auth/") ||
+    path === "/login" ||
+    path === "/logout" ||
+    path === "/email-auth" ||
+    path === "/create-account" ||
+    path.startsWith("/verify-account") ||
+    path.startsWith("/session")
+  )
+}
+
+// Propshaft fingerprints assets as /assets/<name>-<digest>.<ext> — immutable.
+function isDigestedAsset(url) {
+  return url.pathname.startsWith("/assets/")
+}
+
+function isStaticIcon(url) {
+  return /^\/icon(-192)?\.(png|svg)$/.test(url.pathname)
+}
+
+// Cache-first: serve from cache; otherwise fetch, cache the OK response, return.
+async function cacheFirst(request, cacheName) {
+  const cache = await caches.open(cacheName)
+  const cached = await cache.match(request)
+  if (cached) return cached
+
+  try {
+    const response = await fetch(request)
+    if (response.ok && response.type !== "opaque") cache.put(request, response.clone())
+    return response
+  } catch {
+    return new Response("", { status: 503, statusText: "Offline" })
+  }
+}
+
+// Network-first: always try the network (fresh auth/tenant state); on failure
+// serve the precached offline page.
+async function networkFirstWithOfflineFallback(request) {
+  try {
+    return await fetch(request)
+  } catch {
+    const cache = await caches.open(CACHE_STATIC)
+    const fallback = await cache.match(OFFLINE_URL)
+    return fallback || new Response("Offline", { status: 503, headers: { "Content-Type": "text/html" } })
+  }
+}
