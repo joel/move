@@ -55,6 +55,9 @@ RSpec.describe "Per-photo review" do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Coffee machine").and include("Fruit bowl")
       expect(response.body).to include(I18n.t("reviews.photo.progress", position: 1, total: 1))
+      # The add-form clears + refocuses after a streamed add (Turbo doesn't reset a
+      # stream-responding form) — keep that wiring so rapid entry stays usable.
+      expect(response.body).to include("reset-form")
     end
 
     it "marks the photo's unreviewed items confirmed when shown" do
@@ -140,6 +143,71 @@ RSpec.describe "Per-photo review" do
 
       expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
       expect(flash[:alert]).to eq(I18n.t("reviews.flash.add_failed"))
+    end
+  end
+
+  describe "PATCH .../remove as Turbo Stream (no reload)" do
+    it "streams the row out without re-rendering the rest of the list" do
+      item = detected(name: "Glass backsplash")
+      detected(name: "Stays put")
+
+      patch move_box_review_remove_item_path(move, box, media, item), as: :turbo_stream
+
+      expect(response).to have_http_status(:ok)
+      expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+      expect(response.body)
+        .to include(%(action="remove" target="#{Components::Reviews::ItemRow.dom_id(item)}"))
+      expect(response.body).not_to include(%(target="#{Components::Reviews::ItemList::ID}"))
+      expect(item.reload.presence_state).to eq("removed")
+    end
+
+    it "flips the list to the empty state when the last item is removed" do
+      only_item = detected(name: "Lone detection")
+
+      patch move_box_review_remove_item_path(move, box, media, only_item), as: :turbo_stream
+
+      expect(response.body)
+        .to include(%(action="replace" target="#{Components::Reviews::ItemList::ID}"))
+        .and include(I18n.t("reviews.photo.empty_title"))
+    end
+  end
+
+  describe "POST .../items as Turbo Stream (no reload)" do
+    it "replaces the list with the highlighted new row and a confirmation toast" do
+      detected(name: "Existing")
+
+      post move_box_review_add_item_path(move, box, media),
+           params: { item: { name: "Kettle" } }, as: :turbo_stream
+
+      expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+      item = box.items.find_by(name: "Kettle")
+      # Always replace the stable list wrapper (never append to a maybe-absent rows
+      # container) so a new row never gets silently dropped on a stale/empty client.
+      expect(response.body)
+        .to include(%(action="replace" target="#{Components::Reviews::ItemList::ID}"))
+        .and include(Components::Reviews::ItemRow.dom_id(item))
+        .and include("highlight")
+        .and include("Existing")
+        .and include(I18n.t("reviews.flash.item_added", name: "Kettle"))
+    end
+
+    it "replaces the empty list when adding the first item to a bare photo" do
+      post move_box_review_add_item_path(move, box, media),
+           params: { item: { name: "First" } }, as: :turbo_stream
+
+      expect(response.body)
+        .to include(%(action="replace" target="#{Components::Reviews::ItemList::ID}"))
+        .and include("First")
+    end
+
+    it "streams an alert toast (no row) when the name is blank" do
+      post move_box_review_add_item_path(move, box, media),
+           params: { item: { name: "" } }, as: :turbo_stream
+
+      expect(response.body)
+        .to include(%(target="#{Components::FlashToasts::ID}"))
+        .and include(I18n.t("reviews.flash.add_failed"))
+      expect(response.body).not_to include(%(target="#{Components::Reviews::ItemList::ROWS_ID}"))
     end
   end
 

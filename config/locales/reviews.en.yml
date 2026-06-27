@@ -24,6 +24,7 @@ en:
       empty_description: "No items remain to review in this photo."
     flash:
       nothing: "Nothing to review in this box yet."
+      item_added: "Added “%{name}”."
       add_failed: "Could not add that item — give it a name and try again."
       photo_moved: "Photo moved to box #%{number}."
       move_photo_errors:
