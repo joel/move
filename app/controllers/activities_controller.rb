@@ -12,27 +12,21 @@ class ActivitiesController < MoveScopedController
 
   # GET /moves/:move_id/activity
   def index
-    activities = @move.activities.high_signal.recent.before(*cursor).limit(PAGE).to_a
-    feed = ActivityFeed.new(activities, current_user_id: current_user.id, editable: editable_move?)
-    last = (activities.last if activities.size == PAGE)
-
-    render Views::Activities::Index.new(
-      move: @move, groups: feed.grouped,
-      restorable: feed.restorable_ids, revertable: feed.revertable_ids,
-      next_before: last&.occurred_at, next_before_id: last&.id
-    )
+    render activity_index_view(before: cursor)
   end
 
-  # POST /moves/:move_id/activity/:id/restore
+  # POST /moves/:move_id/activity/:id/restore — re-streams the feed from the top
+  # (the restore appends a new audit entry there, and the acted-on row's button
+  # drops) + a toast; no reload. HTML clients still redirect.
   def restore
     result = restore_subject(activities_scope.find(params.expect(:id)))
-    redirect_with(result, t(".done"), t(".failed"))
+    stream_feed(result, t(".done"), t(".failed"))
   end
 
   # POST /moves/:move_id/activity/:id/revert
   def revert
     result = revert_subject(activities_scope.find(params.expect(:id)))
-    redirect_with(result, t(".done"), t(".failed"))
+    stream_feed(result, t(".done"), t(".failed"))
   end
 
   private
@@ -102,9 +96,33 @@ class ActivitiesController < MoveScopedController
     end
   end
 
-  def redirect_with(result, ok_message, fail_message)
+  # The feed view for the given keyset cursor. `index` passes the request cursor;
+  # restore/revert pass the top ([nil]) so the new audit entry is visible.
+  def activity_index_view(before: [nil])
+    activities = @move.activities.high_signal.recent.before(*before).limit(PAGE).to_a
+    feed = ActivityFeed.new(activities, current_user_id: current_user.id, editable: editable_move?)
+    last = (activities.last if activities.size == PAGE)
+    Views::Activities::Index.new(
+      move: @move, groups: feed.grouped,
+      restorable: feed.restorable_ids, revertable: feed.revertable_ids,
+      next_before: last&.occurred_at, next_before_id: last&.id
+    )
+  end
+
+  # On success re-stream the feed (from the top) + a toast; on failure a toast
+  # only. HTML clients still redirect (the fallback).
+  def stream_feed(result, ok_message, fail_message)
     success = result.respond_to?(:success?) && result.success?
-    redirect_to move_activity_path(@move),
-                **(success ? { notice: ok_message } : { alert: fail_message })
+    streams = success ? -> { [feed_stream] } : []
+    respond_with_streams(streams, redirect: move_activity_path(@move),
+                                  toast: true, status: success ? :ok : :unprocessable_content) do
+      success ? [:notice, ok_message] : [:alert, fail_message]
+    end
+  end
+
+  def feed_stream
+    turbo_stream.replace(
+      Views::Activities::Index::ID, view_context.render(activity_index_view(before: [nil]))
+    )
   end
 end

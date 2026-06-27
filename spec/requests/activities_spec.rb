@@ -84,6 +84,20 @@ RSpec.describe "Activities" do
       expect(Box.exists?(box.id)).to be(true)
       expect(box.items.count).to eq(1)
     end
+
+    it "streams the re-rendered feed + a toast (no reload)" do
+      box = create(:box, move:, number: "7")
+      Boxes::Delete.new.call(box:, actor: user)
+      activity = move.activities.find_by!(action: "box.deleted")
+
+      post move_activity_restore_path(move, activity.id), as: :turbo_stream
+
+      expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+      expect(response.body)
+        .to include(%(action="replace" target="#{Views::Activities::Index::ID}"))
+        .and include(I18n.t("activities.restore.done"))
+      expect(Box.exists?(box.id)).to be(true)
+    end
   end
 
   describe "POST /moves/:move_id/activity/:id/revert" do
@@ -105,6 +119,19 @@ RSpec.describe "Activities" do
       post move_activity_revert_path(move, activity.id)
 
       expect(box.reload.description).to eq("Old summary")
+    end
+
+    it "streams the re-rendered feed + a toast on revert (no reload)" do
+      item = create(:item, :manual, move:, name: "Lamp")
+      Items::Rename.new.call(item:, name: "Desk lamp", editor: user)
+      activity = move.activities.where(action: "item.updated").last
+
+      post move_activity_revert_path(move, activity.id), as: :turbo_stream
+
+      expect(response.body)
+        .to include(%(action="replace" target="#{Views::Activities::Index::ID}"))
+        .and include(I18n.t("activities.revert.done"))
+      expect(item.reload.name).to eq("Lamp")
     end
   end
 
