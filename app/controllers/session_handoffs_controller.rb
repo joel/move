@@ -10,6 +10,10 @@
 # Rodauth email magic link. Replay is blocked by single-use consumption; a token
 # minted for another org is rejected by the tenant check inside the action.
 class SessionHandoffsController < ApplicationController
+  # Exchanges the token for a session; the terms gate (#369) doesn't apply — the
+  # post-handoff redirect to the org home lands on a gated surface that enforces it.
+  skip_before_action :require_terms_agreement!, raise: false
+
   def show
     slug = current_tenant
     return render_expired if slug.blank? # handoff is only meaningful on a tenant subdomain

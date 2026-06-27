@@ -8,7 +8,7 @@
 class TenantController < ApplicationController
   before_action :require_authenticated_user!
   before_action :require_tenant!
-  before_action :require_terms_agreement!
+  # The terms-agreement gate (#369) is applied globally in ApplicationController.
 
   private
 

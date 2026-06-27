@@ -26,6 +26,12 @@ class ApplicationController < ActionController::Base
   helper_method :current_user, :current_tenant, :on_apex_host?, :google_credentials_present?
 
   before_action :set_current_user
+  # The terms-agreement gate (#369) is global and fail-closed: every authenticated
+  # web surface is gated by default, so a new controller can't silently bypass it.
+  # It no-ops for unauthenticated requests, and the auth/session-establishment
+  # controllers (Rodauth, handoff, Google, the agreement wall itself) skip it
+  # explicitly. ActionController::API controllers (MCP) don't inherit this.
+  before_action :require_terms_agreement!
 
   private
 
@@ -98,14 +104,13 @@ class ApplicationController < ActionController::Base
     end
   end
 
-  # The terms-agreement gate (#369): every authenticated account must accept the
-  # current terms version before reaching a tenant surface. Declared as a
-  # `before_action` by each gated controller (TenantController, AccountsController);
-  # AgreementsController skips it (it IS the gate). Runs only after
-  # `require_authenticated_user!`, so `current_user` is present. Acceptance is
-  # identity-level, so the gate holds whatever path (email or Google) created the
-  # account.
+  # The terms-agreement gate (#369): an authenticated account must accept the
+  # current terms version before any app surface. No-ops when unauthenticated
+  # (login/create-account/the apex are reachable logged-out; each controller's own
+  # `require_authenticated_user!` handles auth). Acceptance is identity-level, so
+  # the gate holds whatever path (email or Google) created the account.
   def require_terms_agreement!
+    return if current_user.nil?
     return if terms_accepted?
 
     redirect_to agreement_path

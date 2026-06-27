@@ -195,12 +195,18 @@ the create-account step.
   Apartment model — identity-level, like `users`/`session_handoff_tokens` — with a
   `user_id` FK `ON DELETE CASCADE`). One row per `(user, version)`; `Terms::Accept`
   upserts via `create_or_find_by!` (idempotent on the DB unique index).
-- **Gate.** `ApplicationController#require_terms_agreement!` redirects to
-  `/agreement` unless `terms_accepted?` (an indexed `exists?`). It is declared as a
-  `before_action` by every gated controller — `TenantController` (all app surfaces)
-  and `AccountsController` (`except: :destroy`, so deleting the account is always an
-  available exit). `AgreementsController` *is* the wall, so it `skip_before_action`s
-  the gate; the only ways forward are **Accept** (writes the row) or **Sign out**.
+- **Gate.** `ApplicationController#require_terms_agreement!` is a **global**
+  `before_action` (fail-closed: every authenticated web surface is gated by default,
+  so a new controller can't silently bypass it). It no-ops when unauthenticated and
+  redirects to `/agreement` unless `terms_accepted?` (an indexed `exists?`).
+  Explicit `skip_before_action`s cover the surfaces that must stay reachable without
+  acceptance: `AgreementsController` (the wall itself), the auth/session-establishment
+  controllers (`RodauthController` — so an unaccepted account can still **Sign out** —
+  `SessionHandoffsController`, `GoogleOneTapSessionsController`), and
+  `AccountsController#destroy` (deleting the account is always an exit). MCP
+  controllers are `ActionController::API` and never inherit the gate (bearer-auth, no
+  session). The only ways forward on the wall are **Accept** (writes the row) or
+  **Sign out**.
 - **Re-agreement, for free.** Bumping `CURRENT_VERSION` re-gates every account on
   its next request — the (not-yet-built) re-acceptance flow needs no new mechanism.
 

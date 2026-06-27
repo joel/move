@@ -4,6 +4,10 @@
 # google-one-tap Stimulus controller. Active only when GOOGLE_CLIENT_ID
 # is configured; otherwise the One Tap prompt never renders.
 class GoogleOneTapSessionsController < ApplicationController
+  # Establishes the login session itself; the terms gate (#369) doesn't apply —
+  # the post-login redirect lands on a gated app surface, which enforces it.
+  skip_before_action :require_terms_agreement!, raise: false
+
   # CSRF protection stays ON: #create writes the login session, so an
   # unprotected cross-site POST carrying any valid Move-audience Google ID token
   # could log a victim into the token owner's account (login CSRF). The Stimulus
