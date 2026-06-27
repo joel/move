@@ -37,14 +37,21 @@ class BoxesController < MoveScopedController
   # GET /moves/:move_id/boxes/:id
   def show
     items = authorized_scope(@box.items).in_box
+    review_media_ids = @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
     render Views::Boxes::Show.new(
       move: @move, box: @box, items: items.ordered,
       # Preload the blob only (proxy URLs use the original; no variants/preview).
       media: @box.media.includes(image_attachment: :blob).recent_first,
       editable: editable_move?, pending_count: reviewable_count(items),
+      # Whether this box has at least one of ITS OWN photos that produced an item —
+      # the per-photo review walk's membership (mirrors ReviewsController#review_media,
+      # which intersects with @box.media so a moved-in item's foreign source photo
+      # doesn't count). Drives the permanent review badge: shown whenever true,
+      # green when nothing is pending, tertiary while items await review.
+      reviewable: @box.media.exists?(id: review_media_ids),
       # Photos that produced an item (in-box OR removed) — the per-photo review
       # walk's membership; only these gallery photos link into review.
-      reviewable_media_ids: @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id),
+      reviewable_media_ids: review_media_ids,
       # Orphaned photos worth a recovery affordance (failed / zero-detection) —
       # these link to the recovery screen instead of being dead-end thumbnails.
       recoverable_media_ids: recoverable_media_ids,

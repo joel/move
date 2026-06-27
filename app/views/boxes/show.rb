@@ -16,7 +16,8 @@ module Views
       }.freeze
 
       def initialize(move:, box:, items: [], media: [], editable: false, pending_count: 0,
-                     reviewable_media_ids: [], recoverable_media_ids: [], unpacked_media_ids: [])
+                     reviewable: false, reviewable_media_ids: [], recoverable_media_ids: [],
+                     unpacked_media_ids: [])
         @move = move
         @box = box
         @items = items
@@ -26,6 +27,8 @@ module Views
         # Count of items the C2 walk can review (computed by the controller — see
         # BoxesController#reviewable_count): unreviewed AND photo-backed.
         @pending_count = pending_count
+        # Whether the box has a review-walkable photo (controller-computed).
+        @reviewable = reviewable
         # Media that produced an item (the per-photo review walk) — only these
         # gallery photos link into review; the rest render as plain thumbnails.
         @reviewable_media_ids = reviewable_media_ids
@@ -37,7 +40,7 @@ module Views
       def view_template
         back_link
         header_bento
-        pending_banner if @pending_count.positive?
+        review_banner if @reviewable
         detail_stack
       end
 
@@ -239,9 +242,11 @@ module Views
         end
       end
 
-      # Pending-review call to action, promoted above the Gallery (#260).
-      def pending_banner
-        div(class: "px-2") { pending_badge }
+      # Review CTA above the Gallery (#260) — permanent once the box has a walkable photo.
+      def review_banner
+        div(class: "px-2") do
+          render Components::BoxReviewBadge.new(move: @move, box: @box, pending_count: @pending_count)
+        end
       end
 
       # Read-only inventory (item edit → D5, review actions → D6).
@@ -249,16 +254,6 @@ module Views
         section(class: "flex flex-col gap-stack-gap") do
           h3(class: "px-2 text-headline-md text-text-warm") { I18n.t("boxes.show.items") }
           @items.any? ? items_list : items_empty
-        end
-      end
-
-      # Enters the D6 per-photo review walk (C2). Prefetch off: opening a photo
-      # marks its items reviewed, so hover must not confirm them prematurely.
-      def pending_badge
-        a(href: move_box_review_path(@move, @box), data: { turbo_prefetch: "false" },
-          class: "rounded-full bg-tertiary/15 px-3 py-1 text-label-caps uppercase " \
-                 "text-tertiary transition hover:bg-tertiary/25") do
-          I18n.t("boxes.show.pending_review", count: @pending_count)
         end
       end
 
