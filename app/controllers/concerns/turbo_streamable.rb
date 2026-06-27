@@ -29,16 +29,21 @@ module TurboStreamable
 
   private
 
+  # `streams` is an Array of turbo_stream actions, OR a callable returning one —
+  # pass a lambda when building the streams is expensive (e.g. rendering a whole
+  # detail view) so the work only happens on the Turbo path, never on the HTML
+  # redirect branch.
   def respond_with_streams(streams, redirect:, toast: false, status: :ok)
     flash_key, message = block_given? ? yield : nil
 
     respond_to do |format|
       format.turbo_stream do
+        actions = streams.respond_to?(:call) ? Array(streams.call) : streams
         if toast && flash_key
           flash.now[flash_key] = message
-          streams += [turbo_stream.replace(Components::FlashToasts::ID, Components::FlashToasts.new)]
+          actions += [turbo_stream.replace(Components::FlashToasts::ID, Components::FlashToasts.new)]
         end
-        render turbo_stream: streams, status: status
+        render turbo_stream: actions, status: status
       end
       format.html do
         flash_key ? redirect_to(redirect, flash: { flash_key => message }) : redirect_to(redirect)

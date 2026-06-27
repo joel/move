@@ -36,28 +36,7 @@ class BoxesController < MoveScopedController
 
   # GET /moves/:move_id/boxes/:id
   def show
-    items = authorized_scope(@box.items).in_box
-    review_media_ids = @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
-    render Views::Boxes::Show.new(
-      move: @move, box: @box, items: items.ordered,
-      # Preload the blob only (proxy URLs use the original; no variants/preview).
-      media: @box.media.includes(image_attachment: :blob).recent_first,
-      editable: editable_move?, pending_count: unreviewed_count(items),
-      # Whether this box has at least one of ITS OWN photos that produced an item —
-      # the per-photo review walk's membership (mirrors ReviewsController#review_media,
-      # which intersects with @box.media so a moved-in item's foreign source photo
-      # doesn't count). Drives the permanent review badge: shown whenever true,
-      # green when nothing is pending, tertiary while items await review.
-      reviewable: @box.media.exists?(id: review_media_ids),
-      # Photos that produced an item (in-box OR removed) — the per-photo review
-      # walk's membership; only these gallery photos link into review.
-      reviewable_media_ids: review_media_ids,
-      # Orphaned photos worth a recovery affordance (failed / zero-detection) —
-      # these link to the recovery screen instead of being dead-end thumbnails.
-      recoverable_media_ids: recoverable_media_ids,
-      # Photos whose every sourced item has been unpacked — the gallery badges them.
-      unpacked_media_ids: unpacked_media_ids
-    )
+    render box_show_view
   end
 
   # GET /moves/:move_id/boxes/new
@@ -132,7 +111,10 @@ class BoxesController < MoveScopedController
 
     case result
     in Dry::Monads::Success(box)
-      respond_with_streams([header_bento_stream(box)], redirect: move_box_path(@move, box), toast: true) do
+      # Re-stream the WHOLE detail (lazily — only on the Turbo path): a transition
+      # to `unpacked` cascades the in-box items to removed, so the inventory and
+      # gallery badges must refresh alongside the header, not just the action set.
+      respond_with_streams(-> { [box_detail_stream] }, redirect: move_box_path(@move, box), toast: true) do
         [:notice, t(".transitioned", status: t("boxes.status.#{box.status}"))]
       end
     in Dry::Monads::Failure(reason)
@@ -235,11 +217,38 @@ class BoxesController < MoveScopedController
     head :not_found
   end
 
-  def header_bento_stream(box)
-    turbo_stream.replace(
-      Components::Boxes::HeaderBento::ID,
-      view_context.render(Components::Boxes::HeaderBento.new(move: @move, box: box, editable: editable_move?))
+  # The full B1 detail view with all its derived context — shared by `show` and
+  # by `transition` (which re-streams it so a status change refreshes the header,
+  # the inventory and the gallery badges together; a transition to `unpacked`
+  # cascades the in-box items to removed).
+  def box_show_view
+    items = authorized_scope(@box.items).in_box
+    review_media_ids = @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
+    Views::Boxes::Show.new(
+      move: @move, box: @box, items: items.ordered,
+      # Preload the blob only (proxy URLs use the original; no variants/preview).
+      media: @box.media.includes(image_attachment: :blob).recent_first,
+      editable: editable_move?, pending_count: unreviewed_count(items),
+      # Whether this box has at least one of ITS OWN photos that produced an item —
+      # the per-photo review walk's membership (mirrors ReviewsController#review_media,
+      # which intersects with @box.media so a moved-in item's foreign source photo
+      # doesn't count). Drives the permanent review badge: shown whenever true,
+      # green when nothing is pending, tertiary while items await review.
+      reviewable: @box.media.exists?(id: review_media_ids),
+      # Photos that produced an item (in-box OR removed) — the per-photo review
+      # walk's membership; only these gallery photos link into review.
+      reviewable_media_ids: review_media_ids,
+      # Orphaned photos worth a recovery affordance (failed / zero-detection) —
+      # these link to the recovery screen instead of being dead-end thumbnails.
+      recoverable_media_ids: recoverable_media_ids,
+      # Photos whose every sourced item has been unpacked — the gallery badges them.
+      unpacked_media_ids: unpacked_media_ids
     )
+  end
+
+  def box_detail_stream
+    @box.reload
+    turbo_stream.replace(Views::Boxes::Show::ID, view_context.render(box_show_view))
   end
 
   def transition_error(reason)

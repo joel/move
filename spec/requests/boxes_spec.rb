@@ -378,32 +378,47 @@ RSpec.describe "Boxes" do
     end
 
     context "when responding as a Turbo Stream (no reload)" do
-      it "streams the header bento in its new state with a toast on a plain seal" do
+      it "streams the whole detail in its new state with a toast on a plain seal" do
         box = create(:box, :with_room, move:, number: "1", status: "packing") # no items → plain seal
 
         patch transition_move_box_path(move, box), params: { to: "sealed" }, as: :turbo_stream
 
         expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
         expect(response.body)
-          .to include(%(action="replace" target="#{Components::Boxes::HeaderBento::ID}"))
+          .to include(%(action="replace" target="#{Views::Boxes::Show::ID}"))
           .and include(I18n.t("boxes.status.sealed"))
           .and include(I18n.t("boxes.actions.unseal")) # the action set now offers Unseal
           .and include(I18n.t("boxes.transition.transitioned", status: I18n.t("boxes.status.sealed")))
         expect(box.reload.status).to eq("sealed")
       end
 
-      it "streams the header bento back to packing on an unseal" do
+      it "streams the detail back to packing on an unseal" do
         box = create(:box, :with_room, move:, number: "1", status: "sealed")
 
         patch transition_move_box_path(move, box), params: { to: "packing" }, as: :turbo_stream
 
         expect(response.body)
-          .to include(%(action="replace" target="#{Components::Boxes::HeaderBento::ID}"))
+          .to include(%(action="replace" target="#{Views::Boxes::Show::ID}"))
           .and include(I18n.t("boxes.status.packing"))
         expect(box.reload.status).to eq("packing")
       end
 
-      it "streams an alert toast (no header change) when a roomless seal is refused" do
+      it "refreshes the now-empty inventory when an unpacked transition cascades items out" do
+        box = create(:box, :with_room, move:, number: "1", status: "unpacking")
+        item = create(:item, move:, box:, name: "Sole sock", presence_state: "in_box")
+
+        patch transition_move_box_path(move, box), params: { to: "unpacked" }, as: :turbo_stream
+
+        expect(box.reload.status).to eq("unpacked")
+        expect(item.reload.presence_state).to eq("removed") # cascade_unpacked
+        # The streamed detail re-renders the inventory section as empty (the item is
+        # no longer in-box) rather than leaving the stale list — the Codex #390 fix.
+        expect(response.body)
+          .to include(%(action="replace" target="#{Views::Boxes::Show::ID}"))
+          .and include(I18n.t("boxes.show.items_empty_title"))
+      end
+
+      it "streams an alert toast (no detail change) when a roomless seal is refused" do
         box = create(:box, move:, number: "1", status: "packing", room: nil)
 
         patch transition_move_box_path(move, box), params: { to: "sealed" }, as: :turbo_stream
@@ -412,7 +427,7 @@ RSpec.describe "Boxes" do
         expect(response.body)
           .to include(%(target="#{Components::FlashToasts::ID}"))
           .and include(I18n.t("boxes.transition.room_required"))
-        expect(response.body).not_to include(%(target="#{Components::Boxes::HeaderBento::ID}"))
+        expect(response.body).not_to include(%(action="replace" target="#{Views::Boxes::Show::ID}"))
         expect(box.reload.status).to eq("packing")
       end
     end

@@ -10,6 +10,12 @@ module Views
     # so BoxesController#transition can stream a lifecycle change in place (status
     # chip + action buttons + contents) without reloading the page (#389).
     class Show < Views::Base
+      # Stable id wrapping the whole detail so BoxesController#transition can
+      # re-stream it after a lifecycle change — a transition to `unpacked`
+      # cascades the in-box items to removed, so the inventory + gallery badges
+      # must refresh together with the header, not just the action set.
+      ID = "box-detail"
+
       def initialize(move:, box:, items: [], media: [], editable: false, pending_count: 0,
                      reviewable: false, reviewable_media_ids: [], recoverable_media_ids: [],
                      unpacked_media_ids: [])
@@ -32,10 +38,12 @@ module Views
       end
 
       def view_template
-        back_link
-        render Components::Boxes::HeaderBento.new(move: @move, box: @box, editable: @editable)
-        review_banner if @reviewable
-        detail_stack
+        div(id: ID, class: "flex flex-col gap-section-gap") do
+          back_link
+          render Components::Boxes::HeaderBento.new(move: @move, box: @box, editable: @editable)
+          review_banner if @reviewable
+          detail_stack
+        end
       end
 
       private
