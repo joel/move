@@ -4,6 +4,8 @@
 # auth flow. Routed only in the test environment (see config/routes.rb).
 class TestSessionsController < ApplicationController
   skip_before_action :verify_authenticity_token
+  # Establishes the session itself; the terms gate (#369) doesn't apply here.
+  skip_before_action :require_terms_agreement!, raise: false
 
   def show
     raise ActionController::RoutingError, "Not Found" unless Rails.env.test?

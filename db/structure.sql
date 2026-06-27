@@ -1257,6 +1257,22 @@ CREATE TABLE public.tags (
 
 
 --
+-- Name: terms_acceptances; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.terms_acceptances (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    terms_version character varying NOT NULL,
+    accepted_at timestamp(6) without time zone NOT NULL,
+    ip_address character varying,
+    user_agent character varying,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: user_email_auth_keys; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1532,6 +1548,14 @@ ALTER TABLE ONLY public.session_handoff_tokens
 
 ALTER TABLE ONLY public.tags
     ADD CONSTRAINT tags_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: terms_acceptances terms_acceptances_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.terms_acceptances
+    ADD CONSTRAINT terms_acceptances_pkey PRIMARY KEY (id);
 
 
 --
@@ -2123,6 +2147,13 @@ CREATE UNIQUE INDEX index_tags_on_move_id_and_lower_name ON public.tags USING bt
 
 
 --
+-- Name: index_terms_acceptances_on_user_id_and_terms_version; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_terms_acceptances_on_user_id_and_terms_version ON public.terms_acceptances USING btree (user_id, terms_version);
+
+
+--
 -- Name: index_user_omniauth_identities_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2498,12 +2529,21 @@ ALTER TABLE ONLY public.user_remember_keys
 
 
 --
+-- Name: terms_acceptances fk_rails_fd06c20803; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.terms_acceptances
+    ADD CONSTRAINT fk_rails_fd06c20803 FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- PostgreSQL database dump complete
 --
 
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260627120000'),
 ('20260625130817'),
 ('20260621180000'),
 ('20260621140000'),

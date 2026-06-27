@@ -181,6 +181,39 @@ sequenceDiagram
   delete submits with `data-turbo="false"` + a `confirm` Stimulus controller so
   the browser follows the cross-host redirect (Turbo won't follow it via fetch).
 
+### Terms-agreement gate: every account accepts before any app surface (#369)
+
+The app is open-signup while the legal framework is still being put in place, so
+every account must accept a **versioned risk-acknowledgement** before it can do
+anything. This is modelled as an **access gate**, not a signup-form field, which
+makes it path-agnostic — it holds identically whether the account was created via
+the email form or Google OAuth, because the check sits at the access layer, not
+the create-account step.
+
+- **State.** `Terms::CURRENT_VERSION` (a date string) names the live terms;
+  acceptance is an append-only audit row in `public.terms_acceptances` (an excluded
+  Apartment model — identity-level, like `users`/`session_handoff_tokens` — with a
+  `user_id` FK `ON DELETE CASCADE`). One row per `(user, version)`; `Terms::Accept`
+  upserts via `create_or_find_by!` (idempotent on the DB unique index).
+- **Gate.** `ApplicationController#require_terms_agreement!` is a **global**
+  `before_action` (fail-closed: every authenticated tenant surface is gated by
+  default, so a new controller can't silently bypass it). It no-ops when
+  unauthenticated **and on the apex** (`current_tenant.nil?`) — the app and the wall
+  are tenant-only, and the apex is a broker whose authenticated session only lingers
+  in an error/fallback state (#349); redirecting it to the tenant-only `/agreement`
+  would 404. On a tenant it redirects to `/agreement` unless `terms_accepted?` (an
+  indexed `exists?`).
+  Explicit `skip_before_action`s cover the surfaces that must stay reachable without
+  acceptance: `AgreementsController` (the wall itself), the auth/session-establishment
+  controllers (`RodauthController` — so an unaccepted account can still **Sign out** —
+  `SessionHandoffsController`, `GoogleOneTapSessionsController`), and
+  `AccountsController#destroy` (deleting the account is always an exit). MCP
+  controllers are `ActionController::API` and never inherit the gate (bearer-auth, no
+  session). The only ways forward on the wall are **Accept** (writes the row) or
+  **Sign out**.
+- **Re-agreement, for free.** Bumping `CURRENT_VERSION` re-gates every account on
+  its next request — the (not-yet-built) re-acceptance flow needs no new mechanism.
+
 ---
 
 ## 3. Per-request tenant resolution

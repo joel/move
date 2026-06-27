@@ -112,6 +112,34 @@ class RodauthMain < Rodauth::Rails::Auth
       account[:updated_at] ||= timestamp
     end
 
+    # Terms-agreement gate for passkey MANAGEMENT (#369). Rodauth routes are
+    # served by the Roda middleware, so they bypass the Rails before_action gate
+    # (ApplicationController#require_terms_agreement!) entirely — which is why
+    # logout stays reachable from the wall, but also why these authenticated
+    # account-management routes (`/account/passkeys`, `/account/passkeys/new`)
+    # would otherwise let an unaccepted account add/remove passkeys. Enforce
+    # acceptance here, at the Rodauth layer. Login-side webauthn routes
+    # (webauthn_login/_auth) are pre-auth and intentionally NOT gated.
+    def before_webauthn_setup
+      super
+      require_terms_agreement_for_management
+    end
+
+    def before_webauthn_remove
+      super
+      require_terms_agreement_for_management
+    end
+
+    # Redirect an unaccepted account to the agreement wall. Tenant-only: the wall
+    # lives on the org subdomain and the apex is a broker (mirrors the Rails gate's
+    # current_tenant guard), so never redirect to the tenant-only wall off-tenant.
+    def require_terms_agreement_for_management
+      return if Apartment::Tenant.current == "public"
+      return if TermsAcceptance.exists?(user_id: account_id, terms_version: Terms::CURRENT_VERSION)
+
+      request.redirect("/agreement")
+    end
+
     # Verify accounts without forcing a password step (we are
     # passwordless), then auto-login and respond.
     def verify_account_view

@@ -2,6 +2,11 @@
 
 class AccountsController < ApplicationController
   before_action :require_authenticated_user!
+  # The global terms gate (#369) covers all of /account, deliberately: the wall's
+  # single exit is "Sign out" (a product decision), so account management — incl.
+  # the danger-zone delete, whose UI lives on this gated page — is not reachable
+  # until the account accepts. No destroy exemption: it would be dead code (the
+  # delete form can't be reached) and imply a delete-as-exit the wall doesn't offer.
   before_action :set_user
 
   # GET /account

@@ -12,7 +12,13 @@ require "rails_helper"
 RSpec.describe "GET /session/handoff" do
   let(:user) { create(:user, status: 2) } # 2 = open/verified (passwordless)
 
-  before { stub_current_tenant("acme") }
+  before do
+    stub_current_tenant("acme")
+    # Past the #369 terms gate: the post-handoff probe (GET /account) is gated, and
+    # this spec exercises session auth, not the gate. A real handed-off user has
+    # already accepted.
+    Terms::Accept.new.call(user:)
+  end
 
   def mint_for(slug = "acme", as: user)
     SessionHandoffs::Mint.new.call(user: as, organization_slug: slug).value!

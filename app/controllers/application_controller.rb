@@ -26,6 +26,12 @@ class ApplicationController < ActionController::Base
   helper_method :current_user, :current_tenant, :on_apex_host?, :google_credentials_present?
 
   before_action :set_current_user
+  # The terms-agreement gate (#369) is global and fail-closed: every authenticated
+  # web surface is gated by default, so a new controller can't silently bypass it.
+  # It no-ops for unauthenticated requests, and the auth/session-establishment
+  # controllers (Rodauth, handoff, Google, the agreement wall itself) skip it
+  # explicitly. ActionController::API controllers (MCP) don't inherit this.
+  before_action :require_terms_agreement!
 
   private
 
@@ -96,5 +102,60 @@ class ApplicationController < ActionController::Base
       end
       format.any { head :unauthorized }
     end
+  end
+
+  # The terms-agreement gate (#369): an authenticated account must accept the
+  # current terms version before any app surface. No-ops when unauthenticated
+  # (login/create-account/the apex are reachable logged-out; each controller's own
+  # `require_authenticated_user!` handles auth). Acceptance is identity-level, so
+  # the gate holds whatever path (email or Google) created the account.
+  def require_terms_agreement!
+    return if current_user.nil?
+    # Gate only on org subdomains. The app — and the agreement wall itself
+    # (AgreementsController < TenantController) — live on tenants; the apex is a
+    # pure auth broker (#280) that clears its session on a successful handoff, so
+    # an authenticated apex session only lingers in an error/fallback state (#349).
+    # Redirecting it to the tenant-only `/agreement` would 404 and strand the user
+    # (incl. account management/deletion); the gate re-engages the moment they
+    # reach their subdomain.
+    return if current_tenant.nil?
+    # Logout must stay reachable so an unaccepted account can leave from the wall.
+    # Rodauth renders through RodauthController (so this gate DOES run for its
+    # views); exempt only the logout path. Login/verify/email-auth render
+    # unauthenticated, so they no-op above; passkey-management renders are gated.
+    return if request.path == rodauth.logout_path
+    return if terms_accepted?
+
+    remember_terms_return_path
+    redirect_to agreement_path
+  end
+
+  # Single source of truth for "has the account accepted the live terms version".
+  # Indexed `exists?` — no rows are loaded into Ruby.
+  def terms_accepted?
+    current_user.terms_acceptances.exists?(terms_version: Terms::CURRENT_VERSION)
+  end
+
+  # Remember where the user was headed so accepting the terms returns them there
+  # (UX: don't lose a deep link behind the wall). Only a safe, tenant-local GET
+  # path — never a mutation target or an off-host URL, and never the wall itself.
+  def remember_terms_return_path
+    # Only safe, idempotent navigations (GET/HEAD) — never a POST/PATCH/DELETE
+    # target, which we could not legitimately replay as a GET after acceptance.
+    return unless safe_navigation_request?
+    # Skip paths that themselves redirect onward (root → welcome#home → moves):
+    # returning there after accept would bounce once more and sweep the success
+    # flash. They are not real deep links anyway — fall back to the app home.
+    return if request.path == "/" || request.path.start_with?("/welcome")
+
+    path = request.fullpath
+    return unless path.start_with?("/") && !path.start_with?("//")
+    return if path.start_with?(agreement_path)
+
+    session[:terms_return_to] = path
+  end
+
+  def safe_navigation_request?
+    request.get? || request.head?
   end
 end

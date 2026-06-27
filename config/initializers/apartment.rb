@@ -22,8 +22,11 @@ Apartment.configure do |config|
   # subdomain (tenant active) — see #280 — so it must resolve to the same public
   # rows regardless of the active schema; excluding it pins the model to public
   # and keeps the table out of every tenant clone.
+  # TermsAcceptance records identity-level legal acceptance (#369); like User it
+  # must resolve to the same public rows from the apex and from any org
+  # subdomain, so it is excluded (pinned to public + kept out of every clone).
   config.excluded_models = %w[
-    User Organization OrganizationMembership SessionHandoffToken
+    User Organization OrganizationMembership SessionHandoffToken TermsAcceptance
     ActiveStorage::Blob ActiveStorage::Attachment ActiveStorage::VariantRecord
   ]
 

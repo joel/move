@@ -6,6 +6,11 @@ Rails.application.routes.draw do
   # and redirects here, where the subdomain exchanges it for its own session.
   # Lives on the tenant subdomain (the controller validates against the tenant).
   get "session/handoff", to: "session_handoffs#show", as: :session_handoff
+  # #369 — terms-agreement gate. Authenticated accounts must accept the current
+  # terms version before any tenant surface; TenantController redirects here until
+  # they do. Lives on the tenant subdomain (the controller is tenant-resolved).
+  get "agreement", to: "agreements#show", as: :agreement
+  post "agreement", to: "agreements#accept", as: :accept_agreement
   resource :account, only: %i[show update destroy]
   # D13 — MCP assistant endpoint. Tenant-scoped (resolved from the org subdomain
   # by the Apartment elevator) and authenticated by a per-Move Bearer integration
