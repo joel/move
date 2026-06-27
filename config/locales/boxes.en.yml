@@ -91,6 +91,7 @@ en:
       pending_review:
         one: "1 pending review"
         other: "%{count} pending review"
+      review_complete: "All items reviewed"
       items_empty_title: "No items yet"
       items_empty_description: "Capture a photo or add items manually to fill this box."
       gallery: "Gallery"

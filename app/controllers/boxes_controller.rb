@@ -37,14 +37,21 @@ class BoxesController < MoveScopedController
   # GET /moves/:move_id/boxes/:id
   def show
     items = authorized_scope(@box.items).in_box
+    review_media_ids = @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
     render Views::Boxes::Show.new(
       move: @move, box: @box, items: items.ordered,
       # Preload the blob only (proxy URLs use the original; no variants/preview).
       media: @box.media.includes(image_attachment: :blob).recent_first,
-      editable: editable_move?, pending_count: reviewable_count(items),
+      editable: editable_move?, pending_count: unreviewed_count(items),
+      # Whether this box has at least one of ITS OWN photos that produced an item —
+      # the per-photo review walk's membership (mirrors ReviewsController#review_media,
+      # which intersects with @box.media so a moved-in item's foreign source photo
+      # doesn't count). Drives the permanent review badge: shown whenever true,
+      # green when nothing is pending, tertiary while items await review.
+      reviewable: @box.media.exists?(id: review_media_ids),
       # Photos that produced an item (in-box OR removed) — the per-photo review
       # walk's membership; only these gallery photos link into review.
-      reviewable_media_ids: @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id),
+      reviewable_media_ids: review_media_ids,
       # Orphaned photos worth a recovery affordance (failed / zero-detection) —
       # these link to the recovery screen instead of being dead-end thumbnails.
       recoverable_media_ids: recoverable_media_ids,
@@ -160,13 +167,14 @@ class BoxesController < MoveScopedController
 
   # Items the C2 review walk can act on: unreviewed (pending_review or
   # needs_correction) AND backed by a photo *in this box*. The walk (review_media)
-  # only spans @box.media, so an item moved in from another box keeps its foreign
-  # source_media_id and isn't reviewable here — require the source photo to belong
-  # to @box, not just be present. A photo-less correction is resolved on C3. Drives
-  # the box review badge, keeping it from advertising a dead-end CTA (#146).
-  def reviewable_count(items)
-    items.where(review_state: %w[pending_review needs_correction])
-         .where(source_media_id: @box.media.select(:id)).count
+  # Count of in-box items still awaiting review (any source photo). Drives the box
+  # review badge's count + its green/tertiary state: the badge only goes green
+  # ("All items reviewed") when this is zero, so a still-pending item whose source
+  # photo is foreign/absent (not walkable from here) can't be mistaken for done —
+  # it keeps the tertiary state even though the walk can't yet resolve it (the
+  # photo-less / moved-in correction is itself resolved on C3, #146).
+  def unreviewed_count(items)
+    items.where(review_state: %w[pending_review needs_correction]).count
   end
 
   # Orphaned photos whose latest recognition attempt is settled: a terminal run

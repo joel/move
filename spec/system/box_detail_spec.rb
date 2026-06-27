@@ -66,13 +66,44 @@ RSpec.describe "Box detail & lifecycle" do
     foreign_media = create(:media, move:, box: create(:box, move:, number: "4"))
     box = create(:box, move:, number: "5", status: "packing")
     # In this box, but its source photo lives in box 4 — the box-5 walk can't reach
-    # it, so the badge must not count it.
+    # it, so the badge must not count it. Neither the pending nor the "all reviewed"
+    # badge may render: the box has no walkable photo of its own.
     create(:item, move:, box:, source_media: foreign_media, review_state: "needs_correction")
 
     visit move_box_path(move, box)
 
     expect(page).to have_text("Box #005")
     expect(page).to have_no_link(I18n.t("boxes.show.pending_review", count: 1))
+    expect(page).to have_no_link(I18n.t("boxes.show.review_complete"))
+  end
+
+  it "shows a permanent green review link once every item is reviewed" do
+    box = create(:box, move:, number: "6", status: "packing")
+    media = create(:media, move:, box:)
+    # A confirmed item backed by this box's own photo: nothing pending, but the box
+    # is still walkable — so the badge stays accessible, in its green state.
+    create(:item, move:, box:, source_media: media, name: "Plates", review_state: "confirmed")
+
+    visit move_box_path(move, box)
+
+    expect(page).to have_link(I18n.t("boxes.show.review_complete"))
+    expect(page).to have_no_link(I18n.t("boxes.show.pending_review", count: 1))
+  end
+
+  it "stays tertiary (not green) when a still-pending item has no walkable photo" do
+    box = create(:box, move:, number: "7", status: "packing")
+    media = create(:media, move:, box:)
+    # A reviewed photo makes the box walkable (green-eligible)…
+    create(:item, move:, box:, source_media: media, name: "Plates", review_state: "confirmed")
+    # …but a still-pending item with no source photo means the box is NOT done. The
+    # badge must not claim "All items reviewed" just because the pending item isn't
+    # photo-backed (it counts toward unreviewed regardless of walkability).
+    create(:item, move:, box:, name: "Loose papers", review_state: "needs_correction")
+
+    visit move_box_path(move, box)
+
+    expect(page).to have_link(I18n.t("boxes.show.pending_review", count: 1))
+    expect(page).to have_no_link(I18n.t("boxes.show.review_complete"))
   end
 
   it "is read-only on an archived move" do
