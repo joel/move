@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Offline — Move</title>
+  <!-- Self-contained: the Move dark palette is inlined so this renders with no
+       asset fetches (the network is down when it's shown). The service worker
+       precaches this page at install time. -->
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { color-scheme: dark; }
+    html, body {
+      min-height: 100dvh;
+      background: #2a2822;
+      color: #ece7dc;
+      font-family: "Plus Jakarta Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+    .icon { font-size: 3rem; }
+    h1 { font-size: 24px; font-weight: 600; line-height: 32px; }
+    p { font-size: 16px; line-height: 24px; color: #aba496; max-width: 320px; }
+    a {
+      margin-top: 16px;
+      padding: 12px 28px;
+      border-radius: 9999px;
+      background: #9fb089;
+      color: #1f2e15;
+      font-weight: 600;
+      font-size: 16px;
+      text-decoration: none;
+    }
+    a:active { opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <div class="icon">📦</div>
+  <h1>You're offline</h1>
+  <p>Move needs a connection to load your boxes and items. Check your network and try again.</p>
+  <a href="/">Retry</a>
+</body>
+</html>
