@@ -94,5 +94,15 @@ RSpec.describe "Terms agreement gate" do
       expect { post accept_agreement_path }.not_to change(TermsAcceptance, :count)
       expect(response).to redirect_to(moves_path)
     end
+
+    it "returns the user to the deep link they were headed for" do
+      stub_current_user(user, accept_terms: false)
+
+      get account_path # a gated deep link — remembers the destination
+      expect(response).to redirect_to(agreement_path)
+
+      post accept_agreement_path # same session → consumes the remembered path
+      expect(response).to redirect_to(account_path)
+    end
   end
 end

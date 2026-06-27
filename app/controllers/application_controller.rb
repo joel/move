@@ -126,6 +126,7 @@ class ApplicationController < ActionController::Base
     return if request.path == rodauth.logout_path
     return if terms_accepted?
 
+    remember_terms_return_path
     redirect_to agreement_path
   end
 
@@ -133,5 +134,18 @@ class ApplicationController < ActionController::Base
   # Indexed `exists?` — no rows are loaded into Ruby.
   def terms_accepted?
     current_user.terms_acceptances.exists?(terms_version: Terms::CURRENT_VERSION)
+  end
+
+  # Remember where the user was headed so accepting the terms returns them there
+  # (UX: don't lose a deep link behind the wall). Only a safe, tenant-local GET
+  # path — never a mutation target or an off-host URL, and never the wall itself.
+  def remember_terms_return_path
+    return unless request.get?
+
+    path = request.fullpath
+    return unless path.start_with?("/") && !path.start_with?("//")
+    return if path.start_with?(agreement_path)
+
+    session[:terms_return_to] = path
   end
 end

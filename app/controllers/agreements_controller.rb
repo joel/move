@@ -29,11 +29,24 @@ class AgreementsController < TenantController
 
     case result
     in Dry::Monads::Success(_acceptance)
-      # Straight to the app home (not root_path → welcome#home → moves_path):
-      # the extra redirect hop would sweep the flash before it is shown.
-      redirect_to moves_path, notice: t(".accepted")
+      # Back to the deep link they were headed for, else the app home. Direct
+      # (not root_path → welcome#home → moves_path): the extra redirect hop would
+      # sweep the flash before it is shown.
+      redirect_to return_path_after_accept, notice: t(".accepted")
     in Dry::Monads::Failure(_)
       redirect_to agreement_path, alert: t(".failed")
     end
+  end
+
+  private
+
+  # The remembered pre-wall destination, re-validated as a safe tenant-local path
+  # (guard against a tampered session), else the app home.
+  def return_path_after_accept
+    path = session.delete(:terms_return_to)
+    return moves_path if path.blank?
+    return moves_path unless path.start_with?("/") && !path.start_with?("//")
+
+    path
   end
 end
