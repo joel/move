@@ -11,6 +11,8 @@ module Accounts
   #   - Rodauth auth tables (public.user_*_keys, omniauth identities) are removed
   #     by their `ON DELETE CASCADE` FKs when the `users` row goes.
   #   - OrganizationMembership rows (public) go via the owning org's cascade.
+  #   - SessionHandoffToken rows (public, #280) have no FK to users, so they are
+  #     deleted explicitly (they would otherwise linger until the purge sweep).
   #   - For every Organization the user is the SOLE member of, the registry row is
   #     destroyed and its Apartment tenant schema is dropped, taking its Moves,
   #     boxes, photos and tenant-local memberships with it.
@@ -162,6 +164,11 @@ module Accounts
     end
 
     def delete_user(user)
+      # Handoff tokens (public, #280) reference user_id with no FK, so user.destroy!
+      # won't cascade them — delete them explicitly so nothing user-owned lingers.
+      # (They are digest-only + single-use + auto-purged, so this is completeness,
+      # not a security fix.)
+      SessionHandoffToken.where(user_id: user.id).delete_all
       user.destroy! # auth tables cascade; org memberships already gone with their orgs
       Success()
     rescue ActiveRecord::RecordNotDestroyed, ActiveRecord::InvalidForeignKey => e

@@ -44,6 +44,15 @@ RSpec.describe Accounts::Delete do
       )
     end
 
+    it "deletes the user's session handoff tokens (no FK to cascade them)" do
+      SessionHandoffs::Mint.new.call(user: user, organization_slug: "acme").value!
+      expect(SessionHandoffToken.where(user_id: user.id)).to exist
+
+      result
+
+      expect(SessionHandoffToken.where(user_id: user.id)).not_to exist
+    end
+
     it "purges the tenant's Active Storage blobs as part of deletion" do
       # Attachment/blob tables live in public, so DROP SCHEMA would otherwise
       # orphan them. The blob (and its attachment) must be purged.
