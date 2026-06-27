@@ -119,6 +119,11 @@ class ApplicationController < ActionController::Base
     # (incl. account management/deletion); the gate re-engages the moment they
     # reach their subdomain.
     return if current_tenant.nil?
+    # Logout must stay reachable so an unaccepted account can leave from the wall.
+    # Rodauth renders through RodauthController (so this gate DOES run for its
+    # views); exempt only the logout path. Login/verify/email-auth render
+    # unauthenticated, so they no-op above; passkey-management renders are gated.
+    return if request.path == rodauth.logout_path
     return if terms_accepted?
 
     redirect_to agreement_path
