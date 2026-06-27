@@ -173,7 +173,7 @@ RSpec.describe "Per-photo review" do
   end
 
   describe "POST .../items as Turbo Stream (no reload)" do
-    it "appends the highlighted new row and a confirmation toast when items exist" do
+    it "replaces the list with the highlighted new row and a confirmation toast" do
       detected(name: "Existing")
 
       post move_box_review_add_item_path(move, box, media),
@@ -181,10 +181,13 @@ RSpec.describe "Per-photo review" do
 
       expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
       item = box.items.find_by(name: "Kettle")
+      # Always replace the stable list wrapper (never append to a maybe-absent rows
+      # container) so a new row never gets silently dropped on a stale/empty client.
       expect(response.body)
-        .to include(%(action="append" target="#{Components::Reviews::ItemList::ROWS_ID}"))
+        .to include(%(action="replace" target="#{Components::Reviews::ItemList::ID}"))
         .and include(Components::Reviews::ItemRow.dom_id(item))
         .and include("highlight")
+        .and include("Existing")
         .and include(I18n.t("reviews.flash.item_added", name: "Kettle"))
     end
 

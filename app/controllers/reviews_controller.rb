@@ -104,26 +104,19 @@ class ReviewsController < MoveScopedController
 
   private
 
-  # Stream the new item into the list: when the photo was empty the rows container
-  # doesn't exist yet, so replace the whole list (highlighting the lone new row);
-  # otherwise append the highlighted row to the existing container. Plus a toast.
+  # Stream the new item in by replacing the whole list (highlighting the new row)
+  # plus a toast. We always replace — never append — because the append target
+  # (#review-item-rows) is absent on a client that loaded the photo empty, and the
+  # post-create DB count can't tell us that client's DOM state (a concurrent add or
+  # a race would make the count > 1 yet the rows container still wouldn't exist
+  # here, so Turbo would silently drop an append). The stable list wrapper always
+  # exists, so a replace is robust regardless of how the page was first rendered.
   def add_item_success(item)
     items = photo_items(@media).to_a
-    streams =
-      if items.size == 1
-        [review_list_stream(items, highlight_id: item.id)]
-      else
-        [turbo_stream.append(Components::Reviews::ItemList::ROWS_ID, review_row(item, highlight: true))]
-      end
-    respond_with_streams(streams, redirect: move_box_review_photo_path(@move, @box, @media), toast: true) do
+    respond_with_streams([review_list_stream(items, highlight_id: item.id)],
+                         redirect: move_box_review_photo_path(@move, @box, @media), toast: true) do
       [:notice, t("reviews.flash.item_added", name: item.name)]
     end
-  end
-
-  def review_row(item, highlight: false)
-    view_context.render(Components::Reviews::ItemRow.new(
-                          move: @move, box: @box, media: @media, item: item, editable: editable_move?, highlight: highlight
-                        ))
   end
 
   def review_list_stream(items, highlight_id: nil)
