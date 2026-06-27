@@ -62,8 +62,10 @@ en:
       remove: "Remove %{name}"
     create:
       created: "Added “%{name}”."
+      create_failed: "Could not add that value. Please try again."
     update:
       updated: "Renamed to “%{name}”."
+      update_failed: "Could not rename that value. Please try again."
     destroy:
       removed:
         zero: "Removed “%{name}”."
