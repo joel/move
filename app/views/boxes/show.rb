@@ -24,8 +24,8 @@ module Views
         @media = media
         @editable = editable
         @unpacked_media_ids = unpacked_media_ids # photos whose every item is unpacked
-        # Count of items the C2 walk can review (computed by the controller — see
-        # BoxesController#reviewable_count): unreviewed AND photo-backed.
+        # Count of in-box items still awaiting review, any source photo (see
+        # BoxesController#unreviewed_count). Zero → the badge's green "reviewed" state.
         @pending_count = pending_count
         # Whether the box has a review-walkable photo (controller-computed).
         @reviewable = reviewable

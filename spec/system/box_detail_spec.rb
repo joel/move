@@ -90,6 +90,22 @@ RSpec.describe "Box detail & lifecycle" do
     expect(page).to have_no_link(I18n.t("boxes.show.pending_review", count: 1))
   end
 
+  it "stays tertiary (not green) when a still-pending item has no walkable photo" do
+    box = create(:box, move:, number: "7", status: "packing")
+    media = create(:media, move:, box:)
+    # A reviewed photo makes the box walkable (green-eligible)…
+    create(:item, move:, box:, source_media: media, name: "Plates", review_state: "confirmed")
+    # …but a still-pending item with no source photo means the box is NOT done. The
+    # badge must not claim "All items reviewed" just because the pending item isn't
+    # photo-backed (it counts toward unreviewed regardless of walkability).
+    create(:item, move:, box:, name: "Loose papers", review_state: "needs_correction")
+
+    visit move_box_path(move, box)
+
+    expect(page).to have_link(I18n.t("boxes.show.pending_review", count: 1))
+    expect(page).to have_no_link(I18n.t("boxes.show.review_complete"))
+  end
+
   it "is read-only on an archived move" do
     archived = create(:move, :archived, created_by: user)
     box = create(:box, :with_room, move: archived, number: "1", status: "packing")

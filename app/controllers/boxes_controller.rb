@@ -42,7 +42,7 @@ class BoxesController < MoveScopedController
       move: @move, box: @box, items: items.ordered,
       # Preload the blob only (proxy URLs use the original; no variants/preview).
       media: @box.media.includes(image_attachment: :blob).recent_first,
-      editable: editable_move?, pending_count: reviewable_count(items),
+      editable: editable_move?, pending_count: unreviewed_count(items),
       # Whether this box has at least one of ITS OWN photos that produced an item —
       # the per-photo review walk's membership (mirrors ReviewsController#review_media,
       # which intersects with @box.media so a moved-in item's foreign source photo
@@ -167,13 +167,14 @@ class BoxesController < MoveScopedController
 
   # Items the C2 review walk can act on: unreviewed (pending_review or
   # needs_correction) AND backed by a photo *in this box*. The walk (review_media)
-  # only spans @box.media, so an item moved in from another box keeps its foreign
-  # source_media_id and isn't reviewable here — require the source photo to belong
-  # to @box, not just be present. A photo-less correction is resolved on C3. Drives
-  # the box review badge, keeping it from advertising a dead-end CTA (#146).
-  def reviewable_count(items)
-    items.where(review_state: %w[pending_review needs_correction])
-         .where(source_media_id: @box.media.select(:id)).count
+  # Count of in-box items still awaiting review (any source photo). Drives the box
+  # review badge's count + its green/tertiary state: the badge only goes green
+  # ("All items reviewed") when this is zero, so a still-pending item whose source
+  # photo is foreign/absent (not walkable from here) can't be mistaken for done —
+  # it keeps the tertiary state even though the walk can't yet resolve it (the
+  # photo-less / moved-in correction is itself resolved on C3, #146).
+  def unreviewed_count(items)
+    items.where(review_state: %w[pending_review needs_correction]).count
   end
 
   # Orphaned photos whose latest recognition attempt is settled: a terminal run
