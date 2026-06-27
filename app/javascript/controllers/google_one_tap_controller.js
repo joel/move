@@ -6,7 +6,7 @@ const NO_ACCOUNT_KEY = "google_one_tap_no_account"
 
 // How long to suppress One Tap after a no_account result — just long enough to
 // ride through the OAuth bridge redirect (/login?via=google → /auth/google)
-// without auto_select re-firing no_account → redirect in a loop. It then
+// without the "Continue as <name>" card re-appearing on the bridge page. It then
 // self-expires so One Tap re-prompts later (e.g. after a sign-out). We can't
 // clear it on sign-out instead: sessionStorage is origin-scoped to the apex
 // where One Tap runs, but sign-in/out happens on the org subdomain (a different
@@ -57,7 +57,11 @@ export default class extends Controller {
     window.google.accounts.id.initialize({
       client_id: this.clientIdValue,
       callback: this.handleCredential.bind(this),
-      auto_select: true,
+      // Never auto-confirm a returning Google session: always show the
+      // "Continue as <name>" card and wait for a deliberate tap. auto_select
+      // signs the user in with no gesture, which on the post-deletion apex
+      // landing silently re-creates the account the user just deleted.
+      auto_select: false,
       cancel_on_tap_outside: true,
       context: "signin",
       use_fedcm_for_prompt: true
@@ -84,9 +88,9 @@ export default class extends Controller {
           sessionStorage.removeItem(NO_ACCOUNT_KEY)
           window.location.replace(data.redirect || "/")
         } else if (data.error === "no_account") {
-          // Briefly suppress (so auto_select can't loop on the bridge page), then
-          // bridge into the account-creating OAuth flow. The window self-expires
-          // so One Tap returns later — see SUPPRESS_MS.
+          // Briefly suppress (so the One Tap card doesn't re-show on the bridge
+          // page), then bridge into the account-creating OAuth flow. The window
+          // self-expires so One Tap returns later — see SUPPRESS_MS.
           sessionStorage.setItem(NO_ACCOUNT_KEY, String(Date.now()))
           window.location.replace(data.redirect || "/create-account")
         }
