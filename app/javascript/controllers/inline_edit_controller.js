@@ -25,6 +25,9 @@ export default class extends Controller {
   }
 
   cancel() {
+    // Discard any edits: reset the form to its rendered (server-truth) values so
+    // reopening the row never shows abandoned text or a previously-rejected name.
+    this.formTarget.querySelector("form")?.reset()
     this.formTarget.classList.add("hidden")
     this.displayTarget.classList.remove("hidden")
   }

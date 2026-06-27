@@ -60,10 +60,27 @@ RSpec.describe "Vocabularies" do
       expect(move.tags.find_by(name: "Fragile").applies_to).to eq("both")
     end
 
-    it "re-renders with an error for a blank name" do
-      post move_vocabularies_path(move, "categories"), params: { vocabulary: { name: "" } }
+    it "re-streams the add form with an error for a blank name" do
+      post move_vocabularies_path(move, "categories"),
+           params: { vocabulary: { name: "" } }, as: :turbo_stream
 
       expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body)
+        .to include(%(target="#{Components::Vocabularies::AddForm::ID}"))
+        .and include("can&#39;t be blank").or include("can't be blank")
+    end
+
+    it "streams the new value into the highlighted list with a toast" do
+      post move_vocabularies_path(move, "categories"),
+           params: { vocabulary: { name: "Books" } }, as: :turbo_stream
+
+      expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+      category = move.categories.find_by(name: "Books")
+      expect(response.body)
+        .to include(%(action="replace" target="#{Components::Vocabularies::List::ID}"))
+        .and include(Components::Vocabularies::Row.dom_id(category))
+        .and include("highlight")
+        .and include(I18n.t("vocabularies.create.created", name: "Books"))
     end
   end
 
@@ -77,14 +94,31 @@ RSpec.describe "Vocabularies" do
       expect(response).to redirect_to(move_vocabularies_path(move, "categories"))
     end
 
-    it "re-opens the inline edit form with the error on a failed rename" do
+    it "streams the renamed value back into the highlighted list with a toast" do
+      category = create(:category, move:, name: "Bookz")
+
+      patch move_vocabulary_path(move, "categories", category),
+            params: { vocabulary: { name: "Books" } }, as: :turbo_stream
+
+      expect(response.body)
+        .to include(%(action="replace" target="#{Components::Vocabularies::List::ID}"))
+        .and include(I18n.t("vocabularies.update.updated", name: "Books"))
+      expect(category.reload.name).to eq("Books")
+    end
+
+    it "re-streams just the edited row with its form re-opened on a failed rename" do
       category = create(:category, move:, name: "Books")
 
-      patch move_vocabulary_path(move, "categories", category), params: { vocabulary: { name: "" } }
+      patch move_vocabulary_path(move, "categories", category),
+            params: { vocabulary: { name: "" } }, as: :turbo_stream
 
       expect(response).to have_http_status(:unprocessable_content)
-      # The edited row reopens its form showing why the save failed.
-      expect(response.body).to include("can&#39;t be blank").or include("can't be blank")
+      expect(response.body)
+        .to include(%(action="replace" target="#{Components::Vocabularies::Row.dom_id(category)}"))
+        .and include(%(data-inline-edit-open-value="true"))
+        # The display keeps the persisted name, so canceling reverts to it.
+        .and include("Books")
+        .and include("can&#39;t be blank").or include("can't be blank")
       expect(category.reload.name).to eq("Books")
     end
   end
@@ -99,6 +133,29 @@ RSpec.describe "Vocabularies" do
       end.to change(move.rooms, :count).by(-1)
 
       expect(box.reload.room_id).to be_nil
+    end
+
+    it "streams the row out, and flips to the empty state on the last value" do
+      only = create(:category, move:, name: "Sole")
+
+      delete move_vocabulary_path(move, "categories", only), as: :turbo_stream
+
+      expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+      expect(response.body)
+        .to include(%(action="remove" target="#{Components::Vocabularies::Row.dom_id(only)}"))
+        .and include(%(action="replace" target="#{Components::Vocabularies::List::ID}"))
+        .and include(I18n.t("vocabularies.categories.empty_title"))
+    end
+
+    it "streams only the row out while other values remain" do
+      kept = create(:category, move:, name: "Keep")
+      gone = create(:category, move:, name: "Drop")
+
+      delete move_vocabulary_path(move, "categories", gone), as: :turbo_stream
+
+      expect(response.body).to include(%(action="remove" target="#{Components::Vocabularies::Row.dom_id(gone)}"))
+      expect(response.body).not_to include(%(action="replace" target="#{Components::Vocabularies::List::ID}"))
+      expect(move.categories).to include(kept)
     end
   end
 
