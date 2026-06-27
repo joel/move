@@ -55,6 +55,16 @@ RSpec.describe Items::Update do
     expect(call(name: "").failure[:name]).to be_present
   end
 
+  it "leaves no phantom confirmation on the item when the edit is rejected" do
+    auto = create(:item, :auto_confirmed, move:)
+    result = described_class.new.call(item: auto, params: { name: "" }, editor:)
+    expect(result).to be_failure
+    # Neither the in-memory object (a rejected form may re-render it) nor the DB
+    # row may read confirmed after a failed save.
+    expect(auto.review_state).to eq("auto_confirmed")
+    expect(auto.reload.review_state).to eq("auto_confirmed")
+  end
+
   it "rejects a non-integer quantity instead of truncating it" do
     result = call(name: "X", quantity: "2abc")
     expect(result).to be_failure

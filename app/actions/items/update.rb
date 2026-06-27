@@ -36,6 +36,10 @@ module Items
       end
       Success(item)
     rescue ActiveRecord::RecordInvalid => e
+      # The failed update! left the unsaved confirmation on the in-memory item;
+      # drop it so a re-rendered rejected form can't flash a false "Confirmed".
+      # (The edited fields stay dirty on purpose — the user corrects and resubmits.)
+      e.record.restore_attributes(%i[review_state])
       Failure(e.record.errors)
     end
 

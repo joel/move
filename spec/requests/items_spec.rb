@@ -196,6 +196,19 @@ RSpec.describe "Items" do
       expect(response.body).to include(Components::Ui::SaveStatus::ID)
       expect(response.body).not_to include(I18n.t("items.show.view_only"))
     end
+
+    it "keeps the original state chip (not Confirmed) when a rejected edit re-renders" do
+      item = create(:item, :auto_confirmed, move:, box:, name: "Old")
+
+      patch move_item_path(move, item), params: { item: { name: "" } }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      # The save failed, so the overlaid chip must still read its persisted state,
+      # not the unsaved in-memory promotion to confirmed.
+      expect(response.body).to include(I18n.t("items.state.auto_confirmed"))
+      expect(response.body).not_to include(I18n.t("items.state.confirmed"))
+      expect(item.reload.review_state).to eq("auto_confirmed")
+    end
   end
 
   describe "PATCH /moves/:move_id/items/:id (Turbo auto-save)" do

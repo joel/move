@@ -22,6 +22,9 @@ module Items
       item.update!(name: name, review_state: "confirmed")
       Success(item)
     rescue ActiveRecord::RecordInvalid => e
+      # Drop the unsaved confirmation a failed update! left in memory, so a caller
+      # that re-renders the rejected item can't show a false "Confirmed".
+      e.record.restore_attributes(%i[review_state])
       Failure(e.record.errors)
     end
 
