@@ -140,7 +140,9 @@ class ApplicationController < ActionController::Base
   # (UX: don't lose a deep link behind the wall). Only a safe, tenant-local GET
   # path — never a mutation target or an off-host URL, and never the wall itself.
   def remember_terms_return_path
-    return unless request.get?
+    # Only safe, idempotent navigations (GET/HEAD) — never a POST/PATCH/DELETE
+    # target, which we could not legitimately replay as a GET after acceptance.
+    return unless request.get? || request.head?
 
     path = request.fullpath
     return unless path.start_with?("/") && !path.start_with?("//")
