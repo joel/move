@@ -11,6 +11,11 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::Routes
 
+      # Stable id wrapping the feed so ActivitiesController#restore / #revert can
+      # re-stream it (from the top, where the new audit entry lands) after the
+      # write — the acted-on row's button also drops — with no reload.
+      ID = "activity-feed"
+
       def initialize(move:, groups:, restorable:, revertable:, next_before: nil, next_before_id: nil)
         @move = move
         @groups = groups
@@ -21,7 +26,7 @@ module Views
       end
 
       def view_template
-        div(class: "flex flex-col gap-section-gap") do
+        div(id: ID, class: "flex flex-col gap-section-gap") do
           render Components::Ui::SectionHeader.new(
             eyebrow: I18n.t("activities.index.eyebrow"),
             title: I18n.t("activities.index.title")
