@@ -96,75 +96,9 @@ module Views
       end
 
       def list
-        return empty_state if @items.empty?
-
-        div(class: "mt-5 flex flex-col gap-stack-gap") do
-          @items.each { |item| row(item) }
-        end
-      end
-
-      def row(item)
-        div(
-          data: row_data(item),
-          class: "group flex items-center gap-3 rounded-card border border-card-border bg-card p-4 " \
-                 "transition focus-within:border-accent-sage"
-        ) do
-          div(class: "flex flex-1 flex-col gap-1") do
-            name_field(item)
-            confidence_line(item)
-          end
-          row_actions(item) if @editable
-        end
-      end
-
-      def row_data(item)
-        return {} unless @editable
-
-        { controller: "inline-rename", inline_rename_url_value: rename_path(item) }
-      end
-
-      def name_field(item)
-        input(
-          type: "text", value: item.name, readonly: !@editable,
-          aria_label: I18n.t("reviews.photo.name"), data: name_field_data,
-          class: "w-full border-0 bg-transparent p-0 text-body-lg text-text-warm focus:ring-0"
+        render Components::Reviews::ItemList.new(
+          move: @move, box: @box, media: @media, items: @items, editable: @editable
         )
-      end
-
-      def name_field_data
-        return {} unless @editable
-
-        { inline_rename_target: "input",
-          action: "focus->inline-rename#clearError blur->inline-rename#save keydown.enter->inline-rename#blur" }
-      end
-
-      def confidence_line(item)
-        div(class: "flex items-center gap-1.5") do
-          if (pct = confidence_percent(item))
-            span(class: "h-1.5 w-1.5 rounded-full bg-accent-sage")
-            span(class: "text-label-caps uppercase text-muted") do
-              I18n.t("reviews.photo.confidence", percent: pct)
-            end
-          else
-            span(class: "text-label-caps uppercase text-muted") { I18n.t("reviews.photo.added") }
-          end
-        end
-      end
-
-      def row_actions(item)
-        div(class: "flex shrink-0 items-center gap-1") do
-          button(type: "button", data: { action: "inline-rename#focus" }, class: icon_button(:sage)) do
-            render Components::Icons::Pencil.new(css: "h-5 w-5")
-            span(class: "sr-only") { I18n.t("reviews.photo.edit") }
-          end
-          button_to(
-            move_box_review_remove_item_path(@move, @box, @media, item),
-            method: :patch, class: icon_button(:error), form_class: "shrink-0"
-          ) do
-            render Components::Icons::Close.new(css: "h-5 w-5")
-            span(class: "sr-only") { I18n.t("reviews.photo.remove_named", name: item.name) }
-          end
-        end
       end
 
       # An inline "add a missed item" row: type a name, submit to append it to this
@@ -229,27 +163,10 @@ module Views
         end
       end
 
-      def empty_state
-        render Components::Ui::EmptyState.new(
-          icon: Components::Icons::Camera,
-          title: I18n.t("reviews.photo.empty_title"),
-          description: I18n.t("reviews.photo.empty_description")
-        )
-      end
-
+      # The add-form's submit button shares the row icon-button styling.
       def icon_button(tint)
         hover = tint == :error ? "hover:text-error hover:bg-error/10" : "hover:text-accent-sage hover:bg-accent-sage/10"
         "flex h-10 w-10 items-center justify-center rounded-full text-muted transition #{hover}"
-      end
-
-      def confidence_percent(item)
-        return nil if item.confidence_score.nil?
-
-        (item.confidence_score * 100).round
-      end
-
-      def rename_path(item)
-        move_box_review_rename_item_path(@move, @box, @media, item)
       end
 
       def progress_pct

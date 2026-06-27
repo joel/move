@@ -56,24 +56,33 @@ class ReviewsController < MoveScopedController
   end
 
   # PATCH .../review/photo/:media_id/items/:id/remove — drop a wrong detection.
+  # Streams the row out (no reload); flips to the empty state on the last item.
+  # No toast — the row vanishing is the feedback, and corrections come in bursts.
   def remove_item
     # The review walk removes a mis-detected item *during packing* — a distinct use
     # case from destination-side unpacking, so it bypasses MarkRemoved's phase guard.
     Items::MarkRemoved.new.call(item: @item, actor: current_user, allow_any_phase: true)
-    redirect_to move_box_review_photo_path(@move, @box, @media)
+    items = photo_items(@media).to_a
+    streams = [turbo_stream.remove(Components::Reviews::ItemRow.dom_id(@item))]
+    streams << review_list_stream(items) if items.empty?
+    respond_with_streams(streams, redirect: move_box_review_photo_path(@move, @box, @media))
   end
 
-  # POST .../review/photo/:media_id/items — add a missed item to this photo.
+  # POST .../review/photo/:media_id/items — add a missed item to this photo. Streams
+  # the new row in (highlighted + scrolled into view) with a confirmation toast
+  # (UX rule #1); HTML clients still redirect.
   def add_item
     result = Items::CreateManual.new.call(
       box: @box, params: { name: params.dig(:item, :name) }, creator: current_user, source_media: @media
     )
 
     case result
-    in Dry::Monads::Success(_item)
-      redirect_to move_box_review_photo_path(@move, @box, @media)
+    in Dry::Monads::Success(item)
+      add_item_success(item)
     in Dry::Monads::Failure(_)
-      redirect_to move_box_review_photo_path(@move, @box, @media), alert: t("reviews.flash.add_failed")
+      respond_with_streams([], redirect: move_box_review_photo_path(@move, @box, @media), toast: true) do
+        [:alert, t("reviews.flash.add_failed")]
+      end
     end
   end
 
@@ -92,6 +101,37 @@ class ReviewsController < MoveScopedController
   end
 
   private
+
+  # Stream the new item into the list: when the photo was empty the rows container
+  # doesn't exist yet, so replace the whole list (highlighting the lone new row);
+  # otherwise append the highlighted row to the existing container. Plus a toast.
+  def add_item_success(item)
+    items = photo_items(@media).to_a
+    streams =
+      if items.size == 1
+        [review_list_stream(items, highlight_id: item.id)]
+      else
+        [turbo_stream.append(Components::Reviews::ItemList::ROWS_ID, review_row(item, highlight: true))]
+      end
+    respond_with_streams(streams, redirect: move_box_review_photo_path(@move, @box, @media), toast: true) do
+      [:notice, t("reviews.flash.item_added", name: item.name)]
+    end
+  end
+
+  def review_row(item, highlight: false)
+    view_context.render(Components::Reviews::ItemRow.new(
+                          move: @move, box: @box, media: @media, item: item, editable: editable_move?, highlight: highlight
+                        ))
+  end
+
+  def review_list_stream(items, highlight_id: nil)
+    turbo_stream.replace(
+      Components::Reviews::ItemList::ID,
+      view_context.render(Components::Reviews::ItemList.new(
+                            move: @move, box: @box, media: @media, items: items, editable: editable_move?, highlight_id: highlight_id
+                          ))
+    )
+  end
 
   def move_photo_error(reason)
     key = %i[box_missing same_box cross_move move_archived].include?(reason) ? reason : :failed
