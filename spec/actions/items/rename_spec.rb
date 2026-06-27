@@ -5,13 +5,21 @@ require "rails_helper"
 RSpec.describe Items::Rename do
   let(:editor) { create(:user) }
   let(:move) { create(:move, created_by: editor) }
-  let(:item) { create(:item, move:, name: "Cofee machine") }
+  let(:item) { create(:item, :auto_confirmed, move:, name: "Cofee machine") }
 
-  it "updates only the name" do
+  it "updates the name" do
     result = described_class.new.call(item:, name: "Coffee machine", editor:)
 
     expect(result).to be_success
     expect(item.reload.name).to eq("Coffee machine")
+  end
+
+  it "confirms the item from any unreviewed state — a human edit vouches for it" do
+    %w[pending_review auto_confirmed needs_correction].each do |state|
+      target = create(:item, move:, review_state: state, name: "x")
+      described_class.new.call(item: target, name: "Renamed #{state}", editor:)
+      expect(target.reload.review_state).to eq("confirmed")
+    end
   end
 
   it "emits an item.updated event so search follows" do

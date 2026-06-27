@@ -58,7 +58,11 @@ class ItemsController < MoveScopedController
     case result
     in Dry::Monads::Success(item)
       respond_to do |format|
-        format.turbo_stream { render turbo_stream: save_status_stream(:saved) }
+        # Refresh the state chip too: the edit promotes the item to `confirmed`,
+        # so the overlaid "Auto-confirmed"/"Pending review" badge must follow live.
+        format.turbo_stream do
+          render turbo_stream: [save_status_stream(:saved), state_badge_stream(item)]
+        end
         format.html { redirect_to move_item_path(@move, item), notice: t(".updated", name: item.name) }
       end
     in Dry::Monads::Failure(Symbol => reason)
@@ -148,6 +152,15 @@ class ItemsController < MoveScopedController
     turbo_stream.replace(
       Components::Ui::SaveStatus::ID,
       view_context.render(Components::Ui::SaveStatus.new(state: state, message: message))
+    )
+  end
+
+  # Turbo Stream that refreshes the item's review-state chip after a save (the
+  # edit promotes it to `confirmed`, so the overlaid badge must update in place).
+  def state_badge_stream(item)
+    turbo_stream.replace(
+      Components::ItemStateBadge.dom_id(item),
+      view_context.render(Components::ItemStateBadge.new(item: item))
     )
   end
 
