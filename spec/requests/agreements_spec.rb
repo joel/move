@@ -43,6 +43,16 @@ RSpec.describe "Terms agreement gate" do
 
       expect(response).to redirect_to(agreement_path)
     end
+
+    it "does NOT gate on the apex broker host (no tenant) — avoids a 404 wall" do
+      stub_current_user(user, accept_terms: false)
+      stub_current_tenant(nil) # apex / non-tenant host
+
+      get account_path
+
+      # The tenant-only wall would 404 here, so the gate stays out of the way.
+      expect(response).to have_http_status(:ok)
+    end
   end
 
   describe "GET /agreement" do

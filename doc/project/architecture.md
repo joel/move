@@ -196,9 +196,13 @@ the create-account step.
   `user_id` FK `ON DELETE CASCADE`). One row per `(user, version)`; `Terms::Accept`
   upserts via `create_or_find_by!` (idempotent on the DB unique index).
 - **Gate.** `ApplicationController#require_terms_agreement!` is a **global**
-  `before_action` (fail-closed: every authenticated web surface is gated by default,
-  so a new controller can't silently bypass it). It no-ops when unauthenticated and
-  redirects to `/agreement` unless `terms_accepted?` (an indexed `exists?`).
+  `before_action` (fail-closed: every authenticated tenant surface is gated by
+  default, so a new controller can't silently bypass it). It no-ops when
+  unauthenticated **and on the apex** (`current_tenant.nil?`) — the app and the wall
+  are tenant-only, and the apex is a broker whose authenticated session only lingers
+  in an error/fallback state (#349); redirecting it to the tenant-only `/agreement`
+  would 404. On a tenant it redirects to `/agreement` unless `terms_accepted?` (an
+  indexed `exists?`).
   Explicit `skip_before_action`s cover the surfaces that must stay reachable without
   acceptance: `AgreementsController` (the wall itself), the auth/session-establishment
   controllers (`RodauthController` — so an unaccepted account can still **Sign out** —

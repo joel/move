@@ -111,6 +111,14 @@ class ApplicationController < ActionController::Base
   # the gate holds whatever path (email or Google) created the account.
   def require_terms_agreement!
     return if current_user.nil?
+    # Gate only on org subdomains. The app — and the agreement wall itself
+    # (AgreementsController < TenantController) — live on tenants; the apex is a
+    # pure auth broker (#280) that clears its session on a successful handoff, so
+    # an authenticated apex session only lingers in an error/fallback state (#349).
+    # Redirecting it to the tenant-only `/agreement` would 404 and strand the user
+    # (incl. account management/deletion); the gate re-engages the moment they
+    # reach their subdomain.
+    return if current_tenant.nil?
     return if terms_accepted?
 
     redirect_to agreement_path
