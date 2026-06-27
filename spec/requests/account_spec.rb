@@ -14,6 +14,26 @@ RSpec.describe "/account" do
     expect(response.body).to include("inline-edit") # rename toggle controller
     expect(response.body).to include('aria-label="Edit name"')
     expect(response.body).to include('aria-label="Account name"') # labelled inline field
+    # No pending errors → the inline-edit form stays closed (Phlex drops the
+    # false open-value, so Stimulus defaults to closed).
+    expect(response.body).not_to include('data-inline-edit-open-value="true"')
+  end
+
+  it "re-opens the inline edit form with the error on a rejected name save (#383)" do
+    # `name` has no model validation today, so force the failure render path; the
+    # point is the rendered open-value, which must be the STRING "true" — Phlex
+    # renders a Ruby `true` as a bare attribute, which Stimulus reads as false, so
+    # the form would otherwise never reopen to show the error.
+    allow(user).to receive(:update).and_wrap_original do |_orig, *|
+      user.errors.add(:name, "is invalid")
+      false
+    end
+
+    patch account_url, params: { user: { name: "x" } }
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(response.body).to include('data-inline-edit-open-value="true"')
+    expect(response.body).to include("is invalid")
   end
 
   it "submits the delete form natively (turbo:false) with a Stimulus confirm" do

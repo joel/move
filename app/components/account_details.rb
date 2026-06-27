@@ -13,7 +13,12 @@ module Components
     def view_template
       div(
         class: "ha-card p-8",
-        data: { controller: "inline-edit", inline_edit_open_value: @user.errors.any? }
+        # The string "true" (not a Ruby boolean): Phlex renders `true` as a bare
+        # `data-inline-edit-open-value` attribute, which Stimulus reads as false (a
+        # Boolean value coerces via `=== "true"`), so a rejected save wouldn't
+        # reopen the form to show the error. `false` is dropped by Phlex (Stimulus
+        # then defaults to false). Mirrors Components::Vocabularies::Row (#383).
+        data: { controller: "inline-edit", inline_edit_open_value: (@user.errors.any? ? "true" : false) }
       ) do
         div(class: "flex items-center gap-6") do
           render_avatar
