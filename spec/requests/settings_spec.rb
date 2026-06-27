@@ -114,13 +114,16 @@ RSpec.describe "Settings" do
       expect(response.body).to include('value="gpt-5"')
     end
 
-    it "renders the editable model field for an admin (#187)" do
+    it "renders the editable model field as an auto-save input with no Save button (#187)" do
       move.update!(recognition_provider: "openai", openai_api_key: "sk-live", openai_model: "gpt-5")
 
       get move_settings_path(move)
 
       expect(response.body).to include('name="move[model]"')
       expect(response.body).to include("gpt-5") # the override is shown
+      # Auto-saves on blur via the auto-submit controller — the Save button is gone.
+      expect(response.body).to include("auto-submit#submit")
+      expect(response.body).not_to include(I18n.t("settings.show.recognition.providers.save"))
     end
 
     it "shows the resolved model read-only for a contributor (no model input)" do
@@ -169,6 +172,18 @@ RSpec.describe "Settings" do
       patch move_settings_unit_system_path(move), params: { move: { unit_system: "imperial" } }
 
       expect(response).to redirect_to(move_settings_path(move))
+      expect(move.reload.unit_system).to eq("imperial")
+    end
+
+    it "streams the re-rendered unit toggle + a toast (no reload)" do
+      patch move_settings_unit_system_path(move),
+            params: { move: { unit_system: "imperial" } }, as: :turbo_stream
+
+      expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+      expect(response.body)
+        .to include(%(action="replace" target="#{Components::Settings::UnitToggle::ID}"))
+        .and include(%(target="#{Components::FlashToasts::ID}"))
+        .and include(I18n.t("settings.update_unit_system.unit_changed"))
       expect(move.reload.unit_system).to eq("imperial")
     end
 
@@ -222,6 +237,17 @@ RSpec.describe "Settings" do
 
       expect(response).to redirect_to(move_settings_path(move))
       expect(move.reload.labels_per_box).to eq(2)
+    end
+
+    it "streams a toast only — the select reflects its own value (no reload, no toggle refresh)" do
+      patch move_settings_labels_per_box_path(move),
+            params: { move: { labels_per_box: "5" } }, as: :turbo_stream
+
+      expect(response.body)
+        .to include(%(target="#{Components::FlashToasts::ID}"))
+        .and include(I18n.t("settings.update_labels_per_box.labels_per_box_changed"))
+      expect(response.body).not_to include(%(target="#{Components::Settings::UnitToggle::ID}"))
+      expect(move.reload.labels_per_box).to eq(5)
     end
 
     it "forbids a viewer" do
