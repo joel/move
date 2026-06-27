@@ -115,7 +115,9 @@ RSpec.describe "Vocabularies" do
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.body)
         .to include(%(action="replace" target="#{Components::Vocabularies::Row.dom_id(category)}"))
-        .and include("inline-edit-open-value")
+        .and include(%(data-inline-edit-open-value="true"))
+        # The display keeps the persisted name, so canceling reverts to it.
+        .and include("Books")
         .and include("can&#39;t be blank").or include("can't be blank")
       expect(category.reload.name).to eq("Books")
     end

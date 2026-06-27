@@ -17,7 +17,13 @@ module Components
         "vocab-#{record.id}"
       end
 
-      def initialize(move:, vocabulary:, record:, usage_count:, can_edit:, open: false, highlight: false)
+      # record drives the display + stable id (always the persisted value).
+      # edit_record drives the edit form's field values + errors; it defaults to
+      # record, but a rejected rename passes the submitted (invalid) record so the
+      # form shows what was typed + the error while the display stays persisted —
+      # so canceling reveals the persisted name, never the abandoned/invalid one.
+      def initialize(move:, vocabulary:, record:, usage_count:, can_edit:,
+                     open: false, highlight: false, edit_record: nil)
         @move = move
         @vocabulary = vocabulary
         @record = record
@@ -25,6 +31,7 @@ module Components
         @can_edit = can_edit
         @open = open
         @highlight = highlight
+        @edit_record = edit_record || record
       end
 
       def view_template
@@ -56,7 +63,7 @@ module Components
       def edit_panel
         div(class: "hidden", data: { inline_edit_target: "form" }) do
           render Components::VocabularyForm.new(
-            vocabulary: @vocabulary, record: @record,
+            vocabulary: @vocabulary, record: @edit_record,
             url: move_vocabulary_path(@move, kind, @record), method: :patch,
             submit_label: I18n.t("vocabularies.form.save"),
             cancel_action: "inline-edit#cancel", compact: true,

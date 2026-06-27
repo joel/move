@@ -63,9 +63,12 @@ class VocabulariesController < MoveScopedController
         [:notice, t(".updated", name: record.name)]
       end
     in Dry::Monads::Failure
-      # @record carries the submitted (invalid) attributes + errors.
-      respond_with_streams([row_stream(@record, open: true)], redirect: index_path,
-                                                              toast: true, status: :unprocessable_content) do
+      # @record carries the submitted (invalid) attributes + errors; re-fetch the
+      # persisted row so the display keeps the real name (canceling reverts to it)
+      # while the re-opened form shows what was typed + the error.
+      persisted = @vocabulary.records(@move).find(@record.id)
+      respond_with_streams([row_stream(persisted, edit_record: @record, open: true)],
+                           redirect: index_path, toast: true, status: :unprocessable_content) do
         [:alert, @record.errors.full_messages.first.presence || t(".update_failed")]
       end
     end
@@ -122,12 +125,13 @@ class VocabulariesController < MoveScopedController
     )
   end
 
-  def row_stream(record, open: false)
+  def row_stream(record, edit_record: nil, open: false)
     turbo_stream.replace(
       Components::Vocabularies::Row.dom_id(record),
       view_context.render(Components::Vocabularies::Row.new(
                             move: @move, vocabulary: @vocabulary, record: record,
-                            usage_count: usage_counts[record.id].to_i, can_edit: can_edit?, open: open
+                            usage_count: usage_counts[record.id].to_i, can_edit: can_edit?,
+                            open: open, edit_record: edit_record
                           ))
     )
   end
