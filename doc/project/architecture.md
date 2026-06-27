@@ -119,6 +119,68 @@ sequenceDiagram
 New tenants created later via `Apartment::Tenant.create` clone the current full
 `public`, so they start correct; this path keeps **pre-existing** tenants current.
 
+### Tenant teardown: deleting an account drops its solo-org schemas (#365)
+
+Account deletion is the inverse of tenant creation and the only place a tenant
+schema is **dropped** in normal operation. It is a domain action,
+[`Accounts::Delete`](../../app/actions/accounts/delete.rb) — both self-service
+(`AccountsController#destroy`) and admin (`UsersController#destroy`) route through
+it, so the rules below always apply.
+
+**What it deletes.** For every Organization the user is the **sole member** of
+(membership `COUNT(*) = 1`, computed in SQL), it destroys the registry row and
+drops the tenant schema — taking that org's moves, boxes, photos and
+move_memberships with it. The `users` row then goes; its Rodauth `user_*_keys`
+cascade via FK. An org the user shares with **any** other member is **refused**
+(`Failure(:owns_shared_data)`): dropping a shared tenant would destroy others'
+data, and deleting the user would strand the moves they authored there
+(`Move#created_by` is required, no FK). Multi-member deletion is deferred to the
+ownership-transfer feature (#366). Today every user owns a single org, so the
+guard never trips.
+
+**Ordering is the whole game** — `DROP SCHEMA` is irreversible and runs on a
+neutral connection (it can't share the row-delete transaction), and the Active
+Storage `attachments`/`blobs` tables are excluded into `public`, so a naive drop
+orphans them. Each solo org is therefore torn down as a **per-org atomic unit**,
+then the user is deleted last:
+
+```mermaid
+sequenceDiagram
+  participant A as Accounts::Delete
+  participant PG as Postgres (public + tenant schema)
+  participant AS as Active Storage (public blobs + storage)
+  A->>A: guard — refuse if any org has another member (:owns_shared_data)
+  loop each solo org (irreversible unit)
+    A->>AS: capture attachment ids (Media/LabelPrintRun, unscoped*)
+    A->>PG: DROP SCHEMA <slug> CASCADE  (gated on schema_exists?)
+    A->>AS: purge captured attachments (only AFTER the drop succeeds)
+    A->>PG: destroy public Organization row (memberships cascade)
+  end
+  A->>PG: destroy users row (Rodauth user_*_keys cascade)
+```
+
+- **Drop before the row delete; abort on a real drop failure.** The schema is
+  what makes a tenant's data + MCP tokens inaccessible (the elevator resolves the
+  subdomain by label and tokens authenticate as long as the schema exists), so a
+  drop that genuinely fails returns `Failure(:tenant_drop_failed)` rather than
+  reporting a "deleted" account in front of a live, routable schema. Drops are
+  gated on `schema_exists?`, so a retry after a partial teardown is idempotent.
+- **Capture attachments *before* the drop, purge *after* it.** The tenant records
+  must still exist to identify their public attachment rows; purging before the
+  drop would strip files from a tenant that then survives a failed drop.
+  `*unscoped` reaches soft-deleted (`Discardable`) media too.
+- **Best-effort cleanup never fails an already-irreversible step** — blob
+  capture/purge swallow errors (the sanctioned `Move/BroadRescue` of AGENTS §1#4).
+- **Tenant-safe redirect.** After a delete that dropped the **current** subdomain
+  (detected by `ApplicationController#current_subdomain_dropped?` — `!schema_exists?`,
+  since teardown drops the schema before the row), the controller redirects to the
+  **apex** (`allow_other_host`) instead of routing back through the missing tenant
+  (the elevator would 404); otherwise it stays on the current host, because
+  host-only cookies ([#280](#cookies-are-host-only-the-apex-hands-off-to-subdomains-by-token-280))
+  mean a needless apex bounce lands the user unauthenticated. The danger-zone
+  delete submits with `data-turbo="false"` + a `confirm` Stimulus controller so
+  the browser follows the cross-host redirect (Turbo won't follow it via fetch).
+
 ---
 
 ## 3. Per-request tenant resolution
