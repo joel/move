@@ -25,7 +25,7 @@ class MembersController < MoveScopedController
 
     case result
     in Dry::Monads::Success(membership)
-      respond_with_streams([list_stream(highlight_id: membership.id), add_form_stream],
+      respond_with_streams([list_stream(highlight_id: membership.id), *candidate_pool_streams],
                            redirect: index_path, toast: true) { [:notice, t(".added")] }
     in Dry::Monads::Failure(_)
       # Cross-org / unknown user (:not_found), bad role (:invalid_role), or a
@@ -64,7 +64,7 @@ class MembersController < MoveScopedController
 
     case result
     in Dry::Monads::Success(_details)
-      respond_with_streams([turbo_stream.remove(Components::Members::Row.dom_id(target)), add_form_stream],
+      respond_with_streams([turbo_stream.remove(Components::Members::Row.dom_id(target)), *candidate_pool_streams],
                            redirect: index_path, toast: true) { [:notice, t(".removed")] }
     in Dry::Monads::Failure(reason)
       key = reason == :last_admin ? ".last_admin" : ".remove_failed"
@@ -133,12 +133,16 @@ class MembersController < MoveScopedController
     )
   end
 
-  # Refresh the add-member region after the candidate pool changes (a member added
-  # leaves it; a member removed rejoins it); the form hides when none remain.
-  def add_form_stream
-    turbo_stream.replace(
-      Components::Members::AddForm::ID,
-      view_context.render(Components::Members::AddForm.new(move: @move, candidates: candidates))
-    )
+  # Everything that tracks the candidate pool, refreshed together when it changes
+  # (a member added leaves it; a member removed rejoins it): the add-member form
+  # AND the header Invite CTA both hide when none remain / reappear when one does.
+  def candidate_pool_streams
+    pool = candidates
+    [
+      turbo_stream.replace(Components::Members::AddForm::ID,
+                           view_context.render(Components::Members::AddForm.new(move: @move, candidates: pool))),
+      turbo_stream.replace(Components::Members::Header::ID,
+                           view_context.render(Components::Members::Header.new(move: @move, candidates: pool)))
+    ]
   end
 end

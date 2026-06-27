@@ -112,7 +112,11 @@ RSpec.describe "Members" do
         .and include(Components::Members::Row.dom_id(membership))
         .and include("highlight")
         .and include(%(action="replace" target="#{Components::Members::AddForm::ID}"))
+        .and include(%(action="replace" target="#{Components::Members::Header::ID}"))
         .and include(I18n.t("members.create.added"))
+      # Adding the only candidate empties the pool, so the Invite CTA is dropped
+      # from the re-streamed header (UX rule #3 — no action you can't take).
+      expect(response.body).not_to include(I18n.t("members.index.invite"))
     end
 
     it "PATCH update_role success streams the re-sorted, highlighted roster with a toast" do
@@ -148,6 +152,9 @@ RSpec.describe "Members" do
       expect(response.body)
         .to include(%(action="remove" target="#{Components::Members::Row.dom_id(membership)}"))
         .and include(%(action="replace" target="#{Components::Members::AddForm::ID}"))
+        # The removed user rejoins the pool, so the header re-streams WITH the CTA.
+        .and include(%(action="replace" target="#{Components::Members::Header::ID}"))
+        .and include(I18n.t("members.index.invite"))
         .and include(I18n.t("members.destroy.removed"))
     end
   end

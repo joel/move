@@ -28,7 +28,7 @@ module Views
 
       def view_template
         div(class: "flex flex-col gap-section-gap") do
-          header
+          render Components::Members::Header.new(move: @move, candidates: @candidates)
           role_definitions
           render Components::Members::AddForm.new(move: @move, candidates: @candidates)
           render Components::Members::List.new(
@@ -38,22 +38,6 @@ module Views
       end
 
       private
-
-      def header
-        render Components::Ui::SectionHeader.new(
-          eyebrow: @move.name,
-          title: I18n.t("members.index.title"),
-          subtitle: I18n.t("members.index.subtitle")
-        ) do
-          if @candidates.any?
-            render Components::Ui::Button.new(
-              label: I18n.t("members.index.invite"),
-              icon: Components::Icons::Plus,
-              href: "##{Components::Members::AddForm::ID}"
-            )
-          end
-        end
-      end
 
       # Bento of the three role definitions, with a short explanation of each.
       def role_definitions
