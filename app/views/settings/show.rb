@@ -116,26 +116,7 @@ module Views
       end
 
       def unit_toggle
-        if @editable
-          div(class: "inline-flex self-start rounded-full border border-card-border bg-card p-1") do
-            Move::UNIT_SYSTEMS.each { |system| unit_option(system) }
-          end
-        else
-          resolved_value(I18n.t("settings.show.preferences.#{@move.unit_system}"))
-        end
-      end
-
-      def unit_option(system)
-        label = I18n.t("settings.show.preferences.#{system}")
-        if @move.unit_system == system
-          span(class: "#{toggle_pill} bg-surface-container-high text-text-warm", aria_current: "true") { label }
-        else
-          button_to(
-            move_settings_unit_system_path(@move), method: :patch,
-                                                   params: { move: { unit_system: system } },
-                                                   class: "#{toggle_pill} text-on-surface-variant hover:text-text-warm"
-          ) { label }
-        end
+        render Components::Settings::UnitToggle.new(move: @move, editable: @editable)
       end
 
       # --- AI: shared capability keys (#242), then per-feature selectors ---
@@ -244,10 +225,6 @@ module Views
 
       def resolved_value(text)
         span(class: "rounded-full bg-surface-container-high px-4 py-2 text-body-md text-text-warm") { text }
-      end
-
-      def toggle_pill
-        "rounded-full px-6 py-2 text-sm font-semibold transition"
       end
 
       def format_threshold(value)

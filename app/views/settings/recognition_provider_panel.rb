@@ -107,20 +107,23 @@ module Views
       # or default clears it.
       def model_form
         provider = @move.recognition_provider
+        # Auto-saves on blur (the existing auto-submit controller) — no Save button.
+        # The PATCH already streams the AI panels in place (#260), so the override
+        # commits and the panel re-renders without a reload.
         form_with(url: move_settings_recognition_provider_path(@move), method: :patch,
-                  class: "mt-2 flex flex-col gap-2") do
+                  data: { controller: "auto-submit" }, class: "mt-2 flex flex-col gap-2") do
           input(type: "hidden", name: "move[recognition_provider]", value: provider)
           span(class: "text-label-caps uppercase text-muted") { t("model_label") }
           input(
             type: "text", name: "move[model]", autocomplete: "off",
             value: @move.recognition_model_for(provider).to_s,
             placeholder: RecognitionProviders.default_model(provider),
+            data: { action: "change->auto-submit#submit" },
             class: "w-full rounded-card border border-card-border bg-card px-4 py-3 text-text-warm " \
                    "placeholder:text-muted transition focus:border-accent-sage focus:outline-none " \
                    "focus:ring-2 focus:ring-accent-sage/30"
           )
           span(class: "text-body-md text-on-surface-variant") { t("model_help") }
-          div { render Components::Ui::Button.new(label: t("save"), type: "submit", variant: :secondary) }
         end
       end
 

@@ -22,7 +22,10 @@ class SettingsController < MoveScopedController
 
   # PATCH /moves/:move_id/settings/unit_system
   def update_unit_system
-    write_setting(Moves::SetUnitSystem, unit_system: settings_param(:unit_system)) do |result|
+    # Re-stream the toggle so the selected pill flips in place (the labels select
+    # and threshold slider keep their value client-side, so they need no refresh).
+    write_setting(Moves::SetUnitSystem, unit_system: settings_param(:unit_system),
+                                        refresh: -> { unit_toggle_stream }) do |result|
       result.success? ? t(".unit_changed") : t(".unit_invalid")
     end
   end
@@ -161,15 +164,28 @@ class SettingsController < MoveScopedController
   end
 
   # Shared write path: policy-authorized (editor by default), archived-guarded,
-  # action-driven, then redirect back to settings with a success/failure flash
-  # from the block. Secret-bearing writes pass policy: :manage_recognition_keys?.
-  def write_setting(action_class, policy: :edit_settings?, **args)
+  # action-driven, then a Turbo Stream toast (+ an optional `refresh` stream to
+  # re-render a control whose state changed) with an HTML redirect fallback.
+  # Secret-bearing writes pass policy: :manage_recognition_keys?. `refresh` is a
+  # lazy callable so its render only runs on the Turbo path (#390 pattern).
+  def write_setting(action_class, policy: :edit_settings?, refresh: nil, **args)
     authorize! @move, to: policy, with: MovePolicy
     return redirect_to(move_settings_path(@move), alert: t(".read_only")) unless @move.writable?
 
     result = action_class.new.call(move: @move, actor: current_user, **args)
-    flash_key = result.success? ? :notice : :alert
-    redirect_to move_settings_path(@move), flash: { flash_key => yield(result) }
+    message = yield(result)
+    streams = refresh && result.success? ? Array(refresh.call) : []
+    respond_with_streams(streams, redirect: move_settings_path(@move), toast: true,
+                                  status: result.success? ? :ok : :unprocessable_content) do
+      [result.success? ? :notice : :alert, message]
+    end
+  end
+
+  def unit_toggle_stream
+    turbo_stream.replace(
+      Components::Settings::UnitToggle::ID,
+      view_context.render(Components::Settings::UnitToggle.new(move: @move.reload, editable: editable_move?))
+    )
   end
 
   def settings_param(key)
