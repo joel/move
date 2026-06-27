@@ -131,18 +131,22 @@ class ItemsController < MoveScopedController
   def mark_removed
     case Items::MarkRemoved.new.call(item: @item, actor: current_user)
     in Dry::Monads::Success(_)
-      redirect_to move_item_path(@move, @item), notice: t(".removed")
+      respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".removed")] }
     in Dry::Monads::Failure(:wrong_phase)
-      redirect_to move_item_path(@move, @item), alert: t(".wrong_phase")
+      respond_with_streams([], redirect: item_path, toast: true, status: :unprocessable_content) do
+        [:alert, t(".wrong_phase")]
+      end
     in Dry::Monads::Failure(_)
-      redirect_to move_item_path(@move, @item), alert: t(".failed")
+      respond_with_streams([], redirect: item_path, toast: true, status: :unprocessable_content) do
+        [:alert, t(".failed")]
+      end
     end
   end
 
   # PATCH /moves/:move_id/items/:id/restore
   def restore
     Items::RestoreToBox.new.call(item: @item, actor: current_user)
-    redirect_to move_item_path(@move, @item), notice: t(".restored")
+    respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".restored")] }
   end
 
   private
@@ -162,6 +166,35 @@ class ItemsController < MoveScopedController
       Components::ItemStateBadge.dom_id(item),
       view_context.render(Components::ItemStateBadge.new(item: item))
     )
+  end
+
+  def item_path
+    move_item_path(@move, @item)
+  end
+
+  # Streams for a presence flip (mark_removed / restore): the overlay badges (the
+  # "Removed" chip appears/disappears) and the footer controls (Move hides while
+  # removed; the presence button swaps Restore↔Mark-unpacked/Delete). No reload.
+  def presence_streams
+    @item.reload
+    [
+      turbo_stream.replace(Components::Items::StateBadges::ID,
+                           view_context.render(Components::Items::StateBadges.new(item: @item))),
+      turbo_stream.replace(Components::Items::PresenceControls::ID,
+                           view_context.render(Components::Items::PresenceControls.new(
+                                                 move: @move, item: @item, boxes: presence_boxes,
+                                                 editable: editable_move?
+                                               )))
+    ]
+  end
+
+  # The Move control renders only the *other* boxes (the current one is excluded),
+  # and only while the item is in-box. Query the targets directly so a single-box
+  # Move (or a removed item) loads nothing — no eager-loaded :room left unused.
+  def presence_boxes
+    return [] if @item.removed?
+
+    @move.boxes.where.not(id: @item.box_id).includes(:room).ordered
   end
 
   # How many *other* in-box items were detected in the same photo — drives the C3
