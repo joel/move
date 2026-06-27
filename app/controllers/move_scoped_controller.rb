@@ -6,6 +6,8 @@
 # (set_box / set_item / …) and writable-Move guards; the parent before_actions
 # (auth, tenant, then set_move) run first, so @move is available to them.
 class MoveScopedController < TenantController
+  include TurboStreamable
+
   layout -> { Views::Layouts::AppShellLayout }
 
   before_action :set_move

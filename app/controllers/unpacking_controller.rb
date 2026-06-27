@@ -26,15 +26,21 @@ class UnpackingController < MoveScopedController
   end
 
   # PATCH /moves/:move_id/boxes/:box_id/unpacking/items/:item_id/remove
+  # Tapping a remaining item marks it removed and moves it to the unpacked
+  # section. Streams the surgical DOM updates (no reload) — the source row out,
+  # the destination section + progress refreshed; HTML clients still redirect.
+  # No toast: the checklist is a rapid tap-loop, so a toast per tap would spam.
   def remove
     Items::MarkRemoved.new.call(item: @item, actor: current_user)
-    redirect_to move_box_unpacking_path(@move, @box)
+    respond_with_streams(move_item_streams(from: :remaining, to: :unpacked),
+                         redirect: move_box_unpacking_path(@move, @box))
   end
 
   # PATCH /moves/:move_id/boxes/:box_id/unpacking/items/:item_id/restore
   def restore
     Items::RestoreToBox.new.call(item: @item, actor: current_user)
-    redirect_to move_box_unpacking_path(@move, @box)
+    respond_with_streams(move_item_streams(from: :unpacked, to: :remaining),
+                         redirect: move_box_unpacking_path(@move, @box))
   end
 
   # PATCH /moves/:move_id/boxes/:box_id/unpacking/complete — mark the box unpacked
@@ -59,6 +65,62 @@ class UnpackingController < MoveScopedController
   end
 
   private
+
+  # The surgical Turbo Stream array for moving an item between the two checklist
+  # sections (remove: remaining→unpacked, restore: unpacked→remaining). Symmetric:
+  #   1. drop the tapped row from its source section,
+  #   2. refresh the progress card (count + bar),
+  #   3. re-render the destination section so the item lands at its sorted
+  #      position (and the unpacked section reveals itself on the first item),
+  #   4. only when the source section empties, re-render it too (remaining →
+  #      all-clear empty state; unpacked → hidden). While it still has rows the
+  #      per-row remove in step 1 is enough — the rest of the list is untouched.
+  def move_item_streams(from:, to:)
+    editable = editable_move?
+    # Only the destination section is re-rendered, so only it needs its rows (with
+    # categories) loaded; the source is just counted in SQL (no eager-load of a
+    # list we won't render). When the source empties we render it with no rows.
+    destination = ordered_items(to)
+    source_count = items_scope(from).count
+    remaining_count = to == :remaining ? destination.size : source_count
+    total = destination.size + source_count
+
+    streams = [
+      turbo_stream.remove(Components::Unpacking::ItemRow.dom_id(@item, from)),
+      progress_stream(remaining_count: remaining_count, total: total),
+      section_stream(to, destination, editable)
+    ]
+    streams << section_stream(from, [], editable) if source_count.zero?
+    streams
+  end
+
+  def items_scope(variant)
+    scope = authorized_scope(@box.items)
+    variant == :remaining ? scope.in_box : scope.removed
+  end
+
+  def ordered_items(variant)
+    items_scope(variant).includes(:category).ordered.to_a
+  end
+
+  def progress_stream(remaining_count:, total:)
+    turbo_stream.replace(
+      Components::Unpacking::ProgressCard::ID,
+      view_context.render(Components::Unpacking::ProgressCard.new(remaining_count:, total:))
+    )
+  end
+
+  def section_stream(variant, items, editable)
+    component, id =
+      if variant == :remaining
+        [Components::Unpacking::RemainingSection.new(remaining: items, move: @move, box: @box, editable:),
+         Components::Unpacking::RemainingSection::ID]
+      else
+        [Components::Unpacking::UnpackedSection.new(unpacked: items, move: @move, box: @box, editable:),
+         Components::Unpacking::UnpackedSection::ID]
+      end
+    turbo_stream.replace(id, view_context.render(component))
+  end
 
   def set_box
     @box = authorized_scope(@move.boxes).find(params.expect(:box_id))
