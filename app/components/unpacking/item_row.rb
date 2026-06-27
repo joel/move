@@ -32,7 +32,11 @@ module Components
 
       def view_template
         if @editable
-          button_to(action_path, method: :patch, id: dom_id, class: button_classes, **button_attrs) do
+          # The stable id must sit on the <form> button_to generates (the flex
+          # child of the section), NOT the inner <button> — otherwise
+          # turbo_stream.remove(dom_id) strips only the button and leaves an empty
+          # form behind as a ghost gap whenever the section isn't fully replaced.
+          button_to(action_path, method: :patch, form: { id: dom_id }, class: button_classes, **button_attrs) do
             row_body
           end
         else

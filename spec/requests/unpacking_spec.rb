@@ -23,6 +23,19 @@ RSpec.describe "Unpacking" do
         .and include(I18n.t("unpacking.remaining_count", count: 1, total: 2))
     end
 
+    it "puts the row's stable id on the button_to <form>, not the inner <button>" do
+      # turbo_stream.remove(dom_id) must strip the whole row; if the id were on the
+      # <button> the empty <form> would linger as a ghost gap (Codex P2).
+      box = create(:box, :with_room, move:, status: "unpacking")
+      item = create(:item, move:, box:, presence_state: "in_box")
+
+      get move_box_unpacking_path(move, box)
+
+      dom_id = Components::Unpacking::ItemRow.dom_id(item, :remaining)
+      expect(response.body).to match(/<form[^>]*\bid="#{dom_id}"/o)
+      expect(response.body).not_to match(/<button[^>]*\bid="#{dom_id}"/o)
+    end
+
     it "renders the celebration for an unpacked box" do
       box = create(:box, :with_room, move:, number: "8", status: "unpacked")
 
