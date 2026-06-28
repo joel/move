@@ -82,14 +82,26 @@ RSpec.describe "Items" do
       expect(flash[:alert]).to eq(I18n.t("items.create.box_closed"))
     end
 
-    it "still allows a recovery add (source photo) on a non-packing box" do
+    it "still allows a recovery add (settled-orphan source photo) on a non-packing box" do
       sealed = create(:box, move:, status: "sealed")
-      media = create(:media, move:, box: sealed)
+      media = create(:media, move:, box: sealed) # orphan: no items, no suggestions, no in-flight run
 
       expect do
         post move_box_items_path(move, sealed),
              params: { item: { name: "Missed mug", source_media_id: media.id } }
       end.to change(sealed.items, :count).by(1)
+    end
+
+    it "still gates a forged/stale source_media_id that doesn't resolve (no bypass)" do
+      sealed = create(:box, move:, status: "sealed")
+
+      expect do
+        post move_box_items_path(move, sealed),
+             params: { item: { name: "Sneaky", source_media_id: SecureRandom.uuid } }
+      end.not_to change(sealed.items, :count)
+
+      expect(response).to redirect_to(move_box_path(move, sealed))
+      expect(flash[:alert]).to eq(I18n.t("items.create.box_closed"))
     end
   end
 
