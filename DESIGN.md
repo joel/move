@@ -179,6 +179,19 @@ terracotta/error border + Retry overlay) · `needs_correction` (pencil, terracot
 `Ui::EmptyState` · `Ui::SectionHeader` / `Ui::PageHeader` · `Ui::Toast` /
 `FlashToasts` · `Ui::SaveStatus` · `Ui::ThemeToggle`.
 
+### Overlays — native `<dialog>` + the `modal` Stimulus controller
+Two card-surface overlay chromes share the `modal` controller (`open` / `close` /
+`backdropClose`; `showModal()` gives focus-trap, Escape and a dimmed `::backdrop`):
+- **`.ha-modal`** — centred modal (capped 400px), e.g. the describe-before-sealing
+  flow (`Components::BoxSealTrigger`).
+- **`.ha-sheet`** — bottom sheet: full-width (capped 480px, centred on wide
+  viewports), rounded top, slides up (`ha-sheet-up`, disabled under
+  `prefers-reduced-motion`). Used by **`Components::Boxes::ManageSheet`** — the box
+  detail's ⋮ "Manage box" overflow that holds the secondary actions (lifecycle
+  step(s), print label/manifest, edit, delete) so the screen shows one contextual
+  hero. Rows are full-width `surface-container-high` pills (`text-error` for the
+  destructive Delete row).
+
 ### Navigation chrome
 `Ui::BottomTabBar` (mobile, docked) and `Ui::Sidebar` (desktop ≥`lg`, 280px) render
 the five destinations **Boxes · Search · Scan · Summary · Menu**; active =
@@ -187,7 +200,8 @@ tab bar; desktop sidebar + content) applying `margin-mobile` / `margin-desktop`.
 
 ### Icons (`app/components/icons/`)
 Rounded-line / duotone set (1.6 stroke, `currentColor`), e.g. `Search`, `Clock`,
-`Sparkles`, `Check`, `Boxes`, `Camera`, `ChevronRight`. Size via `css:`
+`Sparkles`, `Check`, `Boxes`, `Camera`, `ChevronRight`, `EllipsisVertical` (⋮
+overflow), `Lock` (seal), `Printer` (print), `Trash` (delete). Size via `css:`
 (e.g. `h-5 w-5`); colour by inheriting `text-*`.
 
 ---

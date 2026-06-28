@@ -11,18 +11,21 @@ RSpec.describe "Box detail & lifecycle" do
     stub_current_tenant("acme")
   end
 
-  it "edits a box, derives volume, and walks the seal/unseal lifecycle" do
+  # The lifecycle clicks (seal / unseal / transition) now live behind the JS
+  # Manage-box sheet; their behaviour is covered route-level in the request spec
+  # (spec/requests/boxes_spec.rb) and the sheet interaction in
+  # spec/system/box_manage_sheet_spec.rb (:js). Here we assert the no-JS surface:
+  # identity, the contextual hero, the ⋮ trigger, and the edit→volume derivation.
+  it "shows identity, the capture hero + manage trigger, and derives volume from an edit" do
     box = create(:box, move:, number: "1", status: "packing", room: nil)
 
     visit move_box_path(move, box)
     expect(page).to have_text("Box #001")
+    # Packing → the single contextual hero is Capture; secondary actions are in ⋮.
+    expect(page).to have_link(I18n.t("boxes.actions.capture"))
+    expect(page).to have_css("button[aria-label='#{I18n.t("boxes.manage.trigger")}']")
 
-    # Sealing is blocked until the box has a room.
-    click_button I18n.t("boxes.actions.seal")
-    expect(page).to have_text(I18n.t("boxes.transition.room_required"))
-    expect(box.reload.status).to eq("packing")
-
-    # Edit: assign a room and dimensions.
+    # Edit: assign a room and dimensions; the detail derives volume.
     visit edit_move_box_path(move, box)
     fill_in I18n.t("boxes.form.room"), with: "Kitchen"
     fill_in I18n.t("boxes.form.length_cm"), with: "40"
@@ -30,14 +33,7 @@ RSpec.describe "Box detail & lifecycle" do
     fill_in I18n.t("boxes.form.height_cm"), with: "25"
     click_button I18n.t("boxes.edit.submit")
 
-    # Detail now shows the room, derived volume, and allows sealing.
     expect(page).to have_text("Kitchen").and have_text("0.030 m³")
-    click_button I18n.t("boxes.actions.seal")
-    expect(box.reload.status).to eq("sealed")
-
-    # A sealed box can be unsealed.
-    click_button I18n.t("boxes.actions.unseal")
-    expect(box.reload.status).to eq("packing")
   end
 
   it "shows the review CTA for a box whose only items are needs_correction (#146)" do
