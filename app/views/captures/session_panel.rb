@@ -75,11 +75,10 @@ module Views
       end
 
       def chips(item)
-        return unless item.category || item.fragile?
+        return unless item.category
 
         div(class: "flex flex-wrap gap-1.5") do
           render Components::Ui::Chip.new(label: item.category.name, kind: :room) if item.category
-          render Components::Ui::Chip.new(label: I18n.t("boxes.item.fragile"), kind: :tag) if item.fragile?
         end
       end
 

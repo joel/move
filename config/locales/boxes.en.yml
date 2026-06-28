@@ -30,8 +30,6 @@ en:
         one: "1 item"
         other: "%{count} items"
       missing_dimensions: "Add dimensions"
-    item:
-      fragile: "Fragile"
     # Badge shown on the box header + card when the box is marked fragile (Phase A).
     fragile_badge: "Fragile"
     item_state:

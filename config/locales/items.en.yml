@@ -32,8 +32,6 @@ en:
       # photo). Restorable from the activity feed.
       delete: "Delete from box"
       delete_confirm: "Delete this item? Its photo is removed too if no other item uses it. You can restore it from the activity feed."
-      "yes": "Yes"
-      "no": "No"
       archived: "This move is archived and is read-only."
       view_only: "You have view-only access to this move."
       from_same_photo:
@@ -45,7 +43,6 @@ en:
       category: "Category"
       category_blank: "Select a category"
       quantity: "Quantity"
-      fragile: "Mark as Fragile"
       tags: "Tags"
       tags_empty: "No tags yet — tag vocabulary is managed in a later phase."
       cancel: "Cancel"

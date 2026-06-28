@@ -35,9 +35,5 @@ module Items
     def coerce_quantity(value)
       value.presence || 1
     end
-
-    def coerce_fragile(value)
-      ActiveModel::Type::Boolean.new.cast(value) || false
-    end
   end
 end

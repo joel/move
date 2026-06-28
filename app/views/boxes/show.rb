@@ -103,7 +103,6 @@ module Views
         ) do
           div(class: "flex flex-col gap-1") do
             span(class: "text-body-lg text-text-warm") { item_label(item) }
-            span(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.item.fragile") } if item.fragile?
           end
           render Components::Ui::Chip.new(label: I18n.t("boxes.item_state.#{item.review_state}"), kind: item_chip_kind(item))
         end

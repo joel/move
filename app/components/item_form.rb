@@ -2,7 +2,7 @@
 
 module Components
   # Shared item form fields for B3 (manual add) and C3 (detail/edit). Lightweight
-  # per the spec: name, category (selection-only), quantity, fragile, tags
+  # per the spec: name, category (selection-only), quantity, tags
   # (selection-only) — no value fields. `models` is the Rails-nested model array
   # ([move, box, item] for create, [move, item] for update) so form_with derives
   # the right URL + verb. The C3 Move/Remove controls are separate forms rendered
@@ -33,7 +33,6 @@ module Components
         render_errors if @item.errors.any?
         name_field
         category_and_quantity
-        fragile_toggle
         tags_field
         footer(form) unless @autosave
       end
@@ -72,34 +71,6 @@ module Components
 
     def category_options
       [[I18n.t("items.form.category_blank"), ""]] + @categories.map { |c| [c.name, c.id] }
-    end
-
-    def fragile_toggle
-      div(class: "flex items-center justify-between rounded-card border border-card-border bg-card px-4 py-3") do
-        span(class: "flex items-center gap-2 text-body-md text-text-warm") do
-          render Components::Icons::Alert.new(css: "h-5 w-5 text-secondary")
-          plain I18n.t("items.form.fragile")
-        end
-        toggle_switch
-      end
-    end
-
-    def toggle_switch
-      label(class: "relative inline-flex cursor-pointer items-center") do
-        input(type: "hidden", name: "item[fragile]", value: "0")
-        input(
-          type: "checkbox", name: "item[fragile]", value: "1", checked: @item.fragile,
-          class: "peer sr-only"
-        )
-        div(
-          class: "h-6 w-11 rounded-full bg-surface-container-highest transition-colors " \
-                 "peer-checked:bg-accent-sage"
-        )
-        div(
-          class: "absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition " \
-                 "peer-checked:translate-x-5"
-        )
-      end
     end
 
     def tags_field

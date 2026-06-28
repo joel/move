@@ -123,7 +123,6 @@ module Views
           detail_row(I18n.t("items.form.quantity"), @item.quantity.to_s)
           detail_row(I18n.t("items.form.category"), @item.category&.name || "—")
           detail_row(I18n.t("items.form.tags"), item_tag_labels)
-          detail_row(I18n.t("items.form.fragile"), I18n.t("items.show.#{@item.fragile? ? "yes" : "no"}"))
           p(class: "border-t border-card-border pt-4 text-body-md text-muted") do
             I18n.t(@move.archived? ? "items.show.archived" : "items.show.view_only")
           end
