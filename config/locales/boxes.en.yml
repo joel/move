@@ -32,11 +32,18 @@ en:
       missing_dimensions: "Add dimensions"
     # Badge shown on the box header + card when the box is marked fragile (Phase A).
     fragile_badge: "Fragile"
-    item_state:
-      pending_review: "Pending review"
-      auto_confirmed: "Auto-confirmed"
-      confirmed: "Confirmed"
-      needs_correction: "Needs review"
+    # D1 — the unified photo-card grid (one card per photo + placeholder cards for
+    # photo-less manual items).
+    contents:
+      title: "Contents"
+      count:
+        zero: "No items"
+        one: "1 item"
+        other: "%{count} items"
+      added_manually: "Added manually"
+      more: "+%{count} more"
+      empty_title: "No items yet"
+      empty_description: "Capture a photo or add an item manually to fill this box."
     status:
       packing: "Packing"
       sealed: "Sealed"
@@ -88,22 +95,12 @@ en:
       weight: "Weight Est."
       archived: "This move is archived — boxes are read-only."
       view_only: "You have view-only access — boxes are read-only."
-      items: "Items"
       contents: "Contents"
       add_description: "Add a description"
       pending_review:
         one: "1 pending review"
         other: "%{count} pending review"
       review_complete: "All items reviewed"
-      items_empty_title: "No items yet"
-      items_empty_description: "Capture a photo or add items manually to fill this box."
-      gallery: "Gallery"
-      photos:
-        zero: "No photos"
-        one: "1 photo"
-        other: "%{count} photos"
-      gallery_empty_title: "No photos yet"
-      gallery_empty_description: "Photos you capture for this box will appear here."
     edit:
       title: "Edit box"
       subtitle: "Update the room, dimensions and weight."
