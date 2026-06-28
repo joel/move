@@ -151,6 +151,15 @@ RSpec.describe "MCP endpoint" do
         hash_including(source: :mcp, tool: "add_item_to_box", move_id: move.id, item_id: item.id)
       )
     end
+
+    it "refuses to add to a sealed (non-packing) box (a pure add is packing-only)" do
+      sealed = create(:box, move:, number: 7, status: "sealed")
+
+      body = nil
+      expect { body = tool_call("add_item_to_box", { box_number: 7, name: "Kettle" }) }
+        .not_to change(sealed.items, :count)
+      expect(body.dig("result", "isError")).to be(true)
+    end
   end
 
   describe "move_item" do

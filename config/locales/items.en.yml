@@ -57,6 +57,7 @@ en:
         other: "%{count} errors prevented this item from being saved:"
     create:
       created: "%{name} was added."
+      box_closed: "This box isn’t open for new items — only a packing box accepts them."
     update:
       updated: "%{name} was updated."
     move:

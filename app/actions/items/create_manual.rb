@@ -9,8 +9,9 @@ module Items
   class CreateManual < BaseAction
     include Items::FormResolution
 
-    def call(box:, params:, creator:, source_media: nil)
+    def call(box:, params:, creator:, source_media: nil, require_open: false)
       yield ensure_writable(box.move)
+      yield ensure_open(box) if require_open
       category = yield resolve_category(box.move, params[:category_id])
       tags = yield resolve_tags(box.move, params[:tag_ids])
       item = yield with_responsible(creator) { persist(box, params, category, tags, source_media) }
@@ -19,6 +20,15 @@ module Items
     end
 
     private
+
+    # A *pure* manual add (box-detail "Add manually" / the MCP add_item_to_box
+    # tool) only makes sense while the box is open — the same gate as capture
+    # (Box#capturable? is packing-only). The photo-correction callers (per-photo
+    # review, recovery) leave `require_open` false so a mis-detection can still be
+    # fixed on an already-captured photo after the box is sealed/in transit.
+    def ensure_open(box)
+      box.capturable? ? Success() : Failure(:not_capturable)
+    end
 
     # Item creation and tag assignment share one transaction so a validation
     # failure leaves no half-tagged item. `source_media` is set when the item is

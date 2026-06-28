@@ -77,6 +77,29 @@ RSpec.describe Items::CreateManual do
     expect(Item.where(name: "Glass")).to be_empty
   end
 
+  context "with require_open (pure manual add / MCP)" do
+    it "rejects an add to a sealed (non-packing) box" do
+      sealed = create(:box, :with_room, move:, status: "sealed")
+      result = described_class.new.call(box: sealed, params: { name: "Lamp" }, creator:, require_open: true)
+
+      expect(result).to be_failure
+      expect(result.failure).to eq(:not_capturable)
+      expect(sealed.items).to be_empty
+    end
+
+    it "allows an add to a packing box" do
+      result = described_class.new.call(box:, params: { name: "Lamp" }, creator:, require_open: true)
+      expect(result).to be_success
+    end
+
+    it "does NOT gate the photo-correction callers (require_open defaults false)" do
+      sealed = create(:box, :with_room, move:, status: "sealed")
+      # Review / recovery add a missed item to an already-captured photo in any phase.
+      result = described_class.new.call(box: sealed, params: { name: "Missed mug" }, creator:)
+      expect(result).to be_success
+    end
+  end
+
   it "emits an item.created event" do
     allow(Rails.event).to receive(:notify)
 
