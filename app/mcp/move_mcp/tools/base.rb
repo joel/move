@@ -72,7 +72,7 @@ module MoveMcp
         def box_json(box)
           {
             number: box.number.to_i, status: box.status, room: box.room&.name,
-            item_count: box.items.in_box.count
+            fragile: box.fragile?, item_count: box.items.in_box.count
           }
         end
 

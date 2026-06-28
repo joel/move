@@ -114,6 +114,14 @@ RSpec.describe "MCP endpoint" do
 
       expect(numbers).to eq([mine.number.to_i])
     end
+
+    it "exposes the box fragile flag (the handling instruction lives on the box now)" do
+      create(:box, move:, number: 1, fragile: true)
+
+      box = structured(tool_call("list_boxes"))["boxes"].first
+
+      expect(box["fragile"]).to be(true)
+    end
   end
 
   describe "get_box_contents" do
