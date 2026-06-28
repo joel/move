@@ -24,6 +24,34 @@ class DropCategoriesAndTags < ActiveRecord::Migration[8.1]
       WHEN (coalesce(current_setting('logidze.disabled', true), '') <> 'on')
       EXECUTE PROCEDURE logidze_logger(null, 'updated_at', '{name}', true);
     SQL
+
+    rebuild_search_projection
+  end
+
+  private
+
+  # The search projection denormalized category/tag names into search_text (and
+  # into the embedding vector). Dropping the columns doesn't touch those existing
+  # rows, so without this a search could still match/rank on removed taxonomy
+  # until each item is next edited. Recompute search_text the same way the new
+  # Search::RefreshDocument#compose_text does (name + "Box N" + room) in plain SQL
+  # — self-contained, no app classes — and null the now-stale embeddings; they
+  # regenerate on the next item edit or `rake search:reindex`. Runs per tenant via
+  # Apartment's db:migrate. Lexical/trigram search works without the embedding.
+  def rebuild_search_projection
+    return unless table_exists?(:item_search_documents)
+
+    execute(<<~SQL.squish)
+      UPDATE item_search_documents AS d
+      SET search_text = btrim(regexp_replace(
+            concat_ws(' ', i.name, 'Box ' || b.number, r.name), '\\s+', ' ', 'g')),
+          embedding = NULL, embedding_model = NULL, embedded_at = NULL,
+          updated_at = now()
+      FROM items i
+      JOIN boxes b ON b.id = i.box_id
+      LEFT JOIN rooms r ON r.id = b.room_id
+      WHERE d.item_id = i.id
+    SQL
   end
 
   def down

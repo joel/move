@@ -6,7 +6,7 @@ namespace :search do
     Organization.pluck(:slug).each do |slug|
       Apartment::Tenant.switch(slug) do
         count = 0
-        Item.includes(:category, :tags, box: :room).find_each do |item|
+        Item.includes(box: :room).find_each do |item|
           Search::RefreshDocument.new.call(item: item)
           count += 1
         end
