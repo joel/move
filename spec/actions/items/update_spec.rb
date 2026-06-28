@@ -5,17 +5,17 @@ require "rails_helper"
 RSpec.describe Items::Update do
   let(:editor) { create(:user) }
   let(:move) { create(:move, created_by: editor) }
-  let(:item) { create(:item, :manual, move:, name: "Old", quantity: 1) }
+  let(:item) { create(:item, :manual, move:, name: "Old") }
 
   def call(params)
     described_class.new.call(item:, params:, editor:)
   end
 
   it "updates editable attributes" do
-    result = call(name: "New", quantity: "3")
+    result = call(name: "New")
 
     expect(result).to be_success
-    expect(item.reload).to have_attributes(name: "New", quantity: 3)
+    expect(item.reload).to have_attributes(name: "New")
   end
 
   it "replaces the tag set" do
@@ -63,12 +63,5 @@ RSpec.describe Items::Update do
     # row may read confirmed after a failed save.
     expect(auto.review_state).to eq("auto_confirmed")
     expect(auto.reload.review_state).to eq("auto_confirmed")
-  end
-
-  it "rejects a non-integer quantity instead of truncating it" do
-    result = call(name: "X", quantity: "2abc")
-    expect(result).to be_failure
-    expect(result.failure[:quantity]).to be_present
-    expect(item.reload.name).to eq("Old")
   end
 end

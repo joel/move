@@ -93,7 +93,7 @@ module Components
       end
 
       def item_label
-        @item.quantity > 1 ? "#{@item.name} ×#{@item.quantity}" : @item.name
+        @item.name
       end
     end
   end

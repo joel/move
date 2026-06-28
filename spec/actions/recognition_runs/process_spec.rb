@@ -63,7 +63,7 @@ RSpec.describe RecognitionRuns::Process do
   end
 
   it "records a conflict (no overwrite, no duplicate) when a confirmed item of the same name exists" do
-    existing = create(:item, :confirmed, move:, box:, name: "Coffee maker", quantity: 5)
+    existing = create(:item, :confirmed, move:, box:, name: "Coffee maker")
 
     described_class.new.call(run:)
 
@@ -71,7 +71,7 @@ RSpec.describe RecognitionRuns::Process do
     expect(conflict.state).to eq("conflict")
     expect(conflict.item).to eq(existing)
     # The confirmed item is untouched and not duplicated.
-    expect(existing.reload).to have_attributes(quantity: 5, review_state: "confirmed")
+    expect(existing.reload).to have_attributes(review_state: "confirmed")
     expect(box.items.where("LOWER(name) = ?", "coffee maker").count).to eq(1)
   end
 
@@ -79,10 +79,8 @@ RSpec.describe RecognitionRuns::Process do
     # Second detection's confidence overflows decimal(4,3) → create! raises
     # midway. The transaction must roll back the first item too.
     objects = [
-      RecognitionProviders::DetectedObject.new(label: "Lamp", confidence: 0.97, count: 1,
-                                               category: nil),
-      RecognitionProviders::DetectedObject.new(label: "Rug", confidence: 99.0, count: 1,
-                                               category: nil)
+      RecognitionProviders::DetectedObject.new(label: "Lamp", confidence: 0.97, category: nil),
+      RecognitionProviders::DetectedObject.new(label: "Rug", confidence: 99.0, category: nil)
     ]
     provider = instance_double(RecognitionProviders::Fake)
     allow(provider).to receive(:identify).and_return(
@@ -109,7 +107,7 @@ RSpec.describe RecognitionRuns::Process do
     it "reuses an existing move category (case-insensitive) on the item + suggestion" do
       create(:category, move:, name: "Kitchenware")
       object = RecognitionProviders::DetectedObject.new(
-        label: "Wine glasses", confidence: 0.95, count: 6, category: "kitchenware"
+        label: "Wine glasses", confidence: 0.95, category: "kitchenware"
       )
 
       described_class.new.call(run:, provider: stub_provider(object))
@@ -123,7 +121,7 @@ RSpec.describe RecognitionRuns::Process do
 
     it "creates a new move category when the model proposes one that does not exist yet" do
       object = RecognitionProviders::DetectedObject.new(
-        label: "Drill", confidence: 0.9, count: 1, category: "Tools"
+        label: "Drill", confidence: 0.9, category: "Tools"
       )
 
       expect { described_class.new.call(run:, provider: stub_provider(object)) }
@@ -163,7 +161,7 @@ RSpec.describe RecognitionRuns::Process do
 
     it "leaves the item uncategorised when the model returns a blank category" do
       object = RecognitionProviders::DetectedObject.new(
-        label: "Mystery item", confidence: 0.9, count: 1, category: nil
+        label: "Mystery item", confidence: 0.9, category: nil
       )
 
       described_class.new.call(run:, provider: stub_provider(object))
@@ -184,7 +182,7 @@ RSpec.describe RecognitionRuns::Process do
 
     def detection(name, tags, confidence: 0.95)
       RecognitionProviders::DetectedObject.new(
-        label: name, confidence:, count: 1, category: nil, tags:
+        label: name, confidence:, category: nil, tags:
       )
     end
 

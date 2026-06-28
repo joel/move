@@ -44,11 +44,11 @@ RSpec.describe "Items" do
   describe "POST /moves/:move_id/boxes/:box_id/items" do
     it "creates a confirmed manual item and redirects to the box" do
       expect do
-        post move_box_items_path(move, box), params: { item: { name: "Lamp", quantity: "2" } }
+        post move_box_items_path(move, box), params: { item: { name: "Lamp" } }
       end.to change(box.items, :count).by(1)
 
       item = box.items.last
-      expect(item).to have_attributes(name: "Lamp", quantity: 2, created_via: "manual", review_state: "confirmed")
+      expect(item).to have_attributes(name: "Lamp", created_via: "manual", review_state: "confirmed")
       expect(response).to redirect_to(move_box_path(move, box))
     end
 
@@ -221,9 +221,9 @@ RSpec.describe "Items" do
     it "updates editable attributes" do
       item = create(:item, :manual, move:, box:, name: "Old")
 
-      patch move_item_path(move, item), params: { item: { name: "New", quantity: "4" } }
+      patch move_item_path(move, item), params: { item: { name: "New" } }
 
-      expect(item.reload).to have_attributes(name: "New", quantity: 4)
+      expect(item.reload).to have_attributes(name: "New")
       expect(response).to redirect_to(move_item_path(move, item))
     end
 
@@ -257,19 +257,19 @@ RSpec.describe "Items" do
     it "swaps the save-status badge with a Saved confirmation" do
       item = create(:item, :manual, move:, box:, name: "Old")
 
-      patch move_item_path(move, item), params: { item: { name: "New", quantity: "4" } }, as: :turbo_stream
+      patch move_item_path(move, item), params: { item: { name: "New" } }, as: :turbo_stream
 
       expect(response).to have_http_status(:ok)
       expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
       expect(response.body).to include("turbo-stream").and include(Components::Ui::SaveStatus::ID)
       expect(response.body).to include(I18n.t("items.show.saved"))
-      expect(item.reload).to have_attributes(name: "New", quantity: 4)
+      expect(item.reload).to have_attributes(name: "New")
     end
 
     it "refreshes the state chip to Confirmed when an auto_confirmed item is edited" do
       item = create(:item, :auto_confirmed, move:, box:, name: "Old")
 
-      patch move_item_path(move, item), params: { item: { name: "New", quantity: "1" } }, as: :turbo_stream
+      patch move_item_path(move, item), params: { item: { name: "New" } }, as: :turbo_stream
 
       expect(response).to have_http_status(:ok)
       # The overlaid review-state chip is streamed alongside the save status so the

@@ -40,7 +40,7 @@ RSpec.describe RecognitionProviders::Base do
   describe "#normalize" do
     it "parses the tags array, stripping blanks and de-duplicating" do
       detected = provider.send(:normalize, [
-                                 { "label" => "Mug", "confidence" => 0.9, "count" => 1,
+                                 { "label" => "Mug", "confidence" => 0.9,
                                    "category" => "Kitchenware",
                                    "tags" => ["Heavy", " Heavy ", "", "Valuable"] }
                                ])
@@ -51,7 +51,7 @@ RSpec.describe RecognitionProviders::Base do
 
     it "defaults tags to an empty array when the field is absent" do
       detected = provider.send(:normalize, [
-                                 { "label" => "Mug", "confidence" => 0.9, "count" => 1,
+                                 { "label" => "Mug", "confidence" => 0.9,
                                    "category" => "Kitchenware" }
                                ])
 

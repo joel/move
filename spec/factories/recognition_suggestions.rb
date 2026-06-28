@@ -7,7 +7,6 @@ FactoryBot.define do
     media { association :media, move: move, box: box }
     recognition_run { association :recognition_run, move: move, box: box, media: media }
     proposed_name { "Coffee Maker" }
-    proposed_quantity { 1 }
     confidence_score { 0.95 }
     state { "pending" }
 
@@ -21,7 +20,7 @@ FactoryBot.define do
       after(:create) do |suggestion|
         item = create(
           :item, move: suggestion.move, box: suggestion.box,
-                 name: suggestion.proposed_name, quantity: suggestion.proposed_quantity,
+                 name: suggestion.proposed_name,
                  confidence_score: suggestion.confidence_score, created_via: "recognition",
                  review_state: "pending_review", source_media: suggestion.media,
                  source_recognition_suggestion_id: suggestion.id

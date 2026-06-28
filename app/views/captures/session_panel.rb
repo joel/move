@@ -71,7 +71,7 @@ module Views
       end
 
       def item_label(item)
-        item.quantity.to_i > 1 ? "#{item.name} ×#{item.quantity}" : item.name
+        item.name
       end
 
       def chips(item)

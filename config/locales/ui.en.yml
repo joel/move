@@ -40,6 +40,3 @@ en:
       description: "When there is something to show, it will appear here."
     progress:
       label: "Progress"
-    quantity:
-      decrease: "Decrease quantity"
-      increase: "Increase quantity"

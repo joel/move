@@ -52,7 +52,7 @@ namespace :seed_recognition do
           context: { room: room_for[photo[:box]], categories: categories, tags: item_tags }
         )
         objects = result.objects.map do |object|
-          { "label" => object.label, "confidence" => object.confidence, "count" => object.count,
+          { "label" => object.label, "confidence" => object.confidence,
             "category" => object.category, "tags" => object.tags }
         end
         target.write("#{JSON.pretty_generate(

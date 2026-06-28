@@ -43,10 +43,10 @@ module Boxes
       text.to_s.truncate(Box::DESCRIPTION_MAX_LENGTH)
     end
 
-    # In-box items as { label:, category:, count: }, category eager-loaded.
+    # In-box items as { label:, category: }, category eager-loaded.
     def digest_for(box)
       box.items.in_box.includes(:category).ordered.map do |item|
-        { label: item.name, category: item.category&.name, count: item.quantity }
+        { label: item.name, category: item.category&.name }
       end
     end
 

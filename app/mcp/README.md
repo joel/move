@@ -72,16 +72,15 @@ module MoveMcp::Tools
     tool_name "add_item_to_box"
     description "Add a manually-entered item to a box, identified by its box number."
     input_schema(properties: {
-      box_number: { type: "integer" }, name: { type: "string" },
-      quantity: { type: "integer", minimum: 1 }
+      box_number: { type: "integer" }, name: { type: "string" }
     }, required: %w[box_number name])
 
-    def self.call(box_number:, name:, server_context:, quantity: 1)
+    def self.call(box_number:, name:, server_context:, **)
       box = find_box(server_context, box_number)                       # Move-scoped
       return error_response("No box ##{box_number} in this move.") if box.nil?
 
       result = ::Items::CreateManual.new.call(                         # the SAME action as the web UI
-        box:, params: { name:, quantity: }, creator: actor(server_context)
+        box:, params: { name: }, creator: actor(server_context)
       )
       return failure_response(result.failure) if result.failure?       # Failure → friendly tool error
 
@@ -113,7 +112,7 @@ shared action and emit `mcp.tool_called`; queries are read-only.
 | `get_box_contents` | `box_number` | — | | `{ box, items }` |
 | `search_items` | `query` | `Search::Items` | | `{ query, results }` |
 | `get_volume_summary` | — | `Moves::VolumeSummary` | | `{ totals, rooms }` |
-| `add_item_to_box` | `box_number, name, quantity?` | `Items::CreateManual` | ● | `{ item }` |
+| `add_item_to_box` | `box_number, name` | `Items::CreateManual` | ● | `{ item }` |
 | `add_media_to_box` | `box_number, signed_id` | `Captures::Create` | ● | `{ media_id, recognition }` |
 | `move_item` | `item_id, to_box_number` | `Items::Move` | ● | `{ item }` |
 | `mark_unpacked` | `item_id` | `Items::MarkRemoved` | ● | `{ item }` |

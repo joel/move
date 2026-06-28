@@ -18,7 +18,6 @@ module Views
           cards_section
           chips_section
           forms_section
-          quantity_section
           progress_section
           recognition_section
           feedback_section
@@ -161,14 +160,6 @@ module Views
               name: "unit", label: "Unit system",
               options: [%w[Metric metric], %w[Imperial imperial]], selected: "metric"
             )
-          end
-        end
-      end
-
-      def quantity_section
-        section("Quantity adjuster") do
-          theme_pair do
-            render Components::Ui::QuantityAdjuster.new(name: "qty", value: 3)
           end
         end
       end

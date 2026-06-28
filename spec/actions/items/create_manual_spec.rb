@@ -12,20 +12,15 @@ RSpec.describe Items::CreateManual do
   end
 
   it "creates a confirmed, manual item with no source media" do
-    result = call(name: "Lamp", quantity: "2")
+    result = call(name: "Lamp")
 
     expect(result).to be_success
     item = result.value!
     expect(item).to have_attributes(
-      name: "Lamp", quantity: 2, created_via: "manual",
+      name: "Lamp", created_via: "manual",
       review_state: "confirmed", presence_state: "in_box", source_media: nil
     )
     expect(item.box).to eq(box)
-  end
-
-  it "defaults a blank quantity to 1" do
-    item = call(name: "Vase", quantity: "").value!
-    expect(item.quantity).to eq(1)
   end
 
   it "assigns a category and tags from the Move vocabulary" do
@@ -67,13 +62,6 @@ RSpec.describe Items::CreateManual do
     result = call(name: "")
     expect(result).to be_failure
     expect(result.failure[:name]).to be_present
-  end
-
-  it "rejects a non-integer quantity instead of silently truncating it" do
-    result = call(name: "Glass", quantity: "1.5")
-    expect(result).to be_failure
-    expect(result.failure[:quantity]).to be_present
-    expect(Item.where(name: "Glass")).to be_empty
   end
 
   context "with require_open (pure manual add / MCP)" do

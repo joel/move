@@ -149,7 +149,7 @@ RSpec.describe "MCP endpoint" do
       box = create(:box, move:, number: 3)
       allow(Rails.event).to receive(:notify).and_call_original
 
-      expect { tool_call("add_item_to_box", { box_number: 3, name: "Kettle", quantity: 2 }) }
+      expect { tool_call("add_item_to_box", { box_number: 3, name: "Kettle" }) }
         .to change { box.items.count }.by(1)
 
       item = box.items.order(:created_at).last
@@ -158,6 +158,13 @@ RSpec.describe "MCP endpoint" do
         "mcp.tool_called",
         hash_including(source: :mcp, tool: "add_item_to_box", move_id: move.id, item_id: item.id)
       )
+    end
+
+    it "tolerates (ignores) a stale quantity arg from a pre-Phase-B client" do
+      create(:box, move:, number: 3)
+
+      expect { tool_call("add_item_to_box", { box_number: 3, name: "Kettle", quantity: 4 }) }
+        .to change { Item.where(name: "Kettle").count }.by(1)
     end
 
     it "refuses to add to a sealed (non-packing) box (a pure add is packing-only)" do

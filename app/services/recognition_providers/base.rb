@@ -47,11 +47,10 @@ module RecognitionProviders
           items: {
             type: "object",
             additionalProperties: false,
-            required: %w[label confidence count category tags],
+            required: %w[label confidence category tags],
             properties: {
               label: { type: "string" },
               confidence: { type: "number" },
-              count: { type: "integer" },
               category: { type: "string" },
               tags: { type: "array", items: { type: "string" } }
             }
@@ -79,7 +78,7 @@ module RecognitionProviders
 
     # Summarise a box's items into one short contents description string. Text-only
     # (no image), so it reuses the same key/model/transport as #identify. `items` is
-    # an Array<Hash> of { label:, category:, count: } built by Boxes::SuggestDescription.
+    # an Array<Hash> of { label:, category: } built by Boxes::SuggestDescription.
     # @return [String]
     def summarize_contents(items:)
       raise NotImplementedError, "#{self.class} must implement #summarize_contents"
@@ -148,7 +147,6 @@ module RecognitionProviders
         DetectedObject.new(
           label: label,
           confidence: fetch(obj, :confidence)&.to_f&.clamp(0.0, 1.0),
-          count: (fetch(obj, :count) || 1).to_i,
           category: fetch(obj, :category).to_s.strip.presence,
           tags: Array(fetch(obj, :tags)).map { it.to_s.strip }.compact_blank.uniq
         )
@@ -188,7 +186,7 @@ module RecognitionProviders
                end
 
       lines << "Give one entry per distinct item and collapse identical duplicates into a " \
-               "single entry with a count. Ignore the box itself, packing materials " \
+               "single entry. Ignore the box itself, packing materials " \
                "(paper, bubble wrap, tape) and anything in the background. Skip whatever is " \
                "too occluded or blurry to identify rather than guessing. Treat confidence as " \
                "your rough certainty from 0 to 1."
@@ -198,17 +196,15 @@ module RecognitionProviders
     # Text prompt for the contents-summary call. Lists the box's items and asks for
     # one short, comma-separated description of the main things it carries — no
     # sentence, no trailing period — so the result reads like "Clothes, Electronics,
-    # Books". `items` is an Array<Hash> of { label:, category:, count: }.
+    # Books". `items` is an Array<Hash> of { label:, category: }.
     def summarize_prompt(items)
       lines = Array(items).filter_map do |entry|
         label = entry[:label].to_s.strip
         next if label.blank?
 
-        count = entry[:count].to_i
         category = entry[:category].to_s.strip
-        prefix = count > 1 ? "#{count}× " : ""
         suffix = category.present? ? " (#{category})" : ""
-        "#{prefix}#{label}#{suffix}"
+        "#{label}#{suffix}"
       end
 
       "Summarise the contents of this moving box into one short, human-readable line " \

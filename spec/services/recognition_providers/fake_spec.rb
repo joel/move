@@ -15,7 +15,7 @@ RSpec.describe RecognitionProviders::Fake do
 
   it "carries category + tags, and no bounding-box data" do
     object = described_class.new.identify(image: nil, context: {}).objects.first
-    expect(object.members).to contain_exactly(:label, :confidence, :count, :category, :tags)
+    expect(object.members).to contain_exactly(:label, :confidence, :category, :tags)
     expect(object.category).to eq("Kitchenware")
     expect(object.tags).to eq(%w[Heavy])
   end

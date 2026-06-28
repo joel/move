@@ -73,21 +73,19 @@ module RecognitionRuns
     # duplicate — record the detection as a `conflict` suggestion linked to the
     # existing item and leave it for human resolution in the review queue (D6).
     def materialize_one(run, object, threshold)
-      quantity = [object.count.to_i, 1].max
       category = resolve_category(run.move, object.category)
       existing = confirmed_match(run.box, object.label)
-      return conflict_suggestion(run, object, quantity, existing, category) if existing
+      return conflict_suggestion(run, object, existing, category) if existing
 
       auto = object.confidence.present? && object.confidence >= threshold
       suggestion = run.recognition_suggestions.create!(
         move: run.move, box: run.box, media: run.media,
-        proposed_name: object.label, proposed_quantity: quantity,
-        proposed_category: category,
+        proposed_name: object.label, proposed_category: category,
         confidence_score: object.confidence, state: auto ? "auto_accepted" : "pending"
       )
       item = run.box.items.create!(
         move: run.move, source_media: run.media, source_recognition_suggestion_id: suggestion.id,
-        name: object.label, quantity: quantity, confidence_score: object.confidence,
+        name: object.label, confidence_score: object.confidence,
         category: category,
         created_via: "recognition", review_state: auto ? "auto_confirmed" : "pending_review"
       )
@@ -108,11 +106,10 @@ module RecognitionRuns
     # Record the duplicate detection as a conflict without touching the existing
     # item or adding a second inventory row. The model's proposed category rides
     # along on the suggestion for the reviewer to apply.
-    def conflict_suggestion(run, object, quantity, existing, category)
+    def conflict_suggestion(run, object, existing, category)
       run.recognition_suggestions.create!(
         move: run.move, box: run.box, media: run.media, item: existing,
-        proposed_name: object.label, proposed_quantity: quantity,
-        proposed_category: category,
+        proposed_name: object.label, proposed_category: category,
         confidence_score: object.confidence, state: "conflict"
       )
     end

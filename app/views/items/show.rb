@@ -120,7 +120,6 @@ module Views
       def read_only_body
         div(class: "flex flex-col gap-5") do
           detail_row(I18n.t("items.form.name"), @item.name)
-          detail_row(I18n.t("items.form.quantity"), @item.quantity.to_s)
           detail_row(I18n.t("items.form.category"), @item.category&.name || "—")
           detail_row(I18n.t("items.form.tags"), item_tag_labels)
           p(class: "border-t border-card-border pt-4 text-body-md text-muted") do
