@@ -45,7 +45,7 @@ RSpec.describe RecognitionProviders::Anthropic do
       expect(tool["name"]).to eq("record_objects")
       required = tool.dig("input_schema", "properties", "objects", "items", "required")
       expect(required).to include("category", "tags")
-      expect(required).not_to include("fragile")
+      expect(required).not_to include("fragile", "count")
       expect(sent.dig("messages", 0, "content", 1, "source"))
         .to eq("type" => "base64", "media_type" => "image/jpeg", "data" => Base64.strict_encode64("bytes"))
     end
@@ -54,7 +54,7 @@ RSpec.describe RecognitionProviders::Anthropic do
   it "normalizes detections from the forced tool_use input, including category" do
     body = { content: [{
       type: "tool_use", name: "record_objects",
-      input: { objects: [{ label: "chair", confidence: 0.7, count: 1,
+      input: { objects: [{ label: "chair", confidence: 0.7,
                            category: "Furniture" }] }
     }] }.to_json
     stub_http(code: "200", body: body)
@@ -100,7 +100,7 @@ RSpec.describe RecognitionProviders::Anthropic do
   end
 
   describe "#summarize_contents" do
-    let(:items) { [{ label: "Mugs", category: "Kitchenware", count: 4 }, { label: "Books", category: "Books", count: 1 }] }
+    let(:items) { [{ label: "Mugs", category: "Kitchenware" }, { label: "Books", category: "Books" }] }
 
     it "sends a forced description-tool request (no image) and returns the description" do
       body = { content: [{ type: "tool_use", name: "record_description",

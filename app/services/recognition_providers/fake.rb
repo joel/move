@@ -9,9 +9,9 @@ module RecognitionProviders
   # existing item-applicable default) and empty cases.
   class Fake < Base
     SAMPLE = [
-      { label: "Coffee maker",   confidence: 0.97, count: 1, category: "Kitchenware", tags: %w[Heavy] },
-      { label: "Stack of books", confidence: 0.88, count: 3, category: "Books",       tags: %w[Heavy] },
-      { label: "Set of mugs",    confidence: 0.62, count: 1, category: "Kitchenware", tags: [] }
+      { label: "Coffee maker",   confidence: 0.97, category: "Kitchenware", tags: %w[Heavy] },
+      { label: "Stack of books", confidence: 0.88, category: "Books",       tags: %w[Heavy] },
+      { label: "Set of mugs",    confidence: 0.62, category: "Kitchenware", tags: [] }
     ].freeze
 
     def identify(image:, context:) # rubocop:disable Lint/UnusedMethodArgument
