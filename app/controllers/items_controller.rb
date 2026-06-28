@@ -31,11 +31,13 @@ class ItemsController < MoveScopedController
   # POST /moves/:move_id/boxes/:box_id/items
   def create
     authorize! @box.items.new(move: @move), to: :create?, with: ItemPolicy
+    media = source_media
     result = Items::CreateManual.new.call(
-      box: @box, params: item_params, creator: current_user, source_media: source_media,
-      # A pure new-item add is packing-only; a recovery add (carrying a source
-      # photo) corrects a captured photo and is allowed in any phase.
-      require_open: source_media_id.blank?
+      box: @box, params: item_params, creator: current_user, source_media: media,
+      # A pure new-item add is packing-only. Gate on the *validated* source photo
+      # (a settled orphan), not the raw param: a forged/stale source_media_id that
+      # doesn't resolve is a pure add, not a recovery, so it must still be gated.
+      require_open: media.nil?
     )
 
     case result
@@ -219,11 +221,12 @@ class ItemsController < MoveScopedController
     head :not_found
   end
 
-  # A pure manual add (no source photo) targeting a box that isn't open (packing).
-  # The recovery add carries a source_media_id and corrects a captured photo, so
-  # it stays allowed in any phase. Mirrors Items::CreateManual#ensure_open.
+  # A pure manual add (no *valid* source photo) targeting a box that isn't open
+  # (packing). A recovery add resolves to a settled orphan photo (corrects a
+  # captured photo) and stays allowed in any phase; a forged/stale id that doesn't
+  # resolve is treated as a pure add. Mirrors Items::CreateManual#ensure_open.
   def pure_add_closed?
-    source_media_id.blank? && !@box.capturable?
+    source_media.nil? && !@box.capturable?
   end
 
   # Recovery flow: a manual add launched from an orphaned photo carries the photo
@@ -241,10 +244,13 @@ class ItemsController < MoveScopedController
   # box, just not attributed to that photo). Mirrors Media#orphaned? + the gallery's
   # settled (not-in-flight) check.
   def source_media
-    return nil unless source_media_id
+    return @source_media if defined?(@source_media)
 
-    media = @box.media.find_by(id: source_media_id)
-    media if media&.orphaned? && !media.recognition_in_flight?
+    @source_media =
+      if source_media_id
+        media = @box.media.find_by(id: source_media_id)
+        media if media&.orphaned? && !media.recognition_in_flight?
+      end
   end
 
   def set_item
