@@ -77,12 +77,28 @@ module Views
         end
       end
 
-      # Read-only inventory (item edit → D5, review actions → D6).
+      # Inventory list. The inline + (editor only) is the box-detail add-item
+      # affordance now that the full-width button has moved off the header (#398).
       def items_section
         section(class: "flex flex-col gap-stack-gap") do
-          h3(class: "px-2 text-headline-md text-text-warm") { I18n.t("boxes.show.items") }
+          div(class: "flex items-center justify-between px-2") do
+            h3(class: "text-headline-md text-text-warm") do
+              plain I18n.t("boxes.show.items")
+              span(class: "ml-2 text-body-md text-muted") { "(#{@items.size})" } if @items.any?
+            end
+            add_item_button if @editable
+          end
           @items.any? ? items_list : items_empty
         end
+      end
+
+      def add_item_button
+        a(
+          href: new_move_box_item_path(@move, @box),
+          aria_label: I18n.t("boxes.actions.add_item"),
+          class: "rounded-full bg-surface-container-high p-2 text-accent-sage transition " \
+                 "hover:bg-surface-container-highest active:scale-[0.98]"
+        ) { render Components::Icons::Plus.new(css: "h-5 w-5") }
       end
 
       def items_list

@@ -76,6 +76,9 @@ en:
       created: "Box %{number} was added."
     update:
       updated: "Box %{number} was updated."
+    destroy:
+      deleted: "Box %{number} was deleted."
+      failed: "Could not delete the box."
     show:
       title: "Box #%{number}"
       back: "Back to boxes"
@@ -108,15 +111,24 @@ en:
       submit: "Save changes"
     actions:
       capture: "Capture image"
+      capture_hint: "Use AI to recognise and log items instantly."
       add_item: "Add item manually"
-      seal: "Seal"
+      add_item_short: "Add item"
+      seal: "Seal box"
       unseal: "Unseal"
       in_transit: "Mark in transit"
       unpacking: "Mark unpacking"
       unpacked: "Mark unpacked"
+      reopen: "Reopen for unpacking"
       unpack: "Open unpacking"
       print_label: "Print label"
       print_manifest: "Print manifest (A4)"
+      edit: "Edit box"
+      delete: "Delete box"
+      delete_confirm: "Delete this box and its items? You can restore it from the activity feed."
+    manage:
+      title: "Manage Box #%{number}"
+      trigger: "Manage box"
     transition:
       transitioned: "Box marked %{status}."
       room_required: "Assign a room before sealing this box."

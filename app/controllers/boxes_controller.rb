@@ -5,13 +5,13 @@
 # subdomain elevator switches Apartment first) and is scoped to one Move. Thin:
 # authorize, call the action, pattern-match, render.
 class BoxesController < MoveScopedController
-  before_action :set_box, only: %i[show edit update transition seal description_suggestion]
+  before_action :set_box, only: %i[show edit update transition seal description_suggestion destroy]
   # `seal` and `description_suggestion` can spend the Move's AI quota (they call
   # the configured vendor provider), so they need the same editing-role + writable
   # guard as the mutating actions — not just `set_box` — to keep viewers and
   # archived Moves out (defense in depth behind the already-hidden UI controls).
   before_action :require_writable_move!,
-                only: %i[new create edit update transition seal description_suggestion]
+                only: %i[new create edit update transition seal description_suggestion destroy]
 
   # GET /moves/:move_id/boxes
   def index
@@ -122,6 +122,19 @@ class BoxesController < MoveScopedController
                                toast: true, status: :unprocessable_content) do
         [:alert, transition_error(reason)]
       end
+    end
+  end
+
+  # DELETE /moves/:move_id/boxes/:id
+  # Soft-deletes the box (cascading the discard to its items) and lands back on
+  # the boxes home with a toast — the box and its items can be brought back
+  # together from the activity feed (Boxes::Restore).
+  def destroy
+    case Boxes::Delete.new.call(box: @box, actor: current_user)
+    in Dry::Monads::Success(box)
+      redirect_to move_boxes_path(@move), notice: t(".deleted", number: box.number)
+    in Dry::Monads::Failure
+      redirect_to move_box_path(@move, @box), alert: t(".failed")
     end
   end
 

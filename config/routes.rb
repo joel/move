@@ -23,7 +23,7 @@ Rails.application.routes.draw do
   # A2 — Boxes Home: the box list/grid is the hub of a Move.
   resources :moves, only: %i[index new create] do
     # B1 — Box detail & lifecycle.
-    resources :boxes, only: %i[index new create show edit update] do
+    resources :boxes, only: %i[index new create show edit update destroy] do
       member do
         patch :transition
         # B1 — seal-time "describe before sealing" modal frame (auto-suggests a

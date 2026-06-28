@@ -528,6 +528,47 @@
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(2px);
   }
+
+  /* Native <dialog> bottom sheet (B1 "Manage box") — same card chrome as
+   * .ha-modal, but anchored to the bottom edge with a rounded top and a
+   * slide-up entrance. showModal() still gives focus-trap, Escape and the
+   * ::backdrop; we only re-position via margin (top:auto sticks it to the
+   * bottom, left/right:auto centres a capped width on wide viewports). */
+  .ha-sheet {
+    width: 100%;
+    max-width: 480px;
+    margin: auto auto 0;
+    padding: 1.5rem 1.5rem 2.5rem;
+    border: 1px solid var(--c-card-border);
+    border-bottom: 0;
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
+    background: var(--c-card);
+    color: var(--c-text-warm);
+  }
+
+  .ha-sheet[open] {
+    animation: ha-sheet-up 240ms ease-out both;
+  }
+
+  .ha-sheet::backdrop {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(2px);
+  }
+
+  @keyframes ha-sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ha-sheet[open] {
+      animation: none;
+    }
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────────
