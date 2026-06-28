@@ -18,7 +18,8 @@ RSpec.describe "Manual add & item detail" do
     create(:tag, move:, name: "Heavy")
 
     visit move_box_path(move, source)
-    click_link I18n.t("boxes.actions.add_item")
+    # The box-detail add affordance is now an icon link on the Items header (#398).
+    find("a[aria-label='#{I18n.t("boxes.actions.add_item")}']").click
     fill_in "item[name]", with: "Ceramic Plates"
     select "Kitchenware", from: "item[category_id]"
     check "Heavy"

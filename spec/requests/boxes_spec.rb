@@ -356,6 +356,43 @@ RSpec.describe "Boxes" do
     end
   end
 
+  describe "DELETE /moves/:move_id/boxes/:id" do
+    it "soft-deletes the box (cascading its items) and lands on the boxes home with a toast" do
+      box = create(:box, move:, number: "1")
+      create(:item, move:, box:, name: "Lamp")
+
+      delete move_box_path(move, box)
+
+      expect(response).to redirect_to(move_boxes_path(move))
+      expect(flash[:notice]).to eq(I18n.t("boxes.destroy.deleted", number: box.number))
+      expect(Box.find_by(id: box.id)).to be_nil           # gone from the default (kept) scope
+      expect(Box.with_discarded.find(box.id)).to be_discarded
+      expect(move.items.find_by(name: "Lamp")).to be_nil  # the item was discarded with it
+    end
+
+    it "is blocked for a viewer (403, box untouched)" do
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      box = create(:box, move:, number: "1")
+      stub_current_user(viewer)
+
+      delete move_box_path(move, box)
+
+      expect(response).to have_http_status(:forbidden)
+      expect(box.reload).not_to be_discarded
+    end
+
+    it "is blocked on an archived move (redirect, box untouched)" do
+      archived = create(:move, :archived, created_by: user)
+      box = create(:box, move: archived, number: "1")
+
+      delete move_box_path(archived, box)
+
+      expect(response).to redirect_to(move_boxes_path(archived))
+      expect(box.reload).not_to be_discarded
+    end
+  end
+
   describe "PATCH /moves/:move_id/boxes/:id/transition" do
     it "seals a box that has a room" do
       box = create(:box, :with_room, move:, number: "1", status: "packing")
