@@ -2,8 +2,8 @@
 
 module Components
   # Shared item form fields for B3 (manual add) and C3 (detail/edit). Lightweight
-  # per the spec: name, category (selection-only), quantity, tags
-  # (selection-only) — no value fields. `models` is the Rails-nested model array
+  # per the spec: name, category (selection-only), tags (selection-only) — no
+  # quantity or value fields. `models` is the Rails-nested model array
   # ([move, box, item] for create, [move, item] for update) so form_with derives
   # the right URL + verb. The C3 Move/Remove controls are separate forms rendered
   # by the view, not part of this edit form.
@@ -32,7 +32,7 @@ module Components
         input(type: "hidden", name: "item[source_media_id]", value: @source_media_id) if @source_media_id
         render_errors if @item.errors.any?
         name_field
-        category_and_quantity
+        category_field
         tags_field
         footer(form) unless @autosave
       end
@@ -54,19 +54,11 @@ module Components
       )
     end
 
-    def category_and_quantity
-      div(class: "grid grid-cols-1 gap-5 sm:grid-cols-2") do
-        render Components::Ui::Select.new(
-          name: "item[category_id]", label: I18n.t("items.form.category"),
-          options: category_options, selected: @item.category_id
-        )
-        div(class: "flex flex-col gap-2") do
-          span(class: "text-label-caps uppercase text-muted") { I18n.t("items.form.quantity") }
-          render Components::Ui::QuantityAdjuster.new(
-            name: "item[quantity]", value: @item.quantity || 1, min: 1
-          )
-        end
-      end
+    def category_field
+      render Components::Ui::Select.new(
+        name: "item[category_id]", label: I18n.t("items.form.category"),
+        options: category_options, selected: @item.category_id
+      )
     end
 
     def category_options

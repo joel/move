@@ -149,7 +149,7 @@ RSpec.describe "MCP endpoint" do
       box = create(:box, move:, number: 3)
       allow(Rails.event).to receive(:notify).and_call_original
 
-      expect { tool_call("add_item_to_box", { box_number: 3, name: "Kettle", quantity: 2 }) }
+      expect { tool_call("add_item_to_box", { box_number: 3, name: "Kettle" }) }
         .to change { box.items.count }.by(1)
 
       item = box.items.order(:created_at).last

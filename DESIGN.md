@@ -175,7 +175,7 @@ terracotta/error border + Retry overlay) · `needs_correction` (pencil, terracot
 `auto_confirmed` (bolt, sage outline) · `pending_review` (eye, tertiary).
 
 ### Other primitives
-`Ui::ProgressBar` (pill, sage fill) · `Ui::QuantityAdjuster` (pill, large ± targets) ·
+`Ui::ProgressBar` (pill, sage fill) ·
 `Ui::EmptyState` · `Ui::SectionHeader` / `Ui::PageHeader` · `Ui::Toast` /
 `FlashToasts` · `Ui::SaveStatus` · `Ui::ThemeToggle`.
 

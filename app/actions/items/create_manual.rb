@@ -39,7 +39,6 @@ module Items
         item = box.items.create!(
           move: box.move,
           name: params[:name],
-          quantity: coerce_quantity(params[:quantity]),
           category: category,
           source_media: source_media,
           created_via: "manual",

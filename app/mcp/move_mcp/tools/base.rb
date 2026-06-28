@@ -78,7 +78,7 @@ module MoveMcp
 
         def item_json(item)
           {
-            id: item.id, name: item.name, quantity: item.quantity,
+            id: item.id, name: item.name,
             category: item.category&.name, box_number: item.box.number.to_i,
             review_state: item.review_state, presence_state: item.presence_state
           }

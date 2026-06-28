@@ -84,7 +84,7 @@ class ActivitiesController < MoveScopedController
     case type
     when "Item"
       Items::Update.new.call(item: record, editor: current_user, params: {
-                               name: prior.name, quantity: prior.quantity,
+                               name: prior.name,
                                category_id: prior.category_id, tag_ids: record.tag_ids
                              })
     when "Box"

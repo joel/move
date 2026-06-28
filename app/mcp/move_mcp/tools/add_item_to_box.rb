@@ -9,18 +9,17 @@ module MoveMcp
       input_schema(
         properties: {
           box_number: { type: "integer", description: "The box number to add the item to." },
-          name: { type: "string", description: "Item name." },
-          quantity: { type: "integer", description: "Quantity (defaults to 1).", minimum: 1 }
+          name: { type: "string", description: "Item name." }
         },
         required: %w[box_number name]
       )
 
-      def self.call(box_number:, name:, server_context:, quantity: 1)
+      def self.call(box_number:, name:, server_context:)
         box = find_box(server_context, box_number)
         return error_response("No box ##{box_number} in this move.") if box.nil?
 
         result = ::Items::CreateManual.new.call(
-          box: box, params: { name: name, quantity: quantity }, creator: actor(server_context),
+          box: box, params: { name: name }, creator: actor(server_context),
           # A pure new-item add is packing-only (same gate as add_media_to_box).
           require_open: true
         )

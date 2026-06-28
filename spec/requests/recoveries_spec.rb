@@ -126,7 +126,7 @@ RSpec.describe "Photo recovery" do
       create(:recognition_run, :failed, move:, box:, media:)
 
       post move_box_items_path(move, box),
-           params: { item: { name: "Desk lamp", quantity: "1", source_media_id: media.id } }
+           params: { item: { name: "Desk lamp", source_media_id: media.id } }
 
       item = box.items.find_by(name: "Desk lamp")
       expect(item.source_media_id).to eq(media.id)
@@ -137,7 +137,7 @@ RSpec.describe "Photo recovery" do
       create(:recognition_suggestion, :conflict, move:, box:, media:, recognition_run: run)
 
       post move_box_items_path(move, box),
-           params: { item: { name: "Desk lamp", quantity: "1", source_media_id: media.id } }
+           params: { item: { name: "Desk lamp", source_media_id: media.id } }
 
       item = box.items.find_by(name: "Desk lamp")
       expect(item).to be_present
@@ -148,7 +148,7 @@ RSpec.describe "Photo recovery" do
       create(:recognition_run, :processing, move:, box:, media:)
 
       post move_box_items_path(move, box),
-           params: { item: { name: "Desk lamp", quantity: "1", source_media_id: media.id } }
+           params: { item: { name: "Desk lamp", source_media_id: media.id } }
 
       item = box.items.find_by(name: "Desk lamp")
       expect(item).to be_present

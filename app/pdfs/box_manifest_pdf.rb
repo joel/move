@@ -55,11 +55,10 @@ class BoxManifestPdf
   end
 
   def table(doc)
-    rows = [%w[Item Qty Category Tags]]
+    rows = [%w[Item Category Tags]]
     @items.each do |item|
       rows << [
         item.name,
-        item.quantity.to_s,
         item.category&.name || "—",
         item.tags.map(&:name).join(", ").presence || "—"
       ]
@@ -69,7 +68,6 @@ class BoxManifestPdf
                     cell_style: { size: 9, padding: [6, 8] }) do |t|
       t.row(0).font_style = :bold
       t.row(0).background_color = "F2F2F2"
-      t.columns(1).align = :center
     end
   end
 end

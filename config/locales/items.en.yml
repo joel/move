@@ -42,7 +42,6 @@ en:
       name_placeholder: "e.g. Espresso Machine"
       category: "Category"
       category_blank: "Select a category"
-      quantity: "Quantity"
       tags: "Tags"
       tags_empty: "No tags yet — tag vocabulary is managed in a later phase."
       cancel: "Cancel"

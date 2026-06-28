@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 module Items
-  # Updates an Item's editable attributes (name, category, quantity, tags) from
-  # the C3 detail/edit screen. A user edit is authoritative and is
+  # Updates an Item's editable attributes (name, category, tags) from the C3
+  # detail/edit screen. A user edit is authoritative and is
   # never silently overwritten by recognition (Domain §6.4) — so the edit also
   # vouches for the item: its review_state becomes `confirmed` (a human has now
   # reviewed it), no longer reading as machine-`auto_confirmed`/`pending_review`.
@@ -26,7 +26,6 @@ module Items
       ActiveRecord::Base.transaction do
         item.update!(
           name: params[:name],
-          quantity: coerce_quantity(params[:quantity]),
           category: category,
           # A human edit confirms the item (machine-vouched → human-vouched).
           review_state: "confirmed"
