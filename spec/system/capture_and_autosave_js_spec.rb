@@ -39,7 +39,7 @@ RSpec.describe "Capture & auto-save (JS)", :js do
     Capybara.always_include_port = original_include_port
   end
 
-  it "auto-submits the captured photo (no shutter) and lands recognised, tappable items" do
+  it "auto-submits the captured photo (no shutter) and lands a recognised photo card" do
     move, box = Apartment::Tenant.switch(slug) do
       m = create(:move, created_by: user)
       [m, create(:box, move: m, number: "1", status: "packing")]
@@ -54,9 +54,10 @@ RSpec.describe "Capture & auto-save (JS)", :js do
     # file fires `change`, which auto-submits — no button click.
     attach_file("file", image, make_visible: true)
 
-    # Inline recognition (Fake provider) lands items; the Items panel lists them as
-    # links to Item Detail. Asserting on the rendered link (not a cross-thread DB
-    # read) proves the full JS path: file select → auto-submit → recognition.
+    # Inline recognition (Fake provider) lands a photo-first card: the recognised
+    # names show as chips inside ONE card linking to the per-photo detail (D3).
+    # Asserting on the rendered card (not a cross-thread DB read) proves the full
+    # JS path: file select → auto-submit → recognition.
     #
     # Match with a CSS href-attribute selector, NOT `have_link(text, href:)`:
     # Capybara's link href filter runs `node[:href].match?(regex)` and raises
@@ -65,8 +66,9 @@ RSpec.describe "Capture & auto-save (JS)", :js do
     # CI-only flake (capybara/selector/definition/link.rb:35). `a[href*="…"]` only
     # matches anchors that already carry the href (no nil to crash on), and the
     # text filter retries cleanly on a node swapped mid-navigation.
-    expect(page).to have_css(%(a[href*="/moves/#{move.id}/items/"]), text: "Coffee maker")
-    expect(page).to have_css(%(a[href*="/moves/#{move.id}/items/"]), text: "Set of mugs")
+    review_link = %(a[href*="/moves/#{move.id}/boxes/#{box.id}/review/photo"])
+    expect(page).to have_css(review_link, text: "Coffee maker")
+    expect(page).to have_css(review_link, text: "Set of mugs")
   end
 
   it "auto-saves an item edit (no Save button) and shows the Saved badge" do
