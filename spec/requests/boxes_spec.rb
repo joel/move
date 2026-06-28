@@ -266,6 +266,15 @@ RSpec.describe "Boxes" do
       expect(response.body).not_to include(I18n.t("boxes.contents.empty_title"))
     end
 
+    it "shows a review-state chip on an unreviewed standalone (manual) item card" do
+      box = create(:box, move:, number: "1")
+      create(:item, move:, box:, name: "Loose cable", review_state: "needs_correction") # manual, no photo
+
+      get move_box_path(move, box)
+
+      expect(response.body).to include(I18n.t("items.state.needs_correction"))
+    end
+
     it "links a settled orphaned photo (failed) to recovery, but not one still in flight" do
       box = create(:box, move:, number: "1")
       failed = create(:media, move:, box:)
