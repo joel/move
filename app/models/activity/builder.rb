@@ -36,7 +36,7 @@ class Activity
     }.freeze
     # Vocabulary events resolve their subject from the `kind` segment.
     VOCAB = %w[vocabulary.created vocabulary.updated vocabulary.removed].freeze
-    VOCAB_MODELS = { "category" => "Category", "tag" => "Tag", "room" => "Room" }.freeze
+    VOCAB_MODELS = { "room" => "Room" }.freeze
     # Reads that should not clutter the default feed (kept behind a filter).
     LOW_SIGNAL = %w[manifest.viewed qr.resolved move.summary_viewed].freeze
     # First present key wins — payloads name the actor inconsistently.

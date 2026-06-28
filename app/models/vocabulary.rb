@@ -1,19 +1,14 @@
 # frozen_string_literal: true
 
-# Lightweight, non-persisted registry describing the three managed per-Move
-# vocabularies (D7): categories, tags, rooms. Maps a URL `kind` segment to its
-# model, the Move association, the chip tint used to distinguish it, the
-# medallion icon, and whether it carries the `applies_to` facet (tags only).
-#
-# One controller (VocabulariesController) and one view template
-# (Views::Vocabularies::Index) serve all three sibling surfaces by dispatching
-# through this object, so the kinds stay in lockstep.
+# Lightweight, non-persisted registry for the per-Move managed vocabulary. Rooms
+# are now the only managed vocabulary — categories and tags were removed in the
+# items/photos simplification epic. The registry shape is kept (rather than
+# inlining rooms everywhere) so VocabulariesController and Views::Vocabularies::Index
+# still dispatch through one object; adding a future kind stays a one-line change.
 class Vocabulary
-  KINDS = %w[categories tags rooms].freeze
+  KINDS = %w[rooms].freeze
 
   CONFIG = {
-    "categories" => { model: Category, chip_kind: :category, icon: Components::Icons::Category },
-    "tags" => { model: Tag, chip_kind: :tag, icon: Components::Icons::Tag },
     "rooms" => { model: Room, chip_kind: :room, icon: Components::Icons::Boxes }
   }.freeze
 
@@ -41,14 +36,9 @@ class Vocabulary
     CONFIG.fetch(kind)[:icon]
   end
 
-  # The plural association on Move (move.categories / move.tags / move.rooms).
+  # The plural association on Move (move.rooms).
   def association
     kind.to_sym
-  end
-
-  # Only tags carry the applies-to facet (item / box / both).
-  def applies_to?
-    kind == "tags"
   end
 
   def records(move)
@@ -57,19 +47,12 @@ class Vocabulary
 
   # Strong-params keys this vocabulary accepts.
   def permitted_params
-    applies_to? ? %i[name applies_to] : %i[name]
+    %i[name]
   end
 
-  # Bulk { record_id => usage_count } so the index never N+1s its rows.
-  # Usage drives the in-use removal confirmation (Domain §4.5–4.7).
+  # Bulk { record_id => usage_count } so the index never N+1s its rows. Usage
+  # drives the in-use removal confirmation (Domain §4.5–4.7).
   def usage_counts(move)
-    case kind
-    when "categories"
-      move.items.where.not(category_id: nil).group(:category_id).count
-    when "rooms"
-      move.boxes.where.not(room_id: nil).group(:room_id).count
-    when "tags"
-      move.items.joins(:item_tags).group("item_tags.tag_id").count
-    end
+    move.boxes.where.not(room_id: nil).group(:room_id).count
   end
 end

@@ -98,11 +98,6 @@ module Components
 
       def meta
         div(class: "flex flex-wrap items-center gap-2") do
-          if @vocabulary.applies_to?
-            render Components::Ui::Chip.new(
-              label: I18n.t("vocabularies.applies_to.#{@record.applies_to}"), kind: :tag
-            )
-          end
           span(class: "text-body-md text-muted") do
             I18n.t("vocabularies.#{kind}.usage", count: @usage_count)
           end

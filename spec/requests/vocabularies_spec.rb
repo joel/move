@@ -12,56 +12,41 @@ RSpec.describe "Vocabularies" do
   end
 
   describe "GET /moves/:move_id/vocabularies/:kind" do
-    it "renders the categories surface with its values" do
-      create(:category, move:, name: "Kitchenware")
+    it "renders the rooms surface with its values" do
+      create(:room, move:, name: "Kitchen")
 
-      get move_vocabularies_path(move, "categories")
-
-      expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Manage Categories").and include("Kitchenware")
-    end
-
-    it "shows a tag's applies-to facet" do
-      create(:tag, :box, move:, name: "Heavy")
-
-      get move_vocabularies_path(move, "tags")
+      get move_vocabularies_path(move, "rooms")
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Manage Tags").and include("Heavy")
-      expect(response.body).to include(I18n.t("vocabularies.applies_to.box"))
+      expect(response.body).to include("Manage Rooms").and include("Kitchen")
     end
 
-    it "renders the rooms surface and the empty state when there are none" do
+    it "renders the rooms empty state when there are none" do
       get move_vocabularies_path(move, "rooms")
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(I18n.t("vocabularies.rooms.empty_title"))
     end
 
-    it "404s for an unknown kind" do
-      get "/moves/#{move.id}/vocabularies/widgets"
-
-      expect(response).to have_http_status(:not_found)
+    it "404s for a removed kind (categories / tags) or an unknown one" do
+      %w[categories tags widgets].each do |kind|
+        get "/moves/#{move.id}/vocabularies/#{kind}"
+        expect(response).to have_http_status(:not_found)
+      end
     end
   end
 
   describe "POST /moves/:move_id/vocabularies/:kind" do
-    it "adds a category and redirects" do
+    it "adds a room and redirects" do
       expect do
-        post move_vocabularies_path(move, "categories"), params: { vocabulary: { name: "Books" } }
-      end.to change(move.categories, :count).by(1)
+        post move_vocabularies_path(move, "rooms"), params: { vocabulary: { name: "Attic" } }
+      end.to change(move.rooms, :count).by(1)
 
-      expect(response).to redirect_to(move_vocabularies_path(move, "categories"))
-    end
-
-    it "adds a tag with applies_to" do
-      post move_vocabularies_path(move, "tags"), params: { vocabulary: { name: "Fragile", applies_to: "both" } }
-
-      expect(move.tags.find_by(name: "Fragile").applies_to).to eq("both")
+      expect(response).to redirect_to(move_vocabularies_path(move, "rooms"))
     end
 
     it "re-streams the add form with an error for a blank name" do
-      post move_vocabularies_path(move, "categories"),
+      post move_vocabularies_path(move, "rooms"),
            params: { vocabulary: { name: "" } }, as: :turbo_stream
 
       expect(response).to have_http_status(:unprocessable_content)
@@ -71,60 +56,60 @@ RSpec.describe "Vocabularies" do
     end
 
     it "streams the new value into the highlighted list with a toast" do
-      post move_vocabularies_path(move, "categories"),
-           params: { vocabulary: { name: "Books" } }, as: :turbo_stream
+      post move_vocabularies_path(move, "rooms"),
+           params: { vocabulary: { name: "Attic" } }, as: :turbo_stream
 
       expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
-      category = move.categories.find_by(name: "Books")
+      room = move.rooms.find_by(name: "Attic")
       expect(response.body)
         .to include(%(action="replace" target="#{Components::Vocabularies::List::ID}"))
-        .and include(Components::Vocabularies::Row.dom_id(category))
+        .and include(Components::Vocabularies::Row.dom_id(room))
         .and include("highlight")
-        .and include(I18n.t("vocabularies.create.created", name: "Books"))
+        .and include(I18n.t("vocabularies.create.created", name: "Attic"))
     end
   end
 
   describe "PATCH /moves/:move_id/vocabularies/:kind/:id" do
     it "renames a value" do
-      category = create(:category, move:, name: "Bookz")
+      room = create(:room, move:, name: "Kitchn")
 
-      patch move_vocabulary_path(move, "categories", category), params: { vocabulary: { name: "Books" } }
+      patch move_vocabulary_path(move, "rooms", room), params: { vocabulary: { name: "Kitchen" } }
 
-      expect(category.reload.name).to eq("Books")
-      expect(response).to redirect_to(move_vocabularies_path(move, "categories"))
+      expect(room.reload.name).to eq("Kitchen")
+      expect(response).to redirect_to(move_vocabularies_path(move, "rooms"))
     end
 
     it "streams the renamed value back into the highlighted list with a toast" do
-      category = create(:category, move:, name: "Bookz")
+      room = create(:room, move:, name: "Kitchn")
 
-      patch move_vocabulary_path(move, "categories", category),
-            params: { vocabulary: { name: "Books" } }, as: :turbo_stream
+      patch move_vocabulary_path(move, "rooms", room),
+            params: { vocabulary: { name: "Kitchen" } }, as: :turbo_stream
 
       expect(response.body)
         .to include(%(action="replace" target="#{Components::Vocabularies::List::ID}"))
-        .and include(I18n.t("vocabularies.update.updated", name: "Books"))
-      expect(category.reload.name).to eq("Books")
+        .and include(I18n.t("vocabularies.update.updated", name: "Kitchen"))
+      expect(room.reload.name).to eq("Kitchen")
     end
 
     it "re-streams just the edited row with its form re-opened on a failed rename" do
-      category = create(:category, move:, name: "Books")
+      room = create(:room, move:, name: "Kitchen")
 
-      patch move_vocabulary_path(move, "categories", category),
+      patch move_vocabulary_path(move, "rooms", room),
             params: { vocabulary: { name: "" } }, as: :turbo_stream
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.body)
-        .to include(%(action="replace" target="#{Components::Vocabularies::Row.dom_id(category)}"))
+        .to include(%(action="replace" target="#{Components::Vocabularies::Row.dom_id(room)}"))
         .and include(%(data-inline-edit-open-value="true"))
         # The display keeps the persisted name, so canceling reverts to it.
-        .and include("Books")
+        .and include("Kitchen")
         .and include("can&#39;t be blank").or include("can't be blank")
-      expect(category.reload.name).to eq("Books")
+      expect(room.reload.name).to eq("Kitchen")
     end
   end
 
   describe "DELETE /moves/:move_id/vocabularies/:kind/:id" do
-    it "removes a value and detaches it" do
+    it "removes a value and detaches it from its boxes" do
       room = create(:room, move:)
       box = create(:box, move:, room:)
 
@@ -136,26 +121,26 @@ RSpec.describe "Vocabularies" do
     end
 
     it "streams the row out, and flips to the empty state on the last value" do
-      only = create(:category, move:, name: "Sole")
+      only = create(:room, move:, name: "Sole")
 
-      delete move_vocabulary_path(move, "categories", only), as: :turbo_stream
+      delete move_vocabulary_path(move, "rooms", only), as: :turbo_stream
 
       expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
       expect(response.body)
         .to include(%(action="remove" target="#{Components::Vocabularies::Row.dom_id(only)}"))
         .and include(%(action="replace" target="#{Components::Vocabularies::List::ID}"))
-        .and include(I18n.t("vocabularies.categories.empty_title"))
+        .and include(I18n.t("vocabularies.rooms.empty_title"))
     end
 
     it "streams only the row out while other values remain" do
-      kept = create(:category, move:, name: "Keep")
-      gone = create(:category, move:, name: "Drop")
+      kept = create(:room, move:, name: "Keep")
+      gone = create(:room, move:, name: "Drop")
 
-      delete move_vocabulary_path(move, "categories", gone), as: :turbo_stream
+      delete move_vocabulary_path(move, "rooms", gone), as: :turbo_stream
 
       expect(response.body).to include(%(action="remove" target="#{Components::Vocabularies::Row.dom_id(gone)}"))
       expect(response.body).not_to include(%(action="replace" target="#{Components::Vocabularies::List::ID}"))
-      expect(move.categories).to include(kept)
+      expect(move.rooms).to include(kept)
     end
   end
 
@@ -168,47 +153,47 @@ RSpec.describe "Vocabularies" do
     end
 
     it "lets a non-admin member view but hides edit affordances" do
-      create(:category, move:, name: "Kitchenware")
+      create(:room, move:, name: "Kitchen")
 
-      get move_vocabularies_path(move, "categories")
+      get move_vocabularies_path(move, "rooms")
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Kitchenware")
-      expect(response.body).not_to include(I18n.t("vocabularies.categories.add"))
+      expect(response.body).to include("Kitchen")
+      expect(response.body).not_to include(I18n.t("vocabularies.rooms.add"))
     end
 
     it "rejects a non-admin member's create" do
-      post move_vocabularies_path(move, "categories"), params: { vocabulary: { name: "Books" } }
+      post move_vocabularies_path(move, "rooms"), params: { vocabulary: { name: "Attic" } }
 
       expect(response).to have_http_status(:forbidden)
-      expect(move.categories.count).to eq(0)
+      expect(move.rooms.count).to eq(0)
     end
 
     it "rejects a non-admin member's destroy" do
-      category = create(:category, move:, name: "Books")
+      room = create(:room, move:, name: "Kitchen")
 
-      delete move_vocabulary_path(move, "categories", category)
+      delete move_vocabulary_path(move, "rooms", room)
 
       expect(response).to have_http_status(:forbidden)
-      expect(Category.exists?(category.id)).to be(true)
+      expect(Room.exists?(room.id)).to be(true)
     end
   end
 
   describe "in-use remove confirmation" do
     it "gates the remove form with a Turbo confirm only when the value is in use" do
-      in_use = create(:category, move:, name: "Books")
-      create(:item, move:, category: in_use)
+      in_use = create(:room, move:, name: "Kitchen")
+      create(:box, move:, room: in_use)
 
-      get move_vocabularies_path(move, "categories")
+      get move_vocabularies_path(move, "rooms")
 
       expect(response.body).to include("data-turbo-confirm")
-      expect(response.body).to include("uncategorised") # the in-use confirm copy
+      expect(response.body).to include("lose its room") # the in-use confirm copy
     end
 
     it "omits the Turbo confirm when nothing is in use" do
-      create(:category, move:, name: "Tools") # no items
+      create(:room, move:, name: "Attic") # no boxes
 
-      get move_vocabularies_path(move, "categories")
+      get move_vocabularies_path(move, "rooms")
 
       expect(response.body).not_to include("data-turbo-confirm")
     end
@@ -218,9 +203,9 @@ RSpec.describe "Vocabularies" do
     it "404s a signed-in non-member non-disclosingly (move is out of their scope)" do
       stranger = create(:user) # no move_membership for this Move
       stub_current_user(stranger)
-      create(:category, move:, name: "Kitchenware")
+      create(:room, move:, name: "Kitchen")
 
-      get move_vocabularies_path(move, "categories")
+      get move_vocabularies_path(move, "rooms")
 
       expect(response).to have_http_status(:not_found)
     end

@@ -78,7 +78,7 @@ class ActivityPresenter
     case activity.action
     when /\Amove_membership\./ then I18n.t("activities.subject.member")
     when /\Amove\./ then I18n.t("activities.subject.move")
-    when /\Avocabulary\./, /\A(box|item|category|tag|room)\b/
+    when /\Avocabulary\./, /\A(box|item|room)\b/
       named_subject_label
     when /\Amedia\./ then I18n.t("activities.subject.photo")
     else I18n.t("activities.subject.unknown")

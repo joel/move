@@ -2,10 +2,10 @@
 
 module Views
   module Vocabularies
-    # D2 — Manage categories / tags / rooms. One template for all three sibling
-    # surfaces: a header, sibling tabs, an add form (admins, writable Move), and
-    # a row list with inline rename + remove. Renders inside the AppLayout sidebar
-    # shell. Stitch is dark-only; light comes from the Refined-Palette tokens.
+    # D2 — Manage rooms (the only managed vocabulary left). A header, an add form
+    # (admins, writable Move), and a row list with inline rename + remove. Renders
+    # inside the AppLayout sidebar shell. Stitch is dark-only; light comes from the
+    # Refined-Palette tokens.
     #
     # The add form, list and rows are extracted into stable-id Components so the
     # controller can stream create/rename/remove without a reload (#382); the
@@ -23,7 +23,6 @@ module Views
 
       def view_template
         header
-        tabs
         if @can_edit
           render Components::Vocabularies::AddForm.new(
             move: @move, vocabulary: @vocabulary, record: @new_record || @vocabulary.model.new
@@ -50,21 +49,6 @@ module Views
               label: I18n.t("vocabularies.#{kind}.add"),
               icon: Components::Icons::Plus, href: "##{Components::Vocabularies::AddForm::ID}"
             )
-          end
-        end
-      end
-
-      # Sibling navigation across the three vocabularies (Categories | Tags |
-      # Rooms). The active surface fills; the others are outlined links.
-      def tabs
-        nav(class: "flex gap-3 overflow-x-auto pb-1", aria_label: I18n.t("vocabularies.tabs_label")) do
-          Vocabulary::KINDS.each do |k|
-            a(href: move_vocabularies_path(@move, k), class: "flex-shrink-0") do
-              render Components::Ui::Chip.new(
-                label: I18n.t("vocabularies.#{k}.tab"),
-                kind: Vocabulary.new(k).chip_kind, selected: k == kind
-              )
-            end
           end
         end
       end

@@ -13,34 +13,11 @@ module Moves
       "Garage", "Office", "Hallway", "Dining Room", "Basement", "Attic", "Garden"
     ].freeze
 
-    CATEGORIES = %w[
-      Kitchenware Books Electronics Clothing Tools
-      Furniture Decor Toys Documents Appliances
-    ].freeze
-
-    # name => applies_to (item / box / both)
-    TAGS = {
-      "Heavy" => "both", "Fragile" => "box", "Liquid" => "item",
-      "Important" => "both", "Valuable" => "both", "Seasonal" => "item"
-    }.freeze
-
-    # Populates the Move's three managed vocabularies with the curated defaults.
-    # Caller owns the transaction (Moves::Create wraps it with the Move + admin
-    # membership; db/seeds.rb calls it standalone).
+    # Populates the Move's managed vocabulary (rooms — the only one left) with the
+    # curated defaults. Caller owns the transaction (Moves::Create wraps it with the
+    # Move + admin membership; db/seeds.rb calls it standalone).
     def self.apply(move)
       ROOMS.each { |name| find_or_create(move.rooms, name) }
-      CATEGORIES.each { |name| find_or_create(move.categories, name) }
-      # Additive only, like rooms/categories: create a missing tag with its default
-      # facet, but never overwrite an existing tag's `applies_to`. On a backfill over
-      # an existing Move that would silently narrow e.g. a user's item-scoped
-      # `Fragile` to box-only, skipping the detach/reindex that Vocabularies::Update
-      # performs and orphaning item<->tag links (#168). Defaults fill gaps; the user's
-      # facet choices win.
-      TAGS.each do |name, applies_to|
-        next if existing(move.tags, name)
-
-        move.tags.create!(name: name, applies_to: applies_to)
-      end
     end
 
     # Case-insensitive lookup against the lower(name) unique index, so a value

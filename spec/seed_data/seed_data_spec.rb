@@ -7,15 +7,6 @@ require Rails.root.join("db/seed_data/catalog").to_s
 # both read. These guard the invariants the seed relies on (valid enum values,
 # vocabulary references, unique image slugs) so a typo fails here, not mid-seed.
 RSpec.describe SeedData do
-  # The vocabularies the seed actually creates: the curated defaults + the
-  # demo-only "Everyday Use" tag added in db/seeds.rb. Box-only tags can't tag
-  # items, so they're excluded from the item-taggable set.
-  def known_categories = Moves::DefaultVocabularies::CATEGORIES
-
-  def item_taggable
-    Moves::DefaultVocabularies::TAGS.reject { |_name, applies| applies == "box" }.keys + ["Everyday Use"]
-  end
-
   def box_numbers = SeedData::BOXES.pluck(:number)
 
   describe "BOXES" do
@@ -65,7 +56,7 @@ RSpec.describe SeedData do
       end
     end
 
-    it "only uses valid item enum values and known vocabulary" do
+    it "only uses valid item enum values" do
       photo_items = SeedData::PHOTOS.flat_map { |photo| photo[:items] }
       expect(photo_items).not_to be_empty
       photo_items.each { |item| expect_valid_item(item) }
@@ -79,7 +70,7 @@ RSpec.describe SeedData do
       end
     end
 
-    it "only uses valid item enum values and known vocabulary" do
+    it "only uses valid item enum values" do
       SeedData::MANUAL_ITEMS.each { |item| expect_valid_item(item) }
     end
   end
@@ -89,11 +80,9 @@ RSpec.describe SeedData do
 
     let(:objects) do
       [
-        { "label" => "Coffee maker", "confidence" => 0.95, "count" => 0, "category" => "Appliances",
-          "tags" => [] },
-        { "label" => "Wine glasses", "confidence" => 0.4, "count" => 6, "category" => "Kitchenware",
-          "tags" => [" Valuable ", "Valuable", ""] },
-        { "label" => "  ", "confidence" => 0.9, "count" => 1, "category" => "x", "tags" => [] }
+        { "label" => "Coffee maker", "confidence" => 0.95 },
+        { "label" => "Wine glasses", "confidence" => 0.4 },
+        { "label" => "  ", "confidence" => 0.9 }
       ]
     end
 
@@ -104,10 +93,6 @@ RSpec.describe SeedData do
     it "splits review_state on the auto-confirm threshold" do
       expect(detections.first[:review]).to eq("auto_confirmed")  # 0.95 >= 0.8
       expect(detections.last[:review]).to eq("pending_review")   # 0.40 < 0.8
-    end
-
-    it "strips, blank-drops and dedupes tags" do
-      expect(detections.last[:tags]).to eq(["Valuable"])
     end
   end
 
@@ -124,8 +109,7 @@ RSpec.describe SeedData do
     it "uses the recorded objects when present" do
       photo = SeedData::PHOTOS.find { |p| p[:slug] == "kitchen-counter" }
       allow(described_class).to receive(:recorded_recognition).with("kitchen-counter").and_return(
-        "objects" => [{ "label" => "Kettle", "confidence" => 0.9, "count" => 1,
-                        "category" => "Appliances", "tags" => [] }]
+        "objects" => [{ "label" => "Kettle", "confidence" => 0.9 }]
       )
 
       detections = described_class.detections_for(photo, threshold: 0.8)
@@ -148,9 +132,5 @@ RSpec.describe SeedData do
     expect(label).to be_present
     expect(Item::REVIEW_STATES).to include(item[:review]), "#{label} review"
     expect(Item::PRESENCE_STATES).to include(item[:presence] || "in_box"), "#{label} presence"
-    expect(known_categories).to include(item[:category]) if item[:category]
-    (item[:tags] || []).each do |tag|
-      expect(item_taggable).to include(tag), "#{label} tag #{tag}"
-    end
   end
 end

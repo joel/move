@@ -90,10 +90,10 @@ RSpec.describe Activity::RecordSubscriber do
   end
 
   it "resolves a vocabulary subject from its kind" do
-    category = create(:category, move:)
-    emit("vocabulary.created", kind: "category", record_id: category.id, move_id: move.id, actor_id: actor.id)
+    room = create(:room, move:)
+    emit("vocabulary.created", kind: "room", record_id: room.id, move_id: move.id, actor_id: actor.id)
 
-    expect(Activity.last).to have_attributes(subject_type: "Category", subject_id: category.id)
+    expect(Activity.last).to have_attributes(subject_type: "Room", subject_id: room.id)
   end
 
   it "normalises the actor from whichever key the payload used" do
