@@ -5,12 +5,10 @@ module Views
     # B3 — Manual add item. A lightweight form inside the AppShell, scoped to the
     # box the item lands in. Reuses Components::ItemForm.
     class New < Views::Base
-      def initialize(move:, box:, item:, categories:, tags:, source_media_id: nil)
+      def initialize(move:, box:, item:, source_media_id: nil)
         @move = move
         @box = box
         @item = item
-        @categories = categories
-        @tags = tags
         @source_media_id = source_media_id
       end
 
@@ -24,7 +22,6 @@ module Views
         render Components::Ui::Card.new(padding: "p-6") do
           render Components::ItemForm.new(
             models: [@move, @box, @item], item: @item,
-            categories: @categories, tags: @tags,
             submit_label: I18n.t("items.new.submit"),
             cancel_href: move_box_path(@move, @box),
             source_media_id: @source_media_id

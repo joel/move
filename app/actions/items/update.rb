@@ -1,37 +1,28 @@
 # frozen_string_literal: true
 
 module Items
-  # Updates an Item's editable attributes (name, category, tags) from the C3
-  # detail/edit screen. A user edit is authoritative and is
-  # never silently overwritten by recognition (Domain §6.4) — so the edit also
-  # vouches for the item: its review_state becomes `confirmed` (a human has now
-  # reviewed it), no longer reading as machine-`auto_confirmed`/`pending_review`.
-  # Presence state stays an independent axis changed by its own actions. Category +
-  # tags are selection-only. Caller owns tenant context + writable-Move guard.
+  # Updates an Item's name from the C3 detail/edit screen. A user edit is
+  # authoritative and is never silently overwritten by recognition (Domain §6.4) —
+  # so the edit also vouches for the item: its review_state becomes `confirmed` (a
+  # human has now reviewed it), no longer reading as machine-`auto_confirmed`/
+  # `pending_review`. Presence state stays an independent axis changed by its own
+  # actions. Caller owns tenant context + writable-Move guard.
   class Update < BaseAction
-    include Items::FormResolution
-
     def call(item:, params:, editor:)
       yield ensure_writable(item.move)
-      category = yield resolve_category(item.move, params[:category_id])
-      tags = yield resolve_tags(item.move, params[:tag_ids])
-      yield with_responsible(editor) { persist(item, params, category, tags) }
+      yield with_responsible(editor) { persist(item, params) }
       yield emit_event(item, editor)
       Success(item)
     end
 
     private
 
-    def persist(item, params, category, tags)
-      ActiveRecord::Base.transaction do
-        item.update!(
-          name: params[:name],
-          category: category,
-          # A human edit confirms the item (machine-vouched → human-vouched).
-          review_state: "confirmed"
-        )
-        item.tags = tags
-      end
+    def persist(item, params)
+      item.update!(
+        name: params[:name],
+        # A human edit confirms the item (machine-vouched → human-vouched).
+        review_state: "confirmed"
+      )
       Success(item)
     rescue ActiveRecord::RecordInvalid => e
       # The failed update! left the unsaved confirmation on the in-memory item;

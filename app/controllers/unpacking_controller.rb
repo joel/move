@@ -18,7 +18,7 @@ class UnpackingController < MoveScopedController
     editable = editable_move?
     return render(Views::Unpacking::Celebration.new(move: @move, box: @box, editable:)) if @box.unpacked?
 
-    items = authorized_scope(@box.items).includes(:category)
+    items = authorized_scope(@box.items)
     render Views::Unpacking::Checklist.new(
       move: @move, box: @box,
       remaining: items.in_box.ordered, unpacked: items.removed.ordered, editable:
@@ -100,7 +100,7 @@ class UnpackingController < MoveScopedController
   end
 
   def ordered_items(variant)
-    items_scope(variant).includes(:category).ordered.to_a
+    items_scope(variant).ordered.to_a
   end
 
   def progress_stream(remaining_count:, total:)

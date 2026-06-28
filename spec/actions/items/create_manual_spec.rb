@@ -23,41 +23,6 @@ RSpec.describe Items::CreateManual do
     expect(item.box).to eq(box)
   end
 
-  it "assigns a category and tags from the Move vocabulary" do
-    category = create(:category, move:, name: "Kitchenware")
-    heavy = create(:tag, move:, name: "Heavy")
-    daily = create(:tag, move:, name: "Everyday Use")
-
-    item = call(name: "Plates", category_id: category.id, tag_ids: [heavy.id, daily.id]).value!
-
-    expect(item.category).to eq(category)
-    expect(item.tags).to contain_exactly(heavy, daily)
-  end
-
-  it "rejects a category outside the Move vocabulary (selection-only)" do
-    foreign = create(:category, move: create(:move), name: "Garage")
-    result = call(name: "Drill", category_id: foreign.id)
-
-    expect(result).to be_failure
-    expect(result.failure).to eq(:invalid_category)
-  end
-
-  it "rejects a tag outside the Move vocabulary (selection-only)" do
-    foreign = create(:tag, move: create(:move), name: "Fragile")
-    result = call(name: "Glass", tag_ids: [foreign.id])
-
-    expect(result).to be_failure
-    expect(result.failure).to eq(:invalid_tag)
-  end
-
-  it "rejects a box-only tag on an item (applies-to facet)" do
-    box_tag = create(:tag, :box, move:, name: "Sealed")
-    result = call(name: "Glass", tag_ids: [box_tag.id])
-
-    expect(result).to be_failure
-    expect(result.failure).to eq(:invalid_tag)
-  end
-
   it "returns validation errors for a blank name" do
     result = call(name: "")
     expect(result).to be_failure

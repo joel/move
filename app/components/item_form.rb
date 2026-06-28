@@ -1,21 +1,18 @@
 # frozen_string_literal: true
 
 module Components
-  # Shared item form fields for B3 (manual add) and C3 (detail/edit). Lightweight
-  # per the spec: name, category (selection-only), tags (selection-only) — no
-  # quantity or value fields. `models` is the Rails-nested model array
-  # ([move, box, item] for create, [move, item] for update) so form_with derives
-  # the right URL + verb. The C3 Move/Remove controls are separate forms rendered
-  # by the view, not part of this edit form.
+  # Shared item form for B3 (manual add) and C3 (detail/edit). An item is just a
+  # name now (category/tags/quantity/fragile all removed across the simplification
+  # epic). `models` is the Rails-nested model array ([move, box, item] for create,
+  # [move, item] for update) so form_with derives the right URL + verb. The C3
+  # Move/Remove controls are separate forms rendered by the view.
   class ItemForm < Components::Base
     include Phlex::Rails::Helpers::FormWith
 
-    def initialize(models:, item:, categories:, tags:, submit_label: nil, cancel_href: nil,
+    def initialize(models:, item:, submit_label: nil, cancel_href: nil,
                    autosave: false, source_media_id: nil)
       @models = models
       @item = item
-      @categories = categories
-      @tags = tags
       @submit_label = submit_label
       @cancel_href = cancel_href
       # When present, binds the new item to a captured photo (recovery flow): the
@@ -32,8 +29,6 @@ module Components
         input(type: "hidden", name: "item[source_media_id]", value: @source_media_id) if @source_media_id
         render_errors if @item.errors.any?
         name_field
-        category_field
-        tags_field
         footer(form) unless @autosave
       end
     end
@@ -52,50 +47,6 @@ module Components
         value: @item.name, placeholder: I18n.t("items.form.name_placeholder"),
         error: @item.errors[:name].first
       )
-    end
-
-    def category_field
-      render Components::Ui::Select.new(
-        name: "item[category_id]", label: I18n.t("items.form.category"),
-        options: category_options, selected: @item.category_id
-      )
-    end
-
-    def category_options
-      [[I18n.t("items.form.category_blank"), ""]] + @categories.map { |c| [c.name, c.id] }
-    end
-
-    def tags_field
-      div(class: "flex flex-col gap-2") do
-        span(class: "text-label-caps uppercase text-muted") { I18n.t("items.form.tags") }
-        @tags.any? ? tag_choices : tags_empty
-      end
-    end
-
-    def tag_choices
-      div(class: "flex flex-wrap gap-2") do
-        # Empty value so deselecting every tag still submits the array (clears).
-        input(type: "hidden", name: "item[tag_ids][]", value: "")
-        @tags.each { |tag| tag_choice(tag) }
-      end
-    end
-
-    def tag_choice(tag)
-      label(class: "cursor-pointer") do
-        input(
-          type: "checkbox", name: "item[tag_ids][]", value: tag.id,
-          checked: @item.tags.include?(tag), class: "peer sr-only"
-        )
-        span(
-          class: "inline-flex items-center rounded-full px-3 py-1 text-label-caps uppercase " \
-                 "bg-secondary/15 text-secondary transition " \
-                 "peer-checked:bg-secondary peer-checked:text-on-secondary"
-        ) { tag.name }
-      end
-    end
-
-    def tags_empty
-      p(class: "text-body-md text-on-surface-variant") { I18n.t("items.form.tags_empty") }
     end
 
     def footer(form)

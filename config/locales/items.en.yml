@@ -40,13 +40,7 @@ en:
     form:
       name: "Item name"
       name_placeholder: "e.g. Espresso Machine"
-      category: "Category"
-      category_blank: "Select a category"
-      tags: "Tags"
-      tags_empty: "No tags yet — tag vocabulary is managed in a later phase."
       cancel: "Cancel"
-      invalid_category: "Pick a category from the list."
-      invalid_tag: "Pick tags from the list."
       failed: "Could not save this item."
       errors:
         one: "1 error prevented this item from being saved:"

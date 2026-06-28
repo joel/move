@@ -85,15 +85,8 @@ module Components
       def item_text
         strike = remaining? ? "" : " line-through"
         div(class: "flex-1 text-left") do
-          span(class: "block text-body-lg text-text-warm#{strike}") { item_label }
-          if (subtitle = @item.category&.name)
-            span(class: "block text-body-md text-muted#{strike}") { subtitle }
-          end
+          span(class: "block text-body-lg text-text-warm#{strike}") { @item.name }
         end
-      end
-
-      def item_label
-        @item.name
       end
     end
   end

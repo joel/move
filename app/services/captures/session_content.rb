@@ -21,7 +21,7 @@ module Captures
     # render each as a tappable row under its photo.
     def items_by_media
       @box.items.in_box.where(source_media_id: media.map(&:id))
-          .includes(:category).order(:created_at)
+          .order(:created_at)
           .group_by(&:source_media_id)
     end
 

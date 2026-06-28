@@ -565,14 +565,13 @@ RSpec.describe "Boxes" do
   describe "GET /moves/:move_id/boxes/:id/seal" do
     it "renders the seal-modal frame with an auto-suggested description" do
       box = create(:box, :with_room, move:, number: "1", status: "packing")
-      cat = create(:category, move:, name: "Kitchenware")
-      create(:item, move:, box:, name: "Mug", category: cat)
+      create(:item, move:, box:, name: "Mug")
 
       get seal_move_box_path(move, box)
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(I18n.t("boxes.seal.title"))
-      expect(response.body).to include("Kitchenware") # deterministic suggestion (fake provider)
+      expect(response.body).to include("Mug") # deterministic suggestion (fake provider)
       # Regenerate opts out of Turbo prefetch so a hover can't spend AI quota.
       expect(response.body).to include('data-turbo-prefetch="false"')
     end
@@ -597,13 +596,12 @@ RSpec.describe "Boxes" do
   describe "GET /moves/:move_id/boxes/:id/description_suggestion" do
     it "returns the suggested description as JSON" do
       box = create(:box, :with_room, move:, number: "1", status: "packing")
-      cat = create(:category, move:, name: "Books")
-      create(:item, move:, box:, name: "Novel", category: cat)
+      create(:item, move:, box:, name: "Novel")
 
       get description_suggestion_move_box_path(move, box)
 
       expect(response).to have_http_status(:ok)
-      expect(response.parsed_body["description"]).to eq("Books")
+      expect(response.parsed_body["description"]).to eq("Novel")
     end
   end
 

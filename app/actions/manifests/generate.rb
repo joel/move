@@ -8,7 +8,7 @@ module Manifests
   # Read-only: nothing is mutated.
   class Generate < BaseAction
     def call(box:, actor:)
-      items = box.items.in_box.includes(:category, :tags).ordered.to_a
+      items = box.items.in_box.ordered.to_a
       yield emit_event(box, actor)
       Success(box: box, items: items)
     end

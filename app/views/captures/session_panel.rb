@@ -52,8 +52,8 @@ module Views
         run && %w[succeeded partially_succeeded].include?(run.status)
       end
 
-      # Tappable recognised-item row → Item Detail, so a wrong category/name can be
-      # fixed without leaving the capture flow.
+      # Tappable recognised-item row → Item Detail, so a wrong name can be fixed
+      # without leaving the capture flow.
       def item_row(media, item)
         a(
           href: view_context.move_item_path(@box.move, item),
@@ -63,22 +63,9 @@ module Views
         ) do
           thumb(media)
           div(class: "flex min-w-0 flex-1 flex-col gap-1") do
-            span(class: "truncate text-body-md font-bold text-text-warm") { item_label(item) }
-            chips(item)
+            span(class: "truncate text-body-md font-bold text-text-warm") { item.name }
           end
           render Components::Icons::ChevronRight.new(css: "h-4 w-4 shrink-0 text-muted")
-        end
-      end
-
-      def item_label(item)
-        item.name
-      end
-
-      def chips(item)
-        return unless item.category
-
-        div(class: "flex flex-wrap gap-1.5") do
-          render Components::Ui::Chip.new(label: item.category.name, kind: :room) if item.category
         end
       end
 
