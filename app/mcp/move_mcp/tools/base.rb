@@ -45,7 +45,7 @@ module MoveMcp
           message = {
             move_archived: "This move is archived and is read-only.",
             wrong_phase: "That box isn't being unpacked — delete the item instead of marking it unpacked.",
-            not_capturable: "That box is sealed — unseal it before adding media.",
+            not_capturable: "That box is sealed — unseal it before adding to it.",
             no_file: "No upload was provided.",
             invalid_upload: "The upload could not be found — presign and PUT the bytes first.",
             image_too_large: "Image is too large (max #{Media::MAX_IMAGE_BYTES_LABEL}).",

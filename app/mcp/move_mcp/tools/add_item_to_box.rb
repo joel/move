@@ -20,7 +20,9 @@ module MoveMcp
         return error_response("No box ##{box_number} in this move.") if box.nil?
 
         result = ::Items::CreateManual.new.call(
-          box: box, params: { name: name, quantity: quantity }, creator: actor(server_context)
+          box: box, params: { name: name, quantity: quantity }, creator: actor(server_context),
+          # A pure new-item add is packing-only (same gate as add_media_to_box).
+          require_open: true
         )
         return failure_response(result.failure) if result.failure?
 

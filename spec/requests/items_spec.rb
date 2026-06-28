@@ -30,6 +30,15 @@ RSpec.describe "Items" do
 
       expect(response.body.index("Zebra")).to be < response.body.index("Apple")
     end
+
+    it "redirects a pure add-form on a non-packing box back to the box" do
+      sealed = create(:box, move:, status: "sealed")
+
+      get new_move_box_item_path(move, sealed)
+
+      expect(response).to redirect_to(move_box_path(move, sealed))
+      expect(flash[:alert]).to eq(I18n.t("items.create.box_closed"))
+    end
   end
 
   describe "POST /moves/:move_id/boxes/:box_id/items" do
@@ -60,6 +69,27 @@ RSpec.describe "Items" do
       item = box.items.last
       expect(item.category).to eq(category)
       expect(item.tags).to contain_exactly(tag)
+    end
+
+    it "refuses a pure add to a non-packing box (defence in depth behind the hidden link)" do
+      sealed = create(:box, move:, status: "sealed")
+
+      expect do
+        post move_box_items_path(move, sealed), params: { item: { name: "Lamp" } }
+      end.not_to change(sealed.items, :count)
+
+      expect(response).to redirect_to(move_box_path(move, sealed))
+      expect(flash[:alert]).to eq(I18n.t("items.create.box_closed"))
+    end
+
+    it "still allows a recovery add (source photo) on a non-packing box" do
+      sealed = create(:box, move:, status: "sealed")
+      media = create(:media, move:, box: sealed)
+
+      expect do
+        post move_box_items_path(move, sealed),
+             params: { item: { name: "Missed mug", source_media_id: media.id } }
+      end.to change(sealed.items, :count).by(1)
     end
   end
 

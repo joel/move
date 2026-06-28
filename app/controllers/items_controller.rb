@@ -19,6 +19,8 @@ class ItemsController < MoveScopedController
 
   # GET /moves/:move_id/boxes/:box_id/items/new
   def new
+    return redirect_to move_box_path(@move, @box), alert: t("items.create.box_closed") if pure_add_closed?
+
     item = @box.items.new(move: @move)
     authorize! item, to: :create?, with: ItemPolicy
     render Views::Items::New.new(
@@ -30,12 +32,17 @@ class ItemsController < MoveScopedController
   def create
     authorize! @box.items.new(move: @move), to: :create?, with: ItemPolicy
     result = Items::CreateManual.new.call(
-      box: @box, params: item_params, creator: current_user, source_media: source_media
+      box: @box, params: item_params, creator: current_user, source_media: source_media,
+      # A pure new-item add is packing-only; a recovery add (carrying a source
+      # photo) corrects a captured photo and is allowed in any phase.
+      require_open: source_media_id.blank?
     )
 
     case result
     in Dry::Monads::Success(item)
       redirect_to move_box_path(@move, @box), notice: t(".created", name: item.name)
+    in Dry::Monads::Failure(:not_capturable)
+      redirect_to move_box_path(@move, @box), alert: t(".box_closed")
     in Dry::Monads::Failure(Symbol => reason)
       redirect_to new_move_box_item_path(@move, @box, source_media_id: source_media_id),
                   alert: vocabulary_error(reason)
@@ -210,6 +217,13 @@ class ItemsController < MoveScopedController
     @box = authorized_scope(@move.boxes).find(params.expect(:box_id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
+  end
+
+  # A pure manual add (no source photo) targeting a box that isn't open (packing).
+  # The recovery add carries a source_media_id and corrects a captured photo, so
+  # it stays allowed in any phase. Mirrors Items::CreateManual#ensure_open.
+  def pure_add_closed?
+    source_media_id.blank? && !@box.capturable?
   end
 
   # Recovery flow: a manual add launched from an orphaned photo carries the photo
