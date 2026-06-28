@@ -98,7 +98,7 @@ foregrounds `on-surface` `#E8E1DA`/`#1C1B16`, `on-surface-variant`
 | `text-headline-md` | 24 / 32 / 600 | Card / result titles |
 | `text-body-lg` | 18 / 28 / 400 | Lead body |
 | `text-body-md` | 16 / 24 / 400 | Body |
-| `text-label-caps` | 12 / 16 / 700 / 0.1em, UPPERCASE | Rooms / Tags / Categories labels, overlines |
+| `text-label-caps` | 12 / 16 / 700 / 0.1em, UPPERCASE | Room labels, chips, overlines |
 
 Typical responsive headline: `text-headline-lg-mobile md:text-headline-xl`.
 
