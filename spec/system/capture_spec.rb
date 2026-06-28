@@ -14,19 +14,22 @@ RSpec.describe "Capture image" do
 
   # The capture itself auto-submits on file selection (JS), which the rack_test
   # driver can't drive — that path is covered by the request spec + /product-review.
-  # Here we assert the redesigned surface: the tap-to-capture tile and the renamed
-  # "Items" panel listing recognised items as tappable links to Item Detail.
-  it "shows the tap-to-capture tile and links recognised items to their detail" do
+  # Here we assert the redesigned surface: the tap-to-capture tile and the
+  # photo-first panel — a succeeded photo is one card (names as chips) tapping
+  # into the per-photo detail (D3).
+  it "shows the tap-to-capture tile and links a succeeded photo to its detail" do
     media = create(:media, move:, box:)
     create(:recognition_run, :succeeded, move:, box:, media:)
-    item = create(:item, move:, box:, name: "Ceramic Plates", source_media: media)
+    create(:item, move:, box:, name: "Ceramic Plates", source_media: media)
 
     visit move_box_capture_path(move, box)
 
     expect(page).to have_text("Capture for Box #001 — Kitchen")
     expect(page).to have_text(I18n.t("captures.tap_to_capture"))
-    expect(page).to have_text(I18n.t("captures.session.title")) # "Items", not "Session"
+    expect(page).to have_text(I18n.t("captures.session.title"))
 
-    expect(page).to have_link("Ceramic Plates", href: move_item_path(move, item))
+    # The name shows as a chip inside a card that links to the photo detail.
+    expect(page).to have_text("Ceramic Plates")
+    expect(page).to have_link(href: move_box_review_photo_path(move, box, media_id: media.id))
   end
 end

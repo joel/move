@@ -116,15 +116,18 @@ RSpec.describe "Captures" do
       expect(response.body).to include(%(id="#{Views::Captures::SessionPanel::ID}"))
     end
 
-    it "renders recognised items as tappable links to Item Detail once a run succeeds" do
+    it "renders a succeeded photo as one card (names as chips) linking to the photo detail" do
       media = create(:media, move:, box:)
       create(:recognition_run, :succeeded, move:, box:, media:)
-      item = create(:item, move:, box:, name: "Espresso machine", source_media: media)
+      create(:item, move:, box:, name: "Espresso machine", source_media: media)
 
       get move_box_capture_path(move, box)
 
-      expect(response.body).to include(%(href="#{move_item_path(move, item)}"))
+      # Photo-first (D3): the card links to the per-photo review/detail, with the
+      # item name shown as a chip inside it — not a separate item-detail row.
+      expect(response.body).to include(%(href="#{move_box_review_photo_path(move, box, media_id: media.id)}"))
       expect(response.body).to include("Espresso machine")
+      expect(response.body).to include('data-turbo-prefetch="false"')
     end
 
     it "surfaces a friendly reason for a known failure category (quota)" do

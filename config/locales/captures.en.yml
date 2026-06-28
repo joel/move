@@ -19,6 +19,7 @@ en:
         one: "1 capture"
         other: "%{count} captures"
       empty: "Captured images for this box will appear here."
+      more: "+%{count} more"
       items_found:
         zero: "No items found"
         one: "1 item found"

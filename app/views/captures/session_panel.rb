@@ -2,16 +2,17 @@
 
 module Views
   module Captures
-    # The "Items" panel: this box's recent captures with live recognition state.
+    # The capture panel: this box's recent captures with live recognition state.
     # Broadcast over ActionCable as each run advances (#241 — Captures::
     # SessionBroadcastSubscriber); the stable root id is the Turbo Stream replace
-    # target. Once a photo's run succeeds it expands into one tappable row per
-    # recognised item (→ Item Detail); photos still queued/processing/failed render
-    # as a single status row.
+    # target. Capture is photo-first (D3): a succeeded photo is ONE card showing
+    # its recognised names as chips, tapping into the per-photo detail (C2);
+    # photos still queued/processing/failed render as a single status row.
     class SessionPanel < Views::Base
       include Phlex::Rails::Helpers::ButtonTo
 
       ID = "capture-session-panel"
+      CHIP_CAP = 4 # name chips shown per photo card before collapsing to "+N more"
 
       RUN_TO_STATE = {
         "queued" => :queued, "processing" => :processing,
@@ -36,13 +37,13 @@ module Views
         @media.each { |media| rows(media) }
       end
 
-      # A succeeded photo becomes one tappable row per item; otherwise a single
-      # status row (queued / recognising / failed).
+      # A succeeded photo becomes one card with its recognised names as chips;
+      # otherwise a single status row (queued / recognising / failed).
       def rows(media)
         run = media.recognition_runs.max_by(&:created_at)
         items = @items_by_media[media.id]
         if succeeded?(run) && items&.any?
-          items.each { |item| item_row(media, item) }
+          photo_card(media, items)
         else
           status_row(media, run)
         end
@@ -52,21 +53,31 @@ module Views
         run && %w[succeeded partially_succeeded].include?(run.status)
       end
 
-      # Tappable recognised-item row → Item Detail, so a wrong name can be fixed
-      # without leaving the capture flow.
-      def item_row(media, item)
+      # Photo-first card: the photo + its recognised names as chips, tapping into
+      # the per-photo detail (C2) where a wrong name can be fixed — no separate
+      # per-item rows. turbo_prefetch off: ReviewsController#photo marks the photo
+      # reviewed on GET, so a hover prefetch would silently clear pending_review.
+      def photo_card(media, items)
         a(
-          href: view_context.move_item_path(@box.move, item),
+          href: view_context.move_box_review_photo_path(@box.move, @box, media_id: media.id),
+          data: { turbo_prefetch: "false" },
           class: "flex items-center gap-3 rounded-xl border border-card-border " \
                  "bg-surface-container p-3 transition hover:border-accent-sage " \
                  "hover:bg-surface-container-high"
         ) do
           thumb(media)
-          div(class: "flex min-w-0 flex-1 flex-col gap-1") do
-            span(class: "truncate text-body-md font-bold text-text-warm") { item.name }
+          div(class: "flex min-w-0 flex-1 flex-wrap gap-1") do
+            items.first(CHIP_CAP).each { |item| name_chip(item.name) }
+            name_chip(I18n.t("captures.session.more", count: items.size - CHIP_CAP)) if items.size > CHIP_CAP
           end
           render Components::Icons::ChevronRight.new(css: "h-4 w-4 shrink-0 text-muted")
         end
+      end
+
+      def name_chip(label)
+        span(class: "inline-flex max-w-full items-center truncate rounded-full " \
+                    "bg-surface-container-high px-2.5 py-1 text-label-caps uppercase " \
+                    "text-on-surface-variant") { label }
       end
 
       def status_row(media, run)
