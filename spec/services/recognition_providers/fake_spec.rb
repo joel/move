@@ -13,11 +13,10 @@ RSpec.describe RecognitionProviders::Fake do
     expect(result.objects.map(&:confidence)).to include(a_value > 0.8, a_value < 0.8)
   end
 
-  it "carries category + fragility + tags, and no bounding-box data" do
+  it "carries category + tags, and no bounding-box data" do
     object = described_class.new.identify(image: nil, context: {}).objects.first
-    expect(object.members).to contain_exactly(:label, :confidence, :count, :category, :fragile, :tags)
+    expect(object.members).to contain_exactly(:label, :confidence, :count, :category, :tags)
     expect(object.category).to eq("Kitchenware")
-    expect(object.fragile).to be(false)
     expect(object.tags).to eq(%w[Heavy])
   end
 end

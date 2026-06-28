@@ -80,9 +80,9 @@ RSpec.describe RecognitionRuns::Process do
     # midway. The transaction must roll back the first item too.
     objects = [
       RecognitionProviders::DetectedObject.new(label: "Lamp", confidence: 0.97, count: 1,
-                                               category: nil, fragile: false),
+                                               category: nil),
       RecognitionProviders::DetectedObject.new(label: "Rug", confidence: 99.0, count: 1,
-                                               category: nil, fragile: false)
+                                               category: nil)
     ]
     provider = instance_double(RecognitionProviders::Fake)
     allow(provider).to receive(:identify).and_return(
@@ -97,7 +97,7 @@ RSpec.describe RecognitionRuns::Process do
     expect(run.recognition_suggestions.count).to eq(0)
   end
 
-  describe "model-set category + fragility" do
+  describe "model-set category" do
     def stub_provider(*objects)
       provider = instance_double(RecognitionProviders::Fake)
       allow(provider).to receive(:identify).and_return(
@@ -106,10 +106,10 @@ RSpec.describe RecognitionRuns::Process do
       provider
     end
 
-    it "reuses an existing move category (case-insensitive) and sets fragile on item + suggestion" do
+    it "reuses an existing move category (case-insensitive) on the item + suggestion" do
       create(:category, move:, name: "Kitchenware")
       object = RecognitionProviders::DetectedObject.new(
-        label: "Wine glasses", confidence: 0.95, count: 6, category: "kitchenware", fragile: true
+        label: "Wine glasses", confidence: 0.95, count: 6, category: "kitchenware"
       )
 
       described_class.new.call(run:, provider: stub_provider(object))
@@ -117,15 +117,13 @@ RSpec.describe RecognitionRuns::Process do
       expect(move.categories.where("LOWER(name) = ?", "kitchenware").count).to eq(1)
       item = box.items.find_by(name: "Wine glasses")
       expect(item.category.name).to eq("Kitchenware")
-      expect(item.fragile).to be(true)
       suggestion = run.recognition_suggestions.find_by(proposed_name: "Wine glasses")
       expect(suggestion.proposed_category).to eq(item.category)
-      expect(suggestion.proposed_fragile).to be(true)
     end
 
     it "creates a new move category when the model proposes one that does not exist yet" do
       object = RecognitionProviders::DetectedObject.new(
-        label: "Drill", confidence: 0.9, count: 1, category: "Tools", fragile: false
+        label: "Drill", confidence: 0.9, count: 1, category: "Tools"
       )
 
       expect { described_class.new.call(run:, provider: stub_provider(object)) }
@@ -165,7 +163,7 @@ RSpec.describe RecognitionRuns::Process do
 
     it "leaves the item uncategorised when the model returns a blank category" do
       object = RecognitionProviders::DetectedObject.new(
-        label: "Mystery item", confidence: 0.9, count: 1, category: nil, fragile: false
+        label: "Mystery item", confidence: 0.9, count: 1, category: nil
       )
 
       described_class.new.call(run:, provider: stub_provider(object))
@@ -186,7 +184,7 @@ RSpec.describe RecognitionRuns::Process do
 
     def detection(name, tags, confidence: 0.95)
       RecognitionProviders::DetectedObject.new(
-        label: name, confidence:, count: 1, category: nil, fragile: false, tags:
+        label: name, confidence:, count: 1, category: nil, tags:
       )
     end
 

@@ -43,18 +43,19 @@ RSpec.describe RecognitionProviders::Anthropic do
       expect(sent.dig("tool_choice", "name")).to eq("record_objects")
       tool = sent["tools"].first
       expect(tool["name"]).to eq("record_objects")
-      expect(tool.dig("input_schema", "properties", "objects", "items", "required"))
-        .to include("category", "fragile", "tags")
+      required = tool.dig("input_schema", "properties", "objects", "items", "required")
+      expect(required).to include("category", "tags")
+      expect(required).not_to include("fragile")
       expect(sent.dig("messages", 0, "content", 1, "source"))
         .to eq("type" => "base64", "media_type" => "image/jpeg", "data" => Base64.strict_encode64("bytes"))
     end
   end
 
-  it "normalizes detections from the forced tool_use input, including category + fragile" do
+  it "normalizes detections from the forced tool_use input, including category" do
     body = { content: [{
       type: "tool_use", name: "record_objects",
       input: { objects: [{ label: "chair", confidence: 0.7, count: 1,
-                           category: "Furniture", fragile: false }] }
+                           category: "Furniture" }] }
     }] }.to_json
     stub_http(code: "200", body: body)
 
@@ -62,7 +63,7 @@ RSpec.describe RecognitionProviders::Anthropic do
     object = result.objects.first
 
     expect(result.provider).to eq("anthropic")
-    expect(object).to have_attributes(label: "chair", category: "Furniture", fragile: false)
+    expect(object).to have_attributes(label: "chair", category: "Furniture")
   end
 
   it "treats an empty objects array as a legitimate zero-detection result" do
