@@ -14,7 +14,7 @@ class RemoveQuantityFromItemsAndSuggestions < ActiveRecord::Migration[8.1]
   def down
     execute %(DROP TRIGGER IF EXISTS "logidze_on_items" on "items";)
     add_column :items, :quantity, :integer, null: false, default: 1
-    add_column :recognition_suggestions, :proposed_quantity, :integer, default: 1
+    add_column :recognition_suggestions, :proposed_quantity, :integer, null: false, default: 1
     execute items_trigger("{name, category_id, quantity}")
   end
 
