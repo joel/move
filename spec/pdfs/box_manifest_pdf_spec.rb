@@ -8,12 +8,10 @@ require "rails_helper"
 RSpec.describe BoxManifestPdf do
   let(:move) { create(:move) }
 
-  it "renders a manifest with Unicode item / category / tag names" do
+  it "renders a manifest with Unicode item names" do
     box = create(:box, :with_room, move:, number: "9")
-    category = create(:category, move:, name: "Électronique")
-    tag = create(:tag, move:, name: "Fragile ✨")
-    create(:item, :manual, move:, box:, name: "Lámpara – brass 📦", category:, tags: [tag])
-    items = box.items.includes(:category, :tags).ordered.to_a
+    create(:item, :manual, move:, box:, name: "Lámpara – brass 📦")
+    items = box.items.ordered.to_a
 
     pdf = nil
     expect { pdf = described_class.new(box:, items:).render }.not_to raise_error

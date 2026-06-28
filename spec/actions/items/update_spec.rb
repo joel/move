@@ -18,22 +18,6 @@ RSpec.describe Items::Update do
     expect(item.reload).to have_attributes(name: "New")
   end
 
-  it "replaces the tag set" do
-    a = create(:tag, move:, name: "A")
-    b = create(:tag, move:, name: "B")
-    create(:item_tag, item:, tag: a)
-
-    call(name: "X", tag_ids: [b.id])
-
-    expect(item.reload.tags).to contain_exactly(b)
-  end
-
-  it "clears the category when none is submitted" do
-    item.update!(category: create(:category, move:))
-    call(name: "X", category_id: "")
-    expect(item.reload.category).to be_nil
-  end
-
   it "confirms the item from any unreviewed state — a human edit vouches for it" do
     %w[pending_review auto_confirmed needs_correction].each do |state|
       target = create(:item, move:, review_state: state)
@@ -44,11 +28,6 @@ RSpec.describe Items::Update do
 
   it "leaves presence_state untouched (an independent axis)" do
     expect { call(name: "X") }.not_to(change { item.reload.presence_state })
-  end
-
-  it "rejects a tag outside the Move vocabulary" do
-    foreign = create(:tag, move: create(:move))
-    expect(call(name: "X", tag_ids: [foreign.id]).failure).to eq(:invalid_tag)
   end
 
   it "returns validation errors for a blank name" do

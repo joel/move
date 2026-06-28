@@ -59,16 +59,14 @@ module Search
       doc.embedded_at = nil
     end
 
-    # Textual metadata only: name + category + tags + box number + room.
+    # Textual metadata only: name + box number + room.
     def compose_text(item)
       box = item.box
       [
         item.name,
-        item.category&.name,
-        item.tags.map(&:name),
         ("Box #{box.number}" if box),
         box&.room&.name
-      ].flatten.compact_blank.join(" ")
+      ].compact_blank.join(" ")
     end
   end
 end

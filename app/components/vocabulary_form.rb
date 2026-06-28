@@ -1,11 +1,10 @@
 # frozen_string_literal: true
 
 module Components
-  # D2 — Add / rename form for a controlled-vocabulary value. The routes are not
-  # resourceful (one controller, `:kind` segment), so the URL + method are
-  # passed explicitly and fields are scoped to `vocabulary[...]`. For tags the
-  # form also exposes the applies-to facet. Selection-only everywhere else — this
-  # is the *only* place a value is created.
+  # D2 — Add / rename form for a controlled-vocabulary value (rooms). The routes
+  # are not resourceful (one controller, `:kind` segment), so the URL + method are
+  # passed explicitly and fields are scoped to `vocabulary[...]`. This is the
+  # *only* place a value is created.
   class VocabularyForm < Components::Base
     include Phlex::Rails::Helpers::FormWith
 
@@ -37,22 +36,11 @@ module Components
             error: @record.errors[:name].first, required: true, autofocus: @compact, data: @field_data
           )
         end
-        applies_to_field if @vocabulary.applies_to?
         actions(form)
       end
     end
 
     private
-
-    def applies_to_field
-      div(class: "sm:w-48") do
-        render Components::Ui::Select.new(
-          name: "vocabulary[applies_to]", label: I18n.t("vocabularies.form.applies_to"),
-          options: Tag::APPLIES_TO.map { |v| [I18n.t("vocabularies.applies_to.#{v}"), v] },
-          selected: @record.applies_to, error: @record.errors[:applies_to].first
-        )
-      end
-    end
 
     def actions(form)
       div(class: "flex gap-3") do

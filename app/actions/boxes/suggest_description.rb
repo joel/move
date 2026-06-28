@@ -3,8 +3,8 @@
 module Boxes
   # Proposes a short contents description for a Box from its in-box items. Uses the
   # Move's own recognition provider (per-Move BYO — #185) for a natural summary, and
-  # degrades to a deterministic, key-free join of the items' categories/labels when
-  # no real provider is configured or the vendor call fails. Always returns
+  # degrades to a deterministic, key-free join of the items' labels when no real
+  # provider is configured or the vendor call fails. Always returns
   # Success(String) — a suggestion is advisory, so it never blocks or 500s. The
   # caller renders it into an editable field; nothing is persisted here.
   class SuggestDescription < BaseAction
@@ -43,11 +43,9 @@ module Boxes
       text.to_s.truncate(Box::DESCRIPTION_MAX_LENGTH)
     end
 
-    # In-box items as { label:, category: }, category eager-loaded.
+    # In-box items as { label: }.
     def digest_for(box)
-      box.items.in_box.includes(:category).ordered.map do |item|
-        { label: item.name, category: item.category&.name }
-      end
+      box.items.in_box.ordered.map { |item| { label: item.name } }
     end
 
     # A real provider selected AND this Move's key present (strict BYO). `fake` and
@@ -56,11 +54,9 @@ module Boxes
       move.recognition_provider != "fake" && move.recognition_ready?
     end
 
-    # Key-free summary: distinct category names (falling back to the item label when
-    # uncategorised), in item order, capped and comma-joined.
+    # Key-free summary: distinct item labels, in item order, capped and comma-joined.
     def deterministic(items)
-      items.map { |i| (i[:category].presence || i[:label]).to_s.strip }
-           .compact_blank.uniq.first(MAX_TERMS).join(", ")
+      items.map { |i| i[:label].to_s.strip }.compact_blank.uniq.first(MAX_TERMS).join(", ")
     end
 
     def emit(box, source)

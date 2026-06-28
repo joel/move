@@ -120,15 +120,14 @@ RSpec.describe Search::Items do
   end
 
   describe "denormalized propagation (Domain §7.3)" do
-    it "reindexes an item when its tags change via Items::Update (item.updated event)" do
+    it "reindexes an item when it is renamed via Items::Update (item.updated event)" do
       item = index(confirmed("Plain widget"))
-      tag = create(:tag, move:, name: "Fragile")
-      expect(described_class.new.call(move:, query: "fragile").value!).to be_empty
+      expect(described_class.new.call(move:, query: "Gizmo").value!).to be_empty
 
-      # Editing tags emits item.updated → Search::IndexSubscriber → reindex.
-      Items::Update.new.call(item:, params: { name: item.name, tag_ids: [tag.id] }, editor: create(:user))
+      # Editing the name emits item.updated → Search::IndexSubscriber → reindex.
+      Items::Update.new.call(item:, params: { name: "Gizmo" }, editor: create(:user))
 
-      results = described_class.new.call(move:, query: "fragile").value!.map(&:item)
+      results = described_class.new.call(move:, query: "Gizmo").value!.map(&:item)
       expect(results).to include(item)
     end
 

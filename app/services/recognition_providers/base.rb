@@ -47,12 +47,10 @@ module RecognitionProviders
           items: {
             type: "object",
             additionalProperties: false,
-            required: %w[label confidence category tags],
+            required: %w[label confidence],
             properties: {
               label: { type: "string" },
-              confidence: { type: "number" },
-              category: { type: "string" },
-              tags: { type: "array", items: { type: "string" } }
+              confidence: { type: "number" }
             }
           }
         }
@@ -146,9 +144,7 @@ module RecognitionProviders
 
         DetectedObject.new(
           label: label,
-          confidence: fetch(obj, :confidence)&.to_f&.clamp(0.0, 1.0),
-          category: fetch(obj, :category).to_s.strip.presence,
-          tags: Array(fetch(obj, :tags)).map { it.to_s.strip }.compact_blank.uniq
+          confidence: fetch(obj, :confidence)&.to_f&.clamp(0.0, 1.0)
         )
       end
     end
@@ -157,33 +153,12 @@ module RecognitionProviders
       obj[key.to_s] || obj[key]
     end
 
-    # Vocabulary-aware prompt shared by every adapter. context carries :room plus
-    # :categories and :tags (names from the move's category and item-applicable
-    # tag vocabularies) built in RecognitionRuns::Process#context. `category` and
-    # `tags` are distinct structured-output fields mapping to distinct models, so
-    # both vocabularies are offered as candidates without conflating them.
+    # Detection prompt shared by every adapter. context carries :room (the only
+    # vocabulary still fed to the model — category/tags were removed), built in
+    # RecognitionRuns::Process#context.
     def prompt(context)
       lines = ["Identify the distinct physical objects in this moving-box photo."]
       lines << "The box is in the #{context[:room]}." if context[:room].present?
-
-      categories = Array(context[:categories]).map(&:to_s).compact_blank.uniq
-      lines << if categories.any?
-                 "Classify each item into a category. Prefer one of these existing " \
-                   "categories when it clearly fits (#{categories.join(", ")}); only introduce a " \
-                   "new, concise category when none of these match."
-               else
-                 "Classify each item with a concise category (e.g. Kitchenware, Books, Electronics)."
-               end
-
-      tags = Array(context[:tags]).map(&:to_s).compact_blank.uniq
-      lines << if tags.any?
-                 "Add a short list of descriptive tags to each item (at most a few). Prefer " \
-                   "these existing tags when they fit (#{tags.join(", ")}); only introduce a new, " \
-                   "concise tag when it adds real signal. Use an empty list when none apply."
-               else
-                 "Add a short list of concise descriptive tags to each item (at most a few, " \
-                   "e.g. Heavy, Valuable, Seasonal), or an empty list when none apply."
-               end
 
       lines << "Give one entry per distinct item and collapse identical duplicates into a " \
                "single entry. Ignore the box itself, packing materials " \
@@ -196,15 +171,13 @@ module RecognitionProviders
     # Text prompt for the contents-summary call. Lists the box's items and asks for
     # one short, comma-separated description of the main things it carries — no
     # sentence, no trailing period — so the result reads like "Clothes, Electronics,
-    # Books". `items` is an Array<Hash> of { label:, category: }.
+    # Books". `items` is an Array<Hash> of { label: }.
     def summarize_prompt(items)
       lines = Array(items).filter_map do |entry|
         label = entry[:label].to_s.strip
         next if label.blank?
 
-        category = entry[:category].to_s.strip
-        suffix = category.present? ? " (#{category})" : ""
-        "#{label}#{suffix}"
+        label
       end
 
       "Summarise the contents of this moving box into one short, human-readable line " \

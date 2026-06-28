@@ -15,7 +15,7 @@ module MoveMcp
         box = find_box(server_context, box_number)
         return error_response("No box ##{box_number} in this move.") if box.nil?
 
-        items = box.items.in_box.ordered.includes(:category, :box).map { |item| item_json(item) }
+        items = box.items.in_box.ordered.includes(:box).map { |item| item_json(item) }
         data_response(box: box_json(box), items: items)
       end
     end

@@ -1,13 +1,13 @@
 # frozen_string_literal: true
 
 # An inventory item in exactly one Box (Domain §4.12). Created by recognition
-# (auto_confirmed/pending_review) or manually (D5). Category + tags are managed,
-# selection-only Move vocabularies (D5); their management UI lands in D7. No
-# value, bounding box, or crop fields. Edit/review UIs land in D5/D6.
+# (auto_confirmed/pending_review) or manually. An item is just a name —
+# category, tags, quantity and fragility were all removed across the
+# simplification epic. No value, bounding box, or crop fields.
 class Item < ApplicationRecord
-  # Field-level history (Logidze) over the editable columns (name, category_id) —
-  # powers the activity feed's revert (PR3). The whitelist trigger ignores
-  # discard/system columns, so deleting never churns a version.
+  # Field-level history (Logidze) over the editable column (name) — powers the
+  # activity feed's revert (PR3). The whitelist trigger ignores discard/system
+  # columns, so deleting never churns a version.
   has_logidze
   # Soft delete (Domain §11) — the *deletion* axis, orthogonal to the unpacking
   # `presence_state: removed` axis below. `default_scope { kept }` hides deleted
@@ -21,11 +21,6 @@ class Item < ApplicationRecord
   belongs_to :move
   belongs_to :box
   belongs_to :source_media, class_name: "Media", optional: true
-  # Managed Move vocabularies (D5, selection-only; management in D7). Category is
-  # optional; tags are a many-to-many through the item_tags join.
-  belongs_to :category, optional: true
-  has_many :item_tags, dependent: :destroy
-  has_many :tags, through: :item_tags
   # D8 hybrid-search projection (one row per item; lexical + optional embedding).
   has_one :search_document, class_name: "ItemSearchDocument", dependent: :destroy
   # Raw uuid back-reference (no FK; set when materialized from a suggestion).

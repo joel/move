@@ -19,21 +19,13 @@ RSpec.describe Boxes::SuggestDescription do
   end
 
   context "with no real provider (fake)" do
-    it "joins distinct item categories deterministically, in item order" do
+    it "joins distinct item labels deterministically, in item order" do
       box = create(:box, move:)
-      kitchen = create(:category, move:, name: "Kitchenware")
-      books = create(:category, move:, name: "Books")
-      create(:item, move:, box:, name: "Mug", category: kitchen)
-      create(:item, move:, box:, name: "Plate", category: kitchen)
-      create(:item, move:, box:, name: "Novel", category: books)
+      create(:item, move:, box:, name: "Mug")
+      create(:item, move:, box:, name: "Plate")
+      create(:item, move:, box:, name: "Novel")
 
-      expect(suggest(box).value!).to eq("Kitchenware, Books")
-    end
-
-    it "falls back to the item label when uncategorised" do
-      box = create(:box, move:)
-      create(:item, move:, box:, name: "Lamp", category: nil)
-      expect(suggest(box).value!).to eq("Lamp")
+      expect(suggest(box).value!).to eq("Mug, Plate, Novel")
     end
 
     it "never calls a vendor provider" do
@@ -79,12 +71,11 @@ RSpec.describe Boxes::SuggestDescription do
 
     it "falls back to deterministic (and a fallback event) when the vendor call fails" do
       box = create(:box, move:)
-      cat = create(:category, move:, name: "Kitchenware")
-      create(:item, move:, box:, name: "Mug", category: cat)
+      create(:item, move:, box:, name: "Mug")
       allow(provider).to receive(:summarize_contents).and_raise(ProviderHttp::Error, "boom")
       allow(Rails.event).to receive(:notify)
 
-      expect(suggest(box).value!).to eq("Kitchenware")
+      expect(suggest(box).value!).to eq("Mug")
       expect(Rails.event).to have_received(:notify).with(
         "box.description_suggested", hash_including(source: "fallback")
       )
@@ -94,20 +85,18 @@ RSpec.describe Boxes::SuggestDescription do
     # rescue around the vendor call must still degrade rather than 500.
     it "falls back when the provider raises a raw transport error (TLS / connection reset)" do
       box = create(:box, move:)
-      cat = create(:category, move:, name: "Books")
-      create(:item, move:, box:, name: "Novel", category: cat)
+      create(:item, move:, box:, name: "Novel")
       allow(provider).to receive(:summarize_contents).and_raise(OpenSSL::SSL::SSLError, "reset")
 
-      expect(suggest(box).value!).to eq("Books")
+      expect(suggest(box).value!).to eq("Novel")
     end
 
     it "falls back to deterministic when the AI returns a blank string" do
       box = create(:box, move:)
-      cat = create(:category, move:, name: "Books")
-      create(:item, move:, box:, name: "Novel", category: cat)
+      create(:item, move:, box:, name: "Novel")
       allow(provider).to receive(:summarize_contents).and_return("  ")
 
-      expect(suggest(box).value!).to eq("Books")
+      expect(suggest(box).value!).to eq("Novel")
     end
 
     it "clamps a verbose suggestion to the Box description limit (stays valid)" do

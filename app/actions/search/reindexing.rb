@@ -2,8 +2,8 @@
 
 module Search
   # Shared by actions that change an item's *denormalized* search context (box
-  # number/room, category/tag/room name, vocab removal) without touching the item
-  # rows themselves — so Item#after_commit won't fire. They enqueue a projection
+  # number/room, room name, vocab removal) without touching the item rows
+  # themselves — so Item#after_commit won't fire. They enqueue a projection
   # refresh for the affected items (Domain §7.3).
   module Reindexing
     private
@@ -33,10 +33,10 @@ module Search
       reindex_items(item_ids || move.items.ids, indexing_run: run)
     end
 
-    # Item ids whose search_text embeds this vocabulary value.
+    # Item ids whose search_text embeds this vocabulary value (rooms only — a
+    # room rename changes the box/room context denormalized into search_text).
     def affected_item_ids(record)
       case record
-      when Category, Tag then record.items.ids
       when Room then Item.where(box_id: record.boxes.select(:id)).ids
       else []
       end

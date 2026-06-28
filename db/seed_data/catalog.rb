@@ -16,10 +16,10 @@ require "json"
 # placeholder icon — so `db:seed` works on a fresh DB / CI with no images, and
 # lights up with real photos once they're generated and committed.
 #
-# Vocabulary references (category/tags) MUST match Moves::DefaultVocabularies
-# (+ the demo-only "Everyday Use" tag). Fragility is a box-level flag now
-# (BOXES `fragile:`, a manual mark that prints FRAGILE on the label), not an item
-# attribute or tag. Guarded by spec/seed_data/catalog_spec.rb.
+# Room references (BOXES `room:`) MUST match Moves::DefaultVocabularies::ROOMS.
+# An item is just a name now — category, tags, quantity and fragility were all
+# removed across the simplification epic (fragility moved to BOXES `fragile:`).
+# Guarded by spec/seed_data/catalog_spec.rb.
 module SeedData
   # number => box. dims: [length_cm, width_cm, height_cm, weight_kg] (nil ok).
   # Covers every lifecycle state, full/partial/no dimensions, a roomless box (the
@@ -62,8 +62,7 @@ module SeedData
   #                 `error_code`/`error_message`.
   # `captured_at`: seconds ago, so the per-photo review walk (box 1) visits photos
   #   in this listed order (larger = earlier = visited first).
-  # An item: name (required), confidence, review, presence (default "in_box"),
-  #   category, tags.
+  # An item: name (required), confidence, review, presence (default "in_box").
   PHOTOS = [
     # --- Box 1: the review-walk showcase (3 scene photos + 2 recovery tiles) ----
     { box: "1", slug: "kitchen-counter", status: "succeeded", captured_at: 300,
@@ -73,11 +72,11 @@ module SeedData
               "books, and a set of four ceramic mugs. Even daylight, eye-level, " \
               "mild clutter, no text or watermarks.",
       items: [
-        { name: "Coffee maker", confidence: 0.97, review: "auto_confirmed", category: "Appliances" },
-        { name: "Stack of books", confidence: 0.88, review: "auto_confirmed", category: "Books", tags: ["Heavy"] },
-        { name: "Set of mugs",   confidence: 0.62, review: "pending_review", category: "Kitchenware" },
-        { name: "Table lamp",    confidence: 0.55, review: "pending_review", category: "Electronics" },
-        { name: "Picture frame", confidence: 0.41, review: "pending_review", category: "Decor" }
+        { name: "Coffee maker", confidence: 0.97, review: "auto_confirmed" },
+        { name: "Stack of books", confidence: 0.88, review: "auto_confirmed" },
+        { name: "Set of mugs",   confidence: 0.62, review: "pending_review" },
+        { name: "Table lamp",    confidence: 0.55, review: "pending_review" },
+        { name: "Picture frame", confidence: 0.41, review: "pending_review" }
       ] },
     { box: "1", slug: "open-shelving", status: "succeeded", captured_at: 240,
       provider: "fake", provider_model: "fake-1",
@@ -86,11 +85,11 @@ module SeedData
               "art, and a stack of glossy magazines. Even daylight, eye-level, " \
               "no text or watermarks.",
       items: [
-        { name: "Throw blanket",   confidence: 0.68, review: "pending_review", category: "Decor" },
-        { name: "Decorative vase", confidence: 0.47, review: "pending_review", category: "Decor" },
-        { name: "Wall art",       confidence: 0.53, review: "pending_review", category: "Decor" },
-        { name: "Bookshelf",      confidence: 0.44, review: "pending_review", category: "Furniture" },
-        { name: "Magazines",      confidence: 0.58, review: "needs_correction", category: "Books" }
+        { name: "Throw blanket",   confidence: 0.68, review: "pending_review" },
+        { name: "Decorative vase", confidence: 0.47, review: "pending_review" },
+        { name: "Wall art",       confidence: 0.53, review: "pending_review" },
+        { name: "Bookshelf",      confidence: 0.44, review: "pending_review" },
+        { name: "Magazines",      confidence: 0.58, review: "needs_correction" }
       ] },
     { box: "1", slug: "floor-corner", status: "succeeded", captured_at: 180,
       provider: "fake", provider_model: "fake-1",
@@ -98,11 +97,11 @@ module SeedData
               "rolled area rug, a tall floor lamp, a small wooden coffee table, " \
               "and a ceramic floor vase. Even daylight, eye-level, no text.",
       items: [
-        { name: "Area rug",    confidence: 0.58, review: "pending_review", category: "Decor" },
-        { name: "Floor lamp",  confidence: 0.62, review: "pending_review", category: "Electronics" },
-        { name: "Coffee table", confidence: 0.52, review: "pending_review", category: "Furniture" },
-        { name: "Floor vase",  confidence: 0.51, review: "pending_review", category: "Decor" },
-        { name: "Wall clock",  confidence: 0.54, review: "pending_review", category: "Decor" }
+        { name: "Area rug",    confidence: 0.58, review: "pending_review" },
+        { name: "Floor lamp",  confidence: 0.62, review: "pending_review" },
+        { name: "Coffee table", confidence: 0.52, review: "pending_review" },
+        { name: "Floor vase",  confidence: 0.51, review: "pending_review" },
+        { name: "Wall clock",  confidence: 0.54, review: "pending_review" }
       ] },
     { box: "1", slug: "recovery-failed", status: "failed", captured_at: 30,
       provider: "openai", provider_model: "gpt-5-mini",
@@ -125,11 +124,10 @@ module SeedData
               "hardcover books, two framed family photos, a folded wool blanket, " \
               "and a small stack of vinyl records. Even daylight, no text.",
       items: [
-        { name: "Hardcover Books", confidence: 0.90, review: "auto_confirmed", category: "Books", tags: ["Heavy"] },
-        { name: "Framed Photos",  confidence: 0.85, review: "auto_confirmed", category: "Decor",
-          tags: ["Important"] },
-        { name: "Wool Blanket",   confidence: 0.70, review: "confirmed", category: "Clothing" },
-        { name: "Vinyl Records",  confidence: 0.60, review: "pending_review", category: "Decor", tags: ["Valuable"] }
+        { name: "Hardcover Books", confidence: 0.90, review: "auto_confirmed" },
+        { name: "Framed Photos",  confidence: 0.85, review: "auto_confirmed" },
+        { name: "Wool Blanket",   confidence: 0.70, review: "confirmed" },
+        { name: "Vinyl Records",  confidence: 0.60, review: "pending_review" }
       ] },
 
     # --- Box 5 (Garage, in_transit): power tools -------------------------------
@@ -139,10 +137,10 @@ module SeedData
               "drill, a coiled orange extension cord, a socket wrench set in a " \
               "case, and safety goggles. Even daylight, eye-level, no text.",
       items: [
-        { name: "Cordless Drill", confidence: 0.92, review: "auto_confirmed", category: "Tools", tags: ["Heavy"] },
-        { name: "Extension Cord", confidence: 0.80, review: "auto_confirmed", category: "Tools" },
-        { name: "Socket Set", confidence: 0.70, review: "confirmed", category: "Tools", tags: ["Heavy"] },
-        { name: "Safety Goggles", confidence: 0.60, review: "pending_review", category: "Tools" }
+        { name: "Cordless Drill", confidence: 0.92, review: "auto_confirmed" },
+        { name: "Extension Cord", confidence: 0.80, review: "auto_confirmed" },
+        { name: "Socket Set", confidence: 0.70, review: "confirmed" },
+        { name: "Safety Goggles", confidence: 0.60, review: "pending_review" }
       ] },
 
     # --- Box 7 (Bedroom, unpacking): removal demo — items already unpacked -----
@@ -154,9 +152,8 @@ module SeedData
       prompt: "A realistic smartphone photo of a bedside shelf with a phone " \
               "charger and cable, and a paperback novel. Even indoor light, no text.",
       items: [
-        { name: "Phone Charger", confidence: 0.90, review: "confirmed",
-          category: "Electronics", tags: ["Everyday Use"] },
-        { name: "Paperback", confidence: 0.90, review: "confirmed", category: "Books" }
+        { name: "Phone Charger", confidence: 0.90, review: "confirmed" },
+        { name: "Paperback", confidence: 0.90, review: "confirmed" }
       ] },
 
     # --- Box 9 (Kitchen, packing): removal demo — one photo, two in-box items --
@@ -166,8 +163,8 @@ module SeedData
               "cast-iron skillet and a nested set of stainless mixing bowls. " \
               "Even daylight, eye-level, no text.",
       items: [
-        { name: "Cast Iron Skillet", confidence: 0.90, review: "confirmed", category: "Kitchenware", tags: ["Heavy"] },
-        { name: "Mixing Bowls",     confidence: 0.90, review: "confirmed", category: "Kitchenware" }
+        { name: "Cast Iron Skillet", confidence: 0.90, review: "confirmed" },
+        { name: "Mixing Bowls",     confidence: 0.90, review: "confirmed" }
       ] },
 
     # --- Box 11 (Office, packing): desk gear -----------------------------------
@@ -177,12 +174,11 @@ module SeedData
               "laptop, an external monitor, a mechanical keyboard, a desk lamp, " \
               "and a stack of notebooks. Even daylight, eye-level, no text.",
       items: [
-        { name: "Laptop",           confidence: 0.95, review: "auto_confirmed", category: "Electronics",
-          tags: %w[Valuable Important] },
-        { name: "External Monitor", confidence: 0.88, review: "auto_confirmed", category: "Electronics" },
-        { name: "Mechanical Keyboard", confidence: 0.70, review: "confirmed", category: "Electronics" },
-        { name: "Desk Lamp",        confidence: 0.60, review: "pending_review", category: "Electronics" },
-        { name: "Notebook Stack",   confidence: 0.50, review: "pending_review", category: "Documents" }
+        { name: "Laptop",           confidence: 0.95, review: "auto_confirmed" },
+        { name: "External Monitor", confidence: 0.88, review: "auto_confirmed" },
+        { name: "Mechanical Keyboard", confidence: 0.70, review: "confirmed" },
+        { name: "Desk Lamp",        confidence: 0.60, review: "pending_review" },
+        { name: "Notebook Stack",   confidence: 0.50, review: "pending_review" }
       ] },
 
     # --- Box 12 (Bathroom, sealed): toiletries ---------------------------------
@@ -192,13 +188,10 @@ module SeedData
               "bath towels, a zipped toiletry bag, an electric toothbrush on its " \
               "charger, and a pump bottle of hand soap. Even light, no text.",
       items: [
-        { name: "Bath Towels",       confidence: 0.85, review: "auto_confirmed", category: "Clothing" },
-        { name: "Toiletry Bag",      confidence: 0.70, review: "confirmed", category: "Clothing",
-          tags: ["Everyday Use"] },
-        { name: "Electric Toothbrush", confidence: 0.60, review: "pending_review", category: "Electronics",
-          tags: ["Everyday Use"] },
-        { name: "Hand Soap", confidence: 0.50, review: "pending_review", category: "Kitchenware",
-          tags: ["Liquid"] }
+        { name: "Bath Towels",       confidence: 0.85, review: "auto_confirmed" },
+        { name: "Toiletry Bag",      confidence: 0.70, review: "confirmed" },
+        { name: "Electric Toothbrush", confidence: 0.60, review: "pending_review" },
+        { name: "Hand Soap", confidence: 0.50, review: "pending_review" }
       ] },
 
     # --- Box 13 (Dining Room, in_transit): fragile dinnerware ------------------
@@ -208,11 +201,10 @@ module SeedData
               "white dinner plates, a row of stemmed wine glasses, a large " \
               "serving bowl, and a folded linen tablecloth. Even daylight, no text.",
       items: [
-        { name: "Dinner Plates", confidence: 0.90, review: "auto_confirmed", category: "Kitchenware" },
-        { name: "Wine Glasses",  confidence: 0.85, review: "auto_confirmed", category: "Kitchenware",
-          tags: ["Valuable"] },
-        { name: "Serving Bowl",  confidence: 0.70, review: "confirmed", category: "Kitchenware" },
-        { name: "Linen Tablecloth", confidence: 0.60, review: "pending_review", category: "Clothing" }
+        { name: "Dinner Plates", confidence: 0.90, review: "auto_confirmed" },
+        { name: "Wine Glasses",  confidence: 0.85, review: "auto_confirmed" },
+        { name: "Serving Bowl",  confidence: 0.70, review: "confirmed" },
+        { name: "Linen Tablecloth", confidence: 0.60, review: "pending_review" }
       ] },
 
     # --- Box 14 (Garage, packing): camping gear --------------------------------
@@ -222,11 +214,10 @@ module SeedData
               "packed dome tent in its bag, a rolled sleeping bag, a bicycle " \
               "helmet, and a hand air pump. Even daylight, no text.",
       items: [
-        { name: "Camping Tent",  confidence: 0.80, review: "confirmed", category: "Toys",
-          tags: %w[Seasonal Heavy] },
-        { name: "Sleeping Bag",  confidence: 0.70, review: "confirmed", category: "Clothing", tags: ["Seasonal"] },
-        { name: "Bicycle Helmet", confidence: 0.60, review: "pending_review", category: "Toys" },
-        { name: "Hand Pump", confidence: 0.50, review: "pending_review", category: "Tools" }
+        { name: "Camping Tent",  confidence: 0.80, review: "confirmed" },
+        { name: "Sleeping Bag",  confidence: 0.70, review: "confirmed" },
+        { name: "Bicycle Helmet", confidence: 0.60, review: "pending_review" },
+        { name: "Hand Pump", confidence: 0.50, review: "pending_review" }
       ] },
 
     # --- Box 15 (Living Room, sealed): entertainment ---------------------------
@@ -236,11 +227,10 @@ module SeedData
               "console, a stack of boxed board games, a streaming remote, and a " \
               "row of DVD cases. Even daylight, eye-level, no text.",
       items: [
-        { name: "Game Console",    confidence: 0.90, review: "auto_confirmed", category: "Electronics",
-          tags: ["Valuable"] },
-        { name: "Board Games",     confidence: 0.70, review: "confirmed", category: "Toys" },
-        { name: "DVD Collection",  confidence: 0.60, review: "pending_review", category: "Decor" },
-        { name: "Streaming Remote", confidence: 0.50, review: "pending_review", category: "Electronics" }
+        { name: "Game Console",    confidence: 0.90, review: "auto_confirmed" },
+        { name: "Board Games",     confidence: 0.70, review: "confirmed" },
+        { name: "DVD Collection",  confidence: 0.60, review: "pending_review" },
+        { name: "Streaming Remote", confidence: 0.50, review: "pending_review" }
       ] }
   ].freeze
 
@@ -250,25 +240,25 @@ module SeedData
   # dryer" backs the semantic-search demo ("blow dryer" ~ "Hair dryer").
   MANUAL_ITEMS = [
     { box: "2", name: "Espresso Machine",
-      category: "Electronics", tags: ["Heavy"], review: "confirmed", presence: "in_box" },
+      review: "confirmed", presence: "in_box" },
     { box: "2", name: "Dinner Plates",
-      category: "Kitchenware", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
+      review: "confirmed", presence: "in_box" },
     { box: "4", name: "Paperback Novels",
-      category: "Books", tags: ["Heavy"], review: "needs_correction", presence: "in_box" },
+      review: "needs_correction", presence: "in_box" },
     { box: "4", name: "Winter Coat",
-      category: "Clothing", tags: ["Seasonal"], review: "confirmed", presence: "removed" },
+      review: "confirmed", presence: "removed" },
     { box: "5", name: "Hair dryer",
-      category: "Electronics", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
+      review: "confirmed", presence: "in_box" },
     { box: "7", name: "Bedside Lamp",
-      category: "Electronics", tags: ["Important"], review: "confirmed", presence: "in_box" },
+      review: "confirmed", presence: "in_box" },
     { box: "7", name: "Folded Bedsheets",
-      category: "Clothing", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
+      review: "confirmed", presence: "in_box" },
     { box: "7", name: "Alarm Clock",
-      category: "Electronics", tags: [], review: "confirmed", presence: "in_box" },
+      review: "confirmed", presence: "in_box" },
     { box: "7", name: "Throw Pillows",
-      category: "Clothing", tags: [], review: "confirmed", presence: "removed" },
+      review: "confirmed", presence: "removed" },
     { box: "7", name: "Reading Glasses",
-      category: nil, tags: ["Important"], review: "confirmed", presence: "removed" }
+      review: "confirmed", presence: "removed" }
   ].freeze
 
   # --- Recognition record/replay --------------------------------------------
@@ -292,7 +282,7 @@ module SeedData
   # objects when present (review_state derived from confidence vs `threshold`,
   # mirroring RecognitionRuns::Process), else the authored catalog items
   # (explicit review_state) as the offline fallback. Uniform hash shape either
-  # way: { name:, confidence:, category:, tags:, review: }.
+  # way: { name:, confidence:, review: }.
   def self.detections_for(photo, threshold:)
     recorded = recorded_recognition(photo[:slug])
     return normalize_recorded(recorded["objects"], threshold: threshold) if recorded
@@ -315,16 +305,11 @@ module SeedData
     {
       name: label,
       confidence: confidence,
-      category: object["category"].to_s.strip.presence,
-      tags: Array(object["tags"]).map { |tag| tag.to_s.strip }.reject(&:empty?).uniq,
       review: confidence && confidence >= threshold ? "auto_confirmed" : "pending_review"
     }
   end
 
   def self.authored_detection(item)
-    {
-      name: item[:name], confidence: item[:confidence],
-      category: item[:category], tags: item[:tags] || [], review: item[:review]
-    }
+    { name: item[:name], confidence: item[:confidence], review: item[:review] }
   end
 end

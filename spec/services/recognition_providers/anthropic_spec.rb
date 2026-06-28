@@ -6,7 +6,7 @@ RSpec.describe RecognitionProviders::Anthropic do
   subject(:provider) { described_class.new(api_key: "sk-ant-test") }
 
   let(:image) { instance_double(ActiveStorage::Blob, content_type: "image/jpeg", download: "bytes") }
-  let(:context) { { room: nil, categories: [], tags: [] } }
+  let(:context) { { room: nil } }
   let(:captured) { {} }
 
   # Capture the outgoing request so request-body specs can assert what we SEND.
@@ -44,18 +44,16 @@ RSpec.describe RecognitionProviders::Anthropic do
       tool = sent["tools"].first
       expect(tool["name"]).to eq("record_objects")
       required = tool.dig("input_schema", "properties", "objects", "items", "required")
-      expect(required).to include("category", "tags")
-      expect(required).not_to include("fragile", "count")
+      expect(required).to contain_exactly("label", "confidence")
       expect(sent.dig("messages", 0, "content", 1, "source"))
         .to eq("type" => "base64", "media_type" => "image/jpeg", "data" => Base64.strict_encode64("bytes"))
     end
   end
 
-  it "normalizes detections from the forced tool_use input, including category" do
+  it "normalizes detections from the forced tool_use input" do
     body = { content: [{
       type: "tool_use", name: "record_objects",
-      input: { objects: [{ label: "chair", confidence: 0.7,
-                           category: "Furniture" }] }
+      input: { objects: [{ label: "chair", confidence: 0.7 }] }
     }] }.to_json
     stub_http(code: "200", body: body)
 
@@ -63,7 +61,7 @@ RSpec.describe RecognitionProviders::Anthropic do
     object = result.objects.first
 
     expect(result.provider).to eq("anthropic")
-    expect(object).to have_attributes(label: "chair", category: "Furniture")
+    expect(object).to have_attributes(label: "chair", confidence: 0.7)
   end
 
   it "treats an empty objects array as a legitimate zero-detection result" do
@@ -116,7 +114,7 @@ RSpec.describe RecognitionProviders::Anthropic do
         expect(sent.dig("tools", 0, "input_schema", "required")).to eq(%w[description])
         # Text-only: a single text block, no image source.
         expect(sent.dig("messages", 0, "content").pluck("type")).to eq(%w[text])
-        expect(sent.dig("messages", 0, "content", 0, "text")).to include("Mugs", "Kitchenware")
+        expect(sent.dig("messages", 0, "content", 0, "text")).to include("Mugs", "Books")
       end
     end
 

@@ -6,12 +6,10 @@ module Views
     # never cropped) on the left; the edit form plus Move and Remove/Restore
     # controls on the right. Review and presence are shown as independent axes.
     class Show < Views::Base
-      def initialize(move:, item:, boxes:, categories:, tags:, editable: false, photo_siblings: 0)
+      def initialize(move:, item:, boxes:, editable: false, photo_siblings: 0)
         @move = move
         @item = item
         @boxes = boxes
-        @categories = categories
-        @tags = tags
         @editable = editable
         # Count of *other* in-box items detected in this item's source photo (0 for
         # manual items) — surfaces the one-photo → many-items relationship on C3.
@@ -106,22 +104,17 @@ module Views
       end
 
       def editable_body
-        render Components::ItemForm.new(
-          models: [@move, @item], item: @item,
-          categories: @categories, tags: @tags, autosave: true
-        )
+        render Components::ItemForm.new(models: [@move, @item], item: @item, autosave: true)
         render Components::Items::PresenceControls.new(
           move: @move, item: @item, boxes: @boxes, editable: @editable
         )
       end
 
-      # Read-only detail for viewers / archived Moves: the same attributes the
-      # form edits, rendered as labelled text instead of inputs/controls.
+      # Read-only detail for viewers / archived Moves: the item name, rendered as
+      # labelled text instead of an input.
       def read_only_body
         div(class: "flex flex-col gap-5") do
           detail_row(I18n.t("items.form.name"), @item.name)
-          detail_row(I18n.t("items.form.category"), @item.category&.name || "—")
-          detail_row(I18n.t("items.form.tags"), item_tag_labels)
           p(class: "border-t border-card-border pt-4 text-body-md text-muted") do
             I18n.t(@move.archived? ? "items.show.archived" : "items.show.view_only")
           end
@@ -133,11 +126,6 @@ module Views
           span(class: "text-label-caps uppercase text-muted") { label }
           span(class: "text-body-lg text-text-warm") { value }
         end
-      end
-
-      def item_tag_labels
-        names = @item.tags.map(&:name)
-        names.any? ? names.join(", ") : "—"
       end
 
       def box_context(box)

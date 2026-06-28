@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 # A normalized proposed item from a recognition run (Domain §4.11). Carries no
-# bounding boxes or vendor data. May materialize into an Item (auto-accepted
-# at/above the Move threshold, else pending). The model also proposes a category
-# (best-effort onto the Move vocabulary) and a fragility flag.
+# bounding boxes or vendor data — just a proposed name + confidence. May
+# materialize into an Item (auto-accepted at/above the Move threshold, else
+# pending).
 class RecognitionSuggestion < ApplicationRecord
   STATES = %w[pending auto_accepted accepted corrected needs_correction false_positive conflict].freeze
 
@@ -12,7 +12,6 @@ class RecognitionSuggestion < ApplicationRecord
   belongs_to :media
   belongs_to :recognition_run
   belongs_to :item, optional: true
-  belongs_to :proposed_category, class_name: "Category", optional: true
 
   validates :proposed_name, presence: true
   validates :state, inclusion: { in: STATES }

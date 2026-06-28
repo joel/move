@@ -38,8 +38,6 @@ en:
       member: "a member"
       unknown: "an item"
     kind:
-      category: "category"
-      tag: "tag"
       room: "room"
     summary:
       box:

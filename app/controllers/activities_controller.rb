@@ -83,10 +83,7 @@ class ActivitiesController < MoveScopedController
   def apply_revert(type, record, prior)
     case type
     when "Item"
-      Items::Update.new.call(item: record, editor: current_user, params: {
-                               name: prior.name,
-                               category_id: prior.category_id, tag_ids: record.tag_ids
-                             })
+      Items::Update.new.call(item: record, editor: current_user, params: { name: prior.name })
     when "Box"
       Boxes::Update.new.call(box: record, editor: current_user, params: {
                                number: prior.number, length_cm: prior.length_cm, width_cm: prior.width_cm,

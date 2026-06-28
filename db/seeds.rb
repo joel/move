@@ -145,7 +145,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   move.move_memberships.find_or_create_by!(user: member) { |mm| mm.role = "contributor" }
   move.move_memberships.find_or_create_by!(user: viewer) { |mm| mm.role = "viewer" }
 
-  # Seed the curated default vocabularies (categories, tags, rooms) that every
+  # Seed the curated default vocabulary (rooms) that every
   # new Move now gets through Moves::Create. The shared module keeps the seed and
   # the app in lockstep; the demo Move is built directly here (not via the action)
   # so it must call apply itself.
@@ -182,14 +182,6 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     box.update!(fragile: true) if attrs[:fragile] && !box.fragile?
   end
 
-  # The demo-only "Everyday Use" tag the items below reference (not part of the
-  # curated default set). The indices resolve catalog category/tag names → records.
-  everyday = move.tags.find_or_initialize_by(name: "Everyday Use")
-  everyday.applies_to = "item"
-  everyday.save!
-  categories = move.categories.index_by(&:name)
-  tags = move.tags.index_by(&:name)
-
   # Attach the generated 1:1 demo photo for a slug once it's been generated and
   # committed (db/seed_images/<slug>.jpg via `rails seed_images:generate`); else
   # fall back to the placeholder icon so db:seed works offline / on a fresh DB / CI.
@@ -206,28 +198,8 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   # (db/seed_data/recognition/<slug>.json, written by `seed_recognition:record`)
   # so the demo shows authentic detections; fall back to the authored catalog
   # `items:` offline. review_state splits on the Move's auto-confirm threshold,
-  # exactly like RecognitionRuns::Process. Recorded category/tag names resolve
-  # against the Move vocabulary, growing it for any new value the model proposed
-  # (mirroring the pipeline; a box-only tag can't ride on an item).
+  # exactly like RecognitionRuns::Process. An item is just a name now.
   threshold = move.auto_confirm_threshold.to_f
-  resolve_category = lambda do |name|
-    name = name.to_s.strip
-    next nil if name.blank?
-
-    move.categories.where("LOWER(name) = ?", name.downcase).first || move.categories.create!(name: name)
-  end
-  resolve_tags = lambda do |names|
-    Array(names).filter_map do |raw|
-      name = raw.to_s.strip
-      next if name.blank?
-
-      existing = move.tags.where("LOWER(name) = ?", name.downcase).first
-      next existing if existing&.applies_to&.in?(%w[item both])
-      next nil if existing # box-only tag — can't tag an item
-
-      move.tags.create!(name: name, applies_to: "item")
-    end.uniq
-  end
 
   # Photos → one Media + one generated image each (SeedData::PHOTOS). Covers the
   # per-photo review walk (box 1), the recovery tiles (a FAILED run + a
@@ -270,10 +242,8 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
                                            metadata: { "item_count" => detections.size, "provider" => provider }
                                          ))
       detections.each do |attrs|
-        category = resolve_category.call(attrs[:category])
         suggestion = run.recognition_suggestions.create!(
           move: move, box: box, media: media, proposed_name: attrs[:name],
-          proposed_category: category,
           confidence_score: attrs[:confidence],
           state: attrs[:review] == "auto_confirmed" ? "auto_accepted" : "pending"
         )
@@ -281,8 +251,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
           move: move, source_media: media, source_recognition_suggestion_id: suggestion.id,
           name: attrs[:name],
           confidence_score: attrs[:confidence], created_via: "recognition",
-          review_state: attrs[:review], presence_state: presence,
-          category: category, tags: resolve_tags.call(attrs[:tags])
+          review_state: attrs[:review], presence_state: presence
         )
         suggestion.update!(item: item)
       end
@@ -321,10 +290,8 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     next unless item.new_record?
 
     item.assign_attributes(
-      move: move,
-      category: categories[attrs[:category]], created_via: "manual",
-      review_state: attrs[:review], presence_state: attrs[:presence],
-      tags: attrs[:tags].filter_map { |name| tags[name] }
+      move: move, created_via: "manual",
+      review_state: attrs[:review], presence_state: attrs[:presence]
     )
     item.save!
   end
@@ -439,13 +406,12 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   # D8: build the hybrid-search projection for every seeded item synchronously
   # (background workers don't run during db:seed). Fake embedder → deterministic,
   # no network. After this, search works immediately in /product-review.
-  move.items.includes(:category, :tags, box: :room).find_each do |item|
+  move.items.includes(box: :room).find_each do |item|
     Search::RefreshDocument.new.call(item: item)
   end
 
   Rails.logger.info(
     "[seeds] #{organization.slug}: #{move.boxes.count} boxes, #{move.rooms.count} rooms, " \
-    "#{move.categories.count} categories, #{move.tags.count} tags, " \
     "#{move.items.count} items, #{move.media.count} media, " \
     "#{move.items.in_box.where(review_state: %w[pending_review needs_correction]).count} to review, " \
     "#{ItemSearchDocument.count} search docs"

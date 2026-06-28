@@ -55,14 +55,7 @@ class BoxManifestPdf
   end
 
   def table(doc)
-    rows = [%w[Item Category Tags]]
-    @items.each do |item|
-      rows << [
-        item.name,
-        item.category&.name || "—",
-        item.tags.map(&:name).join(", ").presence || "—"
-      ]
-    end
+    rows = [%w[Item]] + @items.map { |item| [item.name] }
 
     doc.table(rows, header: true, width: doc.bounds.width,
                     cell_style: { size: 9, padding: [6, 8] }) do |t|

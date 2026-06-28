@@ -21,16 +21,6 @@ RSpec.describe "Items" do
       expect(response.body).to include(I18n.t("items.form.name"))
     end
 
-    it "lists tags most-used first, not alphabetically (#337)" do
-      common = create(:tag, move:, name: "Zebra")  # used → should lead
-      create(:tag, move:, name: "Apple")           # unused → trails despite A–Z
-      create(:item_tag, tag: common, item: create(:item, move:, box:))
-
-      get new_move_box_item_path(move, box)
-
-      expect(response.body.index("Zebra")).to be < response.body.index("Apple")
-    end
-
     it "redirects a pure add-form on a non-packing box back to the box" do
       sealed = create(:box, move:, status: "sealed")
 
@@ -57,18 +47,6 @@ RSpec.describe "Items" do
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.body).to include(I18n.t("items.new.title"))
-    end
-
-    it "assigns selection-only category and tags" do
-      category = create(:category, move:, name: "Kitchenware")
-      tag = create(:tag, move:, name: "Heavy")
-
-      post move_box_items_path(move, box),
-           params: { item: { name: "Plates", category_id: category.id, tag_ids: [tag.id] } }
-
-      item = box.items.last
-      expect(item.category).to eq(category)
-      expect(item.tags).to contain_exactly(tag)
     end
 
     it "refuses a pure add to a non-packing box (defence in depth behind the hidden link)" do

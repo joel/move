@@ -13,23 +13,17 @@ RSpec.describe "Manual add & item detail" do
     stub_current_tenant("acme")
   end
 
-  it "adds an item manually with category and tags (B3)" do
-    create(:category, move:, name: "Kitchenware")
-    create(:tag, move:, name: "Heavy")
-
+  it "adds an item manually by name (B3)" do
     visit move_box_path(move, source)
     # The box-detail add affordance is the quiet "Add manually" link under the
     # Capture hero (#401).
     click_link I18n.t("boxes.actions.add_manually")
     fill_in "item[name]", with: "Ceramic Plates"
-    select "Kitchenware", from: "item[category_id]"
-    check "Heavy"
     click_button I18n.t("items.new.submit")
 
     expect(page).to have_text("Ceramic Plates")
     item = move.items.find_by!(name: "Ceramic Plates")
     expect(item).to have_attributes(review_state: "confirmed", created_via: "manual")
-    expect(item.tags.map(&:name)).to contain_exactly("Heavy")
   end
 
   it "presents the detail screen as an auto-saving form with no Save button (C3)" do

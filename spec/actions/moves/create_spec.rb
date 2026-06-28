@@ -16,7 +16,7 @@ RSpec.describe Moves::Create do
     expect(move.move_memberships.find_by(user: creator)&.role).to eq("admin")
   end
 
-  it "pre-populates the curated default categories, tags and rooms" do
+  it "pre-populates the curated default rooms" do
     result = described_class.new.call(
       params: { name: "Spring Move", unit_system: "metric" },
       creator: creator
@@ -24,9 +24,7 @@ RSpec.describe Moves::Create do
 
     move = result.value!
     expect(move.rooms.count).to eq(Moves::DefaultVocabularies::ROOMS.size)
-    expect(move.categories.pluck(:name)).to include("Furniture", "Kitchenware")
-    expect(move.tags.count).to eq(Moves::DefaultVocabularies::TAGS.size)
-    expect(move.tags.find_by(name: "Fragile")&.applies_to).to eq("box")
+    expect(move.rooms.pluck(:name)).to include("Kitchen", "Garage")
   end
 
   it "returns validation errors for an invalid move" do

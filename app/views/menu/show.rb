@@ -36,8 +36,8 @@ module Views
       def organize_links
         links = [
           [I18n.t("menu.show.activity"), Components::Icons::Clock, move_activity_path(@move)],
-          [I18n.t("menu.show.categories"), Components::Icons::Category,
-           move_vocabularies_path(@move, "categories")]
+          [I18n.t("menu.show.rooms"), Components::Icons::Boxes,
+           move_vocabularies_path(@move, "rooms")]
         ]
         links << [I18n.t("menu.show.members"), Components::Icons::Users, move_members_path(@move)] if @admin
         links << [I18n.t("menu.show.summary"), Components::Icons::Chart, move_summary_path(@move)]

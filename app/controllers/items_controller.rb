@@ -13,7 +13,7 @@ class ItemsController < MoveScopedController
   def show
     render Views::Items::Show.new(
       move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-      editable: editable_move?, photo_siblings: photo_siblings(@item), **vocabulary
+      editable: editable_move?, photo_siblings: photo_siblings(@item)
     )
   end
 
@@ -24,7 +24,7 @@ class ItemsController < MoveScopedController
     item = @box.items.new(move: @move)
     authorize! item, to: :create?, with: ItemPolicy
     render Views::Items::New.new(
-      move: @move, box: @box, item: item, source_media_id: source_media_id, **vocabulary
+      move: @move, box: @box, item: item, source_media_id: source_media_id
     )
   end
 
@@ -45,14 +45,11 @@ class ItemsController < MoveScopedController
       redirect_to move_box_path(@move, @box), notice: t(".created", name: item.name)
     in Dry::Monads::Failure(:not_capturable)
       redirect_to move_box_path(@move, @box), alert: t(".box_closed")
-    in Dry::Monads::Failure(Symbol => reason)
-      redirect_to new_move_box_item_path(@move, @box, source_media_id: source_media_id),
-                  alert: vocabulary_error(reason)
     in Dry::Monads::Failure(errors)
       item = @box.items.new(item_attributes.merge(move: @move))
       item.errors.merge!(errors) if errors.respond_to?(:each)
       render Views::Items::New.new(
-        move: @move, box: @box, item: item, source_media_id: source_media_id, **vocabulary
+        move: @move, box: @box, item: item, source_media_id: source_media_id
       ), status: :unprocessable_content
     end
   end
@@ -74,8 +71,8 @@ class ItemsController < MoveScopedController
         end
         format.html { redirect_to move_item_path(@move, item), notice: t(".updated", name: item.name) }
       end
-    in Dry::Monads::Failure(Symbol => reason)
-      message = vocabulary_error(reason)
+    in Dry::Monads::Failure(Symbol)
+      message = t("items.form.failed")
       respond_to do |format|
         format.turbo_stream do
           render turbo_stream: save_status_stream(:error, message:), status: :unprocessable_content
@@ -95,7 +92,7 @@ class ItemsController < MoveScopedController
         format.html do
           render Views::Items::Show.new(
             move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-            editable: true, photo_siblings: photo_siblings(@item), **vocabulary
+            editable: true, photo_siblings: photo_siblings(@item)
           ), status: :unprocessable_content
         end
       end
@@ -259,14 +256,6 @@ class ItemsController < MoveScopedController
     head :not_found
   end
 
-  # The category/tag pickers offer only the Move's managed vocabularies (D5
-  # selection-only; management is D7).
-  def vocabulary
-    # Box-only tags are excluded from the item picker (applies-to facet); tags are
-    # ordered most-used-first so the common ones are quickest to reach (#337).
-    { categories: @move.categories.ordered, tags: @move.tags.for_items.by_usage }
-  end
-
   def move_error(reason)
     case reason
     when :removed then t("items.move.removed_item")
@@ -276,19 +265,11 @@ class ItemsController < MoveScopedController
     end
   end
 
-  def vocabulary_error(reason)
-    case reason
-    when :invalid_category then t("items.form.invalid_category")
-    when :invalid_tag then t("items.form.invalid_tag")
-    else t("items.form.failed")
-    end
-  end
-
   def item_params
     item_attributes.to_h.symbolize_keys
   end
 
   def item_attributes
-    params.expect(item: [:name, :category_id, { tag_ids: [] }])
+    params.expect(item: [:name])
   end
 end

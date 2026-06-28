@@ -10,7 +10,7 @@ module Search
     def perform(item_id, tenant:, indexing_run_id: nil)
       Apartment::Tenant.switch(tenant) do
         Current.tenant = tenant
-        item = Item.includes(:category, :tags, box: :room).find_by(id: item_id)
+        item = Item.includes(box: :room).find_by(id: item_id)
         outcome = :success
         begin
           # A since-deleted item still counts as "done" for the run's progress —

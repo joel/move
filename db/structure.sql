@@ -921,24 +921,6 @@ CREATE TABLE public.boxes (
 
 
 --
--- Name: categories; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.categories (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    move_id uuid NOT NULL,
-    name character varying NOT NULL,
-    created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL,
-    discarded_at timestamp(6) without time zone,
-    discard_batch_id uuid,
-    discarded_by_parent_type character varying,
-    discarded_by_parent_id uuid,
-    log_data jsonb
-);
-
-
---
 -- Name: indexing_runs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -976,19 +958,6 @@ CREATE TABLE public.item_search_documents (
 
 
 --
--- Name: item_tags; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.item_tags (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    item_id uuid NOT NULL,
-    tag_id uuid NOT NULL,
-    created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
-);
-
-
---
 -- Name: items; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1005,7 +974,6 @@ CREATE TABLE public.items (
     presence_state character varying DEFAULT 'in_box'::character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    category_id uuid,
     discarded_at timestamp(6) without time zone,
     discard_batch_id uuid,
     discarded_by_parent_type character varying,
@@ -1186,8 +1154,7 @@ CREATE TABLE public.recognition_suggestions (
     confidence_score numeric(4,3),
     state character varying DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL,
-    proposed_category_id uuid
+    updated_at timestamp(6) without time zone NOT NULL
 );
 
 
@@ -1231,25 +1198,6 @@ CREATE TABLE public.session_handoff_tokens (
     consumed_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
-);
-
-
---
--- Name: tags; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.tags (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    move_id uuid NOT NULL,
-    name character varying NOT NULL,
-    created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL,
-    applies_to character varying DEFAULT 'item'::character varying NOT NULL,
-    discarded_at timestamp(6) without time zone,
-    discard_batch_id uuid,
-    discarded_by_parent_type character varying,
-    discarded_by_parent_id uuid,
-    log_data jsonb
 );
 
 
@@ -1404,14 +1352,6 @@ ALTER TABLE ONLY public.boxes
 
 
 --
--- Name: categories categories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.categories
-    ADD CONSTRAINT categories_pkey PRIMARY KEY (id);
-
-
---
 -- Name: indexing_runs indexing_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1425,14 +1365,6 @@ ALTER TABLE ONLY public.indexing_runs
 
 ALTER TABLE ONLY public.item_search_documents
     ADD CONSTRAINT item_search_documents_pkey PRIMARY KEY (id);
-
-
---
--- Name: item_tags item_tags_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.item_tags
-    ADD CONSTRAINT item_tags_pkey PRIMARY KEY (id);
 
 
 --
@@ -1537,14 +1469,6 @@ ALTER TABLE ONLY public.schema_migrations
 
 ALTER TABLE ONLY public.session_handoff_tokens
     ADD CONSTRAINT session_handoff_tokens_pkey PRIMARY KEY (id);
-
-
---
--- Name: tags tags_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.tags
-    ADD CONSTRAINT tags_pkey PRIMARY KEY (id);
 
 
 --
@@ -1717,34 +1641,6 @@ CREATE INDEX index_boxes_on_status ON public.boxes USING btree (status);
 
 
 --
--- Name: index_categories_on_discard_batch_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_categories_on_discard_batch_id ON public.categories USING btree (discard_batch_id);
-
-
---
--- Name: index_categories_on_discarded_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_categories_on_discarded_at ON public.categories USING btree (discarded_at);
-
-
---
--- Name: index_categories_on_move_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_categories_on_move_id ON public.categories USING btree (move_id);
-
-
---
--- Name: index_categories_on_move_id_and_lower_name; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_categories_on_move_id_and_lower_name ON public.categories USING btree (move_id, lower((name)::text));
-
-
---
 -- Name: index_indexing_runs_on_move_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1794,38 +1690,10 @@ CREATE INDEX index_item_search_documents_on_search_tsvector ON public.item_searc
 
 
 --
--- Name: index_item_tags_on_item_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_item_tags_on_item_id ON public.item_tags USING btree (item_id);
-
-
---
--- Name: index_item_tags_on_item_id_and_tag_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_item_tags_on_item_id_and_tag_id ON public.item_tags USING btree (item_id, tag_id);
-
-
---
--- Name: index_item_tags_on_tag_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_item_tags_on_tag_id ON public.item_tags USING btree (tag_id);
-
-
---
 -- Name: index_items_on_box_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_items_on_box_id ON public.items USING btree (box_id);
-
-
---
--- Name: index_items_on_category_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_items_on_category_id ON public.items USING btree (category_id);
 
 
 --
@@ -2060,13 +1928,6 @@ CREATE INDEX index_recognition_suggestions_on_move_id ON public.recognition_sugg
 
 
 --
--- Name: index_recognition_suggestions_on_proposed_category_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_recognition_suggestions_on_proposed_category_id ON public.recognition_suggestions USING btree (proposed_category_id);
-
-
---
 -- Name: index_recognition_suggestions_on_recognition_run_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2116,34 +1977,6 @@ CREATE UNIQUE INDEX index_session_handoff_tokens_on_token_digest ON public.sessi
 
 
 --
--- Name: index_tags_on_discard_batch_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_tags_on_discard_batch_id ON public.tags USING btree (discard_batch_id);
-
-
---
--- Name: index_tags_on_discarded_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_tags_on_discarded_at ON public.tags USING btree (discarded_at);
-
-
---
--- Name: index_tags_on_move_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_tags_on_move_id ON public.tags USING btree (move_id);
-
-
---
--- Name: index_tags_on_move_id_and_lower_name; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_tags_on_move_id_and_lower_name ON public.tags USING btree (move_id, lower((name)::text));
-
-
---
 -- Name: index_terms_acceptances_on_user_id_and_terms_version; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2179,17 +2012,10 @@ CREATE TRIGGER logidze_on_boxes BEFORE INSERT OR UPDATE ON public.boxes FOR EACH
 
 
 --
--- Name: categories logidze_on_categories; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER logidze_on_categories BEFORE INSERT OR UPDATE ON public.categories FOR EACH ROW WHEN ((COALESCE(current_setting('logidze.disabled'::text, true), ''::text) <> 'on'::text)) EXECUTE FUNCTION public.logidze_logger('null', 'updated_at', '{name}', 'true');
-
-
---
 -- Name: items logidze_on_items; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER logidze_on_items BEFORE INSERT OR UPDATE ON public.items FOR EACH ROW WHEN ((COALESCE(current_setting('logidze.disabled'::text, true), ''::text) <> 'on'::text)) EXECUTE FUNCTION public.logidze_logger('null', 'updated_at', '{name, category_id}', 'true');
+CREATE TRIGGER logidze_on_items BEFORE INSERT OR UPDATE ON public.items FOR EACH ROW WHEN ((COALESCE(current_setting('logidze.disabled'::text, true), ''::text) <> 'on'::text)) EXECUTE FUNCTION public.logidze_logger('null', 'updated_at', '{name}', 'true');
 
 
 --
@@ -2204,21 +2030,6 @@ CREATE TRIGGER logidze_on_moves BEFORE INSERT OR UPDATE ON public.moves FOR EACH
 --
 
 CREATE TRIGGER logidze_on_rooms BEFORE INSERT OR UPDATE ON public.rooms FOR EACH ROW WHEN ((COALESCE(current_setting('logidze.disabled'::text, true), ''::text) <> 'on'::text)) EXECUTE FUNCTION public.logidze_logger('null', 'updated_at', '{name}', 'true');
-
-
---
--- Name: tags logidze_on_tags; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER logidze_on_tags BEFORE INSERT OR UPDATE ON public.tags FOR EACH ROW WHEN ((COALESCE(current_setting('logidze.disabled'::text, true), ''::text) <> 'on'::text)) EXECUTE FUNCTION public.logidze_logger('null', 'updated_at', '{name, applies_to}', 'true');
-
-
---
--- Name: categories fk_rails_01f841557e; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.categories
-    ADD CONSTRAINT fk_rails_01f841557e FOREIGN KEY (move_id) REFERENCES public.moves(id);
 
 
 --
@@ -2267,14 +2078,6 @@ ALTER TABLE ONLY public.recognition_suggestions
 
 ALTER TABLE ONLY public.items
     ADD CONSTRAINT fk_rails_26cde3138d FOREIGN KEY (box_id) REFERENCES public.boxes(id);
-
-
---
--- Name: item_tags fk_rails_2774a12fa0; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.item_tags
-    ADD CONSTRAINT fk_rails_2774a12fa0 FOREIGN KEY (item_id) REFERENCES public.items(id);
 
 
 --
@@ -2350,14 +2153,6 @@ ALTER TABLE ONLY public.organization_memberships
 
 
 --
--- Name: tags fk_rails_62c57c7a1f; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.tags
-    ADD CONSTRAINT fk_rails_62c57c7a1f FOREIGN KEY (move_id) REFERENCES public.moves(id);
-
-
---
 -- Name: media fk_rails_6dfa82d09b; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2403,22 +2198,6 @@ ALTER TABLE ONLY public.boxes
 
 ALTER TABLE ONLY public.user_omniauth_identities
     ADD CONSTRAINT fk_rails_8643d06e22 FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
-
---
--- Name: items fk_rails_89fb86dc8b; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.items
-    ADD CONSTRAINT fk_rails_89fb86dc8b FOREIGN KEY (category_id) REFERENCES public.categories(id);
-
-
---
--- Name: recognition_suggestions fk_rails_9156700172; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.recognition_suggestions
-    ADD CONSTRAINT fk_rails_9156700172 FOREIGN KEY (proposed_category_id) REFERENCES public.categories(id);
 
 
 --
@@ -2510,14 +2289,6 @@ ALTER TABLE ONLY public.item_search_documents
 
 
 --
--- Name: item_tags fk_rails_edc62a420c; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.item_tags
-    ADD CONSTRAINT fk_rails_edc62a420c FOREIGN KEY (tag_id) REFERENCES public.tags(id);
-
-
---
 -- Name: user_remember_keys fk_rails_ee6b3c037b; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2540,6 +2311,7 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260628130000'),
 ('20260628120000'),
 ('20260628110000'),
 ('20260628100000'),

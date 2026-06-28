@@ -68,7 +68,7 @@ module Search
     def select_sql(vector)
       lexical = "ts_rank_cd(item_search_documents.search_tsvector, plainto_tsquery('english', :q))"
       trigram = "similarity(item_search_documents.search_text, :q)"
-      # Name trigram (focused, undiluted by box/room/category context) — drives
+      # Name trigram (focused, undiluted by box/room context) — drives
       # fuzzy recall on the most important field, e.g. "blow dryer" ~ "Hair dryer".
       name = "similarity(items.name, :q)"
       semantic = vector ? semantic_score_sql : "0.0"
