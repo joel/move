@@ -6,7 +6,7 @@ RSpec.describe RecognitionProviders::Openai do
   subject(:provider) { described_class.new(api_key: "sk-test") }
 
   let(:image) { instance_double(ActiveStorage::Blob, content_type: "image/jpeg", download: "bytes") }
-  let(:context) { { room: "Kitchen", categories: ["Lighting"], tags: [] } }
+  let(:context) { { room: "Kitchen" } }
   let(:captured) { {} }
 
   # Capture the outgoing request so request-body specs can assert what we SEND
@@ -49,7 +49,7 @@ RSpec.describe RecognitionProviders::Openai do
         expect(sent.dig("response_format", "json_schema", "name")).to eq("box_description")
         expect(sent.dig("response_format", "json_schema", "schema", "required")).to eq(%w[description])
         # Text-only content (a plain string, not the image multi-part array).
-        expect(sent.dig("messages", 0, "content")).to be_a(String).and include("Lamp", "Lighting")
+        expect(sent.dig("messages", 0, "content")).to be_a(String).and include("Lamp")
       end
     end
 
@@ -75,8 +75,8 @@ RSpec.describe RecognitionProviders::Openai do
       expect(fmt["type"]).to eq("json_schema")
       expect(fmt.dig("json_schema", "strict")).to be(true)
       items = fmt.dig("json_schema", "schema", "properties", "objects", "items")
-      expect(items["required"]).to include("category", "tags")
-      expect(items["required"]).not_to include("fragile", "count")
+      expect(items["required"]).to contain_exactly("label", "confidence")
+      expect(items["properties"].keys).to contain_exactly("label", "confidence")
       content = body.dig("messages", 0, "content")
       expect(content.dig(0, "text")).to include("moving-box photo")
       expect(content.dig(1, "image_url", "url"))
@@ -84,17 +84,15 @@ RSpec.describe RecognitionProviders::Openai do
     end
   end
 
-  it "normalizes a structured-output objects payload, including category" do
-    content = { objects: [{ label: "lamp", confidence: 0.9,
-                            category: "Lighting" }] }.to_json
+  it "normalizes a structured-output objects payload" do
+    content = { objects: [{ label: "lamp", confidence: 0.9 }] }.to_json
     stub_http(code: "200", body: content_response(content))
 
     result = provider.identify(image: image, context: context)
     object = result.objects.first
 
     expect(result.provider).to eq("openai")
-    expect(object).to have_attributes(label: "lamp", confidence: 0.9,
-                                      category: "Lighting")
+    expect(object).to have_attributes(label: "lamp", confidence: 0.9)
   end
 
   it "recovers a fenced JSON object via the backstop" do

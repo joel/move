@@ -22,14 +22,12 @@ module RecognitionProviders
           type: "ARRAY",
           items: {
             type: "OBJECT",
-            required: %w[label confidence category tags],
+            required: %w[label confidence],
             properties: {
               label: { type: "STRING" },
-              confidence: { type: "NUMBER" },
-              category: { type: "STRING" },
-              tags: { type: "ARRAY", items: { type: "STRING" } }
+              confidence: { type: "NUMBER" }
             },
-            propertyOrdering: %w[label confidence category tags]
+            propertyOrdering: %w[label confidence]
           }
         }
       }

@@ -50,16 +50,10 @@ module RecognitionRuns
       Rails.event.notify("recognition_run.processing", recognition_run_id: run.id)
     end
 
-    # Feed the move's category + item-applicable tag vocabularies to the provider
-    # so the model can fit each detection into existing values rather than
-    # inventing near-dupes. Box-only tags are excluded via for_items — they can't
-    # ride on an item.
+    # The room is the only vocabulary the model is given as context — it nudges the
+    # labels without inventing a per-item taxonomy (category/tags were removed).
     def context(run)
-      {
-        room: run.box.room&.name,
-        categories: run.move.categories.order(:name).pluck(:name),
-        tags: run.move.tags.for_items.order(:name).pluck(:name)
-      }
+      { room: run.box.room&.name }
     end
 
     def materialize(run, result)
@@ -73,23 +67,20 @@ module RecognitionRuns
     # duplicate — record the detection as a `conflict` suggestion linked to the
     # existing item and leave it for human resolution in the review queue (D6).
     def materialize_one(run, object, threshold)
-      category = resolve_category(run.move, object.category)
       existing = confirmed_match(run.box, object.label)
-      return conflict_suggestion(run, object, existing, category) if existing
+      return conflict_suggestion(run, object, existing) if existing
 
       auto = object.confidence.present? && object.confidence >= threshold
       suggestion = run.recognition_suggestions.create!(
         move: run.move, box: run.box, media: run.media,
-        proposed_name: object.label, proposed_category: category,
+        proposed_name: object.label,
         confidence_score: object.confidence, state: auto ? "auto_accepted" : "pending"
       )
       item = run.box.items.create!(
         move: run.move, source_media: run.media, source_recognition_suggestion_id: suggestion.id,
         name: object.label, confidence_score: object.confidence,
-        category: category,
         created_via: "recognition", review_state: auto ? "auto_confirmed" : "pending_review"
       )
-      item.tags = resolve_tags(run.move, object.tags)
       suggestion.update!(item: item)
       # Drives the D8 search projection (Search::IndexSubscriber).
       Rails.event.notify(
@@ -104,86 +95,13 @@ module RecognitionRuns
     end
 
     # Record the duplicate detection as a conflict without touching the existing
-    # item or adding a second inventory row. The model's proposed category rides
-    # along on the suggestion for the reviewer to apply.
-    def conflict_suggestion(run, object, existing, category)
+    # item or adding a second inventory row, for the reviewer to resolve.
+    def conflict_suggestion(run, object, existing)
       run.recognition_suggestions.create!(
         move: run.move, box: run.box, media: run.media, item: existing,
-        proposed_name: object.label, proposed_category: category,
+        proposed_name: object.label,
         confidence_score: object.confidence, state: "conflict"
       )
-    end
-
-    # Best-effort map of the model's category name onto the Move's managed
-    # vocabulary: reuse an existing category (case-insensitive) when one fits,
-    # otherwise grow the vocabulary with the new name. Blank → nil (uncategorised).
-    def resolve_category(move, name)
-      name = name.to_s.strip
-      return nil if name.blank?
-
-      move.categories.where("LOWER(name) = ?", name.downcase).first || create_category(move, name)
-    end
-
-    # Insert the new category in its OWN savepoint. materialize runs inside one
-    # transaction, so without requires_new a unique-index collision (a concurrent
-    # run created the same name first) raises RecordNotUnique and aborts the whole
-    # transaction on PostgreSQL — the rescue's re-find would then run in an aborted
-    # transaction and the run would fail. The savepoint rolls back just the failed
-    # insert, leaving the outer transaction usable so we reuse the winner.
-    #
-    # The concurrent race surfaces two ways depending on timing: if the winner is
-    # already visible when create! validates, the model's case-insensitive
-    # uniqueness check raises RecordInvalid (no INSERT runs); if it commits only
-    # after our INSERT, the lower(name) DB index raises RecordNotUnique. Reuse the
-    # winner in both cases; re-raise anything that isn't this race (no matching row).
-    def create_category(move, name)
-      category = ActiveRecord::Base.transaction(requires_new: true) do
-        move.categories.create!(name: name)
-      end
-      Rails.event.notify(
-        "vocabulary.created", kind: "category", record_id: category.id, move_id: move.id, actor_id: nil
-      )
-      category
-    rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
-      move.categories.where("LOWER(name) = ?", name.downcase).first || raise(e)
-    end
-
-    # Map the model's proposed tag names onto the Move's tag vocabulary, mirroring
-    # category resolution. Returns item-applicable Tag records to assign.
-    def resolve_tags(move, names)
-      Array(names).filter_map { |name| resolve_tag(move, name) }.uniq
-    end
-
-    # Reuse an existing item-applicable tag (case-insensitive), else grow the
-    # vocabulary with a new item tag. A name matching an existing *box-only* tag
-    # is skipped: it can't ride on an item, and we won't widen the user's facet
-    # (cf. #168) or duplicate the lower(name)-unique name.
-    def resolve_tag(move, name)
-      name = name.to_s.strip
-      return nil if name.blank?
-
-      existing = move.tags.where("LOWER(name) = ?", name.downcase).first
-      return existing if existing&.applies_to&.in?(%w[item both])
-      return nil if existing
-
-      create_tag(move, name)
-    end
-
-    # Insert the new tag in its OWN savepoint (same concurrent-race reasoning as
-    # create_category). New recognition tags default to applies_to "item". On the
-    # race, reuse the winner only if it is item-applicable; a box-only winner is
-    # skipped rather than mis-assigned.
-    def create_tag(move, name)
-      tag = ActiveRecord::Base.transaction(requires_new: true) do
-        move.tags.create!(name: name, applies_to: "item")
-      end
-      Rails.event.notify(
-        "vocabulary.created", kind: "tag", record_id: tag.id, move_id: move.id, actor_id: nil
-      )
-      tag
-    rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
-      winner = move.tags.where("LOWER(name) = ?", name.downcase).first || raise(e)
-      winner.applies_to.in?(%w[item both]) ? winner : nil
     end
 
     def finish(run, result)

@@ -79,8 +79,8 @@ RSpec.describe RecognitionRuns::Process do
     # Second detection's confidence overflows decimal(4,3) → create! raises
     # midway. The transaction must roll back the first item too.
     objects = [
-      RecognitionProviders::DetectedObject.new(label: "Lamp", confidence: 0.97, category: nil),
-      RecognitionProviders::DetectedObject.new(label: "Rug", confidence: 99.0, category: nil)
+      RecognitionProviders::DetectedObject.new(label: "Lamp", confidence: 0.97),
+      RecognitionProviders::DetectedObject.new(label: "Rug", confidence: 99.0)
     ]
     provider = instance_double(RecognitionProviders::Fake)
     allow(provider).to receive(:identify).and_return(
@@ -93,140 +93,6 @@ RSpec.describe RecognitionRuns::Process do
     expect(run.reload.status).to eq("failed")
     expect(box.items.count).to eq(0)
     expect(run.recognition_suggestions.count).to eq(0)
-  end
-
-  describe "model-set category" do
-    def stub_provider(*objects)
-      provider = instance_double(RecognitionProviders::Fake)
-      allow(provider).to receive(:identify).and_return(
-        RecognitionProviders::Result.new(provider: "fake", provider_model: "x", objects:)
-      )
-      provider
-    end
-
-    it "reuses an existing move category (case-insensitive) on the item + suggestion" do
-      create(:category, move:, name: "Kitchenware")
-      object = RecognitionProviders::DetectedObject.new(
-        label: "Wine glasses", confidence: 0.95, category: "kitchenware"
-      )
-
-      described_class.new.call(run:, provider: stub_provider(object))
-
-      expect(move.categories.where("LOWER(name) = ?", "kitchenware").count).to eq(1)
-      item = box.items.find_by(name: "Wine glasses")
-      expect(item.category.name).to eq("Kitchenware")
-      suggestion = run.recognition_suggestions.find_by(proposed_name: "Wine glasses")
-      expect(suggestion.proposed_category).to eq(item.category)
-    end
-
-    it "creates a new move category when the model proposes one that does not exist yet" do
-      object = RecognitionProviders::DetectedObject.new(
-        label: "Drill", confidence: 0.9, category: "Tools"
-      )
-
-      expect { described_class.new.call(run:, provider: stub_provider(object)) }
-        .to change { move.categories.where(name: "Tools").count }.from(0).to(1)
-      expect(box.items.find_by(name: "Drill").category.name).to eq("Tools")
-    end
-
-    it "reuses the winner when the uniqueness validation catches the race (RecordInvalid)" do
-      # Deterministic timing: the winner is already visible when create! validates,
-      # so the model's case-insensitive uniqueness check raises RecordInvalid (no
-      # INSERT runs). create_category must still reuse it (case-insensitively)
-      # rather than let the run fail.
-      winner = create(:category, move:, name: "Tools")
-
-      expect(described_class.new.send(:create_category, move, "tools")).to eq(winner)
-    end
-
-    it "reuses the winner when the DB unique index catches the race (RecordNotUnique)" do
-      # The other timing: validation passed (winner not yet visible) but the
-      # lower(name) index rejects the INSERT with RecordNotUnique. The insert runs
-      # in a requires_new savepoint so the collision can't abort materialize's
-      # outer transaction (see the action); the rescue re-finds the winner.
-      winner = create(:category, move:, name: "Tools")
-      allow(move.categories).to receive(:create!).and_raise(ActiveRecord::RecordNotUnique.new("dup"))
-
-      expect(described_class.new.send(:create_category, move, "Tools")).to eq(winner)
-    end
-
-    it "re-raises when create! fails for a reason other than the duplicate race" do
-      # A non-uniqueness validation failure (no matching row to fall back to) must
-      # surface, not be swallowed as an uncategorised item.
-      allow(move.categories).to receive(:create!).and_raise(ActiveRecord::RecordInvalid.new(Category.new))
-
-      expect { described_class.new.send(:create_category, move, "Tools") }
-        .to raise_error(ActiveRecord::RecordInvalid)
-    end
-
-    it "leaves the item uncategorised when the model returns a blank category" do
-      object = RecognitionProviders::DetectedObject.new(
-        label: "Mystery item", confidence: 0.9, category: nil
-      )
-
-      described_class.new.call(run:, provider: stub_provider(object))
-
-      expect(box.items.find_by(name: "Mystery item").category).to be_nil
-      expect(move.categories.count).to eq(0)
-    end
-  end
-
-  describe "model-set tags" do
-    def stub_provider(*objects)
-      provider = instance_double(RecognitionProviders::Fake)
-      allow(provider).to receive(:identify).and_return(
-        RecognitionProviders::Result.new(provider: "fake", provider_model: "x", objects:)
-      )
-      provider
-    end
-
-    def detection(name, tags, confidence: 0.95)
-      RecognitionProviders::DetectedObject.new(
-        label: name, confidence:, category: nil, tags:
-      )
-    end
-
-    it "reuses an existing item-applicable tag (case-insensitive)" do
-      heavy = create(:tag, move:, name: "Heavy", applies_to: "both")
-
-      described_class.new.call(run:, provider: stub_provider(detection("Anvil", ["heavy"])))
-
-      item = box.items.find_by(name: "Anvil")
-      expect(item.tags).to contain_exactly(heavy)
-      expect(move.tags.where("LOWER(name) = ?", "heavy").count).to eq(1)
-    end
-
-    it "creates a new item tag when the model proposes one that does not exist yet" do
-      allow(Rails.event).to receive(:notify).and_call_original
-
-      expect { described_class.new.call(run:, provider: stub_provider(detection("Vase", ["Glassware"]))) }
-        .to change { move.tags.where(name: "Glassware").count }.from(0).to(1)
-
-      tag = move.tags.find_by(name: "Glassware")
-      expect(tag.applies_to).to eq("item")
-      expect(box.items.find_by(name: "Vase").tags).to contain_exactly(tag)
-      expect(Rails.event).to have_received(:notify).with(
-        "vocabulary.created", hash_including(kind: "tag", record_id: tag.id)
-      )
-    end
-
-    it "drops a proposed tag whose name matches an existing box-only tag" do
-      create(:tag, move:, name: "Fragile", applies_to: "box")
-
-      described_class.new.call(run:, provider: stub_provider(detection("Mirror", ["Fragile"])))
-
-      expect(box.items.find_by(name: "Mirror").tags).to be_empty
-      # The box-only tag is neither widened nor duplicated.
-      expect(move.tags.where("LOWER(name) = ?", "fragile").pluck(:applies_to)).to eq(["box"])
-    end
-
-    it "applies tags to a pending_review item, not just auto-confirmed ones" do
-      described_class.new.call(run:, provider: stub_provider(detection("Teapot", ["Heavy"], confidence: 0.4)))
-
-      item = box.items.find_by(name: "Teapot")
-      expect(item.review_state).to eq("pending_review")
-      expect(item.tags.map(&:name)).to eq(["Heavy"])
-    end
   end
 
   context "when the Move was archived after capture (#118)" do

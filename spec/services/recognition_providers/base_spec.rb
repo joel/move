@@ -6,56 +6,37 @@ RSpec.describe RecognitionProviders::Base do
   subject(:provider) { described_class.new }
 
   describe "#prompt" do
-    it "folds the move's category vocabulary into the classification instruction" do
-      text = provider.send(:prompt, { room: "Kitchen", categories: ["Kitchenware"] })
+    it "names the room when present, and asks for one entry per distinct item" do
+      text = provider.send(:prompt, { room: "Kitchen" })
 
-      expect(text).to include("Kitchen")
-      expect(text).to include("Kitchenware")
-      expect(text).to include("Prefer one of these existing categories")
+      expect(text).to include("The box is in the Kitchen.")
+      expect(text).to include("Give one entry per distinct item")
     end
 
-    it "no longer asks the model about fragility (it is a manual box flag now)" do
-      text = provider.send(:prompt, { room: "Kitchen", categories: ["Kitchenware"] })
+    it "omits the room line when no room is set" do
+      text = provider.send(:prompt, { room: nil })
 
-      expect(text).not_to match(/fragile/i)
-    end
-
-    it "offers the move's item-applicable tag vocabulary as tag candidates" do
-      text = provider.send(:prompt, { room: nil, categories: ["Kitchenware"], tags: %w[Heavy Valuable] })
-
-      expect(text).to include("Prefer these existing tags")
-      expect(text).to include("Heavy")
-      expect(text).to include("Valuable")
-    end
-
-    it "still asks for category and tags when the move has no vocabulary yet" do
-      text = provider.send(:prompt, { room: nil, categories: [], tags: [] })
-
-      expect(text).to include("Classify each item with a concise category")
-      expect(text).to include("Add a short list of concise descriptive tags")
       expect(text).not_to include("The box is in")
+    end
+
+    it "no longer asks the model about category, tags or fragility (item is name-only)" do
+      text = provider.send(:prompt, { room: "Kitchen" })
+
+      expect(text).not_to match(/categor/i)
+      expect(text).not_to match(/\btags?\b/i)
+      expect(text).not_to match(/fragile/i)
     end
   end
 
   describe "#normalize" do
-    it "parses the tags array, stripping blanks and de-duplicating" do
+    it "parses label + confidence, dropping blank labels and clamping confidence" do
       detected = provider.send(:normalize, [
-                                 { "label" => "Mug", "confidence" => 0.9,
-                                   "category" => "Kitchenware",
-                                   "tags" => ["Heavy", " Heavy ", "", "Valuable"] }
+                                 { "label" => "Mug", "confidence" => 1.4 },
+                                 { "label" => " ", "confidence" => 0.5 }
                                ])
 
       expect(detected.size).to eq(1)
-      expect(detected.first.tags).to eq(%w[Heavy Valuable])
-    end
-
-    it "defaults tags to an empty array when the field is absent" do
-      detected = provider.send(:normalize, [
-                                 { "label" => "Mug", "confidence" => 0.9,
-                                   "category" => "Kitchenware" }
-                               ])
-
-      expect(detected.first.tags).to eq([])
+      expect(detected.first).to have_attributes(label: "Mug", confidence: 1.0)
     end
   end
 

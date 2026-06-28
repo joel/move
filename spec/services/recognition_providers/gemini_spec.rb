@@ -6,7 +6,7 @@ RSpec.describe RecognitionProviders::Gemini do
   subject(:provider) { described_class.new(api_key: "g-test") }
 
   let(:image) { instance_double(ActiveStorage::Blob, content_type: "image/jpeg", download: "bytes") }
-  let(:context) { { room: "Garage", categories: ["Tools"], tags: [] } }
+  let(:context) { { room: "Garage" } }
   let(:captured) { {} }
 
   # Capture the outgoing request so request-body specs can assert what we SEND.
@@ -46,7 +46,7 @@ RSpec.describe RecognitionProviders::Gemini do
         expect(body.dig("generationConfig", "responseSchema", "required")).to eq(%w[description])
         parts = body.dig("contents", 0, "parts")
         expect(parts.map(&:keys).flatten).to eq(%w[text]) # text-only, no inlineData
-        expect(parts.dig(0, "text")).to include("Drill", "Tools")
+        expect(parts.dig(0, "text")).to include("Drill")
       end
     end
   end
@@ -63,29 +63,23 @@ RSpec.describe RecognitionProviders::Gemini do
       gen = body["generationConfig"]
       expect(gen["responseMimeType"]).to eq("application/json")
       items = gen.dig("responseSchema", "properties", "objects", "items")
-      expect(items["required"]).to include("category", "tags")
-      expect(items["required"]).not_to include("fragile", "count")
-      expect(items["properties"]).not_to have_key("fragile")
-      expect(items["properties"]).not_to have_key("count")
-      # Gemini's schema dialect uses uppercase type enums.
-      expect(items.dig("properties", "tags", "type")).to eq("ARRAY")
+      expect(items["required"]).to contain_exactly("label", "confidence")
+      expect(items["properties"].keys).to contain_exactly("label", "confidence")
       # Canonical camelCase proto json_name for the inline image part.
       inline = body.dig("contents", 0, "parts", 1, "inlineData")
       expect(inline).to include("mimeType" => "image/jpeg", "data" => Base64.strict_encode64("bytes"))
     end
   end
 
-  it "normalizes a responseSchema objects payload, including category" do
-    content = { objects: [{ label: "drill", confidence: 0.95,
-                            category: "Tools" }] }.to_json
+  it "normalizes a responseSchema objects payload" do
+    content = { objects: [{ label: "drill", confidence: 0.95 }] }.to_json
     stub_http(code: "200", body: content_response(content))
 
     result = provider.identify(image: image, context: context)
     object = result.objects.first
 
     expect(result.provider).to eq("gemini")
-    expect(object).to have_attributes(label: "drill", confidence: 0.95,
-                                      category: "Tools")
+    expect(object).to have_attributes(label: "drill", confidence: 0.95)
   end
 
   it "treats an empty objects array as a legitimate zero-detection result" do
