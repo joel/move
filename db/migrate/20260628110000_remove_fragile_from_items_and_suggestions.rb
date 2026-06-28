@@ -5,6 +5,15 @@ class RemoveFragileFromItemsAndSuggestions < ActiveRecord::Migration[8.1]
   # removed column. No re-snapshot: log_data isn't in structure.sql and the feed's
   # revert reads only name/quantity/category_id, so prior history stays valid.
   def up
+    # Preserve existing per-item fragile marks: roll them up to the box before the
+    # item column is dropped, so a box that held a fragile item keeps showing the
+    # FRAGILE chip + printed label after this deploy (Codex review). boxes.fragile
+    # was just added defaulting to false — this is its one-time backfill, scoped to
+    # kept items, run per tenant by Apartment.
+    execute <<~SQL.squish
+      UPDATE boxes SET fragile = TRUE
+      WHERE id IN (SELECT box_id FROM items WHERE fragile = TRUE AND discarded_at IS NULL)
+    SQL
     execute %(DROP TRIGGER IF EXISTS "logidze_on_items" on "items";)
     remove_column :items, :fragile
     remove_column :recognition_suggestions, :proposed_fragile
