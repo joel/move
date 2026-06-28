@@ -66,9 +66,11 @@ RSpec.describe "Capture & auto-save (JS)", :js do
     # CI-only flake (capybara/selector/definition/link.rb:35). `a[href*="…"]` only
     # matches anchors that already carry the href (no nil to crash on), and the
     # text filter retries cleanly on a node swapped mid-navigation.
+    # Case-insensitive: the chips are CSS-uppercased (text-label-caps), and the one
+    # card carries every recognised name, so match each by regex.
     review_link = %(a[href*="/moves/#{move.id}/boxes/#{box.id}/review/photo"])
-    expect(page).to have_css(review_link, text: "Coffee maker")
-    expect(page).to have_css(review_link, text: "Set of mugs")
+    expect(page).to have_css(review_link, text: /Coffee maker/i)
+    expect(page).to have_css(review_link, text: /Set of mugs/i)
   end
 
   it "auto-saves an item edit (no Save button) and shows the Saved badge" do
