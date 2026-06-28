@@ -14,7 +14,10 @@ module MoveMcp
         required: %w[box_number name]
       )
 
-      def self.call(box_number:, name:, server_context:)
+      # `**` tolerates extra client-supplied args (e.g. a `quantity` from a client
+      # built against the pre-Phase-B schema) — the gem dispatches every argument
+      # as a kwarg, so ignore the unknowns instead of raising rather than adding.
+      def self.call(box_number:, name:, server_context:, **)
         box = find_box(server_context, box_number)
         return error_response("No box ##{box_number} in this move.") if box.nil?
 

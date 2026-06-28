@@ -160,6 +160,13 @@ RSpec.describe "MCP endpoint" do
       )
     end
 
+    it "tolerates (ignores) a stale quantity arg from a pre-Phase-B client" do
+      create(:box, move:, number: 3)
+
+      expect { tool_call("add_item_to_box", { box_number: 3, name: "Kettle", quantity: 4 }) }
+        .to change { Item.where(name: "Kettle").count }.by(1)
+    end
+
     it "refuses to add to a sealed (non-packing) box (a pure add is packing-only)" do
       sealed = create(:box, move:, number: 7, status: "sealed")
 
