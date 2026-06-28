@@ -22,11 +22,14 @@ module Components
                    "text-left text-body-md font-semibold text-error transition " \
                    "hover:bg-error/10 active:scale-[0.98]"
 
-      def initialize(move:, box:, editable: false, consumed: nil)
+      def initialize(move:, box:, editable: false, consumed: nil, omit_delete: false)
         @move = move
         @box = box
         @editable = editable
         @consumed = consumed
+        # The header promotes Delete to the hero for an unpacked box, so the sheet
+        # omits its row to avoid offering Delete twice.
+        @omit_delete = omit_delete
       end
 
       def view_template
@@ -55,12 +58,36 @@ module Components
         h3(class: "text-headline-md text-text-warm mb-4") do
           I18n.t("boxes.manage.title", number: Kernel.format("%03d", @box.number.to_i))
         end
+        details_block
         div(class: "flex flex-col gap-2") do
           lifecycle_rows if @editable
           print_rows
           edit_row if @editable
-          delete_section if @editable
+          delete_section if @editable && !@omit_delete
         end
+      end
+
+      # Read-only dimensions + weight — demoted off the slim box header (#401), they
+      # surface here (and on the Edit form, where they're set).
+      def details_block
+        measurements = BoxMeasurements.new(@box, unit_system: @move.unit_system)
+        div(class: "mb-4 flex items-center justify-between rounded-lg bg-surface-container-high px-4 py-3") do
+          div do
+            p(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.show.dimensions") }
+            p(class: "text-body-md text-text-warm") { measurements.dimensions || "—" }
+            volume_line(measurements.volume)
+          end
+          div(class: "text-right") do
+            p(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.show.weight") }
+            p(class: "text-body-md text-text-warm") { measurements.weight || "—" }
+          end
+        end
+      end
+
+      def volume_line(volume)
+        return unless volume
+
+        p(class: "text-sm text-muted") { I18n.t("boxes.show.volume", value: volume) }
       end
 
       # The lifecycle transitions still available from here, minus the one the

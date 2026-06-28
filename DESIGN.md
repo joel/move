@@ -187,10 +187,10 @@ Two card-surface overlay chromes share the `modal` controller (`open` / `close` 
 - **`.ha-sheet`** — bottom sheet: full-width (capped 480px, centred on wide
   viewports), rounded top, slides up (`ha-sheet-up`, disabled under
   `prefers-reduced-motion`). Used by **`Components::Boxes::ManageSheet`** — the box
-  detail's ⋮ "Manage box" overflow that holds the secondary actions (lifecycle
-  step(s), print label/manifest, edit, delete) so the screen shows one contextual
-  hero. Rows are full-width `surface-container-high` pills (`text-error` for the
-  destructive Delete row).
+  detail's ⋮ "Manage box" overflow that holds the box's dimensions/weight (read-only)
+  plus the secondary actions (lifecycle step(s), print label/manifest, edit, delete)
+  so the screen shows one contextual hero. Rows are full-width `surface-container-high`
+  pills (`text-error` for the destructive Delete row).
 
 ### Navigation chrome
 `Ui::BottomTabBar` (mobile, docked) and `Ui::Sidebar` (desktop ≥`lg`, 280px) render

@@ -111,8 +111,8 @@ en:
       submit: "Save changes"
     actions:
       capture: "Capture image"
-      capture_hint: "Use AI to recognise and log items instantly."
       add_item: "Add item manually"
+      add_manually: "Add manually"
       add_item_short: "Add item"
       seal: "Seal box"
       unseal: "Unseal"
