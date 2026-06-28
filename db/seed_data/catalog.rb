@@ -63,7 +63,7 @@ module SeedData
   # `captured_at`: seconds ago, so the per-photo review walk (box 1) visits photos
   #   in this listed order (larger = earlier = visited first).
   # An item: name (required), confidence, review, presence (default "in_box"),
-  #   category, tags, qty (default 1).
+  #   category, tags.
   PHOTOS = [
     # --- Box 1: the review-walk showcase (3 scene photos + 2 recovery tiles) ----
     { box: "1", slug: "kitchen-counter", status: "succeeded", captured_at: 300,
@@ -75,7 +75,7 @@ module SeedData
       items: [
         { name: "Coffee maker", confidence: 0.97, review: "auto_confirmed", category: "Appliances" },
         { name: "Stack of books", confidence: 0.88, review: "auto_confirmed", category: "Books", tags: ["Heavy"] },
-        { name: "Set of mugs",   confidence: 0.62, review: "pending_review", category: "Kitchenware", qty: 4 },
+        { name: "Set of mugs",   confidence: 0.62, review: "pending_review", category: "Kitchenware" },
         { name: "Table lamp",    confidence: 0.55, review: "pending_review", category: "Electronics" },
         { name: "Picture frame", confidence: 0.41, review: "pending_review", category: "Decor" }
       ] },
@@ -192,7 +192,7 @@ module SeedData
               "bath towels, a zipped toiletry bag, an electric toothbrush on its " \
               "charger, and a pump bottle of hand soap. Even light, no text.",
       items: [
-        { name: "Bath Towels",       confidence: 0.85, review: "auto_confirmed", category: "Clothing", qty: 4 },
+        { name: "Bath Towels",       confidence: 0.85, review: "auto_confirmed", category: "Clothing" },
         { name: "Toiletry Bag",      confidence: 0.70, review: "confirmed", category: "Clothing",
           tags: ["Everyday Use"] },
         { name: "Electric Toothbrush", confidence: 0.60, review: "pending_review", category: "Electronics",
@@ -208,9 +208,9 @@ module SeedData
               "white dinner plates, a row of stemmed wine glasses, a large " \
               "serving bowl, and a folded linen tablecloth. Even daylight, no text.",
       items: [
-        { name: "Dinner Plates", confidence: 0.90, review: "auto_confirmed", category: "Kitchenware", qty: 8 },
+        { name: "Dinner Plates", confidence: 0.90, review: "auto_confirmed", category: "Kitchenware" },
         { name: "Wine Glasses",  confidence: 0.85, review: "auto_confirmed", category: "Kitchenware",
-          qty: 6, tags: ["Valuable"] },
+          tags: ["Valuable"] },
         { name: "Serving Bowl",  confidence: 0.70, review: "confirmed", category: "Kitchenware" },
         { name: "Linen Tablecloth", confidence: 0.60, review: "pending_review", category: "Clothing" }
       ] },
@@ -238,7 +238,7 @@ module SeedData
       items: [
         { name: "Game Console",    confidence: 0.90, review: "auto_confirmed", category: "Electronics",
           tags: ["Valuable"] },
-        { name: "Board Games",     confidence: 0.70, review: "confirmed", category: "Toys", qty: 5 },
+        { name: "Board Games",     confidence: 0.70, review: "confirmed", category: "Toys" },
         { name: "DVD Collection",  confidence: 0.60, review: "pending_review", category: "Decor" },
         { name: "Streaming Remote", confidence: 0.50, review: "pending_review", category: "Electronics" }
       ] }
@@ -249,25 +249,25 @@ module SeedData
   # needs_correction) and the presence axis (in_box / removed). The box-5 "Hair
   # dryer" backs the semantic-search demo ("blow dryer" ~ "Hair dryer").
   MANUAL_ITEMS = [
-    { box: "2", name: "Espresso Machine", qty: 1,
+    { box: "2", name: "Espresso Machine",
       category: "Electronics", tags: ["Heavy"], review: "confirmed", presence: "in_box" },
-    { box: "2", name: "Dinner Plates", qty: 8,
+    { box: "2", name: "Dinner Plates",
       category: "Kitchenware", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
-    { box: "4", name: "Paperback Novels", qty: 12,
+    { box: "4", name: "Paperback Novels",
       category: "Books", tags: ["Heavy"], review: "needs_correction", presence: "in_box" },
-    { box: "4", name: "Winter Coat", qty: 1,
+    { box: "4", name: "Winter Coat",
       category: "Clothing", tags: ["Seasonal"], review: "confirmed", presence: "removed" },
-    { box: "5", name: "Hair dryer", qty: 1,
+    { box: "5", name: "Hair dryer",
       category: "Electronics", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
-    { box: "7", name: "Bedside Lamp", qty: 1,
+    { box: "7", name: "Bedside Lamp",
       category: "Electronics", tags: ["Important"], review: "confirmed", presence: "in_box" },
-    { box: "7", name: "Folded Bedsheets", qty: 4,
+    { box: "7", name: "Folded Bedsheets",
       category: "Clothing", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
-    { box: "7", name: "Alarm Clock", qty: 1,
+    { box: "7", name: "Alarm Clock",
       category: "Electronics", tags: [], review: "confirmed", presence: "in_box" },
-    { box: "7", name: "Throw Pillows", qty: 2,
+    { box: "7", name: "Throw Pillows",
       category: "Clothing", tags: [], review: "confirmed", presence: "removed" },
-    { box: "7", name: "Reading Glasses", qty: 1,
+    { box: "7", name: "Reading Glasses",
       category: nil, tags: ["Important"], review: "confirmed", presence: "removed" }
   ].freeze
 
@@ -292,7 +292,7 @@ module SeedData
   # objects when present (review_state derived from confidence vs `threshold`,
   # mirroring RecognitionRuns::Process), else the authored catalog items
   # (explicit review_state) as the offline fallback. Uniform hash shape either
-  # way: { name:, quantity:, confidence:, category:, tags:, review: }.
+  # way: { name:, confidence:, category:, tags:, review: }.
   def self.detections_for(photo, threshold:)
     recorded = recorded_recognition(photo[:slug])
     return normalize_recorded(recorded["objects"], threshold: threshold) if recorded
@@ -302,7 +302,7 @@ module SeedData
 
   # Normalize recorded provider objects into the uniform detection shape, with
   # review_state split on the auto-confirm threshold (the pipeline's rule). Drops
-  # blank labels and clamps a missing/zero count to 1.
+  # blank labels.
   def self.normalize_recorded(objects, threshold:)
     Array(objects).filter_map { |object| recorded_detection(object, threshold: threshold) }
   end
@@ -314,7 +314,6 @@ module SeedData
     confidence = object["confidence"]&.to_f
     {
       name: label,
-      quantity: [object["count"].to_i, 1].max,
       confidence: confidence,
       category: object["category"].to_s.strip.presence,
       tags: Array(object["tags"]).map { |tag| tag.to_s.strip }.reject(&:empty?).uniq,
@@ -324,7 +323,7 @@ module SeedData
 
   def self.authored_detection(item)
     {
-      name: item[:name], quantity: item[:qty] || 1, confidence: item[:confidence],
+      name: item[:name], confidence: item[:confidence],
       category: item[:category], tags: item[:tags] || [], review: item[:review]
     }
   end

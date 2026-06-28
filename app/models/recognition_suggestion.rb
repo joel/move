@@ -15,7 +15,6 @@ class RecognitionSuggestion < ApplicationRecord
   belongs_to :proposed_category, class_name: "Category", optional: true
 
   validates :proposed_name, presence: true
-  validates :proposed_quantity, numericality: { only_integer: true, greater_than: 0 }
   validates :state, inclusion: { in: STATES }
 
   # Still needs a human decision in the review queue (D6): a fresh low-confidence

@@ -5,7 +5,6 @@ FactoryBot.define do
     move
     box { association :box, move: move }
     name { "Coffee Maker" }
-    quantity { 1 }
     created_via { "recognition" }
     review_state { "pending_review" }
     presence_state { "in_box" }

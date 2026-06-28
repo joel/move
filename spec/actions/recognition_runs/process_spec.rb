@@ -63,7 +63,7 @@ RSpec.describe RecognitionRuns::Process do
   end
 
   it "records a conflict (no overwrite, no duplicate) when a confirmed item of the same name exists" do
-    existing = create(:item, :confirmed, move:, box:, name: "Coffee maker", quantity: 5)
+    existing = create(:item, :confirmed, move:, box:, name: "Coffee maker")
 
     described_class.new.call(run:)
 
@@ -71,7 +71,7 @@ RSpec.describe RecognitionRuns::Process do
     expect(conflict.state).to eq("conflict")
     expect(conflict.item).to eq(existing)
     # The confirmed item is untouched and not duplicated.
-    expect(existing.reload).to have_attributes(quantity: 5, review_state: "confirmed")
+    expect(existing.reload).to have_attributes(review_state: "confirmed")
     expect(box.items.where("LOWER(name) = ?", "coffee maker").count).to eq(1)
   end
 

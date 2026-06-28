@@ -7,10 +7,10 @@ RSpec.describe Item do
     expect(build(:item)).to be_valid
   end
 
-  it "validates name, quantity and the state enums" do
-    item = build(:item, name: nil, quantity: 0, review_state: "bogus", presence_state: "nowhere")
+  it "validates name and the state enums" do
+    item = build(:item, name: nil, review_state: "bogus", presence_state: "nowhere")
     expect(item).not_to be_valid
-    expect(item.errors.attribute_names).to include(:name, :quantity, :review_state, :presence_state)
+    expect(item.errors.attribute_names).to include(:name, :review_state, :presence_state)
   end
 
   describe "scopes" do

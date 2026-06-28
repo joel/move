@@ -273,13 +273,13 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
         category = resolve_category.call(attrs[:category])
         suggestion = run.recognition_suggestions.create!(
           move: move, box: box, media: media, proposed_name: attrs[:name],
-          proposed_quantity: attrs[:quantity], proposed_category: category,
+          proposed_category: category,
           confidence_score: attrs[:confidence],
           state: attrs[:review] == "auto_confirmed" ? "auto_accepted" : "pending"
         )
         item = box.items.create!(
           move: move, source_media: media, source_recognition_suggestion_id: suggestion.id,
-          name: attrs[:name], quantity: attrs[:quantity],
+          name: attrs[:name],
           confidence_score: attrs[:confidence], created_via: "recognition",
           review_state: attrs[:review], presence_state: presence,
           category: category, tags: resolve_tags.call(attrs[:tags])
@@ -321,7 +321,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     next unless item.new_record?
 
     item.assign_attributes(
-      move: move, quantity: attrs[:qty],
+      move: move,
       category: categories[attrs[:category]], created_via: "manual",
       review_state: attrs[:review], presence_state: attrs[:presence],
       tags: attrs[:tags].filter_map { |name| tags[name] }
@@ -385,7 +385,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     next if archived_box.items.exists?(name: name)
 
     archived_box.items.create!(
-      move: archived_move, name: name, quantity: 1, created_via: "manual", review_state: "confirmed"
+      move: archived_move, name: name, created_via: "manual", review_state: "confirmed"
     )
   end
 
@@ -430,7 +430,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
       b.status = "packing"
     end
     if trash.items.none?
-      trash.items.create!(move: move, name: "Old cables", quantity: 1,
+      trash.items.create!(move: move, name: "Old cables",
                           created_via: "manual", review_state: "confirmed", presence_state: "in_box")
     end
     Boxes::Delete.new.call(box: trash, actor: owner)

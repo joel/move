@@ -999,7 +999,6 @@ CREATE TABLE public.items (
     source_media_id uuid,
     source_recognition_suggestion_id uuid,
     name character varying,
-    quantity integer DEFAULT 1 NOT NULL,
     confidence_score numeric(4,3),
     created_via character varying DEFAULT 'recognition'::character varying NOT NULL,
     review_state character varying DEFAULT 'pending_review'::character varying NOT NULL,
@@ -1184,7 +1183,6 @@ CREATE TABLE public.recognition_suggestions (
     recognition_run_id uuid NOT NULL,
     item_id uuid,
     proposed_name character varying NOT NULL,
-    proposed_quantity integer DEFAULT 1 NOT NULL,
     confidence_score numeric(4,3),
     state character varying DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
@@ -2191,7 +2189,7 @@ CREATE TRIGGER logidze_on_categories BEFORE INSERT OR UPDATE ON public.categorie
 -- Name: items logidze_on_items; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER logidze_on_items BEFORE INSERT OR UPDATE ON public.items FOR EACH ROW WHEN ((COALESCE(current_setting('logidze.disabled'::text, true), ''::text) <> 'on'::text)) EXECUTE FUNCTION public.logidze_logger('null', 'updated_at', '{name, category_id, quantity}', 'true');
+CREATE TRIGGER logidze_on_items BEFORE INSERT OR UPDATE ON public.items FOR EACH ROW WHEN ((COALESCE(current_setting('logidze.disabled'::text, true), ''::text) <> 'on'::text)) EXECUTE FUNCTION public.logidze_logger('null', 'updated_at', '{name, category_id}', 'true');
 
 
 --
@@ -2542,6 +2540,7 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260628120000'),
 ('20260628110000'),
 ('20260628100000'),
 ('20260627120000'),

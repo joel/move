@@ -5,7 +5,7 @@ require "rails_helper"
 RSpec.describe Items::Update do
   let(:editor) { create(:user) }
   let(:move) { create(:move, created_by: editor) }
-  let(:item) { create(:item, :manual, move:, name: "Old", quantity: 1) }
+  let(:item) { create(:item, :manual, move:, name: "Old") }
 
   def call(params)
     described_class.new.call(item:, params:, editor:)

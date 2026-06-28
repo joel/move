@@ -97,10 +97,8 @@ RSpec.describe SeedData do
       ]
     end
 
-    it "drops blank labels and clamps a zero count to 1" do
+    it "drops blank labels" do
       expect(detections.pluck(:name)).to eq(["Coffee maker", "Wine glasses"])
-      expect(detections.first[:quantity]).to eq(1)
-      expect(detections.last[:quantity]).to eq(6)
     end
 
     it "splits review_state on the auto-confirm threshold" do

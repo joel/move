@@ -45,7 +45,7 @@ RSpec.describe Category do
     media = create(:media, move:, box:)
     run = create(:recognition_run, move:, box:, media:)
     suggestion = run.recognition_suggestions.create!(
-      move:, box:, media:, proposed_name: "Mug", proposed_quantity: 1, proposed_category: category
+      move:, box:, media:, proposed_name: "Mug", proposed_category: category
     )
 
     expect { category.destroy! }.not_to raise_error
