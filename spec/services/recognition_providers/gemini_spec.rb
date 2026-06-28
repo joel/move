@@ -63,9 +63,10 @@ RSpec.describe RecognitionProviders::Gemini do
       gen = body["generationConfig"]
       expect(gen["responseMimeType"]).to eq("application/json")
       items = gen.dig("responseSchema", "properties", "objects", "items")
-      expect(items["required"]).to include("category", "fragile", "tags")
+      expect(items["required"]).to include("category", "tags")
+      expect(items["required"]).not_to include("fragile")
+      expect(items["properties"]).not_to have_key("fragile")
       # Gemini's schema dialect uses uppercase type enums.
-      expect(items.dig("properties", "fragile", "type")).to eq("BOOLEAN")
       expect(items.dig("properties", "tags", "type")).to eq("ARRAY")
       # Canonical camelCase proto json_name for the inline image part.
       inline = body.dig("contents", 0, "parts", 1, "inlineData")
@@ -73,9 +74,9 @@ RSpec.describe RecognitionProviders::Gemini do
     end
   end
 
-  it "normalizes a responseSchema objects payload, including category + fragile" do
+  it "normalizes a responseSchema objects payload, including category" do
     content = { objects: [{ label: "drill", confidence: 0.95, count: 1,
-                            category: "Tools", fragile: false }] }.to_json
+                            category: "Tools" }] }.to_json
     stub_http(code: "200", body: content_response(content))
 
     result = provider.identify(image: image, context: context)
@@ -83,7 +84,7 @@ RSpec.describe RecognitionProviders::Gemini do
 
     expect(result.provider).to eq("gemini")
     expect(object).to have_attributes(label: "drill", count: 1, confidence: 0.95,
-                                      category: "Tools", fragile: false)
+                                      category: "Tools")
   end
 
   it "treats an empty objects array as a legitimate zero-detection result" do

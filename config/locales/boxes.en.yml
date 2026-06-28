@@ -30,8 +30,8 @@ en:
         one: "1 item"
         other: "%{count} items"
       missing_dimensions: "Add dimensions"
-    item:
-      fragile: "Fragile"
+    # Badge shown on the box header + card when the box is marked fragile (Phase A).
+    fragile_badge: "Fragile"
     item_state:
       pending_review: "Pending review"
       auto_confirmed: "Auto-confirmed"
@@ -126,9 +126,15 @@ en:
       edit: "Edit box"
       delete: "Delete box"
       delete_confirm: "Delete this box and its items? You can restore it from the activity feed."
+      mark_fragile: "Mark as fragile"
+      unmark_fragile: "Remove fragile mark"
     manage:
       title: "Manage Box #%{number}"
       trigger: "Manage box"
+    set_fragile:
+      marked_fragile: "Box marked fragile — FRAGILE will print on the label."
+      unmarked_fragile: "Removed the fragile mark."
+      fragile_failed: "Could not update the box."
     transition:
       transitioned: "Box marked %{status}."
       room_required: "Assign a room before sealing this box."

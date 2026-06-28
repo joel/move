@@ -289,6 +289,6 @@ class ItemsController < MoveScopedController
   end
 
   def item_attributes
-    params.expect(item: [:name, :category_id, :quantity, :fragile, { tag_ids: [] }])
+    params.expect(item: [:name, :category_id, :quantity, { tag_ids: [] }])
   end
 end

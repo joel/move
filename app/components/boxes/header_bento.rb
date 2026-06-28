@@ -96,6 +96,9 @@ module Components
           span(class: "h-2 w-2 rounded-full bg-accent-sage")
           plain I18n.t("boxes.status.#{@box.status}")
         end
+        # Manual fragile mark (Phase A) — terracotta, the design system's Fragile
+        # tint (DESIGN.md), matching the FRAGILE mark printed on the box label.
+        render Components::Ui::Chip.new(label: I18n.t("boxes.fragile_badge"), kind: :tag) if @box.fragile?
       end
 
       def edit_link

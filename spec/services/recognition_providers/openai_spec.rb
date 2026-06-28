@@ -75,8 +75,8 @@ RSpec.describe RecognitionProviders::Openai do
       expect(fmt["type"]).to eq("json_schema")
       expect(fmt.dig("json_schema", "strict")).to be(true)
       items = fmt.dig("json_schema", "schema", "properties", "objects", "items")
-      expect(items["required"]).to include("category", "fragile", "tags")
-      expect(items.dig("properties", "fragile", "type")).to eq("boolean")
+      expect(items["required"]).to include("category", "tags")
+      expect(items["required"]).not_to include("fragile")
       content = body.dig("messages", 0, "content")
       expect(content.dig(0, "text")).to include("moving-box photo")
       expect(content.dig(1, "image_url", "url"))
@@ -84,9 +84,9 @@ RSpec.describe RecognitionProviders::Openai do
     end
   end
 
-  it "normalizes a structured-output objects payload, including category + fragile" do
+  it "normalizes a structured-output objects payload, including category" do
     content = { objects: [{ label: "lamp", confidence: 0.9, count: 2,
-                            category: "Lighting", fragile: true }] }.to_json
+                            category: "Lighting" }] }.to_json
     stub_http(code: "200", body: content_response(content))
 
     result = provider.identify(image: image, context: context)
@@ -94,12 +94,12 @@ RSpec.describe RecognitionProviders::Openai do
 
     expect(result.provider).to eq("openai")
     expect(object).to have_attributes(label: "lamp", count: 2, confidence: 0.9,
-                                      category: "Lighting", fragile: true)
+                                      category: "Lighting")
   end
 
   it "recovers a fenced JSON object via the backstop" do
     content = "```json\n#{{ objects: [{ label: "mug", confidence: 0.5, count: 1,
-                                        category: "Kitchenware", fragile: false }] }.to_json}\n```"
+                                        category: "Kitchenware" }] }.to_json}\n```"
     stub_http(code: "200", body: content_response(content))
 
     expect(provider.identify(image: image, context: context).objects.map(&:label)).to eq(["mug"])

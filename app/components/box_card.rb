@@ -38,10 +38,15 @@ module Components
                  "bg-surface-container-high text-accent-sage"
         ) { render Components::Icons::Boxes.new(css: "h-6 w-6") }
 
-        if @recognition_state
-          render Components::Ui::RecognitionState.new(state: @recognition_state)
-        else
-          span(class: badge_classes) { badge_label }
+        div(class: "flex flex-col items-end gap-1.5") do
+          if @recognition_state
+            render Components::Ui::RecognitionState.new(state: @recognition_state)
+          else
+            span(class: badge_classes) { badge_label }
+          end
+          # Manual fragile mark (Phase A) — terracotta, the design system's Fragile
+          # tint (DESIGN.md), matching the box header chip and the printed label.
+          render Components::Ui::Chip.new(label: I18n.t("boxes.fragile_badge"), kind: :tag) if @box.fragile?
         end
       end
     end

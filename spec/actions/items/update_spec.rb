@@ -12,10 +12,10 @@ RSpec.describe Items::Update do
   end
 
   it "updates editable attributes" do
-    result = call(name: "New", quantity: "3", fragile: "1")
+    result = call(name: "New", quantity: "3")
 
     expect(result).to be_success
-    expect(item.reload).to have_attributes(name: "New", quantity: 3, fragile: true)
+    expect(item.reload).to have_attributes(name: "New", quantity: 3)
   end
 
   it "replaces the tag set" do

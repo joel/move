@@ -61,6 +61,7 @@ module Components
         details_block
         div(class: "flex flex-col gap-2") do
           lifecycle_rows if @editable
+          fragile_row if @editable
           print_rows
           edit_row if @editable
           delete_section if @editable && !@omit_delete
@@ -111,6 +112,18 @@ module Components
         ) do
           render transition_icon(target).new(css: "h-5 w-5")
           span { transition_label(target) }
+        end
+      end
+
+      # Manual fragile toggle (Phase A) — idempotent set of the opposite state, so a
+      # stale sheet can't double-flip. A fragile box prints FRAGILE on its label.
+      def fragile_row
+        button_to(
+          fragile_move_box_path(@move, @box),
+          method: :patch, params: { fragile: !@box.fragile? }, class: ROW, form_class: "w-full"
+        ) do
+          render Components::Icons::Alert.new(css: "h-5 w-5")
+          span { I18n.t(@box.fragile? ? "boxes.actions.unmark_fragile" : "boxes.actions.mark_fragile") }
         end
       end
 

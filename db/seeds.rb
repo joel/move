@@ -170,11 +170,16 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
       b.width_cm = width
       b.height_cm = height
       b.weight_kg = weight
+      b.fragile = attrs[:fragile] || false
     end
     # Backfill a showcase description onto a box seeded before this feature
     # existed, so a re-seed shows it (the create block runs only on first insert).
     # Only fills a blank, leaving developer edits and lifecycle state untouched.
     box.update!(description: attrs[:desc]) if attrs[:desc].present? && box.description.blank?
+    # Same for the Phase A fragile flag: re-assert the catalog's fragile boxes on a
+    # re-seed (the create block ran only on first insert) so the FRAGILE chip +
+    # printed label are showcase-ready without a full DB reset.
+    box.update!(fragile: true) if attrs[:fragile] && !box.fragile?
   end
 
   # The demo-only "Everyday Use" tag the items below reference (not part of the
@@ -269,12 +274,12 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
         suggestion = run.recognition_suggestions.create!(
           move: move, box: box, media: media, proposed_name: attrs[:name],
           proposed_quantity: attrs[:quantity], proposed_category: category,
-          proposed_fragile: attrs[:fragile], confidence_score: attrs[:confidence],
+          confidence_score: attrs[:confidence],
           state: attrs[:review] == "auto_confirmed" ? "auto_accepted" : "pending"
         )
         item = box.items.create!(
           move: move, source_media: media, source_recognition_suggestion_id: suggestion.id,
-          name: attrs[:name], quantity: attrs[:quantity], fragile: attrs[:fragile],
+          name: attrs[:name], quantity: attrs[:quantity],
           confidence_score: attrs[:confidence], created_via: "recognition",
           review_state: attrs[:review], presence_state: presence,
           category: category, tags: resolve_tags.call(attrs[:tags])
@@ -316,7 +321,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     next unless item.new_record?
 
     item.assign_attributes(
-      move: move, quantity: attrs[:qty], fragile: attrs[:fragile],
+      move: move, quantity: attrs[:qty],
       category: categories[attrs[:category]], created_via: "manual",
       review_state: attrs[:review], presence_state: attrs[:presence],
       tags: attrs[:tags].filter_map { |name| tags[name] }

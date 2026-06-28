@@ -31,6 +31,36 @@ RSpec.describe "Box detail — Manage sheet", type: :request do
     end
   end
 
+  it "offers a fragile toggle to an editor (Mark as fragile when not yet fragile)" do
+    box = create(:box, :with_room, move:, number: "1", status: "packing", fragile: false)
+
+    get move_box_path(move, box)
+
+    aggregate_failures do
+      expect(response.body).to include(I18n.t("boxes.actions.mark_fragile"))
+      expect(response.body).to include(fragile_move_box_path(move, box))
+    end
+  end
+
+  it "offers to remove the mark when the box is already fragile" do
+    box = create(:box, :with_room, move:, number: "1", status: "packing", fragile: true)
+
+    get move_box_path(move, box)
+
+    expect(response.body).to include(I18n.t("boxes.actions.unmark_fragile"))
+  end
+
+  it "hides the fragile toggle from a viewer" do
+    viewer = create(:user)
+    create(:move_membership, move:, user: viewer, role: "viewer")
+    box = create(:box, :with_room, move:, number: "1", status: "packing", fragile: false)
+    stub_current_user(viewer)
+
+    get move_box_path(move, box)
+
+    expect(response.body).not_to include(I18n.t("boxes.actions.mark_fragile"))
+  end
+
   it "surfaces the box's dimensions, volume and weight (demoted off the header) in the sheet" do
     box = create(:box, :with_dimensions, move:, number: "1", weight_kg: 9)
 

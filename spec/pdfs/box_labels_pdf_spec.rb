@@ -66,4 +66,23 @@ RSpec.describe BoxLabelsPdf do
 
     expect { described_class.new(entries: [entry(box)]).render }.not_to raise_error
   end
+
+  it "renders the FRAGILE band for a fragile box without raising (Phase A)" do
+    room = create(:room, move:)
+    box = create(:box, move:, room:, number: "9", qr_token: "tok-frag", fragile: true)
+
+    expect { described_class.new(entries: [entry(box)]).render }.not_to raise_error
+  end
+
+  it "adds label content for a fragile box that a non-fragile box doesn't carry" do
+    box = create(:box, move:, room: create(:room, move:), number: "9", qr_token: "tok-frag2", fragile: false)
+    plain_pdf = described_class.new(entries: [entry(box)]).render
+
+    box.update!(fragile: true)
+    fragile_pdf = described_class.new(entries: [entry(box)]).render
+
+    # The FRAGILE band draws an extra filled rectangle + text run, so the fragile
+    # label's content stream is strictly larger than the otherwise-identical plain one.
+    expect(fragile_pdf.bytesize).to be > plain_pdf.bytesize
+  end
 end

@@ -22,16 +22,15 @@ module RecognitionProviders
           type: "ARRAY",
           items: {
             type: "OBJECT",
-            required: %w[label confidence count category fragile tags],
+            required: %w[label confidence count category tags],
             properties: {
               label: { type: "STRING" },
               confidence: { type: "NUMBER" },
               count: { type: "INTEGER" },
               category: { type: "STRING" },
-              fragile: { type: "BOOLEAN" },
               tags: { type: "ARRAY", items: { type: "STRING" } }
             },
-            propertyOrdering: %w[label confidence count category fragile tags]
+            propertyOrdering: %w[label confidence count category tags]
           }
         }
       }

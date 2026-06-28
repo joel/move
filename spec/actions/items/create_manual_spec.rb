@@ -23,10 +23,9 @@ RSpec.describe Items::CreateManual do
     expect(item.box).to eq(box)
   end
 
-  it "defaults a blank quantity to 1 and coerces fragile" do
-    item = call(name: "Vase", quantity: "", fragile: "1").value!
+  it "defaults a blank quantity to 1" do
+    item = call(name: "Vase", quantity: "").value!
     expect(item.quantity).to eq(1)
-    expect(item.fragile).to be(true)
   end
 
   it "assigns a category and tags from the Move vocabulary" do

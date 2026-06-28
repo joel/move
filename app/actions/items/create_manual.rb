@@ -40,7 +40,6 @@ module Items
           move: box.move,
           name: params[:name],
           quantity: coerce_quantity(params[:quantity]),
-          fragile: coerce_fragile(params[:fragile]),
           category: category,
           source_media: source_media,
           created_via: "manual",

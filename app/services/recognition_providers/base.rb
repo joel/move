@@ -47,13 +47,12 @@ module RecognitionProviders
           items: {
             type: "object",
             additionalProperties: false,
-            required: %w[label confidence count category fragile tags],
+            required: %w[label confidence count category tags],
             properties: {
               label: { type: "string" },
               confidence: { type: "number" },
               count: { type: "integer" },
               category: { type: "string" },
-              fragile: { type: "boolean" },
               tags: { type: "array", items: { type: "string" } }
             }
           }
@@ -151,7 +150,6 @@ module RecognitionProviders
           confidence: fetch(obj, :confidence)&.to_f&.clamp(0.0, 1.0),
           count: (fetch(obj, :count) || 1).to_i,
           category: fetch(obj, :category).to_s.strip.presence,
-          fragile: ActiveModel::Type::Boolean.new.cast(fetch(obj, :fragile)) || false,
           tags: Array(fetch(obj, :tags)).map { it.to_s.strip }.compact_blank.uniq
         )
       end
@@ -178,9 +176,6 @@ module RecognitionProviders
                else
                  "Classify each item with a concise category (e.g. Kitchenware, Books, Electronics)."
                end
-
-      lines << "Set fragile to true for items that can break or scratch easily — glass, " \
-               "ceramics, electronics, screens, artwork, mirrors, bottles — and false otherwise."
 
       tags = Array(context[:tags]).map(&:to_s).compact_blank.uniq
       lines << if tags.any?

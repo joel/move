@@ -12,7 +12,12 @@ RSpec.describe RecognitionProviders::Base do
       expect(text).to include("Kitchen")
       expect(text).to include("Kitchenware")
       expect(text).to include("Prefer one of these existing categories")
-      expect(text).to match(/fragile/i)
+    end
+
+    it "no longer asks the model about fragility (it is a manual box flag now)" do
+      text = provider.send(:prompt, { room: "Kitchen", categories: ["Kitchenware"] })
+
+      expect(text).not_to match(/fragile/i)
     end
 
     it "offers the move's item-applicable tag vocabulary as tag candidates" do
@@ -36,7 +41,7 @@ RSpec.describe RecognitionProviders::Base do
     it "parses the tags array, stripping blanks and de-duplicating" do
       detected = provider.send(:normalize, [
                                  { "label" => "Mug", "confidence" => 0.9, "count" => 1,
-                                   "category" => "Kitchenware", "fragile" => true,
+                                   "category" => "Kitchenware",
                                    "tags" => ["Heavy", " Heavy ", "", "Valuable"] }
                                ])
 
@@ -47,7 +52,7 @@ RSpec.describe RecognitionProviders::Base do
     it "defaults tags to an empty array when the field is absent" do
       detected = provider.send(:normalize, [
                                  { "label" => "Mug", "confidence" => 0.9, "count" => 1,
-                                   "category" => "Kitchenware", "fragile" => false }
+                                   "category" => "Kitchenware" }
                                ])
 
       expect(detected.first.tags).to eq([])

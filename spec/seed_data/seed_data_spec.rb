@@ -90,10 +90,10 @@ RSpec.describe SeedData do
     let(:objects) do
       [
         { "label" => "Coffee maker", "confidence" => 0.95, "count" => 0, "category" => "Appliances",
-          "fragile" => false, "tags" => [] },
+          "tags" => [] },
         { "label" => "Wine glasses", "confidence" => 0.4, "count" => 6, "category" => "Kitchenware",
-          "fragile" => true, "tags" => [" Valuable ", "Valuable", ""] },
-        { "label" => "  ", "confidence" => 0.9, "count" => 1, "category" => "x", "fragile" => false, "tags" => [] }
+          "tags" => [" Valuable ", "Valuable", ""] },
+        { "label" => "  ", "confidence" => 0.9, "count" => 1, "category" => "x", "tags" => [] }
       ]
     end
 
@@ -110,7 +110,6 @@ RSpec.describe SeedData do
 
     it "strips, blank-drops and dedupes tags" do
       expect(detections.last[:tags]).to eq(["Valuable"])
-      expect(detections.last[:fragile]).to be(true)
     end
   end
 
@@ -128,7 +127,7 @@ RSpec.describe SeedData do
       photo = SeedData::PHOTOS.find { |p| p[:slug] == "kitchen-counter" }
       allow(described_class).to receive(:recorded_recognition).with("kitchen-counter").and_return(
         "objects" => [{ "label" => "Kettle", "confidence" => 0.9, "count" => 1,
-                        "category" => "Appliances", "fragile" => false, "tags" => [] }]
+                        "category" => "Appliances", "tags" => [] }]
       )
 
       detections = described_class.detections_for(photo, threshold: 0.8)
