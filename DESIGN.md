@@ -35,6 +35,10 @@ hand-code a colour, spacing, radius, or type value.**
 - **charcoal-brown** → text + structural background.
 - **Pure black (`#000000`) is prohibited.** Depth comes from **tonal layering, not
   shadows** — a card is one tonal step lighter than the page plus a 1px hairline edge.
+  **One sanctioned exception:** `.shadow-soft` (a long, low-opacity, downward-only
+  shadow) lifts the *demoted* box-detail identity card off the page so the Capture
+  hero stays the focal action (#401). Do not reach for it elsewhere — default to
+  tonal lift.
 - **Buttons / chips / progress = pill** (`rounded-full`); **cards / inputs = 20px**
   (`rounded-card`).
 - **Dark is the default theme.** Light is a first-class equal, not an afterthought.
@@ -137,6 +141,7 @@ Typical responsive headline: `text-headline-lg-mobile md:text-headline-xl`.
 - **Tonal layering, not shadows.** Lift = card colour over page colour + a 1px
   hairline (`border-hairline` / `--c-hairline`: 5% white in dark, 6% black in light).
   Card hover nudges `translateY(-2px)` and lightens to `surface-container-high`.
+  The lone shadow exception is `.shadow-soft` on the demoted box-detail header (§1).
 - **Press = sink** — `scale(0.98)` on buttons, `0.95` on chips.
 - **Processing = soft pulsing sage glow** (`.ui-pulse-glow`).
 - **Just-created highlight** — a one-shot sage ring that fades (`.box-added-highlight`,
@@ -187,10 +192,10 @@ Two card-surface overlay chromes share the `modal` controller (`open` / `close` 
 - **`.ha-sheet`** — bottom sheet: full-width (capped 480px, centred on wide
   viewports), rounded top, slides up (`ha-sheet-up`, disabled under
   `prefers-reduced-motion`). Used by **`Components::Boxes::ManageSheet`** — the box
-  detail's ⋮ "Manage box" overflow that holds the secondary actions (lifecycle
-  step(s), print label/manifest, edit, delete) so the screen shows one contextual
-  hero. Rows are full-width `surface-container-high` pills (`text-error` for the
-  destructive Delete row).
+  detail's ⋮ "Manage box" overflow that holds the box's dimensions/weight (read-only)
+  plus the secondary actions (lifecycle step(s), print label/manifest, edit, delete)
+  so the screen shows one contextual hero. Rows are full-width `surface-container-high`
+  pills (`text-error` for the destructive Delete row).
 
 ### Navigation chrome
 `Ui::BottomTabBar` (mobile, docked) and `Ui::Sidebar` (desktop ≥`lg`, 280px) render

@@ -31,6 +31,19 @@ RSpec.describe "Box detail — Manage sheet", type: :request do
     end
   end
 
+  it "surfaces the box's dimensions, volume and weight (demoted off the header) in the sheet" do
+    box = create(:box, :with_dimensions, move:, number: "1", weight_kg: 9)
+
+    get move_box_path(move, box)
+
+    aggregate_failures do
+      expect(response.body).to include(I18n.t("boxes.manage.title", number: "001"))
+      expect(response.body).to include("40 × 30 × 25 cm") # dimensions
+      expect(response.body).to include("0.030 m³")        # derived volume
+      expect(response.body).to include(I18n.t("boxes.show.weight"))
+    end
+  end
+
   it "hides the lifecycle / edit / delete actions from a viewer (print stays)" do
     viewer = create(:user)
     create(:move_membership, move:, user: viewer, role: "viewer")

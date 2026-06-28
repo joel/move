@@ -593,6 +593,15 @@
     border: 1px solid var(--c-hairline);
   }
 
+  /* Soft elevation — the ONE sanctioned exception to "tonal layering, not
+   * shadows" (DESIGN.md §1). Used only to lift the *demoted* box-detail identity
+   * card off the page so the Capture hero stays the focal action (#401). A long,
+   * low-opacity, downward-only shadow; do not reach for this elsewhere — default
+   * to tonal lift (card colour + hairline). */
+  .shadow-soft {
+    box-shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.55);
+  }
+
   /* Processing = soft pulsing sage glow (Recognition state). */
   .ui-pulse-glow {
     animation: ui-pulse-glow 2s ease-in-out infinite;

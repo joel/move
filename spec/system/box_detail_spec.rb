@@ -25,7 +25,8 @@ RSpec.describe "Box detail & lifecycle" do
     expect(page).to have_link(I18n.t("boxes.actions.capture"))
     expect(page).to have_css("button[aria-label='#{I18n.t("boxes.manage.trigger")}']")
 
-    # Edit: assign a room and dimensions; the detail derives volume.
+    # Edit: assign a room; the room chip surfaces on the slim header. (Dimensions /
+    # volume now live in the ⋮ Manage sheet — covered in manage_sheet_spec.)
     visit edit_move_box_path(move, box)
     fill_in I18n.t("boxes.form.room"), with: "Kitchen"
     fill_in I18n.t("boxes.form.length_cm"), with: "40"
@@ -33,7 +34,7 @@ RSpec.describe "Box detail & lifecycle" do
     fill_in I18n.t("boxes.form.height_cm"), with: "25"
     click_button I18n.t("boxes.edit.submit")
 
-    expect(page).to have_text("Kitchen").and have_text("0.030 m³")
+    expect(page).to have_text("Kitchen")
   end
 
   it "shows the review CTA for a box whose only items are needs_correction (#146)" do

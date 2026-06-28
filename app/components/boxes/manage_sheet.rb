@@ -55,12 +55,36 @@ module Components
         h3(class: "text-headline-md text-text-warm mb-4") do
           I18n.t("boxes.manage.title", number: Kernel.format("%03d", @box.number.to_i))
         end
+        details_block
         div(class: "flex flex-col gap-2") do
           lifecycle_rows if @editable
           print_rows
           edit_row if @editable
           delete_section if @editable
         end
+      end
+
+      # Read-only dimensions + weight — demoted off the slim box header (#401), they
+      # surface here (and on the Edit form, where they're set).
+      def details_block
+        measurements = BoxMeasurements.new(@box, unit_system: @move.unit_system)
+        div(class: "mb-4 flex items-center justify-between rounded-lg bg-surface-container-high px-4 py-3") do
+          div do
+            p(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.show.dimensions") }
+            p(class: "text-body-md text-text-warm") { measurements.dimensions || "—" }
+            volume_line(measurements.volume)
+          end
+          div(class: "text-right") do
+            p(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.show.weight") }
+            p(class: "text-body-md text-text-warm") { measurements.weight || "—" }
+          end
+        end
+      end
+
+      def volume_line(volume)
+        return unless volume
+
+        p(class: "text-sm text-muted") { I18n.t("boxes.show.volume", value: volume) }
       end
 
       # The lifecycle transitions still available from here, minus the one the
