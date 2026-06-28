@@ -252,6 +252,20 @@ RSpec.describe "Boxes" do
       end
     end
 
+    it "renders an item moved in from another box (foreign source photo) as its own card" do
+      box = create(:box, move:, number: "1")
+      other = create(:box, move:, number: "2")
+      foreign_photo = create(:media, move:, box: other)
+      # Items::Move keeps the original source_media_id (a photo in `other`), so the
+      # item's source photo is not among this box's media — it must still show here.
+      create(:item, move:, box:, source_media: foreign_photo, name: "Relocated drill")
+
+      get move_box_path(move, box)
+
+      expect(response.body).to include("Relocated drill")
+      expect(response.body).not_to include(I18n.t("boxes.contents.empty_title"))
+    end
+
     it "links a settled orphaned photo (failed) to recovery, but not one still in flight" do
       box = create(:box, move:, number: "1")
       failed = create(:media, move:, box:)

@@ -10,8 +10,9 @@ module Components
     #
     # A photo card links where the gallery used to: the per-photo review walk when
     # it produced items, the recovery screen for a settled-orphan photo, else a
-    # plain (queued/processing) tile. A manual placeholder links to the item detail.
-    # Photos lead (most-recent capture first), then manual cards (most-recent first).
+    # plain tile. A standalone card (manual item, or one moved in from another
+    # box's photo) links to the item detail. Photos lead (most-recent capture
+    # first), then standalone cards (most-recent first).
     class ContentsGrid < Components::Base
       CHIP_CAP = 4 # name chips shown per photo card before collapsing to "+N more"
 
@@ -20,12 +21,18 @@ module Components
         @move = move
         @box = box
         @media = media # recent_first, blobs preloaded
+        @items = items # all in-box items
         @reviewable_media_ids = reviewable_media_ids.to_set
         @recoverable_media_ids = recoverable_media_ids.to_set
         @unpacked_media_ids = unpacked_media_ids.to_set
-        # In-box items grouped by their source photo; the nil bucket is the
-        # manually-added items that never had a photo.
+        # In-box items grouped by their source photo (only this box's photos are
+        # rendered as cards).
         @items_by_media = items.group_by(&:source_media_id)
+        # Items NOT represented by one of this box's photos get their own card so
+        # they never vanish: manual items (nil source) AND items moved in from
+        # another box, which keep their foreign source_media_id (Codex).
+        box_media_ids = media.to_set(&:id)
+        @standalone_items = items.reject { |i| i.source_media_id && box_media_ids.include?(i.source_media_id) }
       end
 
       def view_template
@@ -37,12 +44,8 @@ module Components
 
       private
 
-      def manual_items
-        @items_by_media[nil] || []
-      end
-
       def any_cards?
-        @media.any? || manual_items.any?
+        @media.any? || @standalone_items.any?
       end
 
       def header
@@ -55,65 +58,56 @@ module Components
       end
 
       def item_count
-        @items_by_media.values.sum(&:size)
+        @items.size
       end
 
       def grid
         div(class: "grid grid-cols-2 gap-3 sm:grid-cols-3") do
           @media.each { |media| photo_card(media) }
-          # Manual items most-recent first (items arrive created-ascending).
-          manual_items.reverse_each { |item| manual_card(item) }
+          # Standalone items most-recent first (items arrive created-ascending).
+          @standalone_items.reverse_each { |item| standalone_card(item) }
         end
       end
 
       # A photo card. Tappable only when it has somewhere to go (review/recovery);
-      # a queued/processing photo is a plain, inert tile until recognition settles.
+      # a still-processing or settled-empty photo is a plain, inert tile.
       def photo_card(media)
         href = photo_href(media)
         attrs = href ? { href: href, **prefetch_for(media) } : {}
         tag = href ? :a : :div
         public_send(tag, class: card_classes(interactive: href.present?), **attrs) do
           tile(media)
-          names_caption(@items_by_media[media.id] || [], media)
+          names_caption(@items_by_media[media.id] || [])
         end
       end
 
-      def manual_card(item)
+      # A photo-less item: a manually-added one (labelled "Added manually") or an
+      # item moved in from another box, whose source photo lives elsewhere.
+      def standalone_card(item)
         a(href: move_item_path(@move, item), class: card_classes(interactive: true)) do
           placeholder_tile
           div(class: "flex flex-col gap-1 p-2") do
             span(class: "truncate text-body-md font-semibold text-text-warm") { item.name }
-            span(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.contents.added_manually") }
+            span(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.contents.added_manually") } if item.source_media_id.nil?
           end
         end
       end
 
-      # The names recognised in this photo, as wrapping chips (capped). A settled
-      # orphan reads "Needs review"; a still-processing photo, "Processing…".
-      def names_caption(items, media)
-        div(class: "flex flex-col gap-1.5 p-2") do
-          if items.any?
-            div(class: "flex flex-wrap gap-1") do
-              items.first(CHIP_CAP).each { |item| name_chip(item.name) }
-              name_chip(I18n.t("boxes.contents.more", count: items.size - CHIP_CAP)) if items.size > CHIP_CAP
-            end
-          else
-            span(class: "text-label-caps uppercase text-muted") { caption_for(media) }
-          end
+      # The names recognised in this photo, as wrapping chips (capped). A photo with
+      # no in-box items (processing, or its items moved/unpacked away) shows just the
+      # image + any badge — no speculative caption.
+      def names_caption(items)
+        return unless items.any?
+
+        div(class: "flex flex-wrap gap-1 p-2") do
+          items.first(CHIP_CAP).each { |item| name_chip(item.name) }
+          name_chip(I18n.t("boxes.contents.more", count: items.size - CHIP_CAP)) if items.size > CHIP_CAP
         end
       end
 
       def name_chip(label)
         span(class: "inline-flex max-w-full items-center truncate rounded-full bg-surface-container-high " \
                     "px-2.5 py-1 text-label-caps uppercase text-on-surface-variant") { label }
-      end
-
-      def caption_for(media)
-        if @recoverable_media_ids.include?(media.id)
-          I18n.t("boxes.contents.needs_review")
-        else
-          I18n.t("boxes.contents.processing")
-        end
       end
 
       def tile(media)
