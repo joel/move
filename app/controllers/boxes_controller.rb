@@ -259,7 +259,7 @@ class BoxesController < MoveScopedController
     review_media_ids = @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
     Views::Boxes::Show.new(
       move: @move, box: @box, items: items.ordered,
-      # Preload the blob only (proxy URLs use the original; no variants/preview).
+      # Preload the blob so the grid's :thumb variant proxy URLs don't N+1 the blob.
       media: @box.media.includes(image_attachment: :blob).recent_first,
       editable: editable_move?, pending_count: unreviewed_count(items),
       # Whether this box has at least one of ITS OWN photos that produced an item —

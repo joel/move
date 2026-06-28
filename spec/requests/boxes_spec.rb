@@ -235,6 +235,23 @@ RSpec.describe "Boxes" do
       expect(response.body).not_to include(move_box_review_photo_path(move, box, media_id: empty_photo.id))
     end
 
+    it "shows a photo card with its item names as chips, and a placeholder card for a photo-less manual item" do
+      box = create(:box, move:, number: "1")
+      photo = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: photo, name: "Coffee maker")
+      create(:item, :manual, move:, box:, name: "Reading glasses") # no source photo → placeholder card
+
+      get move_box_path(move, box)
+
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("boxes.contents.title"))
+        expect(response.body).to include("Coffee maker") # chip inside the photo card
+        # The manual item is its own placeholder card linking to the item detail.
+        expect(response.body).to include("Reading glasses")
+        expect(response.body).to include(I18n.t("boxes.contents.added_manually"))
+      end
+    end
+
     it "links a settled orphaned photo (failed) to recovery, but not one still in flight" do
       box = create(:box, move:, number: "1")
       failed = create(:media, move:, box:)
@@ -508,7 +525,7 @@ RSpec.describe "Boxes" do
         # no longer in-box) rather than leaving the stale list — the Codex #390 fix.
         expect(response.body)
           .to include(%(action="replace" target="#{Views::Boxes::Show::ID}"))
-          .and include(I18n.t("boxes.show.items_empty_title"))
+          .and include(I18n.t("boxes.contents.empty_title"))
       end
 
       it "streams an alert toast (no detail change) when a roomless seal is refused" do

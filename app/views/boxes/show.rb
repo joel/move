@@ -58,69 +58,22 @@ module Views
         end
       end
 
-      # Full-width vertical stack: Gallery (photos) leads, Items below (#260).
+      # The unified photo-card grid (D1): one card per photo (image + its item-name
+      # chips) plus a placeholder card per photo-less manual item — replacing the
+      # old split of a separate gallery + items list.
       def detail_stack
-        div(class: "flex flex-col gap-stack-gap") do
-          render Views::Boxes::Gallery.new(
-            move: @move, box: @box, media: @media,
-            reviewable_media_ids: @reviewable_media_ids,
-            recoverable_media_ids: @recoverable_media_ids, unpacked_media_ids: @unpacked_media_ids
-          )
-          items_section
-        end
+        render Components::Boxes::ContentsGrid.new(
+          move: @move, box: @box, media: @media, items: @items,
+          reviewable_media_ids: @reviewable_media_ids,
+          recoverable_media_ids: @recoverable_media_ids, unpacked_media_ids: @unpacked_media_ids
+        )
       end
 
-      # Review CTA above the Gallery (#260) — permanent once the box has a walkable photo.
+      # Review CTA above the grid (#260) — permanent once the box has a walkable photo.
       def review_banner
         div(class: "px-2") do
           render Components::BoxReviewBadge.new(move: @move, box: @box, pending_count: @pending_count)
         end
-      end
-
-      # Inventory list. Adding items is the quiet "Add manually" link under the
-      # Capture hero (Components::Boxes::HeaderBento, #401), so the Items header is
-      # just a labelled count.
-      def items_section
-        section(class: "flex flex-col gap-stack-gap") do
-          h3(class: "px-2 text-headline-md text-text-warm") do
-            plain I18n.t("boxes.show.items")
-            span(class: "ml-2 text-body-md text-muted") { "(#{@items.size})" } if @items.any?
-          end
-          @items.any? ? items_list : items_empty
-        end
-      end
-
-      def items_list
-        div(class: "flex flex-col divide-y divide-card-border rounded-card border border-card-border bg-card") do
-          @items.each { |item| item_row(item) }
-        end
-      end
-
-      def item_row(item)
-        a(
-          href: move_item_path(@move, item),
-          class: "flex items-center justify-between gap-3 p-4 transition hover:bg-surface-container-high"
-        ) do
-          div(class: "flex flex-col gap-1") do
-            span(class: "text-body-lg text-text-warm") { item_label(item) }
-          end
-          render Components::Ui::Chip.new(label: I18n.t("boxes.item_state.#{item.review_state}"), kind: item_chip_kind(item))
-        end
-      end
-
-      def item_label(item)
-        item.name
-      end
-
-      def item_chip_kind(item)
-        item.review_state == "pending_review" ? :tag : :room
-      end
-
-      def items_empty
-        render Components::Ui::EmptyState.new(
-          title: I18n.t("boxes.show.items_empty_title"),
-          description: I18n.t("boxes.show.items_empty_description")
-        )
       end
     end
   end
