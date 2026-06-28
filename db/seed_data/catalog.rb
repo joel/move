@@ -17,14 +17,15 @@ require "json"
 # lights up with real photos once they're generated and committed.
 #
 # Vocabulary references (category/tags) MUST match Moves::DefaultVocabularies
-# (+ the demo-only "Everyday Use" tag). The "Fragile" tag is box-scoped, so items
-# express fragility via the `fragile:` boolean, never a tag. Guarded by
-# spec/seed_data/catalog_spec.rb.
+# (+ the demo-only "Everyday Use" tag). Fragility is a box-level flag now
+# (BOXES `fragile:`, a manual mark that prints FRAGILE on the label), not an item
+# attribute or tag. Guarded by spec/seed_data/catalog_spec.rb.
 module SeedData
   # number => box. dims: [length_cm, width_cm, height_cm, weight_kg] (nil ok).
   # Covers every lifecycle state, full/partial/no dimensions, a roomless box (the
   # seal-requires-room guard), repeated sizes (the "Reuse dimensions" chips:
-  # 40x30x25 thrice, 60x40x40 twice), and with/without a description.
+  # 40x30x25 thrice, 60x40x40 twice), with/without a description, and two boxes
+  # marked `fragile` (10, 13) so the FRAGILE chip + printed label are showcased.
   BOXES = [
     { number: "1",  room: "Kitchen",     status: "sealed",     dims: [40, 30, 25, 8],
       desc: "Cookware, small appliances, heavy utensils. Keep upright." },
@@ -38,12 +39,12 @@ module SeedData
     { number: "7",  room: "Bedroom",     status: "unpacking",  dims: [55, 45, 35, 12] },
     { number: "8",  room: "Living Room", status: "unpacked",   dims: [60, 40, 40, 14] },
     { number: "9",  room: "Kitchen",     status: "packing",    dims: [40, 30, 25, 7] },
-    { number: "10", room: "Kitchen",     status: "sealed",     dims: [40, 30, 25, 9],
+    { number: "10", room: "Kitchen",     status: "sealed",     dims: [40, 30, 25, 9], fragile: true,
       desc: "Glassware and seasonal dishes." },
     { number: "11", room: "Office",      status: "packing",    dims: [45, 35, 30, 9] },
     { number: "12", room: "Bathroom",    status: "sealed",     dims: [35, 25, 25, 5],
       desc: "Towels, toiletries, daily essentials." },
-    { number: "13", room: "Dining Room", status: "in_transit", dims: [55, 45, 30, 11],
+    { number: "13", room: "Dining Room", status: "in_transit", dims: [55, 45, 30, 11], fragile: true,
       desc: "Dinnerware and glassware — fragile, pack with care." },
     { number: "14", room: "Garage",      status: "packing",    dims: [70, 50, 40, 13],
       desc: "Camping and outdoor gear." },
@@ -62,7 +63,7 @@ module SeedData
   # `captured_at`: seconds ago, so the per-photo review walk (box 1) visits photos
   #   in this listed order (larger = earlier = visited first).
   # An item: name (required), confidence, review, presence (default "in_box"),
-  #   category, tags, qty (default 1), fragile (default false).
+  #   category, tags, qty (default 1).
   PHOTOS = [
     # --- Box 1: the review-walk showcase (3 scene photos + 2 recovery tiles) ----
     { box: "1", slug: "kitchen-counter", status: "succeeded", captured_at: 300,
@@ -76,7 +77,7 @@ module SeedData
         { name: "Stack of books", confidence: 0.88, review: "auto_confirmed", category: "Books", tags: ["Heavy"] },
         { name: "Set of mugs",   confidence: 0.62, review: "pending_review", category: "Kitchenware", qty: 4 },
         { name: "Table lamp",    confidence: 0.55, review: "pending_review", category: "Electronics" },
-        { name: "Picture frame", confidence: 0.41, review: "pending_review", category: "Decor", fragile: true }
+        { name: "Picture frame", confidence: 0.41, review: "pending_review", category: "Decor" }
       ] },
     { box: "1", slug: "open-shelving", status: "succeeded", captured_at: 240,
       provider: "fake", provider_model: "fake-1",
@@ -86,7 +87,7 @@ module SeedData
               "no text or watermarks.",
       items: [
         { name: "Throw blanket",   confidence: 0.68, review: "pending_review", category: "Decor" },
-        { name: "Decorative vase", confidence: 0.47, review: "pending_review", category: "Decor", fragile: true },
+        { name: "Decorative vase", confidence: 0.47, review: "pending_review", category: "Decor" },
         { name: "Wall art",       confidence: 0.53, review: "pending_review", category: "Decor" },
         { name: "Bookshelf",      confidence: 0.44, review: "pending_review", category: "Furniture" },
         { name: "Magazines",      confidence: 0.58, review: "needs_correction", category: "Books" }
@@ -100,7 +101,7 @@ module SeedData
         { name: "Area rug",    confidence: 0.58, review: "pending_review", category: "Decor" },
         { name: "Floor lamp",  confidence: 0.62, review: "pending_review", category: "Electronics" },
         { name: "Coffee table", confidence: 0.52, review: "pending_review", category: "Furniture" },
-        { name: "Floor vase",  confidence: 0.51, review: "pending_review", category: "Decor", fragile: true },
+        { name: "Floor vase",  confidence: 0.51, review: "pending_review", category: "Decor" },
         { name: "Wall clock",  confidence: 0.54, review: "pending_review", category: "Decor" }
       ] },
     { box: "1", slug: "recovery-failed", status: "failed", captured_at: 30,
@@ -126,7 +127,7 @@ module SeedData
       items: [
         { name: "Hardcover Books", confidence: 0.90, review: "auto_confirmed", category: "Books", tags: ["Heavy"] },
         { name: "Framed Photos",  confidence: 0.85, review: "auto_confirmed", category: "Decor",
-          fragile: true, tags: ["Important"] },
+          tags: ["Important"] },
         { name: "Wool Blanket",   confidence: 0.70, review: "confirmed", category: "Clothing" },
         { name: "Vinyl Records",  confidence: 0.60, review: "pending_review", category: "Decor", tags: ["Valuable"] }
       ] },
@@ -177,9 +178,8 @@ module SeedData
               "and a stack of notebooks. Even daylight, eye-level, no text.",
       items: [
         { name: "Laptop",           confidence: 0.95, review: "auto_confirmed", category: "Electronics",
-          fragile: true, tags: %w[Valuable Important] },
-        { name: "External Monitor", confidence: 0.88, review: "auto_confirmed", category: "Electronics",
-          fragile: true },
+          tags: %w[Valuable Important] },
+        { name: "External Monitor", confidence: 0.88, review: "auto_confirmed", category: "Electronics" },
         { name: "Mechanical Keyboard", confidence: 0.70, review: "confirmed", category: "Electronics" },
         { name: "Desk Lamp",        confidence: 0.60, review: "pending_review", category: "Electronics" },
         { name: "Notebook Stack",   confidence: 0.50, review: "pending_review", category: "Documents" }
@@ -208,11 +208,10 @@ module SeedData
               "white dinner plates, a row of stemmed wine glasses, a large " \
               "serving bowl, and a folded linen tablecloth. Even daylight, no text.",
       items: [
-        { name: "Dinner Plates", confidence: 0.90, review: "auto_confirmed", category: "Kitchenware",
-          qty: 8, fragile: true },
+        { name: "Dinner Plates", confidence: 0.90, review: "auto_confirmed", category: "Kitchenware", qty: 8 },
         { name: "Wine Glasses",  confidence: 0.85, review: "auto_confirmed", category: "Kitchenware",
-          qty: 6, fragile: true, tags: ["Valuable"] },
-        { name: "Serving Bowl",  confidence: 0.70, review: "confirmed", category: "Kitchenware", fragile: true },
+          qty: 6, tags: ["Valuable"] },
+        { name: "Serving Bowl",  confidence: 0.70, review: "confirmed", category: "Kitchenware" },
         { name: "Linen Tablecloth", confidence: 0.60, review: "pending_review", category: "Clothing" }
       ] },
 
@@ -238,7 +237,7 @@ module SeedData
               "row of DVD cases. Even daylight, eye-level, no text.",
       items: [
         { name: "Game Console",    confidence: 0.90, review: "auto_confirmed", category: "Electronics",
-          fragile: true, tags: ["Valuable"] },
+          tags: ["Valuable"] },
         { name: "Board Games",     confidence: 0.70, review: "confirmed", category: "Toys", qty: 5 },
         { name: "DVD Collection",  confidence: 0.60, review: "pending_review", category: "Decor" },
         { name: "Streaming Remote", confidence: 0.50, review: "pending_review", category: "Electronics" }
@@ -250,25 +249,25 @@ module SeedData
   # needs_correction) and the presence axis (in_box / removed). The box-5 "Hair
   # dryer" backs the semantic-search demo ("blow dryer" ~ "Hair dryer").
   MANUAL_ITEMS = [
-    { box: "2", name: "Espresso Machine", qty: 1, fragile: true,
+    { box: "2", name: "Espresso Machine", qty: 1,
       category: "Electronics", tags: ["Heavy"], review: "confirmed", presence: "in_box" },
-    { box: "2", name: "Dinner Plates", qty: 8, fragile: true,
+    { box: "2", name: "Dinner Plates", qty: 8,
       category: "Kitchenware", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
-    { box: "4", name: "Paperback Novels", qty: 12, fragile: false,
+    { box: "4", name: "Paperback Novels", qty: 12,
       category: "Books", tags: ["Heavy"], review: "needs_correction", presence: "in_box" },
-    { box: "4", name: "Winter Coat", qty: 1, fragile: false,
+    { box: "4", name: "Winter Coat", qty: 1,
       category: "Clothing", tags: ["Seasonal"], review: "confirmed", presence: "removed" },
-    { box: "5", name: "Hair dryer", qty: 1, fragile: false,
+    { box: "5", name: "Hair dryer", qty: 1,
       category: "Electronics", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
-    { box: "7", name: "Bedside Lamp", qty: 1, fragile: true,
+    { box: "7", name: "Bedside Lamp", qty: 1,
       category: "Electronics", tags: ["Important"], review: "confirmed", presence: "in_box" },
-    { box: "7", name: "Folded Bedsheets", qty: 4, fragile: false,
+    { box: "7", name: "Folded Bedsheets", qty: 4,
       category: "Clothing", tags: ["Everyday Use"], review: "confirmed", presence: "in_box" },
-    { box: "7", name: "Alarm Clock", qty: 1, fragile: false,
+    { box: "7", name: "Alarm Clock", qty: 1,
       category: "Electronics", tags: [], review: "confirmed", presence: "in_box" },
-    { box: "7", name: "Throw Pillows", qty: 2, fragile: false,
+    { box: "7", name: "Throw Pillows", qty: 2,
       category: "Clothing", tags: [], review: "confirmed", presence: "removed" },
-    { box: "7", name: "Reading Glasses", qty: 1, fragile: true,
+    { box: "7", name: "Reading Glasses", qty: 1,
       category: nil, tags: ["Important"], review: "confirmed", presence: "removed" }
   ].freeze
 
@@ -293,7 +292,7 @@ module SeedData
   # objects when present (review_state derived from confidence vs `threshold`,
   # mirroring RecognitionRuns::Process), else the authored catalog items
   # (explicit review_state) as the offline fallback. Uniform hash shape either
-  # way: { name:, quantity:, confidence:, fragile:, category:, tags:, review: }.
+  # way: { name:, quantity:, confidence:, category:, tags:, review: }.
   def self.detections_for(photo, threshold:)
     recorded = recorded_recognition(photo[:slug])
     return normalize_recorded(recorded["objects"], threshold: threshold) if recorded
@@ -317,7 +316,6 @@ module SeedData
       name: label,
       quantity: [object["count"].to_i, 1].max,
       confidence: confidence,
-      fragile: object["fragile"] == true,
       category: object["category"].to_s.strip.presence,
       tags: Array(object["tags"]).map { |tag| tag.to_s.strip }.reject(&:empty?).uniq,
       review: confidence && confidence >= threshold ? "auto_confirmed" : "pending_review"
@@ -327,8 +325,7 @@ module SeedData
   def self.authored_detection(item)
     {
       name: item[:name], quantity: item[:qty] || 1, confidence: item[:confidence],
-      fragile: item[:fragile] || false, category: item[:category],
-      tags: item[:tags] || [], review: item[:review]
+      category: item[:category], tags: item[:tags] || [], review: item[:review]
     }
   end
 end

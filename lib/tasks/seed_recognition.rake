@@ -53,7 +53,7 @@ namespace :seed_recognition do
         )
         objects = result.objects.map do |object|
           { "label" => object.label, "confidence" => object.confidence, "count" => object.count,
-            "category" => object.category, "fragile" => object.fragile, "tags" => object.tags }
+            "category" => object.category, "tags" => object.tags }
         end
         target.write("#{JSON.pretty_generate(
           "slug" => photo[:slug], "provider" => result.provider,
