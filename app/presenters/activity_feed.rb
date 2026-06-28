@@ -76,7 +76,7 @@ class ActivityFeed
     map = {}
     load_into(map, "Box", Box.with_discarded, box_ids(by_type))
     load_into(map, "Item", Item.with_discarded, ids_for(by_type, "Item"))
-    { "Move" => Move, "Media" => Media, "Category" => Category, "Tag" => Tag, "Room" => Room }
+    { "Move" => Move, "Media" => Media, "Room" => Room }
       .each { |type, klass| load_into(map, type, klass, ids_for(by_type, type)) }
     map
   end

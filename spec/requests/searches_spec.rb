@@ -12,7 +12,7 @@ RSpec.describe "Searches" do
   # Indexing is event-driven off the item actions; factory-built items don't emit
   # those events, so index them explicitly for these controller-level specs.
   def index_all
-    move.items.includes(:category, :tags, box: :room).find_each { |i| Search::RefreshDocument.new.call(item: i) }
+    move.items.includes(box: :room).find_each { |i| Search::RefreshDocument.new.call(item: i) }
   end
 
   describe "GET /moves/:move_id/search" do

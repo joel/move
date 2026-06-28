@@ -17,10 +17,8 @@ namespace :seed_recognition do
     out_dir = Rails.root.join("db/seed_data/recognition")
     out_dir.mkpath
 
-    # The demo's vocabularies, fed to the model as context so it fits detections
-    # into the same categories/tags the seed uses (it may still propose new ones).
-    categories = Moves::DefaultVocabularies::CATEGORIES
-    item_tags = Moves::DefaultVocabularies::TAGS.reject { |_name, applies| applies == "box" }.keys + ["Everyday Use"]
+    # The box's room is the only vocabulary fed to the model as context (an item
+    # is just a name now — category/tags were removed).
     room_for = SeedData::BOXES.to_h { |box| [box[:number], box[:room]] }
 
     # Minimal stand-in for an ActiveStorage attachment: the provider's
@@ -49,11 +47,10 @@ namespace :seed_recognition do
       begin
         result = provider.identify(
           image: image_stub.new(image_path.binread, "image/jpeg"),
-          context: { room: room_for[photo[:box]], categories: categories, tags: item_tags }
+          context: { room: room_for[photo[:box]] }
         )
         objects = result.objects.map do |object|
-          { "label" => object.label, "confidence" => object.confidence,
-            "category" => object.category, "tags" => object.tags }
+          { "label" => object.label, "confidence" => object.confidence }
         end
         target.write("#{JSON.pretty_generate(
           "slug" => photo[:slug], "provider" => result.provider,

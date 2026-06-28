@@ -40,8 +40,6 @@ class Move < ApplicationRecord
   has_many :move_memberships, dependent: :destroy
   has_many :users, through: :move_memberships
   has_many :rooms, dependent: :destroy
-  has_many :categories, dependent: :destroy
-  has_many :tags, dependent: :destroy
   has_many :boxes, dependent: :destroy
   has_many :media, dependent: :destroy
   has_many :recognition_runs, dependent: :destroy
