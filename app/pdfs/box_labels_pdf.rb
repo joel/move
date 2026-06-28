@@ -19,7 +19,7 @@ require "chunky_png"
 # `BoxLabelPdf` delegates here with a single entry, so the single-box endpoint and
 # this batch share one tested layout.
 #
-# A box marked **fragile** (Phase A) prints a red FRAGILE band above the box number.
+# A box marked **fragile** (Phase A) prints a terracotta FRAGILE band above the number.
 # This is a deliberate, single-purpose exception to the "labels carry no contents"
 # rule (Domain §12): it's a handling instruction for movers, not an inventory of
 # what's inside.
@@ -39,9 +39,12 @@ class BoxLabelsPdf
   ROOM_MIN_SIZE = 8
   TOKEN_SIZE = 9 # human-readable manual-entry fallback; shrinks to fit
   TOKEN_MIN_SIZE = 6
-  FRAGILE_SIZE = 20 # the red FRAGILE handling band (fragile boxes only); shrinks to fit
+  FRAGILE_SIZE = 20 # the FRAGILE handling band (fragile boxes only); shrinks to fit
   FRAGILE_MIN_SIZE = 10
-  FRAGILE_COLOR = "C0392B" # warning red — matches the box header/card fragile chip
+  # Terracotta — the design system's Fragile tint (DESIGN.md `secondary`), mirroring
+  # the on-screen fragile chip. Prawn can't read CSS tokens, so this hex tracks
+  # --c-secondary's dark value; update it together with that token.
+  FRAGILE_COLOR = "8F4C34"
 
   # Default copies per box (lid + side) — the prior fixed count. Used when no
   # Move-configured `labels_per_box` is passed (a bare builder call, or a bulk job
@@ -117,7 +120,7 @@ class BoxLabelsPdf
              size: TOKEN_SIZE, min_size: TOKEN_MIN_SIZE, color: "8A8A8A")
   end
 
-  # The red FRAGILE handling band, drawn at the top of the text region for a fragile
+  # The terracotta FRAGILE handling band, drawn at the top of the text region for a fragile
   # box (Phase A). A filled rounded rect with white centered text, occupying ~22% of
   # the region; returns the y of the region top BELOW it (band + a small gap) so the
   # number/room/token stack underneath. The only "contents" a label ever carries —

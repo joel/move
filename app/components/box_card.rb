@@ -44,18 +44,10 @@ module Components
           else
             span(class: badge_classes) { badge_label }
           end
-          fragile_chip if @box.fragile?
+          # Manual fragile mark (Phase A) — terracotta, the design system's Fragile
+          # tint (DESIGN.md), matching the box header chip and the printed label.
+          render Components::Ui::Chip.new(label: I18n.t("boxes.fragile_badge"), kind: :tag) if @box.fragile?
         end
-      end
-    end
-
-    # Fragile mark (Phase A) — error-tinted, matching the box header chip and the
-    # FRAGILE mark printed on the box label.
-    def fragile_chip
-      span(class: "inline-flex items-center gap-1 rounded-full bg-error/15 px-2.5 py-1 " \
-                  "text-label-caps uppercase text-error") do
-        render Components::Icons::Alert.new(css: "h-3.5 w-3.5")
-        span { I18n.t("boxes.fragile_badge") }
       end
     end
 
