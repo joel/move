@@ -96,6 +96,17 @@ module Components
           span(class: "h-2 w-2 rounded-full bg-accent-sage")
           plain I18n.t("boxes.status.#{@box.status}")
         end
+        fragile_chip if @box.fragile?
+      end
+
+      # The manual fragile mark (Phase A) — error-tinted so it reads as a handling
+      # warning, matching the FRAGILE mark printed on the box label.
+      def fragile_chip
+        span(class: "inline-flex items-center gap-1.5 rounded-full bg-error/15 px-3 py-1 " \
+                    "text-label-caps uppercase text-error") do
+          render Components::Icons::Alert.new(css: "h-3.5 w-3.5")
+          plain I18n.t("boxes.fragile_badge")
+        end
       end
 
       def edit_link

@@ -38,11 +38,24 @@ module Components
                  "bg-surface-container-high text-accent-sage"
         ) { render Components::Icons::Boxes.new(css: "h-6 w-6") }
 
-        if @recognition_state
-          render Components::Ui::RecognitionState.new(state: @recognition_state)
-        else
-          span(class: badge_classes) { badge_label }
+        div(class: "flex flex-col items-end gap-1.5") do
+          if @recognition_state
+            render Components::Ui::RecognitionState.new(state: @recognition_state)
+          else
+            span(class: badge_classes) { badge_label }
+          end
+          fragile_chip if @box.fragile?
         end
+      end
+    end
+
+    # Fragile mark (Phase A) — error-tinted, matching the box header chip and the
+    # FRAGILE mark printed on the box label.
+    def fragile_chip
+      span(class: "inline-flex items-center gap-1 rounded-full bg-error/15 px-2.5 py-1 " \
+                  "text-label-caps uppercase text-error") do
+        render Components::Icons::Alert.new(css: "h-3.5 w-3.5")
+        span { I18n.t("boxes.fragile_badge") }
       end
     end
 

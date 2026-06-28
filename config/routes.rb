@@ -26,6 +26,8 @@ Rails.application.routes.draw do
     resources :boxes, only: %i[index new create show edit update destroy] do
       member do
         patch :transition
+        # Phase A — manual fragile flag on the box (drives the FRAGILE label mark).
+        patch :fragile, action: :set_fragile
         # B1 — seal-time "describe before sealing" modal frame (auto-suggests a
         # contents description). `description_suggestion` is the JSON the edit-form
         # ✨ button fetches to fill the field.

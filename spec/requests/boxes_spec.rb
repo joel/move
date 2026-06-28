@@ -393,6 +393,62 @@ RSpec.describe "Boxes" do
     end
   end
 
+  describe "PATCH /moves/:move_id/boxes/:id/fragile" do
+    it "marks a box fragile and redirects to the box" do
+      box = create(:box, :with_room, move:, number: "1", fragile: false)
+
+      patch fragile_move_box_path(move, box), params: { fragile: true }
+
+      expect(response).to redirect_to(move_box_path(move, box))
+      expect(box.reload.fragile?).to be(true)
+    end
+
+    it "removes the fragile mark" do
+      box = create(:box, :with_room, move:, number: "1", fragile: true)
+
+      patch fragile_move_box_path(move, box), params: { fragile: false }
+
+      expect(box.reload.fragile?).to be(false)
+    end
+
+    context "when responding as a Turbo Stream (no reload)" do
+      it "streams the whole detail with the fragile chip and a toast" do
+        box = create(:box, :with_room, move:, number: "1", fragile: false)
+
+        patch fragile_move_box_path(move, box), params: { fragile: true }, as: :turbo_stream
+
+        expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+        expect(response.body)
+          .to include(%(action="replace" target="#{Views::Boxes::Show::ID}"))
+          .and include(I18n.t("boxes.fragile_badge"))
+          .and include(I18n.t("boxes.set_fragile.marked_fragile"))
+        expect(box.reload.fragile?).to be(true)
+      end
+    end
+
+    it "is blocked for a viewer (403, box untouched)" do
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      box = create(:box, :with_room, move:, number: "1", fragile: false)
+      stub_current_user(viewer)
+
+      patch fragile_move_box_path(move, box), params: { fragile: true }
+
+      expect(response).to have_http_status(:forbidden)
+      expect(box.reload.fragile?).to be(false)
+    end
+
+    it "is blocked on an archived move" do
+      archived = create(:move, :archived, created_by: user)
+      box = create(:box, :with_room, move: archived, number: "1", fragile: false)
+
+      patch fragile_move_box_path(archived, box), params: { fragile: true }
+
+      expect(response).to redirect_to(move_boxes_path(archived))
+      expect(box.reload.fragile?).to be(false)
+    end
+  end
+
   describe "PATCH /moves/:move_id/boxes/:id/transition" do
     it "seals a box that has a room" do
       box = create(:box, :with_room, move:, number: "1", status: "packing")

@@ -915,7 +915,8 @@ CREATE TABLE public.boxes (
     discarded_by_parent_type character varying,
     discarded_by_parent_id uuid,
     log_data jsonb,
-    description text
+    description text,
+    fragile boolean DEFAULT false NOT NULL
 );
 
 
@@ -2543,6 +2544,7 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260628100000'),
 ('20260627120000'),
 ('20260625130817'),
 ('20260621180000'),

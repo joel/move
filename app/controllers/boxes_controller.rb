@@ -5,13 +5,14 @@
 # subdomain elevator switches Apartment first) and is scoped to one Move. Thin:
 # authorize, call the action, pattern-match, render.
 class BoxesController < MoveScopedController
-  before_action :set_box, only: %i[show edit update transition seal description_suggestion destroy]
+  before_action :set_box,
+                only: %i[show edit update transition set_fragile seal description_suggestion destroy]
   # `seal` and `description_suggestion` can spend the Move's AI quota (they call
   # the configured vendor provider), so they need the same editing-role + writable
   # guard as the mutating actions — not just `set_box` — to keep viewers and
   # archived Moves out (defense in depth behind the already-hidden UI controls).
   before_action :require_writable_move!,
-                only: %i[new create edit update transition seal description_suggestion destroy]
+                only: %i[new create edit update transition set_fragile seal description_suggestion destroy]
 
   # GET /moves/:move_id/boxes
   def index
@@ -121,6 +122,25 @@ class BoxesController < MoveScopedController
       respond_with_streams([], redirect: move_box_path(@move, @box),
                                toast: true, status: :unprocessable_content) do
         [:alert, transition_error(reason)]
+      end
+    end
+  end
+
+  # PATCH /moves/:move_id/boxes/:id/fragile
+  def set_fragile
+    result = Boxes::SetFragile.new.call(box: @box, fragile: params[:fragile], actor: current_user)
+
+    case result
+    in Dry::Monads::Success(box)
+      # Re-stream the whole detail: the header carries the fragile chip and the
+      # Manage sheet flips its toggle label, so both must refresh without a reload.
+      respond_with_streams(-> { [box_detail_stream] }, redirect: move_box_path(@move, box), toast: true) do
+        [:notice, t(box.fragile? ? ".marked_fragile" : ".unmarked_fragile")]
+      end
+    in Dry::Monads::Failure
+      respond_with_streams([], redirect: move_box_path(@move, @box),
+                               toast: true, status: :unprocessable_content) do
+        [:alert, t(".fragile_failed")]
       end
     end
   end

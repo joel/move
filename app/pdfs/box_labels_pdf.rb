@@ -18,6 +18,11 @@ require "chunky_png"
 # by the caller from the request host, so this builder stays pure and host-agnostic.
 # `BoxLabelPdf` delegates here with a single entry, so the single-box endpoint and
 # this batch share one tested layout.
+#
+# A box marked **fragile** (Phase A) prints a red FRAGILE band above the box number.
+# This is a deliberate, single-purpose exception to the "labels carry no contents"
+# rule (Domain §12): it's a handling instruction for movers, not an inventory of
+# what's inside.
 class BoxLabelsPdf
   include PdfFonts
   include Prawn::Measurements # mm2pt() -> PDF points
@@ -34,6 +39,9 @@ class BoxLabelsPdf
   ROOM_MIN_SIZE = 8
   TOKEN_SIZE = 9 # human-readable manual-entry fallback; shrinks to fit
   TOKEN_MIN_SIZE = 6
+  FRAGILE_SIZE = 20 # the red FRAGILE handling band (fragile boxes only); shrinks to fit
+  FRAGILE_MIN_SIZE = 10
+  FRAGILE_COLOR = "C0392B" # warning red — matches the box header/card fragile chip
 
   # Default copies per box (lid + side) — the prior fixed count. Used when no
   # Move-configured `labels_per_box` is passed (a bare builder call, or a bulk job
@@ -97,6 +105,7 @@ class BoxLabelsPdf
   # long room name / long token scales down instead of overflowing the page (one
   # label per page — #162 / #255). +top+ is the region's top y.
   def details(doc, box, top:)
+    top = fragile_band(doc, top) if box.fragile?
     number_height = top * 0.40
     room_height = top * 0.38
     fit_text(doc, "##{format("%03d", box.number.to_i)}",
@@ -106,6 +115,24 @@ class BoxLabelsPdf
     fit_text(doc, box.qr_token,
              top: top - number_height - room_height, height: top * 0.22,
              size: TOKEN_SIZE, min_size: TOKEN_MIN_SIZE, color: "8A8A8A")
+  end
+
+  # The red FRAGILE handling band, drawn at the top of the text region for a fragile
+  # box (Phase A). A filled rounded rect with white centered text, occupying ~22% of
+  # the region; returns the y of the region top BELOW it (band + a small gap) so the
+  # number/room/token stack underneath. The only "contents" a label ever carries —
+  # a handling instruction, not an inventory (see header).
+  def fragile_band(doc, top)
+    height = top * 0.22
+    doc.fill_color FRAGILE_COLOR
+    doc.fill_rounded_rectangle([0, top], doc.bounds.width, height, 4)
+    doc.text_box(
+      "FRAGILE", at: [0, top], width: doc.bounds.width, height: height,
+                 align: :center, valign: :center, size: FRAGILE_SIZE, style: :bold,
+                 color: "FFFFFF", overflow: :shrink_to_fit, min_font_size: FRAGILE_MIN_SIZE
+    )
+    doc.fill_color "000000"
+    top - height - GAP
   end
 
   # Centered bold text scaled to fit a fixed slice of the page. +top+ is the y of the
