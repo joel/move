@@ -40,6 +40,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          # Don't persist the job's GITHUB_TOKEN (which has issues: write) into
+          # .git/config — the read-only Codex audit step scans the whole repo, and
+          # the issue-creation step supplies GH_TOKEN explicitly, so authenticated
+          # git is never needed after checkout.
+          persist-credentials: false
 
       - name: Run Codex security audit
         id: scan
