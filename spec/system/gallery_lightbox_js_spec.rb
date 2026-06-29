@@ -57,9 +57,10 @@ RSpec.describe "Gallery lightbox (JS)", :js do
     first("button[data-lightbox-target='tile']").click
 
     expect(page).to have_css("dialog.ha-lightbox[open]")
-    expect(page).to have_css("[data-lightbox-target='caption']", text: "Box 2")
-    expect(page).to have_link(I18n.t("galleries.index.lightbox.view_box"),
-                              href: move_box_path(move, move.boxes.find_by(number: "2")))
+    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 2/i)
+    # The caption text is CSS-uppercased, so match the box link by href, not text.
+    box_two = move.boxes.find_by(number: "2")
+    expect(page).to have_css("a[data-lightbox-target='link'][href='#{move_box_path(move, box_two)}']")
   end
 
   it "cycles photos with next/prev and closes" do
@@ -69,9 +70,9 @@ RSpec.describe "Gallery lightbox (JS)", :js do
     first("button[data-lightbox-target='tile']").click
 
     find("button[aria-label='#{I18n.t("galleries.index.lightbox.next")}']").click
-    expect(page).to have_css("[data-lightbox-target='caption']", text: "Box 1")
+    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 1/i)
     find("button[aria-label='#{I18n.t("galleries.index.lightbox.prev")}']").click
-    expect(page).to have_css("[data-lightbox-target='caption']", text: "Box 2")
+    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 2/i)
 
     find("button[aria-label='#{I18n.t("galleries.index.lightbox.close")}']").click
     expect(page).to have_no_css("dialog.ha-lightbox[open]")
