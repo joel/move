@@ -64,7 +64,7 @@ If your project keeps a running steps/audit log per effort (e.g. a per-effort `S
 | 8 (runtime test) | pages verified, anything that broke and the fix commit |
 | 11 (PR review round) | per-comment action + fix commit + resolution, as a table |
 | 13 (release) | CHANGELOG entry filled, then release tag + release URL, if the project versions releases |
-| 12/14 (done) | final summary table: issue → commit → release → status |
+| 14 (done) | final summary table: issue → commit → release → status |
 | 15 (persist) | memories written/updated, docs touched, follow-up issues filed |
 
 **Tone.** Factual, short. The audience is future-you (or a reviewer) reconstructing what decisions were made, not re-arguing them.
@@ -717,7 +717,7 @@ mutation {
 }'
 ```
 
-### Step 11c: Merge the PR (the agent merges — no human gate)
+### Step 12: Merge the PR (the agent merges — no human gate)
 
 Drive the workflow start to end: once the **objective gate** is green, the agent
 merges the PR itself — do **not** pause for human validation. The gate is:
@@ -740,19 +740,9 @@ gh pr merge <PR> --repo <owner>/<repo> --squash
 > re-adding a manual checkpoint. Docs-only / path-ignored PRs that sit `BLOCKED`
 > with no failing checks are admin-merged (`--admin`) per the docs-PR convention.
 
-### Step 12: Move Issue to Done (after merge)
-
-```bash
-gh project item-edit \
-  --project-id <project-id> \
-  --id <ITEM_ID> \
-  --field-id <status-field-id> \
-  --single-select-option-id <done-option-id>
-```
-
 ### Step 13: Tag `main` & Publish Release (OPTIONAL — after merge)
 
-If your project versions releases, tag/publish a release after the PR is merged to `main` (the agent merges — Step 11c). Order: do this **immediately after merge**, then Step 12 (Done). Follow whatever release policy the project's development-workflow doc defines.
+If your project versions releases, tag/publish a release after the PR is merged to `main` (the agent merges — Step 12). Order: do this **immediately after merge**, then Step 14 (Done). Follow whatever release policy the project's development-workflow doc defines.
 
 > **Fill out the CHANGELOG *before* you tag.** If the project keeps a curated
 > changelog (e.g. `CHANGELOG.md`, Keep a Changelog format), add the new version's
@@ -781,7 +771,17 @@ gh release view <tag> --repo <owner>/<repo> >/dev/null 2>&1 \
 
 `gh release create` creates the tag on `main` and publishes the release with auto-generated notes (merged PRs/commits since the previous tag). Record the tag + release URL in the audit log if your project keeps one.
 
-### Step 14: Persist what's worth keeping (before the context resets)
+### Step 14: Move Issue to Done (after merge)
+
+```bash
+gh project item-edit \
+  --project-id <project-id> \
+  --id <ITEM_ID> \
+  --field-id <status-field-id> \
+  --single-select-option-id <done-option-id>
+```
+
+### Step 15: Persist what's worth keeping (before the context resets)
 
 Finishing a feature is the moment to **save anything worth saving from this
 session** — the working memory you built up (hard-won gotchas, the *why* behind a
