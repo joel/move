@@ -268,7 +268,13 @@ class BoxesController < MoveScopedController
         records: foreign, associations: { source_media: { image_attachment: :blob } }
       ).call
     end
-    review_media_ids = @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
+    # The box's real-capture photos that produced an item — the review walk's
+    # membership. not_generated excludes AI-generated item images (#416): they
+    # never had a recognition run, so they must not be review-walkable nor flip
+    # the box to an "all reviewed" state.
+    review_media_ids = @box.media.not_generated
+                           .where(id: @box.items.where.not(source_media_id: nil).select(:source_media_id))
+                           .ids
     Views::Boxes::Show.new(
       move: @move, box: @box, items: items,
       # Preload the blob so the grid's :thumb variant proxy URLs don't N+1 the blob.

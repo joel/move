@@ -148,7 +148,9 @@ class ReviewsController < MoveScopedController
   def review_media
     @review_media ||= begin
       ids = @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
-      @box.media.where(id: ids).order(:captured_at, :created_at).to_a
+      # not_generated: an AI-generated item image is not a recognised capture, so it
+      # never enters the review walk (#416).
+      @box.media.not_generated.where(id: ids).order(:captured_at, :created_at).to_a
     end
   end
 

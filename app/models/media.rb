@@ -76,6 +76,10 @@ class Media < ApplicationRecord
   end
 
   scope :recent_first, -> { order(captured_at: :desc) }
+  # Real captures only — excludes AI-generated images (#416), which never had a
+  # recognition run and so must stay out of the per-photo review walk + the
+  # "all reviewed" badge.
+  scope :not_generated, -> { where.not(captured_via: "generated") }
 
   # The latest run's status drives the per-image recognition badge.
   def recognition_state

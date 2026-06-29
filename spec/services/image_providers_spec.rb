@@ -12,9 +12,14 @@ RSpec.describe ImageProviders do
   end
 
   describe ".for_move" do
-    it "returns Fake when the Move can't generate (real provider, no key)" do
+    it "returns the REAL adapter for a real-provider Move even without a key (BYO preserved)" do
+      # The adapter then raises MissingApiKey on #generate rather than silently
+      # faking an image — so a key removed mid-flight fails, not fakes (#416).
       move = build(:move, image_provider: "openai", openai_api_key: nil)
-      expect(described_class.for_move(move)).to be_a(ImageProviders::Fake)
+      adapter = described_class.for_move(move)
+
+      expect(adapter).to be_a(ImageProviders::Openai)
+      expect { adapter.generate(prompt: "x") }.to raise_error(ImageProviders::Base::MissingApiKey)
     end
 
     it "returns the real adapter when the Move is ready (key present)" do
@@ -22,8 +27,9 @@ RSpec.describe ImageProviders do
       expect(described_class.for_move(move)).to be_a(ImageProviders::Openai)
     end
 
-    it "returns Fake for a fake-provider Move (no key needed)" do
+    it "returns Fake only for an explicitly fake-provider Move (or no Move)" do
       expect(described_class.for_move(build(:move, image_provider: "fake"))).to be_a(ImageProviders::Fake)
+      expect(described_class.for_move(nil)).to be_a(ImageProviders::Fake)
     end
   end
 

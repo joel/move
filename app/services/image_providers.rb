@@ -9,11 +9,13 @@ module ImageProviders
   module_function
 
   # Build the generator for a Move's configured image provider, using *that
-  # Move's* own API key (strict BYO). A Move that hasn't configured a real
-  # provider with its key falls back to the network-free Fake generator (used by
-  # the demo seed + tests), so the flow is exercisable without a vendor account.
+  # Move's* own API key (strict BYO). Only an explicitly `fake` Move (or no Move)
+  # gets the network-free Fake generator; a real provider is built even without a
+  # key so #generate raises MissingApiKey (the action reverts the card) instead of
+  # silently faking an image — preserving BYO if the key is removed after the
+  # controller hid the affordance but before the job runs (#416 Codex).
   def for_move(move)
-    return Fake.new unless move&.image_generation_ready?
+    return Fake.new if move.nil? || move.image_provider == "fake"
 
     resolve(move.image_provider, api_key: move.image_api_key_for(move.image_provider))
   end

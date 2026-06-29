@@ -275,6 +275,19 @@ RSpec.describe "Boxes" do
       expect(response.body).to include(I18n.t("items.state.needs_correction"))
     end
 
+    it "keeps an AI-generated item image out of the review walk (#416)" do
+      box = create(:box, move:, number: "1")
+      generated = create(:media, move:, box:, captured_via: "generated")
+      create(:item, :manual, move:, box:, source_media: generated, name: "Brass lamp")
+
+      get move_box_path(move, box)
+
+      # The generated photo never had recognition, so it must not link into review
+      # nor flip the box to a reviewed state.
+      expect(response.body).not_to include(move_box_review_photo_path(move, box, media_id: generated.id))
+      expect(response.body).not_to include(I18n.t("boxes.show.review_complete"))
+    end
+
     it "links a settled orphaned photo (failed) to recovery, but not one still in flight" do
       box = create(:box, move:, number: "1")
       failed = create(:media, move:, box:)
