@@ -16,7 +16,9 @@ module Items
       item_id = event[:payload]&.dig(:item_id)
       return if item_id.blank?
 
-      item = Item.includes(:move, :box, source_media: { image_attachment: :blob }).find_by(id: item_id)
+      # A single item's card — source_media (only present on success) loads lazily
+      # in the render; eager-loading it would be flagged unused on the failed path.
+      item = Item.includes(:move, :box).find_by(id: item_id)
       return if item.nil?
 
       broadcast(item, failed: event[:name] == "item.image_generation_failed")

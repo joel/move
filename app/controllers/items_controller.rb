@@ -157,34 +157,37 @@ class ItemsController < MoveScopedController
   end
 
   # POST /moves/:move_id/items/:id/generate_image (#416)
-  # Enqueues the slow vendor call off the request path and immediately swaps the
-  # item's box-contents card to a "generating" state; the job's broadcast then
-  # completes it (→ image, or a retryable failed state). Defends the hidden
-  # affordance: only a source-less item on an image-ready Move qualifies.
+  # Claims the item (atomic) and enqueues the slow vendor call off the request
+  # path, then swaps the box-contents card to its current state; the job's
+  # broadcast completes it (→ image, or a retryable failed state). Defends the
+  # hidden affordance: only a source-less item on an image-ready Move qualifies.
   def generate_image
     return head :unprocessable_content unless @item.source_media_id.nil? && @move.image_generation_ready?
 
-    Items::GenerateImageJob.perform_later(
-      @item.id, tenant: Apartment::Tenant.current, actor_id: current_user&.id
-    )
-    respond_with_streams(generating_card_stream, redirect: move_box_path(@move, @item.box))
+    # Claim synchronously BEFORE enqueue, so the in-flight state is observable when
+    # the response renders and only the winner of a concurrent submit enqueues the
+    # (paid) job. A loser just re-renders the card, which already reflects the claim.
+    if @item.claim_image_generation!
+      Items::GenerateImageJob.perform_later(
+        @item.id, tenant: Apartment::Tenant.current, actor_id: current_user&.id
+      )
+    end
+
+    respond_with_streams(item_card_stream, redirect: move_box_path(@move, @item.box))
   end
 
   private
 
-  def generating_card_stream
-    # Reflect the item's CURRENT state, not an unconditional spinner: with an
-    # inline/very-fast adapter the job can finish (and broadcast the image) before
-    # this response renders, so forcing generating:true would let the HTTP response
-    # overwrite a completed card with a spinner no job will clear. Force generating
-    # only while the photo is still absent (#416 Codex).
+  # Render the card in whatever state it is NOW (reload): claimed → generating; an
+  # inline/very-fast job that already attached → image; an inline failure that
+  # released the claim → the retryable placeholder. ItemCard derives generating
+  # from the persisted claim, so the response never overwrites a completed/failed
+  # card with a stale spinner (#416 Codex).
+  def item_card_stream
     @item.reload
     [turbo_stream.replace(
       Components::Boxes::ItemCard.dom_id(@item),
-      view_context.render(Components::Boxes::ItemCard.new(
-                            item: @item, move: @move, image_ready: true,
-                            generating: @item.source_media_id.nil?
-                          ))
+      view_context.render(Components::Boxes::ItemCard.new(item: @item, move: @move, image_ready: true))
     )]
   end
 

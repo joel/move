@@ -390,6 +390,34 @@ RSpec.describe "Items" do
       expect(response.body).not_to include(I18n.t("boxes.contents.generating"))
     end
 
+    it "shows the retryable placeholder (not a stale spinner) when the job fails inline (#416)" do
+      boom = instance_double(ImageProviders::Fake)
+      allow(boom).to receive(:generate).and_raise(ProviderHttp::Error, "boom")
+      allow(ImageProviders).to receive(:for_move).and_return(boom)
+
+      post generate_image_move_item_path(move, item), as: :turbo_stream
+
+      # Inline failure released the claim, so the card reflects a retryable state:
+      # the generate button is present (a stuck spinner card would have none).
+      aggregate_failures do
+        expect(item.reload.image_generating_at).to be_nil
+        expect(response.body).to include(I18n.t("boxes.contents.generate")) # retry button = not a spinner
+      end
+    end
+
+    it "does not enqueue a second paid job while one is already claimed" do
+      item.update!(image_generating_at: Time.current) # a generation is already in flight
+      allow(Items::GenerateImageJob).to receive(:perform_later)
+
+      post generate_image_move_item_path(move, item), as: :turbo_stream
+
+      aggregate_failures do
+        expect(Items::GenerateImageJob).not_to have_received(:perform_later)
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include(I18n.t("boxes.contents.generating")) # still in flight
+      end
+    end
+
     it "is rejected (422) when the item already has a photo" do
       item.update!(source_media: create(:media, move:, box:))
       allow(Items::GenerateImageJob).to receive(:perform_later)

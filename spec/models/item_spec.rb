@@ -35,4 +35,31 @@ RSpec.describe Item do
       expect(box.items.pending_review).to contain_exactly(kept)
     end
   end
+
+  describe "image generation claim (#416)" do
+    let(:item) { create(:item, :manual) }
+
+    it "claims a free, photo-less item exactly once under contention" do
+      results = Array.new(3) { item.claim_image_generation! }
+      expect(results.count(true)).to eq(1)
+      expect(item.reload.image_generating_at).to be_present
+    end
+
+    it "refuses to claim an item that already has a photo" do
+      item.update!(source_media: create(:media, move: item.move, box: item.box))
+      expect(item.claim_image_generation!).to be(false)
+    end
+
+    it "reclaims an abandoned (stale) claim so a crashed job self-heals" do
+      item.update!(image_generating_at: (Item::IMAGE_CLAIM_TTL + 1.minute).ago)
+      expect(item.claim_image_generation!).to be(true)
+    end
+
+    it "reports a fresh claim as generating, a stale one as not" do
+      item.update!(image_generating_at: Time.current)
+      expect(item).to be_image_generating
+      item.update!(image_generating_at: (Item::IMAGE_CLAIM_TTL + 1.minute).ago)
+      expect(item).not_to be_image_generating
+    end
+  end
 end

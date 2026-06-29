@@ -10,15 +10,12 @@ module Items
   # turns a Failure into an `item.image_generation_failed` event so the card
   # reverts — generation must never corrupt the item.
   class GenerateImage < BaseAction
-    # Reclaim window for an abandoned (crashed-job) claim — shared with the model's
-    # image_generating? so the UI and the guard agree. Exceeds the 120s timeout.
-    CLAIM_TTL = Item::IMAGE_CLAIM_TTL
-
     def call(item:, actor: nil)
       yield ensure_writable(item.move)
       yield ensure_generatable(item)
-      yield claim(item) # durable, atomic — taken BEFORE the paid vendor call
-
+      # The claim is taken synchronously by the caller (ItemsController#generate_image)
+      # before enqueue, so the in-flight state is observable when the response
+      # renders; here we just generate, and release/clear the claim on the way out.
       media = generate_and_attach(item)
       emit_generated(item, media, actor) if media # nil = lost a concurrent race; the winner emitted
       Success(item)
@@ -42,18 +39,6 @@ module Items
       return Failure(:already_has_image) if item.source_media_id.present?
 
       Success()
-    end
-
-    # Atomically claim the item before spending on the vendor: a single UPDATE
-    # that only succeeds if no photo exists and no fresh claim is held. A
-    # concurrent submit gets 0 rows → Failure(:already_generating) and bails before
-    # the provider call, so one action incurs at most one paid generation (#416
-    # Codex). Reclaimable after CLAIM_TTL so a crashed job self-heals.
-    def claim(item)
-      claimed = Item.where(id: item.id, source_media_id: nil)
-                    .where("image_generating_at IS NULL OR image_generating_at < ?", CLAIM_TTL.ago)
-                    .update_all(image_generating_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
-      claimed == 1 ? Success() : Failure(:already_generating)
     end
 
     # Drop the claim so a failed generation can be retried immediately (success

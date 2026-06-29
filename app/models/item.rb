@@ -55,4 +55,19 @@ class Item < ApplicationRecord
   def image_generating?
     image_generating_at.present? && image_generating_at > IMAGE_CLAIM_TTL.ago
   end
+
+  # Atomically claim this item for image generation (#416): a single UPDATE that
+  # succeeds only when no photo exists and no fresh claim is held. Concurrent
+  # callers race on one row — exactly one gets `true` (and enqueues the paid job),
+  # so a double-submit can't double-spend. Reclaimable after IMAGE_CLAIM_TTL so a
+  # crashed job self-heals. Taken at the synchronous entry point (the controller)
+  # so the in-flight state is observable when the response renders.
+  # rubocop:disable Naming/PredicateMethod -- a bang command that reports whether it won the claim, not a query
+  def claim_image_generation!
+    rows = self.class.where(id: id, source_media_id: nil)
+               .where("image_generating_at IS NULL OR image_generating_at < ?", IMAGE_CLAIM_TTL.ago)
+               .update_all(image_generating_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+    rows == 1
+  end
+  # rubocop:enable Naming/PredicateMethod
 end
