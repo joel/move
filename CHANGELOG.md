@@ -5,6 +5,17 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.68.0] — 2026-06-29
+
+### Changed
+- **Sharper photo recognition.** Recognition no longer lists the things that
+  aren't your belongings — the **floor**, walls, and the **moving box** itself
+  stop showing up as inventory items, while furniture, rugs, and product boxes
+  (which you *are* moving) are still captured. The detection prompt was rewritten
+  around what you're actually packing, and recognition now runs on newer AI
+  models (OpenAI GPT‑5.5, Google Gemini 3.5 Flash) tuned for accurate, consistent
+  results. Per‑Move model overrides keep working unchanged (#425).
+
 ## [v0.67.0] — 2026-06-29
 
 ### Added
