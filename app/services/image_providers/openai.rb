@@ -29,6 +29,11 @@ module ImageProviders
       raise ProviderHttp::Error, "#{self.class.name} returned a 2xx with no image data" if b64.blank?
 
       Base64.strict_decode64(b64)
+    rescue ArgumentError
+      # Present but malformed base64 — surface as a provider failure so the action's
+      # ProviderHttp::Error rescue runs (releases the claim, reverts the card)
+      # rather than escaping as an uncaught ArgumentError (#416 Codex).
+      raise ProviderHttp::Error, "#{self.class.name} returned a 2xx with undecodable image data"
     end
   end
 end

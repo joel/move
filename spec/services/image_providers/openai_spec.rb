@@ -46,6 +46,13 @@ RSpec.describe ImageProviders::Openai do
       .to raise_error(ProviderHttp::Error, /no image data/)
   end
 
+  it "wraps a present-but-malformed b64 as a ProviderHttp::Error (not a raw ArgumentError)" do
+    stub_http(code: "200", body: { data: [{ b64_json: "not!valid!base64!" }] }.to_json)
+
+    expect { provider.generate(prompt: "x") }
+      .to raise_error(ProviderHttp::Error, /undecodable image/)
+  end
+
   it "raises on a non-2xx response, surfacing the status without the key" do
     stub_http(code: "429", body: { error: { message: "Rate limit reached" } }.to_json)
 
