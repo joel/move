@@ -98,6 +98,10 @@ Rails.application.routes.draw do
     delete "vocabularies/:kind/:id", to: "vocabularies#destroy", constraints: kind
     # D1 — Hybrid search over the Move's items (full-text + trigram + pgvector).
     get "search", to: "searches#index", as: :search
+    # Gallery — browse every captured (and AI-generated) photo across the whole
+    # Move in one recent-first grid, filterable by room. Read-only; reached from
+    # the Menu hub. A tile opens a client-side lightbox (the :detail variant).
+    get "gallery", to: "galleries#index", as: :gallery
     # F1 — Members & roles (admin-only). Add an existing Organization user, change
     # a member's role, or remove them. Role changes go through a member action.
     resources :members, only: %i[index create destroy] do

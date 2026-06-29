@@ -1,0 +1,27 @@
+# Gallery — Move-wide photo browse. No customer-facing copy is hard-coded in the
+# Phlex views; everything renders through galleries.*.
+en:
+  galleries:
+    index:
+      title: "Gallery"
+      subtitle: "Every photo across this move, newest first."
+      generated: "Generated"
+      box_label: "Box %{number}"
+      capped: "Showing the most recent %{count} photos."
+      sort:
+        label: "Sort"
+        recent: "Newest first"
+        oldest: "Oldest first"
+      filters:
+        all: "All rooms"
+        clear: "Clear filter"
+      lightbox:
+        view_box: "View box"
+        prev: "Previous photo"
+        next: "Next photo"
+        close: "Close"
+      empty:
+        title: "No photos yet"
+        description: "Photos you capture while packing boxes will appear here."
+        filtered_title: "No photos in this room"
+        filtered_description: "Try another room, or clear the filter to see every photo."
