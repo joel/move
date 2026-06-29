@@ -58,16 +58,29 @@ RSpec.describe RecognitionProviders::Gemini do
 
     body = sent_body
     aggregate_failures do
-      expect(sent_request.path).to include("models/gemini-2.5-flash:generateContent")
+      expect(sent_request.path).to include("models/gemini-3.5-flash:generateContent")
       expect(sent_request["x-goog-api-key"]).to eq("g-test")
       gen = body["generationConfig"]
       expect(gen["responseMimeType"]).to eq("application/json")
+      expect(gen.dig("thinkingConfig", "thinkingLevel")).to eq("medium")
       items = gen.dig("responseSchema", "properties", "objects", "items")
       expect(items["required"]).to contain_exactly("label", "confidence")
       expect(items["properties"].keys).to contain_exactly("label", "confidence")
       # Canonical camelCase proto json_name for the inline image part.
       inline = body.dig("contents", 0, "parts", 1, "inlineData")
       expect(inline).to include("mimeType" => "image/jpeg", "data" => Base64.strict_encode64("bytes"))
+    end
+  end
+
+  it "omits thinkingConfig for a Gemini 2.5-family override (uses thinkingBudget, not thinkingLevel)" do
+    stub_http(code: "200", body: content_response({ objects: [] }.to_json))
+
+    described_class.new(api_key: "g-test", model: "gemini-2.5-flash")
+                   .identify(image: image, context: context)
+
+    aggregate_failures do
+      expect(sent_request.path).to include("models/gemini-2.5-flash:generateContent")
+      expect(sent_body["generationConfig"]).not_to have_key("thinkingConfig")
     end
   end
 

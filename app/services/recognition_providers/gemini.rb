@@ -9,10 +9,16 @@ module RecognitionProviders
   # raw response upward.
   class Gemini < Base
     HOST = "https://generativelanguage.googleapis.com/v1beta"
-    # TODO: confirm the production Flash string before pinning (placeholder; newer
-    # Flash models are usually the better default). The default when a Move sets no
-    # override (#187 — Move#gemini_model wins via Base#model).
-    DEFAULT_MODEL = "gemini-2.5-flash"
+    # Gemini 3.5 Flash: current GA Flash — near-Pro intelligence at Flash cost,
+    # the better default for cluttered moving photos than the prior 2.5 Flash. The
+    # default when a Move sets no override (#187 — Move#gemini_model wins via
+    # Base#model), so a Move can drop to gemini-3.1-flash-lite to cut cost.
+    DEFAULT_MODEL = "gemini-3.5-flash"
+    # "medium" thinking, matching the OpenAI adapter's reasoning effort — cluttered
+    # packing photos reward some deliberation to separate belongings from the
+    # box/floor/background. (Gemini 3.x replaced the legacy thinkingBudget integer
+    # with thinkingLevel.)
+    THINKING_LEVEL = "medium"
 
     GEMINI_SCHEMA = {
       type: "OBJECT",
@@ -75,6 +81,15 @@ module RecognitionProviders
     # so don't "correct" these to snake_case — keep one consistent style.
     def body(image, context)
       img = encoded_image(image)
+      generation = {
+        responseMimeType: "application/json",
+        responseSchema: GEMINI_SCHEMA
+      }
+      # thinkingLevel is a Gemini 3+ field; the 2.5 family uses the older integer
+      # thinkingBudget. A Move may override the model to a 2.5-family string, which
+      # would reject thinkingLevel, so only send it for Gemini 3+ (older models
+      # just run with their default thinking).
+      generation[:thinkingConfig] = { thinkingLevel: THINKING_LEVEL } if thinking_level_model?(model)
       {
         contents: [{
           role: "user",
@@ -83,11 +98,13 @@ module RecognitionProviders
             { inlineData: { mimeType: img[:media_type], data: img[:base64] } }
           ]
         }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: GEMINI_SCHEMA
-        }
+        generationConfig: generation
       }
+    end
+
+    # Gemini 3+ accepts the thinkingLevel enum; 2.5 and earlier do not.
+    def thinking_level_model?(model)
+      (model.to_s[/\Agemini-(\d+)/, 1] || 0).to_i >= 3
     end
   end
 end

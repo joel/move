@@ -48,7 +48,7 @@ embeddings #232) — there is **no app-wide AI key**:
 
 | Capability | Module | Selector | Adapters | Default model (openai) |
 |---|---|---|---|---|
-| Image recognition | `app/services/recognition_providers/` | **per Move** (`moves.recognition_provider`; keys in AI Capability) | `fake` (default), `openai`, `anthropic`, `gemini` | `gpt-5-mini` |
+| Image recognition | `app/services/recognition_providers/` | **per Move** (`moves.recognition_provider`; keys in AI Capability) | `fake` (default), `openai`, `anthropic`, `gemini` | `gpt-5.5` |
 | Text embeddings (D8 search) | `app/services/embedding_providers/` | **per Move** (`moves.embedding_provider`; keys in AI Capability) | `fake` (default), `openai`, `gemini`, `voyage` (all → 1536d) | `text-embedding-3-small` @ 1536d |
 
 ### How a recognition provider is resolved (per Move)
@@ -199,9 +199,15 @@ cleared (**Remove**) from the **AI Capability** panel. No Doppler/Kamal change i
 for recognition — `RECOGNITION_PROVIDER` and `*_RECOGNITION_MODEL`/`*_API_KEY`
 env vars are **no longer used** for recognition (they were removed in #185).
 
-> Each adapter pins a cost-matched `DEFAULT_MODEL` (`gpt-5-mini`,
-> `claude-haiku-4-5-20251001`, `gemini-2.5-flash`). These are current-generation
-> defaults; changing them is a code change, not configuration.
+> Each adapter pins a current-generation `DEFAULT_MODEL` (`gpt-5.5`,
+> `claude-haiku-4-5-20251001`, `gemini-3.5-flash`) and tunes generation for an
+> extraction task rather than free-form generation: OpenAI `reasoning_effort:
+> "medium"`, Anthropic `temperature: 0`, Gemini `thinkingLevel: "medium"`. The shared
+> detection prompt (`Base#prompt`) is goal-framed (cataloguing belongings to
+> pack) with an explicit do-not-list set (the moving box/container, packing
+> materials, floor/walls/ceiling, people/pets/background) so structural
+> surroundings stop leaking into the inventory. Changing any of these is a code
+> change, not configuration; a Move can still override only the model string.
 
 ## Enabling OpenAI **embeddings** (per Move — no deploy)
 

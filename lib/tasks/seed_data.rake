@@ -7,7 +7,7 @@ namespace :seed_data do
   task refresh: :environment do
     puts "[seed_data:refresh] 1/2 generating images (gpt-image-1)…"
     Rake::Task["seed_images:generate"].invoke
-    puts "[seed_data:refresh] 2/2 recording recognition (gpt-5-mini)…"
+    puts "[seed_data:refresh] 2/2 recording recognition (#{RecognitionProviders::Openai::DEFAULT_MODEL})…"
     Rake::Task["seed_recognition:record"].invoke
     puts "[seed_data:refresh] done. Review + commit db/seed_images/ and " \
          "db/seed_data/recognition/, then run `bin/rails db:seed`."

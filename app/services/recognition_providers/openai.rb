@@ -8,10 +8,17 @@ module RecognitionProviders
   # response upward.
   class Openai < Base
     ENDPOINT = "https://api.openai.com/v1/chat/completions"
-    # GPT-5 mini: flagship-family vision + strict structured outputs at mini-tier
-    # cost. (gpt-4o-mini was prev-gen.) The default when a Move sets no override
-    # (#187 — Move#openai_model wins over this via Base#model).
-    DEFAULT_MODEL = "gpt-5-mini"
+    # GPT-5.5: current flagship with native vision + strict structured outputs —
+    # chosen for recognition accuracy on cluttered moving photos. The default when
+    # a Move sets no override (#187 — Move#openai_model wins over this via
+    # Base#model), so cost-sensitive Moves can drop to gpt-5.5-mini / gpt-5-mini.
+    DEFAULT_MODEL = "gpt-5.5"
+    # Cluttered, real-world packing photos reward some deliberation (telling the
+    # belongings apart from the box/floor/background), so we run at the model's
+    # default "medium" reasoning rather than throttling it — recognition accuracy
+    # is the priority for the flagship default. Cost-sensitive Moves can pick a
+    # cheaper model override; the effort stays consistent across models.
+    REASONING_EFFORT = "medium"
 
     def identify(image:, context:)
       key = api_key!
@@ -46,7 +53,7 @@ module RecognitionProviders
 
     def body(model, image, context)
       img = encoded_image(image)
-      {
+      params = {
         model: model,
         messages: [{
           role: "user",
@@ -63,6 +70,23 @@ module RecognitionProviders
           json_schema: { name: "detected_objects", strict: true, schema: OBJECTS_SCHEMA }
         }
       }
+      # A Move may override to any free-text model, so only send reasoning_effort
+      # where the value is actually accepted.
+      effort = reasoning_effort_for(model)
+      params[:reasoning_effort] = effort if effort
+      params
+    end
+
+    # Our "medium" effort, or nil when the field must be omitted:
+    # - non-reasoning chat models (e.g. gpt-4o-mini) reject reasoning_effort entirely;
+    # - gpt-5-pro only supports (and defaults to) "high", so never send "medium" to it.
+    # Reasoning families are gpt-5* and the o-series.
+    def reasoning_effort_for(model)
+      m = model.to_s
+      return nil unless m.match?(/\A(gpt-5|o\d)/)
+      return nil if m.start_with?("gpt-5-pro")
+
+      REASONING_EFFORT
     end
   end
 end

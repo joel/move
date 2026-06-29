@@ -26,6 +26,15 @@ RSpec.describe RecognitionProviders::Base do
       expect(text).not_to match(/\btags?\b/i)
       expect(text).not_to match(/fragile/i)
     end
+
+    it "excludes the structural surroundings that leaked into the inventory" do
+      # Regression: "floor" and the cardboard "box" kept showing up as items.
+      text = provider.send(:prompt, { room: "Kitchen" })
+
+      expect(text).to match(/do not list/i)
+      expect(text).to include("floor").and include("box")
+      expect(text).to match(/packing materials/i)
+    end
   end
 
   describe "#normalize" do

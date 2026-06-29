@@ -39,6 +39,7 @@ RSpec.describe RecognitionProviders::Anthropic do
       expect(sent_request["x-api-key"]).to eq("sk-ant-test")
       expect(sent_request["anthropic-version"]).to eq("2023-06-01")
       expect(sent["model"]).to eq("claude-haiku-4-5-20251001")
+      expect(sent["temperature"]).to eq(0)
       expect(sent.dig("tool_choice", "type")).to eq("tool")
       expect(sent.dig("tool_choice", "name")).to eq("record_objects")
       tool = sent["tools"].first

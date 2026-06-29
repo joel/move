@@ -155,16 +155,27 @@ module RecognitionProviders
 
     # Detection prompt shared by every adapter. context carries :room (the only
     # vocabulary still fed to the model — category/tags were removed), built in
-    # RecognitionRuns::Process#context.
+    # RecognitionRuns::Process#context. Framed around the goal (cataloguing
+    # belongings to pack) and with an explicit do-not-list set, because a generic
+    # "identify the objects" instruction leaks structural surroundings — the
+    # floor, walls and the cardboard moving box itself — into the inventory. The
+    # exclusions deliberately stop at the box/structure/background: furniture and
+    # rugs ARE belongings being moved, so they are never excluded.
     def prompt(context)
-      lines = ["Identify the distinct physical objects in this moving-box photo."]
+      lines = [
+        "You are cataloguing a household's belongings for a move. Identify the distinct " \
+        "physical items in this photo — the things a person would pack up and take with them."
+      ]
       lines << "The box is in the #{context[:room]}." if context[:room].present?
 
       lines << "Give one entry per distinct item and collapse identical duplicates into a " \
-               "single entry. Ignore the box itself, packing materials " \
-               "(paper, bubble wrap, tape) and anything in the background. Skip whatever is " \
-               "too occluded or blurry to identify rather than guessing. Treat confidence as " \
-               "your rough certainty from 0 to 1."
+               "single entry."
+      lines << "Do not list the moving box, bin or container the items are packed in, packing " \
+               "materials (paper, bubble wrap, tape, foam, labels), the floor, ground, walls, " \
+               "ceiling, doors or windows, or any people, hands, pets or blurred background."
+      lines << "Skip whatever is too occluded or blurry to identify rather than guessing. " \
+               "Give each item a short, specific name (for example \"ceramic dinner plate\" or " \
+               "\"cordless drill\"). Treat confidence as your rough certainty from 0 to 1."
       lines.join(" ")
     end
 
