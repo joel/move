@@ -23,6 +23,13 @@ class Move < ApplicationRecord
   # key — Anthropic has no embeddings API, so Anthropic stays recognition-only).
   EMBEDDING_PROVIDERS = %w[fake openai gemini voyage].freeze
   REAL_EMBEDDING_PROVIDERS = (EMBEDDING_PROVIDERS - %w[fake]).freeze
+  # Item-image generation is per-Move bring-your-own-key too (#416). `fake` is the
+  # network-free default (a placeholder PNG, no key); `openai` is the one real
+  # provider and reuses the recognition openai_api_key column (no new key). The
+  # schema column defaults to "openai" so a Move with an OpenAI key generates with
+  # no extra setup; the affordance stays hidden until a key is present.
+  IMAGE_PROVIDERS = %w[fake openai].freeze
+  REAL_IMAGE_PROVIDERS = (IMAGE_PROVIDERS - %w[fake]).freeze
   # How many identical exterior labels print per box (E1 / #303). 1..10; the
   # default of 2 (lid + side) preserves the prior fixed BoxLabelsPdf behaviour.
   LABELS_PER_BOX_RANGE = (1..10)
@@ -64,6 +71,7 @@ class Move < ApplicationRecord
                             less_than_or_equal_to: LABELS_PER_BOX_RANGE.max }
   validates :recognition_provider, inclusion: { in: RECOGNITION_PROVIDERS }
   validates :embedding_provider, inclusion: { in: EMBEDDING_PROVIDERS }
+  validates :image_provider, inclusion: { in: IMAGE_PROVIDERS }
   # Free-text model overrides (#187): any string the provider accepts. Kept
   # permissive so a brand-new model works the day it ships — the cap just guards
   # against junk. Blank = use the adapter's DEFAULT_MODEL.
@@ -108,7 +116,26 @@ class Move < ApplicationRecord
     powers = []
     powers << :recognition if REAL_RECOGNITION_PROVIDERS.include?(provider.to_s)
     powers << :search if REAL_EMBEDDING_PROVIDERS.include?(provider.to_s)
+    powers << :image if REAL_IMAGE_PROVIDERS.include?(provider.to_s)
     powers
+  end
+
+  # This Move's stored key for the image-generation +provider+, or nil for
+  # fake/unknown. OpenAI is the only real provider and reuses the openai_api_key
+  # column (no separate key). Used by ImageProviders.for_move (#416).
+  def image_api_key_for(provider)
+    return nil unless REAL_IMAGE_PROVIDERS.include?(provider.to_s)
+
+    public_send("#{provider}_api_key").presence
+  end
+
+  # Whether item-image generation can run as configured: fake always can; a real
+  # provider needs this Move's own key (strict BYO). Gates the "✨ generate image"
+  # affordance — hidden entirely when false.
+  def image_generation_ready?
+    return true if image_provider == "fake"
+
+    image_api_key_for(image_provider).present?
   end
 
   # This Move's stored key for the search-embedding +provider+, or nil for

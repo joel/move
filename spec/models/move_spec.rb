@@ -79,6 +79,27 @@ RSpec.describe Move do
     end
   end
 
+  describe "#image_generation_ready? (#416)" do
+    it "is true for fake (network-free placeholder, no key)" do
+      expect(build(:move, image_provider: "fake")).to be_image_generation_ready
+    end
+
+    it "is true for openai only when the Move has its own key (strict BYO)" do
+      expect(build(:move, image_provider: "openai", openai_api_key: nil)).not_to be_image_generation_ready
+      expect(build(:move, image_provider: "openai", openai_api_key: "sk")).to be_image_generation_ready
+    end
+  end
+
+  describe "#image_api_key_for + #provider_powers (#416)" do
+    it "reuses the openai key column and badges openai with :image" do
+      move = build(:move, openai_api_key: "sk")
+
+      expect(move.image_api_key_for("openai")).to eq("sk")
+      expect(move.image_api_key_for("fake")).to be_nil
+      expect(move.provider_powers("openai")).to include(:image)
+    end
+  end
+
   describe "#writable?" do
     it "is writable unless archived" do
       expect(build(:move, status: "planned")).to be_writable
