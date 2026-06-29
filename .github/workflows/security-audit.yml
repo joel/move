@@ -66,12 +66,17 @@ jobs:
         id: triage
         if: always()
         run: |
+          # FAIL CLOSED: a non-empty report is treated as `clean` ONLY when it
+          # carries an explicit CLEAN marker. A FINDINGS marker — or any malformed /
+          # missing / unknown status on a non-empty report — falls through to
+          # `findings` and is redacted, so a report whose marker drifted can never
+          # be published in full to a public sink.
           if [ ! -s security-audit.md ]; then
             echo "status=none" >> "$GITHUB_OUTPUT"
-          elif head -n 5 security-audit.md | grep -q 'SECURITY_AUDIT_STATUS: FINDINGS'; then
-            echo "status=findings" >> "$GITHUB_OUTPUT"
-          else
+          elif grep -q 'SECURITY_AUDIT_STATUS: CLEAN' security-audit.md; then
             echo "status=clean" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=findings" >> "$GITHUB_OUTPUT"
           fi
 
       # CLEAN only — a clean report carries no exploit detail, so it is safe to
