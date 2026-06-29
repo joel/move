@@ -10,10 +10,9 @@ module Items
   # turns a Failure into an `item.image_generation_failed` event so the card
   # reverts — generation must never corrupt the item.
   class GenerateImage < BaseAction
-    # A claim older than this is treated as abandoned (a crashed job) and may be
-    # re-taken, so an item can never wedge in "generating". Comfortably exceeds the
-    # provider read timeout (120s).
-    CLAIM_TTL = 5.minutes
+    # Reclaim window for an abandoned (crashed-job) claim — shared with the model's
+    # image_generating? so the UI and the guard agree. Exceeds the 120s timeout.
+    CLAIM_TTL = Item::IMAGE_CLAIM_TTL
 
     def call(item:, actor: nil)
       yield ensure_writable(item.move)

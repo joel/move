@@ -24,7 +24,9 @@ module Components
         @move = move
         @editable = editable
         @image_ready = image_ready
-        @generating = generating
+        # Reflect a durable in-flight claim too, so a reload/revisit mid-generation
+        # shows "generating" (not an idle generate button) — #416 Codex.
+        @generating = generating || item.image_generating?
         @failed = failed
       end
 

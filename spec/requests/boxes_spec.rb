@@ -288,6 +288,29 @@ RSpec.describe "Boxes" do
       expect(response.body).not_to include(I18n.t("boxes.show.review_complete"))
     end
 
+    it "renders a generated-image item through its own card linking to the item detail (#416)" do
+      box = create(:box, move:, number: "1")
+      generated = create(:media, move:, box:, captured_via: "generated")
+      item = create(:item, :manual, move:, box:, source_media: generated, name: "Brass lamp")
+
+      get move_box_path(move, box)
+
+      # Not a gallery photo card — the item's own ItemCard, with a working detail link.
+      expect(response.body).to include(Components::Boxes::ItemCard.dom_id(item))
+      expect(response.body).to include(%(href="#{move_item_path(move, item)}"))
+    end
+
+    it "shows the generating state (no generate button) for an item with a fresh claim (#416)" do
+      move.update!(image_provider: "fake") # image-ready, so the button would otherwise show
+      box = create(:box, move:, number: "1")
+      create(:item, :manual, move:, box:, name: "Lamp", image_generating_at: Time.current)
+
+      get move_box_path(move, box)
+
+      expect(response.body).to include(I18n.t("boxes.contents.generating"))
+      expect(response.body).not_to include(I18n.t("boxes.contents.generate"))
+    end
+
     it "links a settled orphaned photo (failed) to recovery, but not one still in flight" do
       box = create(:box, move:, number: "1")
       failed = create(:media, move:, box:)

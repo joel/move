@@ -257,7 +257,11 @@ class BoxesController < MoveScopedController
   def box_show_view
     scope = authorized_scope(@box.items).in_box
     items = scope.ordered.to_a
-    box_media_ids = @box.media.ids
+    # Generated images are item images, not gallery photos — they render through
+    # ItemCard, never as a photo card. Excluding them here makes a generated item
+    # "standalone" (its source isn't a gallery photo), so it shows as an ItemCard
+    # with its image + a working item-detail link, not an inert photo tile (#416).
+    box_media_ids = @box.media.not_generated.ids
     # Preload source_media (+ blob) for ONLY the standalone foreign-source items —
     # those render their own thumbnail in an ItemCard (#416). Manual items have a
     # nil source (no query), and photo-backed items aren't standalone (never touch
@@ -277,8 +281,9 @@ class BoxesController < MoveScopedController
                            .ids
     Views::Boxes::Show.new(
       move: @move, box: @box, items: items,
+      # Gallery photos only (not_generated): generated images render via ItemCard.
       # Preload the blob so the grid's :thumb variant proxy URLs don't N+1 the blob.
-      media: @box.media.includes(image_attachment: :blob).recent_first,
+      media: @box.media.not_generated.includes(image_attachment: :blob).recent_first,
       editable: editable_move?, pending_count: unreviewed_count(scope),
       # Whether this box has at least one of ITS OWN photos that produced an item —
       # the per-photo review walk's membership (mirrors ReviewsController#review_media,

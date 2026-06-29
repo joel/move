@@ -23,6 +23,17 @@ RSpec.describe "Captures" do
       expect(response.body).to include(I18n.t("captures.tap_to_capture"))
     end
 
+    it "excludes AI-generated item images from the capture panel (#416)" do
+      # A generated image has no recognition run; in the panel it would otherwise
+      # render as a forever-queued row. With only generated media, the panel is empty.
+      generated = create(:media, move:, box:, captured_via: "generated")
+      create(:item, :manual, move:, box:, source_media: generated, name: "Lamp")
+
+      get move_box_capture_path(move, box)
+
+      expect(response.body).to include(I18n.t("captures.session.empty"))
+    end
+
     it "redirects a sealed box to the box detail (capture blocked)" do
       sealed = create(:box, :with_room, move:, status: "sealed")
 

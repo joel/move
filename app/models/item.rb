@@ -45,4 +45,14 @@ class Item < ApplicationRecord
   def removed?
     presence_state == "removed"
   end
+
+  # A claim older than this is treated as abandoned (a crashed generation job),
+  # so the item is generatable again and the UI stops showing "generating" (#416).
+  IMAGE_CLAIM_TTL = 5.minutes
+
+  # Whether an image generation is currently in flight (a fresh, non-stale claim)
+  # — drives the card's generating state on reload, and the generatable guard.
+  def image_generating?
+    image_generating_at.present? && image_generating_at > IMAGE_CLAIM_TTL.ago
+  end
 end

@@ -13,7 +13,10 @@ module Captures
     end
 
     def media
-      @media ||= @box.media.includes(:recognition_runs, image_attachment: :blob)
+      # not_generated: AI-generated item images have no recognition run, so they'd
+      # show as a forever-queued row here — they belong to the item card, not the
+      # capture panel (#416).
+      @media ||= @box.media.not_generated.includes(:recognition_runs, image_attachment: :blob)
                      .recent_first.limit(MEDIA_LIMIT)
     end
 
