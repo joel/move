@@ -167,9 +167,11 @@ class ItemsController < MoveScopedController
     # Claim synchronously BEFORE enqueue, so the in-flight state is observable when
     # the response renders and only the winner of a concurrent submit enqueues the
     # (paid) job. A loser just re-renders the card, which already reflects the claim.
-    if @item.claim_image_generation!
+    if (claimed_at = @item.claim_image_generation!)
+      # Pass the claim token: the job verifies the item still holds THIS claim
+      # before spending, so a stale-reclaimed duplicate job can't double-spend.
       Items::GenerateImageJob.perform_later(
-        @item.id, tenant: Apartment::Tenant.current, actor_id: current_user&.id
+        @item.id, tenant: Apartment::Tenant.current, actor_id: current_user&.id, claimed_at: claimed_at.to_i
       )
     end
 
