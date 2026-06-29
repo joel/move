@@ -40,15 +40,21 @@ working tree** for live, reachable vulnerabilities.
    threat model, and do not invent findings to fill space.
 4. Do **not** modify any files. This is a read-only analysis.
 
-## Output format
+## Output format — NON-SENSITIVE BY CONSTRUCTION (read carefully)
 
-Write the **full** report (with attack/impact/paths) — it is consumed **privately**
-(a maintainer reproduces it locally). The CI job does **not** publish your detailed
-output to any public sink; on findings it posts only a redacted count + overall risk
-and withholds the rest. So be specific and complete; do not self-censor file paths.
+> ⚠️ **This report runs in PUBLIC CI on an open-source repo, and the runner echoes
+> your output to the world-readable Actions log.** Therefore your report **MUST NOT
+> contain any exploitable specifics** — **no file paths, no line numbers, no code
+> snippets, no attack steps, no reproduction, no exploit primitives.** Reason about
+> the detail internally, but **report only a non-locating summary**: a severity, a
+> confidence, and a **generic one-line title** that names the *class* and *area*
+> without telling an attacker where or how (e.g. "Possible cross-tenant read in a
+> reporting query path" — never the file, method, or technique). The detailed,
+> actionable analysis is the job of the per-change `/security-review` pass and a
+> maintainer's local audit re-run — **not** this CI report.
 
-Return **concise GitHub-flavoured Markdown** only. The **first line must be a
-machine-readable status marker** so automation can decide how to handle the run:
+Return **concise GitHub-flavoured Markdown** only. The **first line must be the
+machine-readable status marker, exactly**, so automation can classify the run:
 
 - `SECURITY_AUDIT_STATUS: FINDINGS` — at least one real, reachable finding, **or**
 - `SECURITY_AUDIT_STATUS: CLEAN` — no meaningful findings.
@@ -60,27 +66,24 @@ SECURITY_AUDIT_STATUS: FINDINGS
 
 ## 🛡️ Security Audit
 
-**Overall risk:** Low | Medium | High — one-sentence justification.
+**Overall risk:** Low | Medium | High — one-sentence, non-locating justification.
 
 ### Findings
 
-#### 1. <short title> — `Severity: Critical|High|Medium|Low` · `Confidence: High|Medium|Low`
-- **Where:** `path/to/file.rb:line` (and related files)
-- **Attack:** how an untrusted actor reaches and exploits this.
-- **Impact:** what they gain (cross-tenant read, auth bypass, secret leak, …).
-- **Fix:** the concrete remediation.
+#### 1. <generic class + area title> — `Severity: Critical|High|Medium|Low` · `Confidence: High|Medium|Low`
+- **Class:** which checklist class (tenant isolation / authz / auth / injection /
+  upload-egress / secrets / output safety).
+- **Next step:** "Investigate with a local `/security-review`" (no specifics here).
 
 #### 2. ...
-
-### Looks fine / lower priority
-- Brief bullets for notable-but-acceptable observations, if any.
 ```
 
 Rules for the output:
-- The status marker is the **first line**, exactly as written above.
+- The status marker is the **first line**, exactly as written above — nothing before it.
+- **No file paths, line numbers, code, attack steps, or impact specifics anywhere.**
+  If you are unsure whether a detail is too revealing, leave it out.
 - Order findings by severity (highest first); always include `Severity` and
   `Confidence`.
-- Reference real file paths and line numbers.
 - If there are no meaningful findings, emit `SECURITY_AUDIT_STATUS: CLEAN`, keep the
-  "Findings" section empty, set overall risk to Low with a clear explanation, and
-  keep the whole report under roughly 400 lines.
+  "Findings" section empty, set overall risk to Low with a brief explanation, and
+  keep the whole report short.

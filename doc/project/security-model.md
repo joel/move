@@ -14,10 +14,13 @@ for exploitable weaknesses. Our defence is twofold:
 - a **periodic** whole-repo adversarial scan —
   [`.github/workflows/security-audit.yml`](../../.github/workflows/security-audit.yml)
   (`Security Audit`) runs on a schedule + on demand and, on findings, opens a
-  **redacted** `security`-labelled issue (count + overall risk only) — exploit
-  detail is **never** published to a public sink (issue/summary/artifact) on this
-  open-source repo; a maintainer reproduces it privately by re-running the audit
-  locally.
+  `security`-labelled issue and fails the run. Its report is **non-sensitive by
+  construction** — the prompt forbids file paths, line numbers, attack steps, and
+  impact specifics (because the CI runner echoes the model output to the public
+  Actions log, which no post-step can redact), so it carries only a severity + a
+  generic, non-locating title per finding. The **actionable** detail is the job of
+  the per-change `/security-review` pass (Step 5d) and a maintainer's local audit
+  re-run — never this public CI report.
 
 Both apply the **"Security & data"** section of
 [`.github/codex/review-rubric.md`](../../.github/codex/review-rubric.md), which

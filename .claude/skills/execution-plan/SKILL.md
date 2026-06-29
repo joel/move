@@ -362,8 +362,9 @@ issue only when genuinely justified, and re-run until a round comes back clean (
 substantive converging rounds is enough). For a whole-codebase audit (not just this
 diff), the scheduled `Security Audit` workflow
 ([`.github/workflows/security-audit.yml`](../../../.github/workflows/security-audit.yml))
-covers the existing surface and, on findings, opens a **redacted** `security` issue
-(exploit detail is withheld from public sinks on this open-source repo).
+covers the existing surface and, on findings, opens a `security` issue with a
+**non-sensitive** summary (severity + generic titles only — no paths/attack detail,
+since CI logs are public); the actionable detail is this Step 5d local pass.
 
 ### Step 6: Pre-Commit Validation
 

@@ -57,36 +57,35 @@ jobs:
           prompt-file: .github/codex/security-audit-prompt.md
           output-file: security-audit.md
 
-      # CRITICAL: this is a PUBLIC, open-source repo. The full report contains
-      # exploit details (attack steps, impact, file:line). It must NEVER reach a
-      # public sink — issue body, job summary, artifact, or logs are all
-      # world-readable here. So: classify first; on findings, publish ONLY a
-      # redacted notice (count + overall risk) and withhold the detail entirely.
+      # The report is NON-SENSITIVE BY CONSTRUCTION: the prompt forbids file paths,
+      # line numbers, code, attack steps, or impact specifics, because the runner
+      # echoes Codex output to the world-readable public Actions log (which no
+      # post-step can redact). So the report is only severity + generic, non-locating
+      # titles — safe to publish to summary/artifact/issue. Detailed, actionable
+      # analysis is the job of the per-change `/security-review` pass (Step 5d) and a
+      # maintainer's local audit re-run, never this CI report.
       - name: Triage report
         id: triage
         if: always()
         run: |
-          # FAIL CLOSED: a non-empty report is treated as `clean` ONLY when it
-          # carries an explicit CLEAN marker. A FINDINGS marker — or any malformed /
-          # missing / unknown status on a non-empty report — falls through to
-          # `findings` and is redacted, so a report whose marker drifted can never
-          # be published in full to a public sink.
+          # FAIL CLOSED: `clean` ONLY when line 1 is exactly the CLEAN marker. A
+          # FINDINGS marker — or any missing/malformed/unknown status on a non-empty
+          # report — is treated as `findings` (opens an issue + fails the run).
+          # grep -x on line 1 avoids matching the marker text quoted elsewhere.
           if [ ! -s security-audit.md ]; then
             echo "status=none" >> "$GITHUB_OUTPUT"
-          elif grep -q 'SECURITY_AUDIT_STATUS: CLEAN' security-audit.md; then
+          elif head -n 1 security-audit.md | grep -qx 'SECURITY_AUDIT_STATUS: CLEAN'; then
             echo "status=clean" >> "$GITHUB_OUTPUT"
           else
             echo "status=findings" >> "$GITHUB_OUTPUT"
           fi
 
-      # CLEAN only — a clean report carries no exploit detail, so it is safe to
-      # publish in full to the (public) summary + artifact.
-      - name: Publish clean report
-        if: always() && steps.triage.outputs.status == 'clean'
+      - name: Publish report to job summary
+        if: always() && steps.triage.outputs.status != 'none'
         run: cat security-audit.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload clean report artifact
-        if: always() && steps.triage.outputs.status == 'clean'
+      - name: Upload report artifact
+        if: always() && steps.triage.outputs.status != 'none'
         uses: actions/upload-artifact@v7
         with:
           name: security-audit-${{ github.run_id }}
@@ -101,39 +100,23 @@ jobs:
             echo "_No report was produced — check the Codex step logs above._"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # FINDINGS — redact. Derive a non-actionable summary (finding count + overall
-      # risk only), publish that to the summary, open a redacted `security` issue,
-      # and fail the run so it is noticed. The detailed report (attack/impact/paths)
-      # is intentionally NOT published anywhere public; a maintainer reproduces it
-      # privately by re-running `/security-review` or this audit locally.
-      - name: Handle findings (redacted — no public disclosure)
+      # FINDINGS — open a `security` issue with the (non-sensitive) summary report and
+      # fail the run so the red ❌ is noticed. Triage is investigated with a local
+      # `/security-review`, where the actionable detail lives.
+      - name: Open issue on findings
         if: always() && steps.triage.outputs.status == 'findings'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          count="$(grep -cE '^#### [0-9]+\.' security-audit.md || true)"
-          overall="$(grep -m1 -E 'Overall risk:' security-audit.md \
-            | sed -E 's/\*\*//g; s/.*Overall risk:[[:space:]]*//; s/[[:space:]]*—.*//' \
-            | cut -c1-40)"
-          {
-            echo "## 🛡️ Security Audit — findings present (details withheld)"
-            echo
-            echo "**Findings:** ${count:-?} · **Overall risk:** ${overall:-unknown}"
-            echo
-            echo "Exploit details (attack steps, impact, file:line) are **intentionally"
-            echo "withheld** from public sinks on this open-source repo. Maintainers:"
-            echo "re-run \`/security-review\` or this audit locally to view the full"
-            echo "report, or wire a private channel (tracked follow-up)."
-          } | tee redacted.md >> "$GITHUB_STEP_SUMMARY"
           gh label create security \
             --color B60205 \
             --description "Security finding (from the Security Audit workflow or a security review)" \
             2>/dev/null || true
           date_str="$(date -u +%Y-%m-%d)"
           gh issue create \
-            --title "Security audit: ${count:-?} finding(s) — ${date_str}" \
+            --title "Security audit findings — ${date_str}" \
             --label security \
-            --body-file redacted.md
-          # Fail the run (after filing the redacted issue) so the red ❌ is noticed.
+            --body-file security-audit.md
+          # Fail the run (after filing the issue) so the red ❌ is noticed.
           exit 1
