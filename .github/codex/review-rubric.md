@@ -47,9 +47,46 @@ enforced — flag only genuine escapes; items marked **[review]** need judgement
   ignores a non-redirect 200 on form submit.
 
 ## Security & data
-- **[review]** ActionPolicy authorize every action; never widen a default scope to
-  expose soft-deleted/other-tenant rows; no secrets/tokens in code; Prawn user
-  text needs a Unicode TTF.
+
+Threat-model checklist — this repo is **open source**, so assume an attacker has
+full source access. Full trust-boundary map + per-control file pointers in
+[`doc/project/security-model.md`](../../doc/project/security-model.md); the
+dedicated pass is `/execution-plan` Step 5d + the scheduled `Security Audit`
+workflow.
+
+- **[review] Tenant isolation** — every query resolves in the **correct Apartment
+  schema**; AR lookups placed *after* an `Apartment::Tenant.switch` block run in the
+  wrong schema unless re-wrapped; signed Turbo Stream names must derive from a
+  tenant-unique uuid (that signed name **is** the channel auth boundary); never
+  widen a `default_scope` to expose other-tenant or soft-deleted rows.
+- **[review] Authorization / IDOR** — ActionPolicy `authorize` on every action;
+  `authorized_scope` gates row visibility; reject out-of-Move ids (selection-only
+  vocabulary — categories/tags/rooms); phase/state **and ownership** guards live in
+  the **shared action**, not just the controller/UI — a forged param, stale form, or
+  direct MCP call must hit the same guard. Gate on the **validated** result, not the
+  raw param (cf. the forged `source_media_id` finding).
+- **[review] Authentication** — no Rodauth bypass; verify-before-login; account
+  status checks; remember-me scoped to the org subdomain (never apex); single-use
+  session-handoff tokens; WebAuthn RP id = apex; social sign-in must not skip the
+  account-creation guards.
+- **[review] Injection & input** — strong-params re-sliced inside the action (a new
+  field must be added to the action's own ATTRS/kwargs); no SQL injection via
+  `Arel.sql` string interpolation; no new shell/command injection — the 5
+  Brakeman-ignored `system(...)` sites are **dev-only `bin/cli`** tooling and must
+  stay unreachable from any web request.
+- **[review] File upload & external egress (SSRF/data leak)** — image uploads keep
+  the magic-byte sniff + size cap (`Media::MAX_IMAGE_BYTES`) + Move-scoped signed-id
+  handshake; user text/images sent to external AI providers
+  (recognition/embedding) is an **egress boundary** — no secret/PII leakage, per-Move
+  BYO keys stay encrypted at rest.
+- **[review] Secrets** — no secrets/tokens/keys in code, fixtures, or logs;
+  per-Move API keys are encrypted attributes; prod secrets come from
+  Doppler/credentials only.
+- **[review] Output safety** — Phlex auto-escapes, but audit every
+  `raw`/`html_safe`/`sanitize`/`unsafe_raw` for XSS; Rodauth forms must carry
+  context (token/account) via **hidden fields**, never trust a client-supplied
+  tenant/account; Prawn user text needs a Unicode TTF (AFM fonts raise on accents/
+  emoji).
 
 ## Tests & seeds
 - **[review]** Cover every rendered view branch (a request spec can miss a Phlex
