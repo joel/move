@@ -144,6 +144,37 @@ Run the design agents in proportion to the work — don't over-process a one-lin
      mirrored into `AGENTS.md` so the `/code-review` CR loop (Step 5c) enforces them;
      there is **no official UX-review plugin**, so UI-heavy changes also warrant a
      focused UX-critic agent run (`ux-conventions.md` as the rubric).
+  4b. **Concurrency & failure-mode pre-mortem — REQUIRED for any feature that is
+     async / job-backed, broadcasts over ActionCable, makes an external or *paid*
+     call, or mutates shared state under concurrency.** This is the cheapest place
+     to catch the bugs the Codex loop otherwise surfaces one-at-a-time over many
+     rounds (the items/photos image-generation feature took **10 rounds**, almost
+     all of them this class: double-spend ×2, claim staleness, transport-error
+     handling, stale broadcasts, viewer-visible mutating controls). Answer these
+     **before coding**, and make the answers requirements the architect blueprint
+     must encode:
+     - **Double-submit / re-entrancy** — two tabs, a double-click, a Turbo retry: is
+       there an atomic claim/guard *before* any expensive or paid side effect (not
+       just before the DB write)? Where is it taken — the synchronous entry point,
+       so the in-flight state is observable to the response?
+     - **External / paid call** — what's the cost of doing it twice? Timeout, non-2xx,
+       transport error (`Net::*`/`Errno`/SSL), and malformed-but-2xx body: does each
+       convert to a handled failure that **releases any claim** and reverts the UI?
+     - **Async ordering** — the job's broadcast vs the request's own response: can
+       they arrive out of order and leave a stale/al­ready-superseded view? Does a
+       reload/revisit mid-flight reflect the persisted state (not a forced one)?
+     - **Multi-viewer / role** — a broadcast is one payload to every subscriber: does
+       it ever carry a mutating affordance a read-only viewer shouldn't see? (Gate by
+       role, don't toggle a flag per finding.)
+     - **Lease / TTL & crash recovery** — if you use an in-flight claim with a TTL,
+       is the TTL comfortably > max job runtime, and what happens at the boundary
+       (claim goes stale *mid-run*)? Decide explicitly what's fixed vs. an accepted,
+       documented limitation.
+
+     Prefer **one principled model** (a state machine / a single atomic claim +
+     token) over patching adjacent interleavings — that is what ends the
+     whack-a-mole. Record the chosen model and any accepted limitation in the issue
+     plan (Step 1).
   5. Launch **2–3 `feature-dev:code-architect`** agents in parallel (minimal-change,
      clean-architecture, pragmatic-balance). Pick one, with reasoning; confirm the
      approach with the user.
@@ -557,17 +588,18 @@ surface. When you see it:
   async/optimistic-UI behaviour keep leaking the *adjacent* interleaving; one correct
   model ends the whack-a-mole. (This session: abort → serialize → abandon-queue patches
   each surfaced the next edge; a convergence state machine subsumed them all.)
-- **Surface the diminishing return to the user explicitly and recommend a stop** —
-  merge-on-next-clean, or accept further nits as known/tracked rather than fix them.
-  This is the user's call (it trades polish vs. cost); don't silently keep cycling, and
-  don't silently stop. Codex *will* keep finding ever-smaller things — "clean" on a
-  living controller is not guaranteed on any finite round.
-- Once the user says "accept further nits / merge on clean," a new Codex comment is
-  **resolved by acknowledgement** (reply that it's an accepted nit — fixed-later or
-  won't-fix with the rationale — and resolve the thread). It does **not** gate the
-  merge: branch protection gates on CI (`lint`/`test`) + `mergeStateStatus`, not on
-  Codex. The agent normally never merges, but the repo owner can explicitly authorize a
-  specific merge ("merge on clean") — that authorization is for that merge only.
+- **Make the stop call yourself — don't wait for the user.** When the signature
+  appears, decide: fix real findings, but once they degrade to contrived nits,
+  accept the remainder as known/tracked rather than spin another full cycle per nit.
+  Codex *will* keep finding ever-smaller things — "clean" on a living surface is not
+  guaranteed on any finite round, so a perfect verdict is not the bar; correct,
+  well-tested code is. State the call in your reply/summary (what you fixed, what
+  you accepted and why) so it's a conscious, recorded decision — just don't pause
+  for approval to make it.
+- An accepted nit is **resolved by acknowledgement** (reply that it's accepted —
+  fixed-later or won't-fix, with the rationale — and resolve the thread). It does
+  **not** gate the merge: branch protection gates on CI (`lint`/`test`) +
+  `mergeStateStatus`, not on Codex severity.
 
 Practical notes:
 - **Codex drops rapid-fire triggers** — firing `@codex review` repeatedly in quick
@@ -685,6 +717,29 @@ mutation {
 }'
 ```
 
+### Step 11c: Merge the PR (the agent merges — no human gate)
+
+Drive the workflow start to end: once the **objective gate** is green, the agent
+merges the PR itself — do **not** pause for human validation. The gate is:
+
+- CI required checks green on HEAD (`lint` + `test`),
+- `mergeStateStatus: CLEAN` (and `MERGEABLE`),
+- **0 unresolved review threads** (every human/Codex thread fixed or
+  accepted-and-resolved per the stop rule), and
+- the latest Codex verdict is clean **or** the remaining items are accepted nits
+  you've consciously resolved.
+
+```bash
+gh pr merge <PR> --repo <owner>/<repo> --squash
+```
+
+> This intentionally **removes the old "a human merges; the agent never does"
+> constraint** — with the flow proven, we don't slow down for approval. The gate
+> above is the safety net (branch protection still enforces CI + `mergeStateStatus`
+> server-side). If something goes wrong, we adjust the execution plan rather than
+> re-adding a manual checkpoint. Docs-only / path-ignored PRs that sit `BLOCKED`
+> with no failing checks are admin-merged (`--admin`) per the docs-PR convention.
+
 ### Step 12: Move Issue to Done (after merge)
 
 ```bash
@@ -697,7 +752,7 @@ gh project item-edit \
 
 ### Step 13: Tag `main` & Publish Release (OPTIONAL — after merge)
 
-If your project versions releases, tag/publish a release after the PR is merged to `main` (a human merges; the agent never does). Order: do this **immediately after merge**, then Step 12 (Done). Follow whatever release policy the project's development-workflow doc defines.
+If your project versions releases, tag/publish a release after the PR is merged to `main` (the agent merges — Step 11c). Order: do this **immediately after merge**, then Step 12 (Done). Follow whatever release policy the project's development-workflow doc defines.
 
 > **Fill out the CHANGELOG *before* you tag.** If the project keeps a curated
 > changelog (e.g. `CHANGELOG.md`, Keep a Changelog format), add the new version's
@@ -768,7 +823,7 @@ and expensive to reconstruct later.
 10. gh project item-edit                               → Move to In Review
 10b. wait for + check Codex review (proactively!)      → chatgpt-codex-connector[bot]
 11. gh api .../comments (+ log replies in audit log)   → Reply + resolve threads (human + Codex)
-12. <human rebase-and-merges the PR to main>           → Merge
+12. gh pr merge --squash (agent; gate: CI green + CLEAN + 0 unresolved) → Merge (no human gate)
 13. fill CHANGELOG → gh release create (OPTIONAL)      → Changelog entry FIRST, then tag main + publish
 14. gh project item-edit + final summary in audit log  → Move to Done
 15. save to agent memory + project docs + follow-ups   → Persist what's worth keeping before context reset
