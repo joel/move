@@ -58,10 +58,11 @@ RSpec.describe RecognitionProviders::Gemini do
 
     body = sent_body
     aggregate_failures do
-      expect(sent_request.path).to include("models/gemini-2.5-flash:generateContent")
+      expect(sent_request.path).to include("models/gemini-3.5-flash:generateContent")
       expect(sent_request["x-goog-api-key"]).to eq("g-test")
       gen = body["generationConfig"]
       expect(gen["responseMimeType"]).to eq("application/json")
+      expect(gen.dig("thinkingConfig", "thinkingLevel")).to eq("medium")
       items = gen.dig("responseSchema", "properties", "objects", "items")
       expect(items["required"]).to contain_exactly("label", "confidence")
       expect(items["properties"].keys).to contain_exactly("label", "confidence")

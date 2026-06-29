@@ -58,6 +58,7 @@ module RecognitionProviders
       {
         model: model,
         max_tokens: 2048, # a very full box can produce a long objects array
+        temperature: 0,   # extraction, not creativity — keep labels stable run-to-run
         tool_choice: { type: "tool", name: TOOL_NAME },
         tools: [{
           name: TOOL_NAME,

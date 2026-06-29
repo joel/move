@@ -8,10 +8,17 @@ module RecognitionProviders
   # response upward.
   class Openai < Base
     ENDPOINT = "https://api.openai.com/v1/chat/completions"
-    # GPT-5 mini: flagship-family vision + strict structured outputs at mini-tier
-    # cost. (gpt-4o-mini was prev-gen.) The default when a Move sets no override
-    # (#187 — Move#openai_model wins over this via Base#model).
-    DEFAULT_MODEL = "gpt-5-mini"
+    # GPT-5.5: current flagship with native vision + strict structured outputs —
+    # chosen for recognition accuracy on cluttered moving photos. The default when
+    # a Move sets no override (#187 — Move#openai_model wins over this via
+    # Base#model), so cost-sensitive Moves can drop to gpt-5.5-mini / gpt-5-mini.
+    DEFAULT_MODEL = "gpt-5.5"
+    # Cluttered, real-world packing photos reward some deliberation (telling the
+    # belongings apart from the box/floor/background), so we run at the model's
+    # default "medium" reasoning rather than throttling it — recognition accuracy
+    # is the priority for the flagship default. Cost-sensitive Moves can pick a
+    # cheaper model override; the effort stays consistent across models.
+    REASONING_EFFORT = "medium"
 
     def identify(image:, context:)
       key = api_key!
@@ -48,6 +55,7 @@ module RecognitionProviders
       img = encoded_image(image)
       {
         model: model,
+        reasoning_effort: REASONING_EFFORT,
         messages: [{
           role: "user",
           content: [

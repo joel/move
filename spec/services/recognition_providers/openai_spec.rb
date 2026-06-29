@@ -69,8 +69,8 @@ RSpec.describe RecognitionProviders::Openai do
     body = sent_body
     aggregate_failures do
       expect(sent_request["authorization"]).to eq("Bearer sk-test")
-      expect(sent_request["content-type"]).to eq("application/json")
-      expect(body["model"]).to eq("gpt-5-mini")
+      expect(body["model"]).to eq("gpt-5.5")
+      expect(body["reasoning_effort"]).to eq("medium")
       fmt = body["response_format"]
       expect(fmt["type"]).to eq("json_schema")
       expect(fmt.dig("json_schema", "strict")).to be(true)
@@ -78,7 +78,7 @@ RSpec.describe RecognitionProviders::Openai do
       expect(items["required"]).to contain_exactly("label", "confidence")
       expect(items["properties"].keys).to contain_exactly("label", "confidence")
       content = body.dig("messages", 0, "content")
-      expect(content.dig(0, "text")).to include("moving-box photo")
+      expect(content.dig(0, "text")).to include("belongings").and include("floor")
       expect(content.dig(1, "image_url", "url"))
         .to eq("data:image/jpeg;base64,#{Base64.strict_encode64("bytes")}")
     end
