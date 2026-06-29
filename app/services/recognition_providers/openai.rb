@@ -53,9 +53,8 @@ module RecognitionProviders
 
     def body(model, image, context)
       img = encoded_image(image)
-      {
+      params = {
         model: model,
-        reasoning_effort: REASONING_EFFORT,
         messages: [{
           role: "user",
           content: [
@@ -71,6 +70,15 @@ module RecognitionProviders
           json_schema: { name: "detected_objects", strict: true, schema: OBJECTS_SCHEMA }
         }
       }
+      # Only the reasoning families (gpt-5*, o-series) accept reasoning_effort; a
+      # Move may override the model to a non-reasoning chat model (e.g. gpt-4o-mini)
+      # that would reject the field, so gate it rather than send it unconditionally.
+      params[:reasoning_effort] = REASONING_EFFORT if reasoning_model?(model)
+      params
+    end
+
+    def reasoning_model?(model)
+      model.to_s.match?(/\A(gpt-5|o\d)/)
     end
   end
 end

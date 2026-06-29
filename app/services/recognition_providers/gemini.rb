@@ -81,6 +81,15 @@ module RecognitionProviders
     # so don't "correct" these to snake_case — keep one consistent style.
     def body(image, context)
       img = encoded_image(image)
+      generation = {
+        responseMimeType: "application/json",
+        responseSchema: GEMINI_SCHEMA
+      }
+      # thinkingLevel is a Gemini 3+ field; the 2.5 family uses the older integer
+      # thinkingBudget. A Move may override the model to a 2.5-family string, which
+      # would reject thinkingLevel, so only send it for Gemini 3+ (older models
+      # just run with their default thinking).
+      generation[:thinkingConfig] = { thinkingLevel: THINKING_LEVEL } if thinking_level_model?(model)
       {
         contents: [{
           role: "user",
@@ -89,12 +98,13 @@ module RecognitionProviders
             { inlineData: { mimeType: img[:media_type], data: img[:base64] } }
           ]
         }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: GEMINI_SCHEMA,
-          thinkingConfig: { thinkingLevel: THINKING_LEVEL }
-        }
+        generationConfig: generation
       }
+    end
+
+    # Gemini 3+ accepts the thinkingLevel enum; 2.5 and earlier do not.
+    def thinking_level_model?(model)
+      (model.to_s[/\Agemini-(\d+)/, 1] || 0).to_i >= 3
     end
   end
 end

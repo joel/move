@@ -72,6 +72,18 @@ RSpec.describe RecognitionProviders::Gemini do
     end
   end
 
+  it "omits thinkingConfig for a Gemini 2.5-family override (uses thinkingBudget, not thinkingLevel)" do
+    stub_http(code: "200", body: content_response({ objects: [] }.to_json))
+
+    described_class.new(api_key: "g-test", model: "gemini-2.5-flash")
+                   .identify(image: image, context: context)
+
+    aggregate_failures do
+      expect(sent_request.path).to include("models/gemini-2.5-flash:generateContent")
+      expect(sent_body["generationConfig"]).not_to have_key("thinkingConfig")
+    end
+  end
+
   it "normalizes a responseSchema objects payload" do
     content = { objects: [{ label: "drill", confidence: 0.95 }] }.to_json
     stub_http(code: "200", body: content_response(content))
