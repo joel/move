@@ -45,4 +45,36 @@ class Item < ApplicationRecord
   def removed?
     presence_state == "removed"
   end
+
+  # A claim older than this is treated as abandoned (a crashed generation job),
+  # so the item is generatable again and the UI stops showing "generating" (#416).
+  IMAGE_CLAIM_TTL = 5.minutes
+
+  # Whether an image generation is currently in flight (a fresh, non-stale claim)
+  # — drives the card's generating state on reload, and the generatable guard.
+  def image_generating?
+    image_generating_at.present? && image_generating_at > IMAGE_CLAIM_TTL.ago
+  end
+
+  # Atomically claim this item for image generation (#416): a single UPDATE that
+  # succeeds only when no photo exists and no fresh claim is held. Concurrent
+  # callers race on one row — exactly one wins. Returns the claim timestamp on a
+  # win (the controller passes it to the job as a token), else nil. Reclaimable
+  # after IMAGE_CLAIM_TTL so a crashed job self-heals; taken at the synchronous
+  # entry point (the controller) so the in-flight state is observable on render.
+  def claim_image_generation!
+    now = Time.current
+    rows = self.class.where(id: id, source_media_id: nil)
+               .where("image_generating_at IS NULL OR image_generating_at < ?", IMAGE_CLAIM_TTL.ago)
+               .update_all(image_generating_at: now) # rubocop:disable Rails/SkipsModelValidations
+    rows == 1 ? now : nil
+  end
+
+  # Whether the item still holds this exact claim — the job verifies its token
+  # before the (paid) vendor call, so a stale-reclaimed duplicate (queue backed up
+  # past the TTL → a second click re-claimed) bails instead of double-spending
+  # (#416). Second precision is ample: a duplicate only arises ≥ TTL apart.
+  def holds_image_claim?(claimed_at)
+    image_generating_at.present? && image_generating_at.to_i == claimed_at.to_i
+  end
 end

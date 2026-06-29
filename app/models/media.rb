@@ -11,7 +11,11 @@ class Media < ApplicationRecord
   include Discardable
 
   MEDIA_TYPES = %w[image].freeze
-  CAPTURED_VIA = %w[web mcp].freeze
+  # web/mcp = a real captured upload; generated = an AI image made for a manual
+  # item (#416). "generated" is deliberately kept out of the recognition/prewarm
+  # pipeline (which keys off media.captured), so a generated photo never re-enters
+  # recognition.
+  CAPTURED_VIA = %w[web mcp generated].freeze
 
   # The formats actually *stored* — what every display surface and the vision
   # providers can read. This is a storage backstop: uploads are normalized by
@@ -72,6 +76,10 @@ class Media < ApplicationRecord
   end
 
   scope :recent_first, -> { order(captured_at: :desc) }
+  # Real captures only — excludes AI-generated images (#416), which never had a
+  # recognition run and so must stay out of the per-photo review walk + the
+  # "all reviewed" badge.
+  scope :not_generated, -> { where.not(captured_via: "generated") }
 
   # The latest run's status drives the per-image recognition badge.
   def recognition_state

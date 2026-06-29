@@ -10,6 +10,8 @@ module Views
     # so BoxesController#transition can stream a lifecycle change in place (status
     # chip + action buttons + contents) without reloading the page (#389).
     class Show < Views::Base
+      include Phlex::Rails::Helpers::TurboStreamFrom
+
       # Stable id wrapping the whole detail so BoxesController#transition can
       # re-stream it after a lifecycle change — a transition to `unpacked`
       # cascades the in-box items to removed, so the inventory + gallery badges
@@ -38,7 +40,14 @@ module Views
       end
 
       def view_template
-        div(id: ID, class: "flex flex-col gap-section-gap") do
+        # data-editable gates editor-only controls inside this surface via CSS
+        # (.editable-only), so a shared Turbo Stream card swap can carry the
+        # generate/retry button without ever showing it to a read-only viewer
+        # (#416). String, not boolean — Phlex omits a boolean-false attribute.
+        div(id: ID, data: { editable: @editable.to_s }, class: "flex flex-col gap-section-gap") do
+          # Live card swaps for the opt-in image generation (#416): the job
+          # broadcasts the replaced ItemCard to this box-scoped stream.
+          turbo_stream_from(@box, :contents)
           back_link
           render Components::Boxes::HeaderBento.new(move: @move, box: @box, editable: @editable)
           review_banner if @reviewable

@@ -255,13 +255,36 @@ class BoxesController < MoveScopedController
   # the inventory and the gallery badges together; a transition to `unpacked`
   # cascades the in-box items to removed).
   def box_show_view
-    items = authorized_scope(@box.items).in_box
-    review_media_ids = @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
+    scope = authorized_scope(@box.items).in_box
+    items = scope.ordered.to_a
+    # Generated images are item images, not gallery photos — they render through
+    # ItemCard, never as a photo card. Excluding them here makes a generated item
+    # "standalone" (its source isn't a gallery photo), so it shows as an ItemCard
+    # with its image + a working item-detail link, not an inert photo tile (#416).
+    box_media_ids = @box.media.not_generated.ids
+    # Preload source_media (+ blob) for ONLY the standalone foreign-source items —
+    # those render their own thumbnail in an ItemCard (#416). Manual items have a
+    # nil source (no query), and photo-backed items aren't standalone (never touch
+    # it), so eager-loading the whole set would be wasted work Bullet rightly flags.
+    foreign = items.select { |i| i.source_media_id && box_media_ids.exclude?(i.source_media_id) }
+    if foreign.any?
+      ActiveRecord::Associations::Preloader.new(
+        records: foreign, associations: { source_media: { image_attachment: :blob } }
+      ).call
+    end
+    # The box's real-capture photos that produced an item — the review walk's
+    # membership. not_generated excludes AI-generated item images (#416): they
+    # never had a recognition run, so they must not be review-walkable nor flip
+    # the box to an "all reviewed" state.
+    review_media_ids = @box.media.not_generated
+                           .where(id: @box.items.where.not(source_media_id: nil).select(:source_media_id))
+                           .ids
     Views::Boxes::Show.new(
-      move: @move, box: @box, items: items.ordered,
+      move: @move, box: @box, items: items,
+      # Gallery photos only (not_generated): generated images render via ItemCard.
       # Preload the blob so the grid's :thumb variant proxy URLs don't N+1 the blob.
-      media: @box.media.includes(image_attachment: :blob).recent_first,
-      editable: editable_move?, pending_count: unreviewed_count(items),
+      media: @box.media.not_generated.includes(image_attachment: :blob).recent_first,
+      editable: editable_move?, pending_count: unreviewed_count(scope),
       # Whether this box has at least one of ITS OWN photos that produced an item —
       # the per-photo review walk's membership (mirrors ReviewsController#review_media,
       # which intersects with @box.media so a moved-in item's foreign source photo

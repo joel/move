@@ -275,6 +275,73 @@ RSpec.describe "Boxes" do
       expect(response.body).to include(I18n.t("items.state.needs_correction"))
     end
 
+    it "keeps an AI-generated item image out of the review walk (#416)" do
+      box = create(:box, move:, number: "1")
+      generated = create(:media, move:, box:, captured_via: "generated")
+      create(:item, :manual, move:, box:, source_media: generated, name: "Brass lamp")
+
+      get move_box_path(move, box)
+
+      # The generated photo never had recognition, so it must not link into review
+      # nor flip the box to a reviewed state.
+      expect(response.body).not_to include(move_box_review_photo_path(move, box, media_id: generated.id))
+      expect(response.body).not_to include(I18n.t("boxes.show.review_complete"))
+    end
+
+    it "renders a generated-image item through its own card linking to the item detail (#416)" do
+      box = create(:box, move:, number: "1")
+      generated = create(:media, move:, box:, captured_via: "generated")
+      item = create(:item, :manual, move:, box:, source_media: generated, name: "Brass lamp")
+
+      get move_box_path(move, box)
+
+      # Not a gallery photo card — the item's own ItemCard, with a working detail link.
+      expect(response.body).to include(Components::Boxes::ItemCard.dom_id(item))
+      expect(response.body).to include(%(href="#{move_item_path(move, item)}"))
+    end
+
+    it "shows the generating state (no generate button) for an item with a fresh claim (#416)" do
+      move.update!(image_provider: "fake") # image-ready, so the button would otherwise show
+      box = create(:box, move:, number: "1")
+      create(:item, :manual, move:, box:, name: "Lamp", image_generating_at: Time.current)
+
+      get move_box_path(move, box)
+
+      expect(response.body).to include(I18n.t("boxes.contents.generating"))
+      expect(response.body).not_to include(I18n.t("boxes.contents.generate"))
+    end
+
+    it "gates the generate button by role via data-editable (one broadcast, role-safe) (#416)" do
+      move.update!(image_provider: "fake")
+      box = create(:box, move:, number: "1")
+      create(:item, :manual, move:, box:, name: "Lamp")
+
+      get move_box_path(move, box)
+
+      # Editor: the surface is data-editable=true and the button rides in an
+      # .editable-only wrapper (CSS shows it here, hides it for a read-only viewer).
+      aggregate_failures do
+        expect(response.body).to include('data-editable="true"')
+        expect(response.body).to include("editable-only")
+        expect(response.body).to include(I18n.t("boxes.contents.generate"))
+      end
+    end
+
+    it "marks the box surface read-only for a viewer so CSS hides the generate button (#416)" do
+      move.update!(image_provider: "fake")
+      box = create(:box, move:, number: "1")
+      create(:item, :manual, move:, box:, name: "Lamp")
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+
+      get move_box_path(move, box)
+
+      # data-editable=false → the .editable-only generate button is CSS-hidden, and
+      # the route stays guarded by require_writable_move! regardless.
+      expect(response.body).to include('data-editable="false"')
+    end
+
     it "links a settled orphaned photo (failed) to recovery, but not one still in flight" do
       box = create(:box, move:, number: "1")
       failed = create(:media, move:, box:)

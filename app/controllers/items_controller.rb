@@ -6,8 +6,9 @@
 # authorize, call the action, pattern-match, render.
 class ItemsController < MoveScopedController
   before_action :set_box, only: %i[new create]
-  before_action :set_item, only: %i[show update destroy move mark_removed restore]
-  before_action :require_writable_move!, only: %i[new create update destroy move mark_removed restore]
+  before_action :set_item, only: %i[show update destroy move mark_removed restore generate_image]
+  before_action :require_writable_move!,
+                only: %i[new create update destroy move mark_removed restore generate_image]
 
   # GET /moves/:move_id/items/:id
   def show
@@ -155,7 +156,42 @@ class ItemsController < MoveScopedController
     respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".restored")] }
   end
 
+  # POST /moves/:move_id/items/:id/generate_image (#416)
+  # Claims the item (atomic) and enqueues the slow vendor call off the request
+  # path, then swaps the box-contents card to its current state; the job's
+  # broadcast completes it (→ image, or a retryable failed state). Defends the
+  # hidden affordance: only a source-less item on an image-ready Move qualifies.
+  def generate_image
+    return head :unprocessable_content unless @item.source_media_id.nil? && @move.image_generation_ready?
+
+    # Claim synchronously BEFORE enqueue, so the in-flight state is observable when
+    # the response renders and only the winner of a concurrent submit enqueues the
+    # (paid) job. A loser just re-renders the card, which already reflects the claim.
+    if (claimed_at = @item.claim_image_generation!)
+      # Pass the claim token: the job verifies the item still holds THIS claim
+      # before spending, so a stale-reclaimed duplicate job can't double-spend.
+      Items::GenerateImageJob.perform_later(
+        @item.id, tenant: Apartment::Tenant.current, actor_id: current_user&.id, claimed_at: claimed_at.to_i
+      )
+    end
+
+    respond_with_streams(item_card_stream, redirect: move_box_path(@move, @item.box))
+  end
+
   private
+
+  # Render the card in whatever state it is NOW (reload): claimed → generating; an
+  # inline/very-fast job that already attached → image; an inline failure that
+  # released the claim → the retryable placeholder. ItemCard derives generating
+  # from the persisted claim, so the response never overwrites a completed/failed
+  # card with a stale spinner (#416 Codex).
+  def item_card_stream
+    @item.reload
+    [turbo_stream.replace(
+      Components::Boxes::ItemCard.dom_id(@item),
+      view_context.render(Components::Boxes::ItemCard.new(item: @item, move: @move, image_ready: true))
+    )]
+  end
 
   # Turbo Stream that swaps the inline auto-save badge in the C3 header.
   def save_status_stream(state, message: nil)

@@ -119,6 +119,11 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     # dryer" recovery below) works offline; an admin flips Settings → Semantic
     # search to On (OpenAI) once a key is set, which re-embeds every item.
     m.embedding_provider = "fake"
+    # #416 — item-image generation is per-Move BYO too. The demo uses the
+    # network-free `fake` generator (a placeholder PNG, no key) so the "✨ generate
+    # image" button on a photo-less manual item works offline; an admin switches to
+    # OpenAI by adding a key in Settings (the default for a real Move).
+    m.image_provider = "fake"
   end
   # #187 — showcase a per-provider model override. The demo keeps `fake` active
   # (offline), but OpenAI is pinned to a custom model: switching the provider pill
@@ -129,6 +134,10 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   # (default is 2: lid + side), so Settings → Move Preferences shows the select on
   # "3" and both label prints emit 3 pages per box. Idempotent.
   move.update!(labels_per_box: 3) unless move.labels_per_box == 3
+  # #416 — keep the demo on the network-free `fake` image generator on re-seed too
+  # (the create-block above only runs on first create), so the "✨ generate image"
+  # affordance is always showcasable offline.
+  move.update!(image_provider: "fake") unless move.image_provider == "fake"
   # #242 — showcase the shared "AI Capability" panel. Placeholder keys (never
   # real) for three vendors so the panel renders "Key set ••••" rows and the
   # Recognition/Semantic Search selectors light up their keyed options; Anthropic

@@ -65,7 +65,11 @@ module Components
         div(class: "grid grid-cols-2 gap-3 sm:grid-cols-3") do
           @media.each { |media| photo_card(media) }
           # Standalone items most-recent first (items arrive created-ascending).
-          @standalone_items.reverse_each { |item| standalone_card(item) }
+          @standalone_items.reverse_each do |item|
+            render Components::Boxes::ItemCard.new(
+              item: item, move: @move, image_ready: @move.image_generation_ready?
+            )
+          end
         end
       end
 
@@ -79,29 +83,6 @@ module Components
           tile(media)
           names_caption(@items_by_media[media.id] || [])
         end
-      end
-
-      # A photo-less item: a manually-added one (labelled "Added manually") or an
-      # item moved in from another box, whose source photo lives elsewhere. Carries
-      # a review-state chip for the attention states (pending_review /
-      # needs_correction) — this card is the only box-detail affordance for a
-      # source-less item, since the photo-review CTA can't cover it (Codex).
-      def standalone_card(item)
-        a(href: move_item_path(@move, item), class: card_classes(interactive: true)) do
-          placeholder_tile
-          div(class: "flex flex-col gap-1.5 p-2") do
-            span(class: "truncate text-body-md font-semibold text-text-warm") { item.name }
-            if needs_attention?(item)
-              render Components::ItemStateBadge.new(item: item)
-            elsif item.source_media_id.nil?
-              span(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.contents.added_manually") }
-            end
-          end
-        end
-      end
-
-      def needs_attention?(item)
-        %w[pending_review needs_correction].include?(item.review_state)
       end
 
       # The names recognised in this photo, as wrapping chips (capped). A photo with
@@ -127,10 +108,6 @@ module Components
           unpacked_badge(media)
           recovery_badge(media)
         end
-      end
-
-      def placeholder_tile
-        div(class: tile_classes) { render Components::Icons::Boxes.new(css: "h-7 w-7") }
       end
 
       def image(media)
