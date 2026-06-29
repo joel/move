@@ -5,6 +5,17 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.67.0] — 2026-06-29
+
+### Added
+- **Gallery — browse every photo in a Move.** A new **Gallery** page (reached
+  from the Menu) shows every photo across the whole Move in one recent-first
+  grid, with each tile labelled by its box and room. Filter by room or switch to
+  oldest-first, and tap any photo to open a full-screen lightbox you can step
+  through with arrow keys or the on-screen controls, with a link straight to the
+  photo's box. AI-generated item images appear too, marked with a ✨ Generated
+  badge (#422).
+
 ## [v0.66.0] — 2026-06-29
 
 ### Added
