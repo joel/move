@@ -34,13 +34,28 @@ module Components
           type: "button",
           aria_label: caption(media),
           data: tile_data(media),
-          class: "group relative flex aspect-square items-center justify-center overflow-hidden " \
-                 "rounded-card border border-card-border bg-surface-container-high text-muted " \
-                 "transition hover:border-accent-sage focus:outline-none " \
+          class: "group flex flex-col overflow-hidden rounded-card border border-card-border " \
+                 "bg-card text-left transition hover:border-accent-sage focus:outline-none " \
                  "focus:ring-2 focus:ring-accent-sage/40"
         ) do
-          image(media)
-          generated_badge if generated?(media)
+          div(class: image_tile_classes) do
+            image(media)
+            generated_badge if generated?(media)
+          end
+          caption_strip(media)
+        end
+      end
+
+      def image_tile_classes
+        "relative flex aspect-square items-center justify-center overflow-hidden " \
+          "bg-surface-container-high text-muted"
+      end
+
+      # The photo's location, shown beneath the image so the box/room is legible
+      # while browsing across boxes (not only on hover/tap).
+      def caption_strip(media)
+        span(class: "block truncate px-3 py-2 text-label-caps uppercase text-on-surface-variant") do
+          caption(media)
         end
       end
 
