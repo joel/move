@@ -27,17 +27,17 @@ class GalleriesController < MoveScopedController
     boxes = @move.boxes
     boxes = boxes.where(room: selected_room) if selected_room
 
+    # Apply the requested order in SQL *before* the cap, so "oldest first" reaches
+    # the genuinely oldest photos (the cap takes the first CAP of the chosen order,
+    # not always the newest). id breaks captured_at ties for a stable page.
     rows = @move.media
                 .where(box_id: boxes.select(:id))
                 .includes(box: :room, image_attachment: :blob)
-                .recent_first
+                .order(captured_at: sort_direction, id: sort_direction)
                 .limit(CAP + 1)
                 .to_a
     over_cap = rows.size > CAP
     rows = rows.first(CAP)
-    # The cap always means "most recent CAP"; oldest-first just reverses that
-    # already-bounded, already-loaded page for display (not a DB re-query).
-    rows = rows.reverse if sort_key == "oldest"
 
     render Views::Galleries::Index.new(
       move: @move, media: rows, rooms: rooms_with_photos,
@@ -57,5 +57,9 @@ class GalleriesController < MoveScopedController
 
   def sort_key
     SORTS.include?(params[:sort]) ? params[:sort] : DEFAULT_SORT
+  end
+
+  def sort_direction
+    sort_key == "oldest" ? :asc : :desc
   end
 end

@@ -40,7 +40,7 @@ module Views
 
       def cap_notice
         p(class: "text-body-md text-on-surface-variant") do
-          I18n.t("galleries.index.capped", count: GalleriesController::CAP)
+          I18n.t("galleries.index.capped.#{@sort_key}", count: GalleriesController::CAP)
         end
       end
 

@@ -101,8 +101,23 @@ RSpec.describe "Galleries" do
       create_list(:media, 2, move:, box:)
 
       get move_gallery_path(move)
+      expect(response.body).to include(I18n.t("galleries.index.capped.recent", count: 1))
 
-      expect(response.body).to include(I18n.t("galleries.index.capped", count: 1))
+      get move_gallery_path(move, sort: "oldest")
+      expect(response.body).to include(I18n.t("galleries.index.capped.oldest", count: 1))
+    end
+
+    it "takes the oldest photos (not a reversed newest window) when capped + sort=oldest" do
+      stub_const("GalleriesController::CAP", 1)
+      create(:media, move:, box: create(:box, move:, number: "1"), captured_at: 10.days.ago)
+      create(:media, move:, box: create(:box, move:, number: "2"), captured_at: 1.hour.ago)
+
+      get move_gallery_path(move, sort: "oldest")
+
+      # The single capped tile is the genuinely-oldest photo (Box 1), not the
+      # newest one reversed into view.
+      expect(response.body).to include("Box 1")
+      expect(response.body).not_to include("Box 2")
     end
 
     it "renders the empty state when the move has no photos" do
