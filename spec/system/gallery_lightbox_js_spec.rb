@@ -59,7 +59,8 @@ RSpec.describe "Gallery lightbox (JS)", :js do
     expect(page).to have_css("dialog.ha-lightbox[open]")
     expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 2/i)
     # The caption text is CSS-uppercased, so match the box link by href, not text.
-    box_two = move.boxes.find_by(number: "2")
+    # Look the box up inside the tenant — the thread has left the schema by now.
+    box_two = Apartment::Tenant.switch(slug) { move.boxes.find_by(number: "2") }
     expect(page).to have_css("a[data-lightbox-target='link'][href='#{move_box_path(move, box_two)}']")
   end
 
