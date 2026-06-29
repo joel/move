@@ -173,10 +173,17 @@ class ItemsController < MoveScopedController
   private
 
   def generating_card_stream
+    # Reflect the item's CURRENT state, not an unconditional spinner: with an
+    # inline/very-fast adapter the job can finish (and broadcast the image) before
+    # this response renders, so forcing generating:true would let the HTTP response
+    # overwrite a completed card with a spinner no job will clear. Force generating
+    # only while the photo is still absent (#416 Codex).
+    @item.reload
     [turbo_stream.replace(
       Components::Boxes::ItemCard.dom_id(@item),
       view_context.render(Components::Boxes::ItemCard.new(
-                            item: @item, move: @move, image_ready: true, generating: true
+                            item: @item, move: @move, image_ready: true,
+                            generating: @item.source_media_id.nil?
                           ))
     )]
   end

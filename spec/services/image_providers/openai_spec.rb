@@ -53,6 +53,13 @@ RSpec.describe ImageProviders::Openai do
       .to raise_error(ProviderHttp::Error, /undecodable image/)
   end
 
+  it "wraps a transport failure (timeout / socket) as a ProviderHttp::Error" do
+    allow(Net::HTTP).to receive(:start).and_raise(Net::ReadTimeout)
+
+    expect { provider.generate(prompt: "x") }
+      .to raise_error(ProviderHttp::Error, /transport error/)
+  end
+
   it "raises on a non-2xx response, surfacing the status without the key" do
     stub_http(code: "429", body: { error: { message: "Rate limit reached" } }.to_json)
 

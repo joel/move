@@ -26,6 +26,12 @@ module ProviderHttp
       uri.host, uri.port, use_ssl: true, open_timeout: open_timeout, read_timeout: read_timeout
     ) { |http| http.request(req) }
     parse_response(res)
+  rescue Timeout::Error, SocketError, SystemCallError, OpenSSL::SSL::SSLError, IOError => e
+    # A connect/read timeout or TCP/TLS failure — present it as the single boundary
+    # error type so every adapter's caller (which already handles ProviderHttp::Error)
+    # fails cleanly instead of leaking a raw Net::*/Errno exception. The class name
+    # is safe to surface; the message/body never is.
+    raise Error, "#{self.class.name} transport error (#{e.class})"
   end
 
   # 2xx → the strictly-parsed JSON body. A 2xx with a non-JSON body (e.g. an

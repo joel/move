@@ -380,6 +380,16 @@ RSpec.describe "Items" do
       end
     end
 
+    it "reflects the completed card, not a stale spinner, when the job finishes inline (#416)" do
+      # The :inline adapter runs the job during the request, so it attaches the
+      # image before the response renders; the response must show the image card,
+      # not a generating spinner that no later broadcast would clear.
+      post generate_image_move_item_path(move, item), as: :turbo_stream
+
+      expect(item.reload.source_media&.image).to be_attached
+      expect(response.body).not_to include(I18n.t("boxes.contents.generating"))
+    end
+
     it "is rejected (422) when the item already has a photo" do
       item.update!(source_media: create(:media, move:, box:))
       allow(Items::GenerateImageJob).to receive(:perform_later)
