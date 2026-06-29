@@ -16,13 +16,12 @@ module Components
     class ContentsGrid < Components::Base
       CHIP_CAP = 4 # name chips shown per photo card before collapsing to "+N more"
 
-      def initialize(move:, box:, media:, items:, editable: false, reviewable_media_ids: [],
+      def initialize(move:, box:, media:, items:, reviewable_media_ids: [],
                      recoverable_media_ids: [], unpacked_media_ids: [])
         @move = move
         @box = box
         @media = media # recent_first, blobs preloaded
         @items = items # all in-box items
-        @editable = editable
         @reviewable_media_ids = reviewable_media_ids.to_set
         @recoverable_media_ids = recoverable_media_ids.to_set
         @unpacked_media_ids = unpacked_media_ids.to_set
@@ -68,7 +67,7 @@ module Components
           # Standalone items most-recent first (items arrive created-ascending).
           @standalone_items.reverse_each do |item|
             render Components::Boxes::ItemCard.new(
-              item: item, move: @move, editable: @editable, image_ready: @move.image_generation_ready?
+              item: item, move: @move, image_ready: @move.image_generation_ready?
             )
           end
         end

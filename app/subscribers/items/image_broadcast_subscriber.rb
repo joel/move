@@ -29,18 +29,16 @@ module Items
     # A broadcast failure must never propagate (it would fail the job): isolate it
     # — worst case is a missed live swap that a reload corrects.
     def broadcast(item, failed:)
-      # On failure, render the card editable so the editor can retry in place — a
-      # transient rate-limit/error shouldn't force a reload (Codex). One HTML payload
-      # reaches every box subscriber, so a viewer would also see the retry button,
-      # but it's harmless: generate_image is guarded by require_writable_move!, so a
-      # viewer's click is rejected. The success card carries an image (no button
-      # regardless), so it stays non-editable.
+      # The failed card carries the retry button (the editor recovers in place);
+      # role is gated by CSS (.editable-only under the box detail's data-editable),
+      # so this one shared payload shows the button only to editors — a read-only
+      # viewer never sees it (#416). The success card has an image (no button).
       Turbo::StreamsChannel.broadcast_replace_to(
         item.box, :contents,
         target: Components::Boxes::ItemCard.dom_id(item),
         html: ApplicationController.render(
           Components::Boxes::ItemCard.new(
-            item: item, move: item.move, editable: failed,
+            item: item, move: item.move,
             image_ready: item.move.image_generation_ready?, failed: failed
           ),
           layout: false

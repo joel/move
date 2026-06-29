@@ -176,7 +176,7 @@ class ItemsController < MoveScopedController
     [turbo_stream.replace(
       Components::Boxes::ItemCard.dom_id(@item),
       view_context.render(Components::Boxes::ItemCard.new(
-                            item: @item, move: @move, editable: true, image_ready: true, generating: true
+                            item: @item, move: @move, image_ready: true, generating: true
                           ))
     )]
   end

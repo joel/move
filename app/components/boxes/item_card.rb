@@ -19,10 +19,9 @@ module Components
         "box_item_#{item.id}_card"
       end
 
-      def initialize(item:, move:, editable: false, image_ready: false, generating: false, failed: false)
+      def initialize(item:, move:, image_ready: false, generating: false, failed: false)
         @item = item
         @move = move
-        @editable = editable
         @image_ready = image_ready
         # Reflect a durable in-flight claim too, so a reload/revisit mid-generation
         # shows "generating" (not an idle generate button) — #416 Codex.
@@ -49,8 +48,11 @@ module Components
         @item.source_media_id.present? && @item.source_media&.image&.attached?
       end
 
+      # Role is gated by CSS (.editable-only under the box detail's data-editable),
+      # not here — so a shared broadcast can carry the button while only editors
+      # see it. We still only render it when generation is actually possible.
       def show_generate?
-        @editable && @image_ready && @item.source_media_id.nil? && !@generating
+        @image_ready && @item.source_media_id.nil? && !@generating
       end
 
       def tile
@@ -97,7 +99,7 @@ module Components
       # the anchor (invalid HTML). Posts to the generate route; Turbo swaps the card
       # to the "generating" state, then the broadcast completes it.
       def generate_control
-        div(class: "px-2 pb-2") do
+        div(class: "editable-only px-2 pb-2") do
           button_to(
             view_context.generate_image_move_item_path(@move, @item),
             method: :post,

@@ -311,6 +311,37 @@ RSpec.describe "Boxes" do
       expect(response.body).not_to include(I18n.t("boxes.contents.generate"))
     end
 
+    it "gates the generate button by role via data-editable (one broadcast, role-safe) (#416)" do
+      move.update!(image_provider: "fake")
+      box = create(:box, move:, number: "1")
+      create(:item, :manual, move:, box:, name: "Lamp")
+
+      get move_box_path(move, box)
+
+      # Editor: the surface is data-editable=true and the button rides in an
+      # .editable-only wrapper (CSS shows it here, hides it for a read-only viewer).
+      aggregate_failures do
+        expect(response.body).to include('data-editable="true"')
+        expect(response.body).to include("editable-only")
+        expect(response.body).to include(I18n.t("boxes.contents.generate"))
+      end
+    end
+
+    it "marks the box surface read-only for a viewer so CSS hides the generate button (#416)" do
+      move.update!(image_provider: "fake")
+      box = create(:box, move:, number: "1")
+      create(:item, :manual, move:, box:, name: "Lamp")
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+
+      get move_box_path(move, box)
+
+      # data-editable=false → the .editable-only generate button is CSS-hidden, and
+      # the route stays guarded by require_writable_move! regardless.
+      expect(response.body).to include('data-editable="false"')
+    end
+
     it "links a settled orphaned photo (failed) to recovery, but not one still in flight" do
       box = create(:box, move:, number: "1")
       failed = create(:media, move:, box:)

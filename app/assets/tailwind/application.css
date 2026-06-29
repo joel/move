@@ -332,6 +332,15 @@
  * Re-skinned shared component classes (used by the legacy shell).
  * ────────────────────────────────────────────────────────────────── */
 @layer components {
+  /* Editor-only affordance: kept in the DOM so a shared Turbo Stream broadcast
+     (which sends one payload to every box subscriber regardless of role) can
+     carry it, but shown only inside an editable surface — a read-only viewer
+     (data-editable="false") never sees the mutating control (#416). Clicking is
+     still server-guarded by require_writable_move!. */
+  [data-editable="false"] .editable-only {
+    display: none;
+  }
+
   /* Cards — 20px radius, tonal lift, hairline edge (no drop shadow). */
   .ha-card {
     border-radius: var(--radius-card);

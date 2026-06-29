@@ -40,7 +40,11 @@ module Views
       end
 
       def view_template
-        div(id: ID, class: "flex flex-col gap-section-gap") do
+        # data-editable gates editor-only controls inside this surface via CSS
+        # (.editable-only), so a shared Turbo Stream card swap can carry the
+        # generate/retry button without ever showing it to a read-only viewer
+        # (#416). String, not boolean — Phlex omits a boolean-false attribute.
+        div(id: ID, data: { editable: @editable.to_s }, class: "flex flex-col gap-section-gap") do
           # Live card swaps for the opt-in image generation (#416): the job
           # broadcasts the replaced ItemCard to this box-scoped stream.
           turbo_stream_from(@box, :contents)
@@ -68,7 +72,7 @@ module Views
       # old split of a separate gallery + items list.
       def detail_stack
         render Components::Boxes::ContentsGrid.new(
-          move: @move, box: @box, media: @media, items: @items, editable: @editable,
+          move: @move, box: @box, media: @media, items: @items,
           reviewable_media_ids: @reviewable_media_ids,
           recoverable_media_ids: @recoverable_media_ids, unpacked_media_ids: @unpacked_media_ids
         )
