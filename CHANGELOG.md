@@ -5,7 +5,19 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
-## [Unreleased]
+## [v0.66.0] — 2026-06-29
+
+### Added
+- **Generate an image for a hand-added item.** A manually added item with no
+  photo now offers an opt-in **"✨ Generate image"** button that creates an
+  illustrative image and fills its card in place — useful when you want a visual
+  for something you didn't photograph. It runs in the background and the card
+  updates live (no reload); a failure leaves a one-tap retry. Generation uses the
+  Move's own AI provider key (bring-your-own-key, reusing the OpenAI key that
+  already powers recognition/search), so the button only appears when a key is
+  set, and it never enters the photo-review flow (#416).
+
+## [v0.65.0] — 2026-06-28
 
 ### Changed
 - **Items and photos are now one surface — a photo-card grid.** Box contents
