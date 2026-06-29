@@ -96,6 +96,18 @@ RSpec.describe RecognitionProviders::Openai do
     end
   end
 
+  it "omits reasoning_effort for gpt-5-pro (only supports its default 'high')" do
+    stub_http(code: "200", body: content_response({ objects: [] }.to_json))
+
+    described_class.new(api_key: "sk-test", model: "gpt-5-pro")
+                   .identify(image: image, context: context)
+
+    aggregate_failures do
+      expect(sent_body["model"]).to eq("gpt-5-pro")
+      expect(sent_body).not_to have_key("reasoning_effort")
+    end
+  end
+
   it "normalizes a structured-output objects payload" do
     content = { objects: [{ label: "lamp", confidence: 0.9 }] }.to_json
     stub_http(code: "200", body: content_response(content))

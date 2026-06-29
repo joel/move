@@ -70,15 +70,23 @@ module RecognitionProviders
           json_schema: { name: "detected_objects", strict: true, schema: OBJECTS_SCHEMA }
         }
       }
-      # Only the reasoning families (gpt-5*, o-series) accept reasoning_effort; a
-      # Move may override the model to a non-reasoning chat model (e.g. gpt-4o-mini)
-      # that would reject the field, so gate it rather than send it unconditionally.
-      params[:reasoning_effort] = REASONING_EFFORT if reasoning_model?(model)
+      # A Move may override to any free-text model, so only send reasoning_effort
+      # where the value is actually accepted.
+      effort = reasoning_effort_for(model)
+      params[:reasoning_effort] = effort if effort
       params
     end
 
-    def reasoning_model?(model)
-      model.to_s.match?(/\A(gpt-5|o\d)/)
+    # Our "medium" effort, or nil when the field must be omitted:
+    # - non-reasoning chat models (e.g. gpt-4o-mini) reject reasoning_effort entirely;
+    # - gpt-5-pro only supports (and defaults to) "high", so never send "medium" to it.
+    # Reasoning families are gpt-5* and the o-series.
+    def reasoning_effort_for(model)
+      m = model.to_s
+      return nil unless m.match?(/\A(gpt-5|o\d)/)
+      return nil if m.start_with?("gpt-5-pro")
+
+      REASONING_EFFORT
     end
   end
 end
