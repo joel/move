@@ -6,8 +6,9 @@
 # authorize, call the action, pattern-match, render.
 class ItemsController < MoveScopedController
   before_action :set_box, only: %i[new create]
-  before_action :set_item, only: %i[show update destroy move mark_removed restore]
-  before_action :require_writable_move!, only: %i[new create update destroy move mark_removed restore]
+  before_action :set_item, only: %i[show update destroy move mark_removed restore generate_image]
+  before_action :require_writable_move!,
+                only: %i[new create update destroy move mark_removed restore generate_image]
 
   # GET /moves/:move_id/items/:id
   def show
@@ -155,7 +156,30 @@ class ItemsController < MoveScopedController
     respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".restored")] }
   end
 
+  # POST /moves/:move_id/items/:id/generate_image (#416)
+  # Enqueues the slow vendor call off the request path and immediately swaps the
+  # item's box-contents card to a "generating" state; the job's broadcast then
+  # completes it (→ image, or a retryable failed state). Defends the hidden
+  # affordance: only a source-less item on an image-ready Move qualifies.
+  def generate_image
+    return head :unprocessable_content unless @item.source_media_id.nil? && @move.image_generation_ready?
+
+    Items::GenerateImageJob.perform_later(
+      @item.id, tenant: Apartment::Tenant.current, actor_id: current_user&.id
+    )
+    respond_with_streams(generating_card_stream, redirect: move_box_path(@move, @item.box))
+  end
+
   private
+
+  def generating_card_stream
+    [turbo_stream.replace(
+      Components::Boxes::ItemCard.dom_id(@item),
+      view_context.render(Components::Boxes::ItemCard.new(
+                            item: @item, move: @move, editable: true, image_ready: true, generating: true
+                          ))
+    )]
+  end
 
   # Turbo Stream that swaps the inline auto-save badge in the C3 header.
   def save_status_stream(state, message: nil)

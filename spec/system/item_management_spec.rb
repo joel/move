@@ -26,6 +26,21 @@ RSpec.describe "Manual add & item detail" do
     expect(item).to have_attributes(review_state: "confirmed", created_via: "manual")
   end
 
+  it "generates an image for a photo-less manual item from its card (#416)" do
+    # Fake image provider → ready offline, so the affordance shows and the inline
+    # job attaches a real placeholder PNG (the live card swap is over ActionCable,
+    # covered by the broadcast subscriber; here we assert the end effect).
+    move.update!(image_provider: "fake")
+    item = create(:item, :manual, move:, box: source, name: "Brass lamp")
+
+    visit move_box_path(move, source)
+    expect(page).to have_button(I18n.t("boxes.contents.generate"))
+    click_button I18n.t("boxes.contents.generate")
+
+    expect(item.reload.source_media&.image).to be_attached
+    expect(item.source_media.captured_via).to eq("generated")
+  end
+
   it "presents the detail screen as an auto-saving form with no Save button (C3)" do
     item = create(:item, :manual, move:, box: source, name: "Old")
 

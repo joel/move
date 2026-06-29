@@ -44,6 +44,10 @@ en:
       more: "+%{count} more"
       empty_title: "No items yet"
       empty_description: "Capture a photo or add an item manually to fill this box."
+      # #416 — opt-in "✨ generate image" for a photo-less manual item.
+      generate: "✨ Generate image"
+      generating: "Generating…"
+      generate_failed: "Couldn't generate — try again"
     status:
       packing: "Packing"
       sealed: "Sealed"

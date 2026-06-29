@@ -84,6 +84,8 @@ Rails.application.routes.draw do
         patch :move
         patch :mark_removed
         patch :restore
+        # #416 — opt-in "✨ generate image" for a photo-less manual item.
+        post :generate_image
       end
     end
     # D2 — Controlled vocabularies (categories / tags / rooms). One controller

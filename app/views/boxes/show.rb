@@ -10,6 +10,8 @@ module Views
     # so BoxesController#transition can stream a lifecycle change in place (status
     # chip + action buttons + contents) without reloading the page (#389).
     class Show < Views::Base
+      include Phlex::Rails::Helpers::TurboStreamFrom
+
       # Stable id wrapping the whole detail so BoxesController#transition can
       # re-stream it after a lifecycle change — a transition to `unpacked`
       # cascades the in-box items to removed, so the inventory + gallery badges
@@ -39,6 +41,9 @@ module Views
 
       def view_template
         div(id: ID, class: "flex flex-col gap-section-gap") do
+          # Live card swaps for the opt-in image generation (#416): the job
+          # broadcasts the replaced ItemCard to this box-scoped stream.
+          turbo_stream_from(@box, :contents)
           back_link
           render Components::Boxes::HeaderBento.new(move: @move, box: @box, editable: @editable)
           review_banner if @reviewable
@@ -63,7 +68,7 @@ module Views
       # old split of a separate gallery + items list.
       def detail_stack
         render Components::Boxes::ContentsGrid.new(
-          move: @move, box: @box, media: @media, items: @items,
+          move: @move, box: @box, media: @media, items: @items, editable: @editable,
           reviewable_media_ids: @reviewable_media_ids,
           recoverable_media_ids: @recoverable_media_ids, unpacked_media_ids: @unpacked_media_ids
         )
