@@ -578,6 +578,28 @@
       animation: none;
     }
   }
+
+  /* Native <dialog> lightbox (Gallery) — a full-viewport photo viewer over a
+   * heavy dimmed/blurred backdrop. showModal() gives focus-trap, Escape and the
+   * ::backdrop for free; the dialog itself is transparent and borderless so the
+   * contained :detail <img> floats centred. The grid tile supplies the src on
+   * open (lazy — detail variants are only fetched when a photo is viewed). */
+  .ha-lightbox {
+    width: 100vw;
+    height: 100dvh;
+    max-width: 100vw;
+    max-height: 100dvh;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--c-text-warm);
+  }
+
+  .ha-lightbox::backdrop {
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(4px);
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────────
