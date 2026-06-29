@@ -10,19 +10,28 @@ module Items
   # turns a Failure into an `item.image_generation_failed` event so the card
   # reverts — generation must never corrupt the item.
   class GenerateImage < BaseAction
+    # A claim older than this is treated as abandoned (a crashed job) and may be
+    # re-taken, so an item can never wedge in "generating". Comfortably exceeds the
+    # provider read timeout (120s).
+    CLAIM_TTL = 5.minutes
+
     def call(item:, actor: nil)
       yield ensure_writable(item.move)
       yield ensure_generatable(item)
+      yield claim(item) # durable, atomic — taken BEFORE the paid vendor call
 
       media = generate_and_attach(item)
       emit_generated(item, media, actor) if media # nil = lost a concurrent race; the winner emitted
       Success(item)
     rescue ImageProviders::Base::MissingApiKey
+      release(item)
       emit_failed(item, actor, :missing_key)
     rescue ProviderHttp::Error => e
+      release(item)
       Rails.logger.warn("[items.generate_image] provider failed for item #{item.id}: #{e.message}")
       emit_failed(item, actor, :generation_failed)
     rescue ActiveRecord::RecordInvalid => e
+      release(item)
       emit_failed(item, actor, e.record.errors)
     end
 
@@ -36,6 +45,24 @@ module Items
       Success()
     end
 
+    # Atomically claim the item before spending on the vendor: a single UPDATE
+    # that only succeeds if no photo exists and no fresh claim is held. A
+    # concurrent submit gets 0 rows → Failure(:already_generating) and bails before
+    # the provider call, so one action incurs at most one paid generation (#416
+    # Codex). Reclaimable after CLAIM_TTL so a crashed job self-heals.
+    def claim(item)
+      claimed = Item.where(id: item.id, source_media_id: nil)
+                    .where("image_generating_at IS NULL OR image_generating_at < ?", CLAIM_TTL.ago)
+                    .update_all(image_generating_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+      claimed == 1 ? Success() : Failure(:already_generating)
+    end
+
+    # Drop the claim so a failed generation can be retried immediately (success
+    # clears it inside the attach transaction instead).
+    def release(item)
+      item.update_columns(image_generating_at: nil) # rubocop:disable Rails/SkipsModelValidations
+    end
+
     def generate_and_attach(item)
       result = ImageProviders.for_move(item.move).generate(prompt: prompt_for(item))
       # Serialize concurrent generations and commit the Media + link atomically: a
@@ -47,7 +74,7 @@ module Items
         next nil if item.source_media_id.present?
 
         media = build_media(item, result)
-        item.update!(source_media: media)
+        item.update!(source_media: media, image_generating_at: nil) # link + clear the claim atomically
         media
       end
     end

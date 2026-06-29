@@ -44,4 +44,32 @@ RSpec.describe Items::GenerateImage do
     move.update!(status: "archived")
     expect(described_class.new.call(item:).failure).to eq(:move_archived)
   end
+
+  it "bails without spending when a fresh in-progress claim is held (no duplicate paid call)" do
+    item.update!(image_generating_at: Time.current) # a concurrent job already claimed it
+    allow(ImageProviders).to receive(:for_move)
+
+    result = described_class.new.call(item:)
+
+    expect(result.failure).to eq(:already_generating)
+    expect(ImageProviders).not_to have_received(:for_move) # never reached the vendor
+    expect(item.reload.source_media_id).to be_nil
+  end
+
+  it "reclaims a stale (abandoned) claim so a crashed job self-heals" do
+    item.update!(image_generating_at: (described_class::CLAIM_TTL + 1.minute).ago)
+
+    expect(described_class.new.call(item:)).to be_success
+    expect(item.reload.source_media&.image).to be_attached
+  end
+
+  it "releases the claim on failure so a retry can re-claim immediately" do
+    boom = instance_double(ImageProviders::Fake)
+    allow(boom).to receive(:generate).and_raise(ProviderHttp::Error, "boom")
+    allow(ImageProviders).to receive(:for_move).and_return(boom)
+
+    described_class.new.call(item:)
+
+    expect(item.reload.image_generating_at).to be_nil
+  end
 end
