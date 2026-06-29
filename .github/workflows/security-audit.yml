@@ -57,13 +57,15 @@ jobs:
           prompt-file: .github/codex/security-audit-prompt.md
           output-file: security-audit.md
 
-      # The report is NON-SENSITIVE BY CONSTRUCTION: the prompt forbids file paths,
-      # line numbers, code, attack steps, or impact specifics, because the runner
-      # echoes Codex output to the world-readable public Actions log (which no
-      # post-step can redact). So the report is only severity + generic, non-locating
-      # titles — safe to publish to summary/artifact/issue. Detailed, actionable
-      # analysis is the job of the per-change `/security-review` pass (Step 5d) and a
-      # maintainer's local audit re-run, never this CI report.
+      # ENFORCEMENT BOUNDARY — the model report is used ONLY to classify pass/fail;
+      # its text is NEVER republished to any sink we control (summary, artifact,
+      # issue body). Prompt compliance is not an enforcement boundary: even though
+      # the prompt constrains the report to non-sensitive output, we do not rely on
+      # that for what WE publish — every CI sink below emits a FIXED generic notice
+      # with no model content. (Residual: the Codex action echoes its own output to
+      # the public Actions log, which no post-step can redact; the non-sensitive
+      # prompt mitigates that, and a private-channel/stdout-suppression hardening is
+      # tracked as a follow-up.) Actionable detail is the local `/security-review`.
       - name: Triage report
         id: triage
         if: always()
@@ -71,7 +73,6 @@ jobs:
           # FAIL CLOSED: `clean` ONLY when line 1 is exactly the CLEAN marker. A
           # FINDINGS marker — or any missing/malformed/unknown status on a non-empty
           # report — is treated as `findings` (opens an issue + fails the run).
-          # grep -x on line 1 avoids matching the marker text quoted elsewhere.
           if [ ! -s security-audit.md ]; then
             echo "status=none" >> "$GITHUB_OUTPUT"
           elif head -n 1 security-audit.md | grep -qx 'SECURITY_AUDIT_STATUS: CLEAN'; then
@@ -80,28 +81,23 @@ jobs:
             echo "status=findings" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish report to job summary
-        if: always() && steps.triage.outputs.status != 'none'
-        run: cat security-audit.md >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload report artifact
-        if: always() && steps.triage.outputs.status != 'none'
-        uses: actions/upload-artifact@v7
-        with:
-          name: security-audit-${{ github.run_id }}
-          path: security-audit.md
-          if-no-files-found: ignore
-
-      - name: No report produced
-        if: always() && steps.triage.outputs.status == 'none'
+      - name: Publish fixed notice to job summary
+        if: always()
+        env:
+          STATUS: ${{ steps.triage.outputs.status }}
         run: |
+          case "$STATUS" in
+            clean)    line="✅ No findings reported." ;;
+            findings) line="⚠️ Potential findings flagged — investigate with a local \`/security-review\`. Detail is intentionally not published to public CI." ;;
+            *)        line="ℹ️ No report was produced — check the Codex step logs." ;;
+          esac
           {
             echo "## 🛡️ Security Audit"
-            echo "_No report was produced — check the Codex step logs above._"
+            echo "$line"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # FINDINGS — open a `security` issue with the (non-sensitive) summary report and
-      # fail the run so the red ❌ is noticed. Triage is investigated with a local
+      # FINDINGS — open a `security` issue with a FIXED, content-free body (no model
+      # output) and fail the run so the red ❌ is noticed. Investigate with a local
       # `/security-review`, where the actionable detail lives.
       - name: Open issue on findings
         if: always() && steps.triage.outputs.status == 'findings'
@@ -114,9 +110,18 @@ jobs:
             --description "Security finding (from the Security Audit workflow or a security review)" \
             2>/dev/null || true
           date_str="$(date -u +%Y-%m-%d)"
+          {
+            echo "The scheduled Security Audit flagged one or more potential findings on ${date_str}."
+            echo
+            echo "Detail is intentionally NOT published to this public, open-source repo."
+            echo "To investigate, run a local /security-review (or the Security Audit"
+            echo "prompt) on the current main branch."
+            echo
+            echo "Filed automatically by the Security Audit workflow (run ${GITHUB_RUN_ID})."
+          } > notice.md
           gh issue create \
-            --title "Security audit findings — ${date_str}" \
+            --title "Security audit flagged potential findings — ${date_str}" \
             --label security \
-            --body-file security-audit.md
+            --body-file notice.md
           # Fail the run (after filing the issue) so the red ❌ is noticed.
           exit 1
