@@ -1,0 +1,96 @@
+name: Security Audit
+
+run-name: Security Audit - ${{ github.event_name }}
+
+# Adversarial, whole-codebase security audit. This repo is open source, so we run
+# our own attacker-mindset scan of the entire working tree on a schedule (and on
+# demand) — the periodic counterpart to the per-change `/security-review` pass
+# (`/execution-plan` Step 5d). It is NON-BLOCKING: it never gates a merge; it opens
+# a `security`-labelled issue when it finds something. Threat model lives in
+# `doc/project/security-model.md`; the prompt anchors to it + the review rubric.
+#
+# Requires the CODEX_OPENAI_API_KEY repository secret (the same CI-only credential
+# used by Release Bug Scan — deliberately NOT `OPENAI_API_KEY`, which the
+# Doppler→GitHub sync manages; see release-bug-scan.yml for the rationale).
+on:
+  schedule:
+    # Mondays 06:00 UTC. Scheduled runs use the default branch (main) only.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+# Least privilege: read the code, and open issues for findings.
+permissions:
+  contents: read
+  issues: write
+
+# Run JS actions on Node 24 (openai/codex-action@v1 pins an older setup-node that
+# still targets the deprecated Node 20 runtime; this opts it into Node 24).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+# One audit at a time; a newer run supersedes an in-flight one.
+concurrency:
+  group: security-audit-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Run Codex security audit
+        id: scan
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.CODEX_OPENAI_API_KEY }}
+          # Read-only: the audit analyses code, it never edits the working tree.
+          sandbox: read-only
+          prompt-file: .github/codex/security-audit-prompt.md
+          output-file: security-audit.md
+
+      - name: Publish report to job summary
+        if: always()
+        run: |
+          if [ -s security-audit.md ]; then
+            cat security-audit.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## 🛡️ Security Audit" >> "$GITHUB_STEP_SUMMARY"
+            echo "_No report was produced — check the Codex step logs above._" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: security-audit-${{ github.run_id }}
+          path: security-audit.md
+          if-no-files-found: ignore
+
+      - name: Open issue on findings
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [ ! -s security-audit.md ]; then
+            echo "No report produced — nothing to file."
+            exit 0
+          fi
+          # The audit prompt makes line 1 a machine-readable status marker.
+          if ! head -n 5 security-audit.md | grep -q 'SECURITY_AUDIT_STATUS: FINDINGS'; then
+            echo "Clean audit (no FINDINGS marker) — no issue opened."
+            exit 0
+          fi
+          # Ensure the label exists (idempotent), then file one issue per run.
+          gh label create security \
+            --color B60205 \
+            --description "Security finding (from the Security Audit workflow or a security review)" \
+            2>/dev/null || true
+          date_str="$(date -u +%Y-%m-%d)"
+          gh issue create \
+            --title "Security audit findings — ${date_str}" \
+            --label security \
+            --body-file security-audit.md

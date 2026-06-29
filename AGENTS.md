@@ -207,7 +207,9 @@ The project uses `overcommit`. Commits will fail if the following hooks are not 
 2. Create an issue on [move Issues](https://github.com/joel/move/issues) with a detailed plan; add an appropriate label (`bug`, `enhancement`, `cleanup`, `documentation`, etc.).
 3. Create a branch from `main` (`feature/*`, `fix/*`, `docs/*`, `refactor/*`).
 4. Implement the change with tests (TDD where practical).
-5. Run the **Pre-Commit Validation** (lint + tests) and make atomic commits.
+5. Run the local review passes — **Code Review** (`/code-review`) and, on
+   security-sensitive changes, the **Security Review** (`/security-review`, see
+   below) — then the **Pre-Commit Validation** (lint + tests), and make atomic commits.
 6. Perform live verification (see **Runtime Test Workflow** / `/product-review`).
 7. Push the branch and open a PR with a summary and test plan (`Closes #<issue>`). Wait for the required `lint` and `test` checks.
 8. **Wait for and check the Codex automated review** (see below) — proactively, before declaring the work done. Then respond to **every** review comment (human **and** Codex) and resolve each conversation.
@@ -221,6 +223,17 @@ The project uses `overcommit`. Commits will fail if the following hooks are not 
 > self-review checklist to run **before** opening a PR — so recurring classes are
 > caught on the first pass, not round 5. Architecture items in it are also enforced
 > by `spec/architecture/` and the `Move/*` cops.
+
+> **Security review is a dedicated pass, not just a rubric line.** The rubric's
+> **"Security & data"** section + the threat model in
+> [`doc/project/security-model.md`](doc/project/security-model.md) are the standard
+> every security review applies. Because this repo is **open source**, security is
+> covered in two places: a **per-change** adversarial pass — `/execution-plan`
+> **Step 5d** runs `/security-review` on security-sensitive branch diffs before the
+> PR is public — and a **periodic** whole-repo scan, the scheduled `Security Audit`
+> workflow ([`.github/workflows/security-audit.yml`](.github/workflows/security-audit.yml)),
+> which opens `security`-labelled issues for findings. Neither blocks merge; both
+> are run/triaged as part of the loop.
 
 > **Codex reviews every PR automatically.** `chatgpt-codex-connector[bot]` posts a
 > review **a few minutes after the PR is opened** (and re-runs on new pushes or a
@@ -421,7 +434,12 @@ This repository ships agent skills under `.claude/skills/`. Prefer them for the 
 - **`/execution-plan`** — drive a unit of work end-to-end (issue → branch → commits → live verify → PR → review response).
 - **`/qa-remediation`** — turn review findings into tracked issues + atomic fix commits.
 - **`/product-review`** — mandatory live product verification (this section's workflow).
-- **`/qa-review`**, **`/security-review`**, **`/ux-review`**, **`/ui-polish`** — review passes before a PR is merged.
+- **`/security-review`** — adversarial, threat-model-driven pass over the branch
+  diff. **Wired into `/execution-plan` as Step 5d** (run after `/code-review`, before
+  push, on security-sensitive changes). Anchored to the rubric's "Security & data"
+  section + [`doc/project/security-model.md`](doc/project/security-model.md). The
+  whole-repo counterpart is the scheduled `Security Audit` workflow.
+- **`/qa-review`**, **`/ux-review`**, **`/ui-polish`** — review passes before a PR is merged.
 - **`/ui-designer`** — build Tailwind + Phlex UI from the component library.
 
 ## 7. Documentation after implementation (Mandatory)
