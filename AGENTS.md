@@ -232,8 +232,9 @@ The project uses `overcommit`. Commits will fail if the following hooks are not 
 > **Step 5d** runs `/security-review` on security-sensitive branch diffs before the
 > PR is public — and a **periodic** whole-repo scan, the scheduled `Security Audit`
 > workflow ([`.github/workflows/security-audit.yml`](.github/workflows/security-audit.yml)),
-> which opens `security`-labelled issues for findings. Neither blocks merge; both
-> are run/triaged as part of the loop.
+> which on findings opens a **redacted** `security` issue (count + risk only — exploit
+> detail is never published to a public sink on this open-source repo). Neither
+> blocks merge; both are run/triaged as part of the loop.
 
 > **Codex reviews every PR automatically.** `chatgpt-codex-connector[bot]` posts a
 > review **a few minutes after the PR is opened** (and re-runs on new pushes or a

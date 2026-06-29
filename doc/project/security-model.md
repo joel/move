@@ -13,8 +13,11 @@ for exploitable weaknesses. Our defence is twofold:
   diff *before* the PR is public; and
 - a **periodic** whole-repo adversarial scan —
   [`.github/workflows/security-audit.yml`](../../.github/workflows/security-audit.yml)
-  (`Security Audit`) runs on a schedule + on demand and opens `security`-labelled
-  issues for findings.
+  (`Security Audit`) runs on a schedule + on demand and, on findings, opens a
+  **redacted** `security`-labelled issue (count + overall risk only) — exploit
+  detail is **never** published to a public sink (issue/summary/artifact) on this
+  open-source repo; a maintainer reproduces it privately by re-running the audit
+  locally.
 
 Both apply the **"Security & data"** section of
 [`.github/codex/review-rubric.md`](../../.github/codex/review-rubric.md), which

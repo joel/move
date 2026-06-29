@@ -42,8 +42,13 @@ working tree** for live, reachable vulnerabilities.
 
 ## Output format
 
+Write the **full** report (with attack/impact/paths) — it is consumed **privately**
+(a maintainer reproduces it locally). The CI job does **not** publish your detailed
+output to any public sink; on findings it posts only a redacted count + overall risk
+and withholds the rest. So be specific and complete; do not self-censor file paths.
+
 Return **concise GitHub-flavoured Markdown** only. The **first line must be a
-machine-readable status marker** so automation can decide whether to open an issue:
+machine-readable status marker** so automation can decide how to handle the run:
 
 - `SECURITY_AUDIT_STATUS: FINDINGS` — at least one real, reachable finding, **or**
 - `SECURITY_AUDIT_STATUS: CLEAN` — no meaningful findings.
