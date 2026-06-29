@@ -63,8 +63,9 @@ If your project keeps a running steps/audit log per effort (e.g. a per-effort `S
 | 7 (commit) | `<sha>` + one-line rationale; note any `SKIP=<hook>` with reason |
 | 8 (runtime test) | pages verified, anything that broke and the fix commit |
 | 11 (PR review round) | per-comment action + fix commit + resolution, as a table |
-| 13 (release) | release tag + release URL, if the project versions releases |
+| 13 (release) | CHANGELOG entry filled, then release tag + release URL, if the project versions releases |
 | 12/14 (done) | final summary table: issue → commit → release → status |
+| 15 (persist) | memories written/updated, docs touched, follow-up issues filed |
 
 **Tone.** Factual, short. The audience is future-you (or a reviewer) reconstructing what decisions were made, not re-arguing them.
 
@@ -698,9 +699,21 @@ gh project item-edit \
 
 If your project versions releases, tag/publish a release after the PR is merged to `main` (a human merges; the agent never does). Order: do this **immediately after merge**, then Step 12 (Done). Follow whatever release policy the project's development-workflow doc defines.
 
+> **Fill out the CHANGELOG *before* you tag.** If the project keeps a curated
+> changelog (e.g. `CHANGELOG.md`, Keep a Changelog format), add the new version's
+> human-facing entry — and relabel any `[Unreleased]` section to the version being
+> cut — **before** `gh release create`, so the tag captures it and the published
+> notes and the changelog agree. A changelog edit that lands *after* the tag is a
+> separate docs commit whose content the release notes never reference (and it does
+> **not** warrant its own release tag — a docs-only changelog change ships nothing).
+> Auto-generated release notes (`--generate-notes`) summarise merged PRs; they do
+> **not** replace the curated changelog entry. Belongs in the **same PR** as the
+> feature when practical, so the changelog merges with the code it describes.
+
 ```bash
 git checkout main && git pull origin main
 # Confirm the merge commit is present and its main CI/Deploy run is green.
+# Confirm CHANGELOG.md carries this version's entry (see the note above).
 
 # Idempotent: stop if the tag/release already exists.
 gh release view <tag> --repo <owner>/<repo> >/dev/null 2>&1 \
@@ -712,6 +725,30 @@ gh release view <tag> --repo <owner>/<repo> >/dev/null 2>&1 \
 ```
 
 `gh release create` creates the tag on `main` and publishes the release with auto-generated notes (merged PRs/commits since the previous tag). Record the tag + release URL in the audit log if your project keeps one.
+
+### Step 14: Persist what's worth keeping (before the context resets)
+
+Finishing a feature is the moment to **save anything worth saving from this
+session** — the working memory you built up (hard-won gotchas, the *why* behind a
+non-obvious decision, dead ends that mustn't be re-tried, a reusable
+pattern/recipe) evaporates when the context is reset. Capture it where it will be
+found again:
+
+- **Agent memory** — durable, cross-session facts: a gotcha that cost real time, a
+  decision and its rationale, a consciously-accepted limitation (with the
+  trade-off), a recurring failure mode. Write the *non-obvious* part, not what the
+  code/git already records. Update an existing memory rather than duplicating it.
+- **Project documentation** — anything that belongs to the project, not just this
+  session: architecture/flow changes and diagrams (the Step 8b mandate), the
+  setup/recipe doc when a step changed, the design system when tokens/components
+  changed, the CHANGELOG entry (Step 13). Put it **where it fits**, and link/cross-
+  reference so it's discoverable.
+- **Follow-ups** — anything deferred or discovered-but-out-of-scope → a tracked
+  issue (don't leave it only in your head or a PR comment).
+
+Rule of thumb: if a future you (or teammate) would have to re-derive it from
+scratch after a reset, write it down now. This is cheap at the end of a feature
+and expensive to reconstruct later.
 
 ## Quick Reference: Complete Flow
 
@@ -732,6 +769,7 @@ gh release view <tag> --repo <owner>/<repo> >/dev/null 2>&1 \
 10b. wait for + check Codex review (proactively!)      → chatgpt-codex-connector[bot]
 11. gh api .../comments (+ log replies in audit log)   → Reply + resolve threads (human + Codex)
 12. <human rebase-and-merges the PR to main>           → Merge
-13. gh release create (OPTIONAL)                       → Tag main + publish release
+13. fill CHANGELOG → gh release create (OPTIONAL)      → Changelog entry FIRST, then tag main + publish
 14. gh project item-edit + final summary in audit log  → Move to Done
+15. save to agent memory + project docs + follow-ups   → Persist what's worth keeping before context reset
 ```
