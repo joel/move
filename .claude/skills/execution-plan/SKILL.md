@@ -322,6 +322,50 @@ runs confidence-scored, multi-agent passes over the current diff, reads
 Catching findings here turns later Codex rounds into confirmations rather than rework —
 that is the whole point of the phase.
 
+### Step 5d: Security Review (SR) — adversarial pass before push
+
+**Goal: an attacker-mindset pass over the branch diff *before* the PR is public.**
+This repo is **open source** — anyone can point an AI at it to hunt for exploitable
+weaknesses, so we run our own adversarial pass first. `/code-review` (5c) hunts
+correctness bugs; this phase hunts **security** defects against the app's specific
+threat model (tenant isolation, authz/IDOR, auth, injection, upload/egress, secrets,
+output safety) — they are different lenses, so run both.
+
+Use the official Anthropic **`/security-review`** skill on the pending changes of the
+current branch. Anchor it to the app's threat model so it reasons about *our* risks,
+not generic OWASP boilerplate:
+
+```
+/security-review        # reviews the pending changes on the current branch
+```
+
+Point it at — and read yourself —
+[`.github/codex/review-rubric.md`](../../../.github/codex/review-rubric.md)
+"Security & data" and
+[`doc/project/security-model.md`](../../../doc/project/security-model.md)
+(trust boundaries + per-class checklist).
+
+**When to run (MANDATORY) — the diff touches any of:**
+- auth (`app/misc/`), authorization (`app/policies/`), or tenancy
+  (`config/initializers/apartment*`, any `Apartment::Tenant.switch`);
+- the actions layer (`app/actions/`), params / strong-params, or raw SQL /
+  `Arel.sql`;
+- file upload / media, MCP tools (`app/mcp/`), or external-provider calls;
+- secrets / credentials, or any **new endpoint / route**.
+
+**Skip only** for docs-only or purely cosmetic UI diffs (no behaviour change).
+
+**The loop** — identical triage + diminishing-returns **stop rule** as Step 5c (read
+that section; it governs this loop too): fix real findings into the relevant atomic
+commit, reproduce-before-dismissing a suspected false positive, defer to a tracked
+issue only when genuinely justified, and re-run until a round comes back clean (two
+substantive converging rounds is enough). For a whole-codebase audit (not just this
+diff), the scheduled `Security Audit` workflow
+([`.github/workflows/security-audit.yml`](../../../.github/workflows/security-audit.yml))
+covers the existing surface and, on findings, opens a **fixed-body** `security`
+issue and fails the run (it never republishes model output to public CI — the
+actionable detail is this Step 5d local pass).
+
 ### Step 6: Pre-Commit Validation
 
 Run the project's lint/test/system-test tasks and ensure they all pass before committing. Many Rails projects expose these as rake tasks; run everything at once with:
@@ -816,6 +860,7 @@ and expensive to reconstruct later.
 5.  <implement the architect blueprint>                → Write code
 5b. extend db/seeds.rb (+ bundle exec rails db:seed)   → Showcase-ready demo data
 5c. /code-review (loop until clean; mind the stop rule) → Internal CR before push (skip if trivial)
+5d. /security-review (when security-sensitive; loop until clean) → Adversarial SR before push
 6.  bundle exec rake                                   → Lint + tests + system tests
 7.  git commit (+ append sha to audit log)             → Overcommit hooks validate
 8.  /product-review (or /verify, or agent-browser+curl) → Live verification (curl Set-Cookie scope for auth/cookie changes)

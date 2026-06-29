@@ -1,0 +1,127 @@
+name: Security Audit
+
+run-name: Security Audit - ${{ github.event_name }}
+
+# Adversarial, whole-codebase security audit. This repo is open source, so we run
+# our own attacker-mindset scan of the entire working tree on a schedule (and on
+# demand) — the periodic counterpart to the per-change `/security-review` pass
+# (`/execution-plan` Step 5d). It is NON-BLOCKING: it never gates a merge; it opens
+# a `security`-labelled issue when it finds something. Threat model lives in
+# `doc/project/security-model.md`; the prompt anchors to it + the review rubric.
+#
+# Requires the CODEX_OPENAI_API_KEY repository secret (the same CI-only credential
+# used by Release Bug Scan — deliberately NOT `OPENAI_API_KEY`, which the
+# Doppler→GitHub sync manages; see release-bug-scan.yml for the rationale).
+on:
+  schedule:
+    # Mondays 06:00 UTC. Scheduled runs use the default branch (main) only.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+# Least privilege: read the code, and open issues for findings.
+permissions:
+  contents: read
+  issues: write
+
+# Run JS actions on Node 24 (openai/codex-action@v1 pins an older setup-node that
+# still targets the deprecated Node 20 runtime; this opts it into Node 24).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+# One audit at a time; a newer run supersedes an in-flight one.
+concurrency:
+  group: security-audit-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          # Don't persist the job's GITHUB_TOKEN (which has issues: write) into
+          # .git/config — the read-only Codex audit step scans the whole repo, and
+          # the issue-creation step supplies GH_TOKEN explicitly, so authenticated
+          # git is never needed after checkout.
+          persist-credentials: false
+
+      - name: Run Codex security audit
+        id: scan
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.CODEX_OPENAI_API_KEY }}
+          # Read-only: the audit analyses code, it never edits the working tree.
+          sandbox: read-only
+          prompt-file: .github/codex/security-audit-prompt.md
+          output-file: security-audit.md
+
+      # ENFORCEMENT BOUNDARY — the model report is used ONLY to classify pass/fail;
+      # its text is NEVER republished to any sink we control (summary, artifact,
+      # issue body). Prompt compliance is not an enforcement boundary: even though
+      # the prompt constrains the report to non-sensitive output, we do not rely on
+      # that for what WE publish — every CI sink below emits a FIXED generic notice
+      # with no model content. (Residual: the Codex action echoes its own output to
+      # the public Actions log, which no post-step can redact; the non-sensitive
+      # prompt mitigates that, and a private-channel/stdout-suppression hardening is
+      # tracked as a follow-up.) Actionable detail is the local `/security-review`.
+      - name: Triage report
+        id: triage
+        if: always()
+        run: |
+          # FAIL CLOSED: `clean` ONLY when line 1 is exactly the CLEAN marker. A
+          # FINDINGS marker — or any missing/malformed/unknown status on a non-empty
+          # report — is treated as `findings` (opens an issue + fails the run).
+          if [ ! -s security-audit.md ]; then
+            echo "status=none" >> "$GITHUB_OUTPUT"
+          elif head -n 1 security-audit.md | grep -qx 'SECURITY_AUDIT_STATUS: CLEAN'; then
+            echo "status=clean" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=findings" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish fixed notice to job summary
+        if: always()
+        env:
+          STATUS: ${{ steps.triage.outputs.status }}
+        run: |
+          case "$STATUS" in
+            clean)    line="✅ No findings reported." ;;
+            findings) line="⚠️ Potential findings flagged — investigate with a local \`/security-review\`. Detail is intentionally not published to public CI." ;;
+            *)        line="ℹ️ No report was produced — check the Codex step logs." ;;
+          esac
+          {
+            echo "## 🛡️ Security Audit"
+            echo "$line"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # FINDINGS — open a `security` issue with a FIXED, content-free body (no model
+      # output) and fail the run so the red ❌ is noticed. Investigate with a local
+      # `/security-review`, where the actionable detail lives.
+      - name: Open issue on findings
+        if: always() && steps.triage.outputs.status == 'findings'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh label create security \
+            --color B60205 \
+            --description "Security finding (from the Security Audit workflow or a security review)" \
+            2>/dev/null || true
+          date_str="$(date -u +%Y-%m-%d)"
+          {
+            echo "The scheduled Security Audit flagged one or more potential findings on ${date_str}."
+            echo
+            echo "Detail is intentionally NOT published to this public, open-source repo."
+            echo "To investigate, run a local /security-review (or the Security Audit"
+            echo "prompt) on the current main branch."
+            echo
+            echo "Filed automatically by the Security Audit workflow (run ${GITHUB_RUN_ID})."
+          } > notice.md
+          gh issue create \
+            --title "Security audit flagged potential findings — ${date_str}" \
+            --label security \
+            --body-file notice.md
+          # Fail the run (after filing the issue) so the red ❌ is noticed.
+          exit 1
