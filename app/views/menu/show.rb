@@ -35,6 +35,7 @@ module Views
 
       def organize_links
         links = [
+          [I18n.t("menu.show.gallery"), Components::Icons::Camera, move_gallery_path(@move)],
           [I18n.t("menu.show.activity"), Components::Icons::Clock, move_activity_path(@move)],
           [I18n.t("menu.show.rooms"), Components::Icons::Boxes,
            move_vocabularies_path(@move, "rooms")]

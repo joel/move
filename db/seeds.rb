@@ -305,6 +305,23 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     item.save!
   end
 
+  # One AI-generated photo (#416) so the Gallery's "Generated" badge state is
+  # showcase-ready — the per-Move Gallery shows ALL media (generated included),
+  # unlike the box review walk which excludes them. Attach a committed seed image
+  # to a photo-less manual item as its generated source_media. Idempotent: skipped
+  # once any generated media exists (keyed on captured_via).
+  unless move.media.exists?(captured_via: "generated")
+    target = move.items.where(source_media_id: nil).order(:created_at).first
+    if target&.box
+      generated = target.box.media.new(
+        move: move, media_type: "image", captured_via: "generated", captured_at: Time.current
+      )
+      generated.image.attach(seed_image_attachable.call(SeedData::PHOTOS.first[:slug]))
+      generated.save!
+      target.update!(source_media: generated)
+    end
+  end
+
   # --- Phase 43: a completed bulk label-print run so the E1 progress/download page
   # is showcase-ready without generating live (the form starts a fresh run). The PDF
   # is rendered from boxes 1–3 against this org's subdomain so the QR codes resolve.

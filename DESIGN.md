@@ -179,9 +179,10 @@ terracotta/error border + Retry overlay) · `needs_correction` (pencil, terracot
 `Ui::EmptyState` · `Ui::SectionHeader` / `Ui::PageHeader` · `Ui::Toast` /
 `FlashToasts` · `Ui::SaveStatus` · `Ui::ThemeToggle`.
 
-### Overlays — native `<dialog>` + the `modal` Stimulus controller
-Two card-surface overlay chromes share the `modal` controller (`open` / `close` /
-`backdropClose`; `showModal()` gives focus-trap, Escape and a dimmed `::backdrop`):
+### Overlays — native `<dialog>` + Stimulus
+Three card/full-bleed overlay chromes built on native `<dialog>` (`showModal()` gives
+focus-trap, Escape and a dimmed `::backdrop`). The first two share the `modal`
+controller (`open` / `close` / `backdropClose`); the third has its own:
 - **`.ha-modal`** — centred modal (capped 400px), e.g. the describe-before-sealing
   flow (`Components::BoxSealTrigger`).
 - **`.ha-sheet`** — bottom sheet: full-width (capped 480px, centred on wide
@@ -191,6 +192,13 @@ Two card-surface overlay chromes share the `modal` controller (`open` / `close` 
   plus the secondary actions (lifecycle step(s), print label/manifest, edit, delete)
   so the screen shows one contextual hero. Rows are full-width `surface-container-high`
   pills (`text-error` for the destructive Delete row).
+- **`.ha-lightbox`** — full-viewport, transparent/borderless photo viewer over a heavy
+  (85%) blurred `::backdrop`; the contained `:detail` `<img>` floats centred
+  (`object-contain`). Driven by the **`lightbox`** Stimulus controller
+  (`open` / `close` / `prev` / `next` / `key` / `backdropClose`): grid tiles carry the
+  photo's `:detail` src + caption + box href as `data-*`, and prev/next cycle (wrapping)
+  over the rendered set with arrow-key support. Used by **`Components::Gallery::Grid`**
+  (the Move-wide Gallery).
 
 ### Navigation chrome
 `Ui::BottomTabBar` (mobile, docked) and `Ui::Sidebar` (desktop ≥`lg`, 280px) render
