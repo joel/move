@@ -53,22 +53,24 @@ A `domain` pack may reference `domain` + `utility`, never `application`.
 
 A `utility` pack may reference only `utility` (itself).
 
-**The shared kernel → `packs/utility`.** The universal base classes + cross-cutting
-infrastructure (`BaseAction`, `ApplicationRecord`, `ApplicationJob`,
-`ApplicationMailer`, `Current`, `Discardable`, `Roleable`, `ProviderHttp`) live in
-`packs/utility` (`layer: utility`). It enforces **dependencies** (`dependencies: []`
-— the kernel is self-contained; it can never reference a domain or application
-constant) and **architecture** (bottom layer). Privacy/visibility are **off** there:
-the kernel is the universal public foundation, so per-constant privacy/visibility
-would be ceremony (a `visible_to` listing every pack). Domain packs keep both strict.
+**The shared kernel → `packs/utility`.** The cross-cutting framework infrastructure
+(`ApplicationRecord`, `ApplicationJob`, `ApplicationMailer`, `Current`, `Discardable`,
+`Roleable`, `ProviderHttp`) lives in `packs/utility` (`layer: utility`). It enforces
+**dependencies** (`dependencies: []` — the kernel is self-contained; it can never
+reference a domain or application constant) and **architecture** (bottom layer).
+Privacy/visibility are **off** there: the kernel is the universal public foundation,
+so per-constant privacy/visibility would be ceremony (a `visible_to` listing every
+pack). Domain packs keep both strict.
 
 > **Self-contained means *no domain coupling at all* — including method calls
-> Packwerk can't see.** `Discards::Cascade`/`CascadeRestore` are deliberately **not**
-> in utility: they `ensure_writable(record.move)`, a method-call dependency on the
-> Move domain. Packwerk only tracks *constants*, so it wouldn't flag it — but a
-> bottom-layer kernel that changes for Move-specific reasons isn't a kernel. They
-> stay in the root (Move-coupled soft-delete infrastructure) until a discards/domain
-> pack claims them.
+> Packwerk can't see.** `BaseAction` and `Discards::Cascade`/`CascadeRestore` are
+> deliberately **not** in utility: both call `ensure_writable(move)` →
+> `move.writable?` / `Failure(:move_archived)`, a method-call dependency on the Move
+> domain's archived-invariant. Packwerk only tracks *constants*, so it wouldn't flag
+> it — but a bottom-layer kernel that has to change when Move's writable/archive
+> contract changes isn't a kernel. They stay in the root until `ensure_writable` is
+> factored out of the action base (tracked follow-up), after which they can be
+> promoted to `utility`.
 
 **The unlayered-root escape hatch.** The root package still has **no `layer:`**. The
 architecture checker treats a reference to a layer-less package as always allowed
@@ -189,10 +191,11 @@ graph TD
     class labels,utility done;
 ```
 
-**kernel** = the shared constants every domain needs (`BaseAction`,
-`ApplicationRecord`, `ApplicationJob`, `ApplicationMailer`, `Current`, `Discardable`,
-`Roleable`, `ProviderHttp`) — extracted into **`packs/utility`** (the `utility`
-layer). `Apartment` + `Rails.event` are gem/framework globals, not packaged.
+**kernel** = the domain-free framework infrastructure (`ApplicationRecord`,
+`ApplicationJob`, `ApplicationMailer`, `Current`, `Discardable`, `Roleable`,
+`ProviderHttp`) — extracted into **`packs/utility`** (the `utility` layer).
+`BaseAction` stays in root for now (its `ensure_writable` couples it to Move).
+`Apartment` + `Rails.event` are gem/framework globals, not packaged.
 
 **Known coupling hotspots** (to untangle as domains are extracted):
 

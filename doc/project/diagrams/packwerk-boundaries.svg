@@ -24,7 +24,7 @@
 <rect x="40" y="340" width="720" height="70" rx="8" fill="#241F1A" stroke="#ECE7DC" stroke-width="1"/>
 <text x="56" y="364" font-family="Inter,Segoe UI,sans-serif" font-size="14" font-weight="normal" fill="#ECE7DC">utility  (shared kernel)</text>
 <rect x="56" y="374" width="680" height="26" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
-<text x="70" y="392" font-family="Inter,Segoe UI,sans-serif" font-size="11" font-weight="bold" fill="#ECE7DC">packs/utility ✅  BaseAction · ApplicationRecord · ApplicationJob · Current · Discardable · ProviderHttp · Roleable</text>
+<text x="70" y="392" font-family="Inter,Segoe UI,sans-serif" font-size="11" font-weight="bold" fill="#ECE7DC">packs/utility ✅  ApplicationRecord · ApplicationJob · Current · Discardable · ProviderHttp · Roleable</text>
 <text x="40" y="440" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="normal" fill="#6B6357">Rule: a domain pack may reference domain/utility (and the unlayered root), never application.</text>
 <text x="40" y="464" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="normal" fill="#6B6357">utility is self-contained (dependencies: []) — the kernel can never reference a domain constant.</text>
 </svg>
