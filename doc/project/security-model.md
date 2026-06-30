@@ -13,7 +13,8 @@ for exploitable weaknesses. Our defence is twofold:
   diff *before* the PR is public; and
 - a **periodic** whole-repo adversarial scan —
   [`.github/workflows/security-audit.yml`](../../.github/workflows/security-audit.yml)
-  (`Security Audit`) runs on a schedule + on demand and, on findings, opens a
+  (`Security Audit`) runs **on demand** (manual `workflow_dispatch`; the weekly
+  schedule is paused until #430 hardens the public-log residual) and, on findings, opens a
   fixed-body `security`-labelled issue and fails the run. **It never republishes the
   model's report** to any sink it controls (summary/artifact/issue) — those emit
   only a fixed, content-free notice — because prompt compliance is not an
