@@ -1,28 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="820" height="500" viewBox="0 0 820 500">
-<rect x="0" y="0" width="820" height="500" rx="0" fill="#15120E" stroke="#15120E" stroke-width="0"/>
-<text x="40" y="46" font-family="Inter,sans-serif" font-size="22" font-weight="bold" fill="#ECE7DC">Packwerk boundaries — layers &amp; packs</text>
-<rect x="40" y="80" width="740" height="90" rx="8" fill="#2A2620" stroke="#ECE7DC" stroke-width="1"/>
-<text x="56" y="104" font-family="Inter,sans-serif" font-size="14" font-weight="normal" fill="#ECE7DC">application  (unlayered root: controllers, views, BaseAction, unextracted domains)</text>
-<rect x="56" y="116" width="300" height="44" rx="8" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="70" y="143" font-family="Inter,sans-serif" font-size="14" font-weight="normal" fill="#ECE7DC">root  (enforce_* off)</text>
-<rect x="40" y="200" width="740" height="110" rx="8" fill="#241F1A" stroke="#ECE7DC" stroke-width="1"/>
-<text x="56" y="224" font-family="Inter,sans-serif" font-size="14" font-weight="normal" fill="#ECE7DC">domain  (per-domain packs — extracted one PR at a time)</text>
-<rect x="56" y="238" width="128" height="52" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
-<text x="66" y="270" font-family="Inter,sans-serif" font-size="11" font-weight="bold" fill="#ECE7DC">labels ✅</text>
-<rect x="194" y="238" width="128" height="52" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
-<text x="204" y="270" font-family="Inter,sans-serif" font-size="11" font-weight="bold" fill="#ECE7DC">manifests ✅</text>
-<rect x="332" y="238" width="128" height="52" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
-<text x="342" y="270" font-family="Inter,sans-serif" font-size="11" font-weight="bold" fill="#ECE7DC">search ✅</text>
-<rect x="470" y="238" width="128" height="52" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
-<text x="480" y="270" font-family="Inter,sans-serif" font-size="11" font-weight="bold" fill="#ECE7DC">recognition ✅</text>
-<rect x="608" y="238" width="80" height="52" rx="8" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="622" y="270" font-family="Inter,sans-serif" font-size="13" font-weight="normal" fill="#ECE7DC">boxes</text>
-<rect x="700" y="238" width="80" height="52" rx="8" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="714" y="270" font-family="Inter,sans-serif" font-size="13" font-weight="normal" fill="#ECE7DC">…</text>
-<rect x="40" y="340" width="740" height="70" rx="8" fill="#241F1A" stroke="#ECE7DC" stroke-width="1"/>
-<text x="56" y="364" font-family="Inter,sans-serif" font-size="14" font-weight="normal" fill="#ECE7DC">utility  (shared kernel)</text>
-<rect x="56" y="374" width="700" height="26" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
-<text x="70" y="392" font-family="Inter,sans-serif" font-size="10" font-weight="bold" fill="#ECE7DC">packs/utility ✅  ApplicationRecord · ApplicationJob · ApplicationMailer · Current · Discardable · Roleable · ProviderHttp</text>
-<text x="40" y="440" font-family="Inter,sans-serif" font-size="13" font-weight="normal" fill="#6B6357">Rule: a domain pack may reference domain/utility (and the unlayered root), never application.</text>
-<text x="40" y="464" font-family="Inter,sans-serif" font-size="13" font-weight="normal" fill="#6B6357">utility is self-contained (dependencies: []) — the kernel can never reference a domain constant.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="520" viewBox="0 0 820 520">
+<rect x="0" y="0" width="820" height="520" rx="0" fill="#15120E" stroke="#15120E" stroke-width="0"/>
+<text x="40" y="42" font-family="Inter,sans-serif" font-size="22" font-weight="bold" fill="#ECE7DC">Packwerk boundaries — layers &amp; packs</text>
+<rect x="40" y="72" width="740" height="70" rx="8" fill="#2A2620" stroke="#ECE7DC" stroke-width="1"/>
+<text x="56" y="94" font-family="Inter,sans-serif" font-size="13" font-weight="normal" fill="#ECE7DC">application  (unlayered root: controllers, views, BaseAction, unextracted domains)</text>
+<rect x="56" y="104" width="300" height="28" rx="8" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="70" y="123" font-family="Inter,sans-serif" font-size="13" font-weight="normal" fill="#ECE7DC">root  (enforce_* off)</text>
+<rect x="40" y="168" width="740" height="150" rx="8" fill="#241F1A" stroke="#ECE7DC" stroke-width="1"/>
+<text x="56" y="190" font-family="Inter,sans-serif" font-size="13" font-weight="bold" fill="#ECE7DC">domain  (per-domain packs — extracted one PR at a time)</text>
+<text x="56" y="214" font-family="Inter,sans-serif" font-size="12" font-weight="normal" fill="#7FC8A0">✅ extracted (11): labels · manifests · search · recognition · activity · qr · terms ·</text>
+<text x="56" y="234" font-family="Inter,sans-serif" font-size="12" font-weight="normal" fill="#7FC8A0">reviews · photos · integration_tokens · move_memberships</text>
+<text x="56" y="258" font-family="Inter,sans-serif" font-size="12" font-weight="normal" fill="#6B6357">remaining: boxes · items · moves · captures · image_generation · demo_data · accounts ·</text>
+<text x="56" y="278" font-family="Inter,sans-serif" font-size="12" font-weight="normal" fill="#6B6357">vocabularies · session_handoffs · organizations · auth</text>
+<rect x="40" y="340" width="740" height="64" rx="8" fill="#241F1A" stroke="#ECE7DC" stroke-width="1"/>
+<text x="56" y="362" font-family="Inter,sans-serif" font-size="13" font-weight="bold" fill="#ECE7DC">utility  (shared kernel)</text>
+<rect x="56" y="372" width="700" height="24" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
+<text x="70" y="389" font-family="Inter,sans-serif" font-size="9.5" font-weight="bold" fill="#ECE7DC">packs/utility ✅  ApplicationRecord · ApplicationJob · ApplicationMailer · Current · Discardable · Roleable · ProviderHttp</text>
+<text x="40" y="432" font-family="Inter,sans-serif" font-size="13" font-weight="normal" fill="#6B6357">Rule: a domain pack may reference domain/utility (and the unlayered root), never application.</text>
+<text x="40" y="456" font-family="Inter,sans-serif" font-size="13" font-weight="normal" fill="#6B6357">utility is self-contained (dependencies: []) — the kernel can never reference a domain constant.</text>
+<text x="40" y="480" font-family="Inter,sans-serif" font-size="13" font-weight="normal" fill="#6B6357">Each domain pack: enforce_dependencies + privacy + visibility + architecture; public API via app/public or a # pack_public sigil.</text>
 </svg>

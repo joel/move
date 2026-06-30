@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/move_memberships: adds a member (MembersController).
+# Kept in the action layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module MoveMemberships
   # Adds an existing Organization user to a Move with a role (F1, D11).
   #

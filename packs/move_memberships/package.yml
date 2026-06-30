@@ -1,0 +1,15 @@
+# packs/move_memberships — per-Move membership management.
+#   PUBLIC (app/public): MoveMembership (model — named in Moves::Destroy).
+#   PUBLIC (sigil): MoveMemberships::Add / ChangeRole / Remove (MembersController).
+#   PRIVATE: MoveMemberships::AdminGuard (the last-admin guard mixin, used internally).
+# dependencies: ['.', 'packs/utility']; visible_to: ['.'].
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+layer: domain
+dependencies:
+  - "."
+  - "packs/utility"
+visible_to:
+  - "."
