@@ -13,3 +13,4 @@ dependencies:
   - "packs/utility"
 visible_to:
   - "."
+  - "packs/demo_data"

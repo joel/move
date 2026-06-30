@@ -1,0 +1,17 @@
+# packs/demo_data — onboarding sample-Move provisioning (the curated demo data a
+# new account auto-gets). Entirely PRIVATE: every consumer is the config
+# initializer (organization.created -> ProvisionSubscriber) or db/seeds, neither
+# of which Packwerk scans, so no constant needs to be public and no pack depends
+# on demo_data (visible_to: []).
+# dependencies: discovered via packwerk check (it seeds across several domains).
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+layer: domain
+dependencies:
+  - "."
+  - "packs/utility"
+  - "packs/move_memberships"
+  - "packs/search"
+visible_to: []

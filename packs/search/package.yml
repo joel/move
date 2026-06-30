@@ -36,4 +36,5 @@ dependencies:
 
 visible_to:
   - "."
+  - "packs/demo_data"
   - "packs/vocabularies"
