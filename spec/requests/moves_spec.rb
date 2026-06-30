@@ -107,6 +107,15 @@ RSpec.describe "Moves" do
       expect(Move.exists?(move.id)).to be(true)
     end
 
+    it "forbids an admin from hard-deleting a non-sample (real) Move via a crafted request" do
+      move = create(:move, created_by: user) # admin, but not a sample
+
+      delete move_path(move)
+
+      expect(response).to have_http_status(:forbidden)
+      expect(Move.exists?(move.id)).to be(true)
+    end
+
     it "shows the Remove affordance to an admin of the sample Move" do
       create(:move, name: "Mine", created_by: user, sample: true)
 

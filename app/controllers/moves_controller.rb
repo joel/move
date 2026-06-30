@@ -43,6 +43,10 @@ class MovesController < TenantController
     case result
     in Dry::Monads::Success(_)
       redirect_to moves_path, notice: t(".destroyed", name: move.name)
+    in Dry::Monads::Failure(:not_sample)
+      # Only the onboarding sample is removable today; a request for any other Move
+      # is a crafted/stale one the UI never offers.
+      head :forbidden
     in Dry::Monads::Failure(_)
       redirect_to moves_path, alert: t(".destroy_failed")
     end

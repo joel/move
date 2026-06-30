@@ -9,6 +9,10 @@ FactoryBot.define do
       status { "archived" }
     end
 
+    trait :sample do
+      sample { true }
+    end
+
     # Mirror Moves::Create: the creator is the Move's first admin member. This
     # lets move-scoped specs act as the creator (a full-access admin) without
     # wiring a membership by hand, matching how Moves are really created (D11).

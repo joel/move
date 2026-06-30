@@ -30,6 +30,12 @@ module Moves
     ATTACHMENT_MODELS = [Media, LabelPrintRun].freeze
 
     def call(move:)
+      # Sample-only for now (#435): the UI surfaces removal only on the onboarding
+      # sample, and there is no deliberate "delete any move" feature yet. Guard in
+      # the shared action so a crafted DELETE (bypassing the UI) can't hard-delete a
+      # real customer Move. Relax this when a general delete is intentionally added.
+      return Failure(:not_sample) unless move.sample?
+
       move_id = move.id
       yield teardown(move)
       yield emit_event(move_id)
