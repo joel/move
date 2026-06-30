@@ -7,18 +7,18 @@
 <text x="70" y="143" font-family="Inter,Segoe UI,sans-serif" font-size="14" font-weight="normal" fill="#ECE7DC">root  (enforce_* off)</text>
 <rect x="40" y="200" width="720" height="110" rx="8" fill="#241F1A" stroke="#ECE7DC" stroke-width="1"/>
 <text x="56" y="224" font-family="Inter,Segoe UI,sans-serif" font-size="14" font-weight="normal" fill="#ECE7DC">domain  (per-domain packs — extracted one PR at a time)</text>
-<rect x="56" y="238" width="120" height="52" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
-<text x="74" y="270" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="bold" fill="#ECE7DC">labels ✅</text>
-<rect x="184" y="238" width="130" height="52" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
-<text x="198" y="270" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="bold" fill="#ECE7DC">manifests ✅</text>
-<rect x="322" y="238" width="100" height="52" rx="8" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="338" y="270" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="normal" fill="#ECE7DC">boxes</text>
-<rect x="430" y="238" width="100" height="52" rx="8" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="446" y="270" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="normal" fill="#ECE7DC">items</text>
-<rect x="538" y="238" width="100" height="52" rx="8" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="554" y="270" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="normal" fill="#ECE7DC">moves</text>
-<rect x="646" y="238" width="100" height="52" rx="8" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="662" y="270" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="normal" fill="#ECE7DC">…</text>
+<rect x="56" y="238" width="128" height="52" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
+<text x="68" y="270" font-family="Inter,Segoe UI,sans-serif" font-size="12" font-weight="bold" fill="#ECE7DC">labels ✅</text>
+<rect x="196" y="238" width="128" height="52" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
+<text x="208" y="270" font-family="Inter,Segoe UI,sans-serif" font-size="12" font-weight="bold" fill="#ECE7DC">manifests ✅</text>
+<rect x="336" y="238" width="128" height="52" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
+<text x="348" y="270" font-family="Inter,Segoe UI,sans-serif" font-size="12" font-weight="bold" fill="#ECE7DC">search ✅</text>
+<rect x="476" y="238" width="86" height="52" rx="8" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="490" y="270" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="normal" fill="#ECE7DC">boxes</text>
+<rect x="574" y="238" width="86" height="52" rx="8" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="588" y="270" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="normal" fill="#ECE7DC">items</text>
+<rect x="672" y="238" width="86" height="52" rx="8" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="686" y="270" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="normal" fill="#ECE7DC">…</text>
 <rect x="40" y="340" width="720" height="70" rx="8" fill="#241F1A" stroke="#ECE7DC" stroke-width="1"/>
 <text x="56" y="364" font-family="Inter,Segoe UI,sans-serif" font-size="14" font-weight="normal" fill="#ECE7DC">utility  (shared kernel)</text>
 <rect x="56" y="374" width="680" height="26" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
