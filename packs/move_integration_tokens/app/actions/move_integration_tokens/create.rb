@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/move_integration_tokens: creates an integration token (IntegrationTokensController).
+# Kept in the action layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module MoveIntegrationTokens
   # Mints a per-Move MCP integration token (D13 / Phase 10, Domain §4.13).
   #

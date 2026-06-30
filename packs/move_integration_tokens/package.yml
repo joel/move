@@ -1,0 +1,15 @@
+# packs/move_integration_tokens — per-Move API integration tokens (MCP access).
+#   PUBLIC (app/public): MoveIntegrationToken (model — named in Moves::Destroy).
+#   PUBLIC (sigil): MoveIntegrationTokens::Create / Revoke — IntegrationTokensController.
+# dependencies: ['.', 'packs/utility'] (actions < BaseAction + reference Move; model
+#   < ApplicationRecord). visible_to: ['.'].
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+layer: domain
+dependencies:
+  - "."
+  - "packs/utility"
+visible_to:
+  - "."

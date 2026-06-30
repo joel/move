@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/move_integration_tokens: revokes an integration token (IntegrationTokensController).
+# Kept in the action layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module MoveIntegrationTokens
   # Revokes a per-Move MCP integration token (D13 / Phase 10). Sets revoked_at so
   # the next MCP auth attempt fails (MoveIntegrationToken.authenticate only
