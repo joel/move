@@ -21,7 +21,7 @@ Rails.application.routes.draw do
   post "mcp/uploads", to: "mcp_uploads#create"
   # A1 — Create / select Move (entry screen on an Organization subdomain).
   # A2 — Boxes Home: the box list/grid is the hub of a Move.
-  resources :moves, only: %i[index new create] do
+  resources :moves, only: %i[index new create destroy] do
     # B1 — Box detail & lifecycle.
     resources :boxes, only: %i[index new create show edit update destroy] do
       member do

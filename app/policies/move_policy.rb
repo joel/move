@@ -39,6 +39,12 @@ class MovePolicy < ApplicationPolicy
     editor_role?(record)
   end
 
+  # Deleting a Move outright (today only the onboarding sample, #432) is admin-only
+  # — it is irreversible and removes every box, item and photo.
+  def destroy?
+    admin_of?(record)
+  end
+
   # F3 — creating/revoking MCP integration tokens is admin-only (Domain §4.13).
   def manage_integration_tokens?
     admin_of?(record)
