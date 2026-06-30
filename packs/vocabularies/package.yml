@@ -1,0 +1,16 @@
+# packs/vocabularies — per-Move room vocabulary (the minimal D2 room list).
+#   PUBLIC (app/public): Vocabulary (model).
+#   PUBLIC (sigil): Vocabularies::Create / Update / Remove (VocabulariesController).
+# dependencies: ['.', 'packs/utility', 'packs/search'] — Update/Remove include
+#   Search::Reindexing (packs/search); actions reference root models. visible_to ['.'].
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+layer: domain
+dependencies:
+  - "."
+  - "packs/utility"
+  - "packs/search"
+visible_to:
+  - "."

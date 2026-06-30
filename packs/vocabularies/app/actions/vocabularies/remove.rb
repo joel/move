@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/vocabularies: removes a vocabulary entry (VocabulariesController).
+# Kept in the action layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module Vocabularies
   # Removes a vocabulary value (rooms), detaching it from every box that used it
   # (Domain §4.5–4.7). Detachment is handled by the model's `dependent: :nullify`

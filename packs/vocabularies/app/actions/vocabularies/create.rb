@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/vocabularies: creates a vocabulary entry (VocabulariesController).
+# Kept in the action layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module Vocabularies
   # Adds a value to one of a Move's managed vocabularies (category / tag / room).
   # The kind is described by a Vocabulary registry object so one action serves
