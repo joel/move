@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/recognition: retries a recognition run (captures + recoveries controllers).
+# Kept in its layer (not app/public) so the architecture fitness tests keep
+# governing it; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module RecognitionRuns
   # Retry a failed run by creating a *new* RecognitionRun for the same Media and
   # re-enqueuing (Domain §4.10). The original run is left as-is for the record.
