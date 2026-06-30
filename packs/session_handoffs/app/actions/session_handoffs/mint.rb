@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/session_handoffs: mints a single-use handoff token (Rodauth).
+# Kept in its layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module SessionHandoffs
   # Mint a single-use apex->subdomain handoff token (#280). Called on the apex
   # right after a successful authentication, bound to the authenticated user and

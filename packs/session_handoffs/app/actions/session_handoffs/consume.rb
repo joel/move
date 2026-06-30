@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/session_handoffs: consumes a handoff token (SessionHandoffsController).
+# Kept in its layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module SessionHandoffs
   # Validate and consume an apex->subdomain handoff token (#280) on the org
   # subdomain. Enforces the token invariants — exists, not expired, not already
