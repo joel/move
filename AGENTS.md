@@ -230,7 +230,7 @@ The project uses `overcommit`. Commits will fail if the following hooks are not 
 > every security review applies. Because this repo is **open source**, security is
 > covered in two places: a **per-change** adversarial pass — `/execution-plan`
 > **Step 5d** runs `/security-review` on security-sensitive branch diffs before the
-> PR is public — and a **periodic** whole-repo scan, the scheduled `Security Audit`
+> PR is public — and a **whole-repo** scan, the on-demand `Security Audit`
 > workflow ([`.github/workflows/security-audit.yml`](.github/workflows/security-audit.yml)),
 > which on findings opens a **fixed-body** `security` issue and fails the run — it
 > never republishes the model report (public CI sinks emit only a content-free
@@ -440,7 +440,7 @@ This repository ships agent skills under `.claude/skills/`. Prefer them for the 
   diff. **Wired into `/execution-plan` as Step 5d** (run after `/code-review`, before
   push, on security-sensitive changes). Anchored to the rubric's "Security & data"
   section + [`doc/project/security-model.md`](doc/project/security-model.md). The
-  whole-repo counterpart is the scheduled `Security Audit` workflow.
+  whole-repo counterpart is the on-demand `Security Audit` workflow.
 - **`/qa-review`**, **`/ux-review`**, **`/ui-polish`** — review passes before a PR is merged.
 - **`/ui-designer`** — build Tailwind + Phlex UI from the component library.
 

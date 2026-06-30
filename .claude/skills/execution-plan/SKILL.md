@@ -360,7 +360,7 @@ that section; it governs this loop too): fix real findings into the relevant ato
 commit, reproduce-before-dismissing a suspected false positive, defer to a tracked
 issue only when genuinely justified, and re-run until a round comes back clean (two
 substantive converging rounds is enough). For a whole-codebase audit (not just this
-diff), the scheduled `Security Audit` workflow
+diff), the on-demand `Security Audit` workflow
 ([`.github/workflows/security-audit.yml`](../../../.github/workflows/security-audit.yml))
 covers the existing surface and, on findings, opens a **fixed-body** `security`
 issue and fails the run (it never republishes model output to public CI — the

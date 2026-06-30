@@ -3,19 +3,25 @@ name: Security Audit
 run-name: Security Audit - ${{ github.event_name }}
 
 # Adversarial, whole-codebase security audit. This repo is open source, so we run
-# our own attacker-mindset scan of the entire working tree on a schedule (and on
-# demand) — the periodic counterpart to the per-change `/security-review` pass
-# (`/execution-plan` Step 5d). It is NON-BLOCKING: it never gates a merge; it opens
-# a `security`-labelled issue when it finds something. Threat model lives in
+# our own attacker-mindset scan of the entire working tree — the whole-repo
+# counterpart to the per-change `/security-review` pass (`/execution-plan` Step 5d).
+# Currently MANUAL DISPATCH ONLY (the weekly cron is paused until #430; see the `on:`
+# block). It is NON-BLOCKING: it never gates a merge; it opens a `security`-labelled
+# issue when it finds something. Threat model lives in
 # `doc/project/security-model.md`; the prompt anchors to it + the review rubric.
 #
 # Requires the CODEX_OPENAI_API_KEY repository secret (the same CI-only credential
 # used by Release Bug Scan — deliberately NOT `OPENAI_API_KEY`, which the
 # Doppler→GitHub sync manages; see release-bug-scan.yml for the rationale).
 on:
-  schedule:
-    # Mondays 06:00 UTC. Scheduled runs use the default branch (main) only.
-    - cron: '0 6 * * 1'
+  # MANUAL DISPATCH ONLY (interim). The weekly `schedule:` cron is intentionally
+  # disabled until the public-log residual is hardened (#430): `openai/codex-action`
+  # echoes its output to the world-readable Actions log, and prompt compliance is
+  # the only thing keeping that non-sensitive. A manual dispatch is run deliberately
+  # by a maintainer who can inspect the log; an unattended weekly run is a passive
+  # leak path. Restore the cron below once detail is routed to a private sink.
+  #   schedule:
+  #     - cron: '0 6 * * 1'   # Mondays 06:00 UTC (default branch only)
   workflow_dispatch:
 
 # Least privilege: read the code, and open issues for findings.
