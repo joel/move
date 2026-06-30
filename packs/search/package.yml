@@ -1,0 +1,38 @@
+# packs/search — hybrid lexical + semantic search: the query, its per-item
+# projection, the reindex pipeline, and the per-Move embedding providers.
+#
+#   PUBLIC API (# pack_public sigil, kept in-layer):
+#     Search::Items            the search query (SearchesController + the MCP tool)
+#     Search::RefreshDocument  upsert an item's search row (demo seed + the job)
+#     Search::Reindexing       mixin included by Boxes::Update + Vocabularies actions
+#     IndexingRuns::Start      start a reindex run (Moves::Set*ProviderKey actions)
+#     Searches::RecentSearches recent-search history (SearchesController)
+#   PUBLIC (app/public):
+#     IndexingRun              run record (named in Moves::Destroy::DELETE_ORDER)
+#     ItemSearchDocument       projection model — Item's `has_one :search_document,
+#                              class_name: "ItemSearchDocument"` IS a reference
+#                              Packwerk resolves (it understands AR associations)
+#   PRIVATE (internal to search):
+#     EmbeddingProviders + adapters (Base/Fake/Gemini/Openai/Result/Voyage) — reached
+#                              only via EmbeddingProviders.for_move inside search
+#     Search::RefreshDocumentJob, Search::IndexSubscriber (config-wired),
+#     IndexingRuns::{RecordProgress, Broadcasting}
+#
+# dependencies: ['.', 'packs/utility'] — search subclasses BaseAction and references
+#   Item/Box/Room/Move (root), and ApplicationRecord (models) + ProviderHttp
+#   (embedding adapters) from the kernel. visible_to: ['.'] — every consumer
+#   (controllers, MCP, demo, boxes, vocabularies, moves) is still in the root.
+
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+
+layer: domain
+
+dependencies:
+  - "."
+  - "packs/utility"
+
+visible_to:
+  - "."

@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/search: mixin included by Boxes::Update / Vocabularies actions to re-index on change.
+# Kept in its layer (not app/public) so the architecture fitness tests keep
+# governing it; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module Search
   # Shared by actions that change an item's *denormalized* search context (box
   # number/room, room name, vocab removal) without touching the item rows

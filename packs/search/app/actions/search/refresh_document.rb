@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/search: upserts an item's search projection (called by the demo seed + the job).
+# Kept in its layer (not app/public) so the architecture fitness tests keep
+# governing it; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module Search
   # (Re)builds an Item's search projection (Domain §7.3; Technical Foundation
   # §11). Composes the denormalized search_text from the item's own metadata plus

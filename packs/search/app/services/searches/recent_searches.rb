@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/search: recent-search history service (the searches controller calls it).
+# Kept in its layer (not app/public) so the architecture fitness tests keep
+# governing it; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module Searches
   # #338 — Per-browser memory of a Move's recent successful searches, so the
   # /search empty state can surface the user's own queries instead of static
