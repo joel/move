@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/qr: ScansController calls Qr::Resolve.
+# Kept in the action layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module Qr
   # Resolves a scanned QR token to its Box within a specific Move (E2).
   #

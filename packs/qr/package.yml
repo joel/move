@@ -1,0 +1,13 @@
+# packs/qr — QR-token resolution for the box scan flow.
+#   PUBLIC: Qr::Resolve (sigil) — ScansController calls it to resolve a scanned token.
+# dependencies: ['.'] — Qr::Resolve < BaseAction and references Box/Move (all root).
+# visible_to: ['.'] — only the root scans controller references it.
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+layer: domain
+dependencies:
+  - "."
+visible_to:
+  - "."
