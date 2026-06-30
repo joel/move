@@ -1,0 +1,13 @@
+# packs/reviews — marking a captured photo as reviewed.
+#   PUBLIC (sigil): Reviews::MarkPhotoReviewed — ReviewsController calls it.
+# The Views::Reviews / Components::Reviews presentation stays in root.
+# dependencies: ['.'] (BaseAction + Media/Item are root). visible_to: ['.'].
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+layer: domain
+dependencies:
+  - "."
+visible_to:
+  - "."
