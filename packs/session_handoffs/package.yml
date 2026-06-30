@@ -1,0 +1,16 @@
+# packs/session_handoffs — single-use apex↔subdomain session handoff (host-only
+# cookie auth isolation).
+#   PUBLIC (app/public): SessionHandoffToken (public-schema model, apartment excluded).
+#   PUBLIC (sigil): SessionHandoffs::Mint / Consume (actions) + TargetResolver
+#     (service) — called by the SessionHandoffsController and Rodauth (app/misc).
+# dependencies: ['.', 'packs/utility']; visible_to: ['.'].
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+layer: domain
+dependencies:
+  - "."
+  - "packs/utility"
+visible_to:
+  - "."

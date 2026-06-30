@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/session_handoffs: resolves the post-login target (Rodauth).
+# Kept in its layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module SessionHandoffs
   # Decides which org subdomain a post-auth handoff (#280) should target (#346).
   #
