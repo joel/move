@@ -85,6 +85,59 @@ jobs:
         name: "Test / System Tests"
         run: TEST_BROWSER=rack_test bundle exec rspec spec/system
 
+  packwerk:
+
+    runs-on: ubuntu-latest
+
+    needs: lint
+
+    # Packwerk boots the Rails app to derive Zeitwerk load paths + the constant
+    # resolver, and the boot introspects the DB (Rodauth reads the users table at
+    # class-load), so it needs Postgres + a loaded schema — same service as `test`.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      DB_HOST: localhost
+      DB_PORT: 5432
+
+    steps:
+      -
+        name: Checkout Source Code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: '1'
+      -
+        name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      -
+        name: "Prepare DB (Packwerk boots the app, which introspects the schema)"
+        run: bin/rails db:create db:schema:load
+      -
+        # `validate` checks the package graph + that Zeitwerk resolves every
+        # catalogued constant (incl. the Phlex Views/Components namespaced roots).
+        # `check` enforces the per-pack dependency/privacy/visibility/architecture
+        # boundaries. A new boundary violation fails the build, like rubocop.
+        name: "Packwerk / boundaries"
+        run: |
+          bundle exec packwerk validate
+          bundle exec packwerk check
+
   lint:
 
     runs-on: ubuntu-latest
