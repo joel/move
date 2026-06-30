@@ -138,10 +138,24 @@ These are non-negotiable for all domain work. Do not reinvent these wheels.
    `select { … }.count`) are enforced by the **`Move/DatabaseAggregation`** cop;
    `group_by` is not copped (it is legitimate on already-in-memory collections).
 
+6. **Domain boundaries → Packwerk, never ad-hoc cross-domain reaching.** Each
+   domain is being carved into a `packs/<domain>/` package that declares its
+   dependencies and exposes a minimal **public API** (a public model in
+   `app/public/`; a public entry-point action stays in `app/actions/` marked
+   `# pack_public: true`). A pack may only reference packs it lists in
+   `dependencies`, only their public constants (`enforce_privacy`), only packs that
+   list it in `visible_to` (`enforce_visibility`), and only its own/lower
+   architecture `layer` (`enforce_architecture`). Don't reach into another domain's
+   internals — depend on its public surface, or extend that surface deliberately.
+   The migration is staged (one pack per PR); `packs/labels` is the template. Full
+   reference: [`doc/project/packwerk-boundaries.md`](doc/project/packwerk-boundaries.md).
+
 > **These cops live in `lib/rubocop/cop/move/`** (wired via `require:` in
 > `.rubocop.yml`, with RuboCop::RSpec specs). They make rules #4/#5 deterministic
 > and merge-blocking instead of review-enforced. When a recurring class of defect
-> escapes review, prefer adding/extending a cop over re-reminding.
+> escapes review, prefer adding/extending a cop over re-reminding. The **horizontal**
+> (domain) counterpart to these **vertical** (layer) cops is **Packwerk** (rule #6),
+> run merge-blocking by the `packwerk` CI job + the overcommit pre-commit hook.
 
 ---
 

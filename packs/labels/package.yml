@@ -1,0 +1,38 @@
+# packs/labels — bulk box-label printing (the async LabelPrintRun lifecycle).
+#
+# This is the first fully-bounded domain pack and the template for the rest. All
+# four boundary axes are enforced:
+#
+#   enforce_dependencies  — may only reference packs listed in `dependencies`.
+#   enforce_privacy       — only constants under app/public/ are referenceable from
+#                           outside; everything else (the actions/job internals) is
+#                           private to this pack.
+#   enforce_visibility    — only packs listed in `visible_to` may depend on labels.
+#   enforce_architecture  — as a `domain` pack it may reference `domain`/`utility`
+#                           (and the unlayered root), never the `application` layer.
+#
+# PUBLIC API (app/public/):
+#   LabelPrintRun           — the run record (referenced by Accounts::Delete,
+#                             Moves::Destroy, PurgeStaleLabelPrintRunsJob).
+#   LabelPrintRuns::Start   — the entry-point action (referenced by the controller).
+# PRIVATE (app/actions, app/jobs):
+#   LabelPrintRuns::{RecordProgress, Broadcasting, GenerateJob}.
+#
+# `dependencies: ['.']` — labels reaches the shared kernel (BaseAction,
+# ApplicationRecord, Move, Box, BoxLabelsPdf, …) which still lives in the root
+# package. As those are extracted into packs/utility / domain packs, swap '.' for
+# the specific packs. `visible_to: ['.']` — only the root app references labels
+# today; when accounts/moves become their own packs, add them here.
+
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+
+layer: domain
+
+dependencies:
+  - "."
+
+visible_to:
+  - "."

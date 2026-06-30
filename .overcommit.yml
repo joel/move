@@ -23,6 +23,14 @@ PreCommit:
   RailsSchemaUpToDate:
     enabled: true
 
+  Packwerk:
+    enabled: true
+    required_executable: bundle
+    description: "Checking Packwerk domain boundaries"
+    include:
+      - "app/**/*.rb"
+      - "packs/**/*.rb"
+
   RuboCop:
     enabled: true
     required_executable: bundle
