@@ -170,6 +170,7 @@ graph TD
     qr["qr ✅"]
     terms["terms ✅"]
     reviews["reviews ✅"]
+    photos["photos ✅"]
     manifests["manifests ✅"]
     discards["discards"]
     accounts["accounts"]
@@ -193,7 +194,7 @@ graph TD
     discards --> moves
 
     classDef done fill:#2f6f4e,stroke:#ECE7DC,color:#fff;
-    class labels,utility,manifests,search,recognition,activity,qr,terms,reviews done;
+    class labels,utility,manifests,search,recognition,activity,qr,terms,reviews,photos done;
 ```
 
 **kernel** = the domain-free framework infrastructure (`ApplicationRecord`,
