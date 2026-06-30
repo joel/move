@@ -20,9 +20,30 @@ RSpec.describe Moves::Destroy do
     expect(Room.unscoped.where(move_id: move_id)).to be_empty
   end
 
+  it "fully tears down a real recognition-built sample (FK order, readonly, blobs)" do
+    # The realistic shape: recognition items linked via source_media_id, suggestions,
+    # runs, an append-only Activity, and Active Storage blobs — none of which the
+    # plain `move.destroy!` cascade can remove (FK order / readonly / no purge).
+    move = DemoData::Provision.new.call(owner: create(:user)).value!
+    move_id = move.id
+    attachment_ids = ActiveStorage::Attachment
+                     .where(record_type: "Media", record_id: Media.where(move_id: move_id).select(:id))
+                     .pluck(:id)
+    expect(move.activities).to be_any
+    expect(Item.where(move_id: move_id).where.not(source_media_id: nil)).to be_any
+
+    result = described_class.new.call(move: move)
+
+    expect(result).to be_success
+    [Box, Item, Media, RecognitionRun, RecognitionSuggestion, Activity,
+     ItemSearchDocument].each do |model|
+      expect(model.unscoped.where(move_id: move_id)).to(be_empty, "#{model} left orphans")
+    end
+    expect(Move.unscoped.where(id: move_id)).to be_empty
+    expect(ActiveStorage::Attachment.where(id: attachment_ids)).to be_empty
+  end
+
   it "hard-deletes soft-deleted (discarded) descendants too" do
-    # The Move's dependent: :destroy cascade runs through the kept default scope and
-    # would otherwise skip a discarded item, orphaning it and FK-blocking the delete.
     move = create(:move)
     box = create(:box, move: move)
     create(:item, box: box, move: move).discard!
@@ -33,35 +54,6 @@ RSpec.describe Moves::Destroy do
     expect(result).to be_success
     expect(Item.unscoped.where(move_id: move_id)).to be_empty
     expect(Box.unscoped.where(move_id: move_id)).to be_empty
-  end
-
-  it "purges the Active Storage blobs of its media (no orphaned storage)" do
-    move = create(:move)
-    box = create(:box, move: move)
-    media = create(:media, box: box, move: move)
-    attachment_id = media.image.attachment.id
-    blob_id = media.image.blob.id
-
-    # Test env runs jobs inline, so the cascade's purge_later runs synchronously.
-    described_class.new.call(move: move)
-
-    expect(ActiveStorage::Attachment.where(id: attachment_id)).to be_empty
-    expect(ActiveStorage::Blob.where(id: blob_id)).to be_empty
-  end
-
-  it "removes a Move that has activity-feed rows (readonly cascade)" do
-    # A real Move (via Moves::Create) records a move.created Activity, which is
-    # append-only (readonly?) — the cascade's dependent: :destroy would raise.
-    move = Moves::Create.new.call(
-      params: { name: "Real move", unit_system: "metric" }, creator: create(:user)
-    ).value!
-    expect(move.activities).to be_any
-
-    result = described_class.new.call(move: move)
-
-    expect(result).to be_success
-    expect(Move.unscoped.where(id: move.id)).to be_empty
-    expect(Activity.where(move_id: move.id)).to be_empty
   end
 
   it "destroys an archived Move (cleanup is valid regardless of status)" do

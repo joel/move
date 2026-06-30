@@ -181,6 +181,22 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   # manual items keyed on name.
   DemoData::SampleBuilder.call(move: move)
 
+  # Dev-seed-only upgrade pass: re-attach a newly-committed real photo onto any media
+  # first seeded with the icon.png fallback (e.g. after `seed_images:generate`), so a
+  # plain re-seed picks it up without a full DB reset. SampleBuilder skips a box once
+  # it has media, so this lives here (not in the shared builder — the prod sample
+  # provisions once and never re-seeds). Idempotent: skips media already on the JPEG.
+  SeedData::PHOTOS.each do |photo|
+    real_image = Rails.root.join("db/seed_images/#{photo[:slug]}.jpg")
+    next unless real_image.exist?
+
+    box = move.boxes.find_by(number: photo[:box])
+    media = box&.media&.find { |m| m.image.blob&.filename.to_s.start_with?("#{photo[:slug]}.") }
+    next if media.nil? || media.image.blob&.content_type == "image/jpeg"
+
+    media.image.attach(io: real_image.open, filename: "#{photo[:slug]}.jpg", content_type: "image/jpeg")
+  end
+
   # One AI-generated photo (#416) so the Gallery's "Generated" badge state is
   # showcase-ready — the per-Move Gallery shows ALL media (generated included),
   # unlike the box review walk which excludes them. Attach a committed seed image

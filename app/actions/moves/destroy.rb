@@ -5,16 +5,29 @@ module Moves
   # onboarding sample is removable from the UI). A hard delete, not a discard: the
   # user wants it gone.
   #
-  # The subtlety: boxes/items/media/rooms are soft-deletable (`default_scope { kept }`),
-  # so the Move's `dependent: :destroy` cascade — which runs through those scoped
-  # associations — silently skips any *discarded* descendant. Left behind, a discarded
-  # item's `move_id` FK blocks the Move delete, and its Media's Active Storage blob is
-  # orphaned. So we un-discard every descendant first, then let the standard cascade
-  # reach them. That also purges each Media/LabelPrintRun attachment via its destroy
-  # callback, so no explicit blob bookkeeping is needed.
+  # The app soft-deletes elsewhere (boxes/items via discard), so the *hard*-delete
+  # cascade order was never exercised — and relying on `move.destroy!`'s
+  # `dependent: :destroy` cascade breaks here three ways: (1) discarded descendants
+  # are invisible to the `kept` default scope and would orphan / FK-block the delete;
+  # (2) `Activity` is append-only (`readonly?`) so destroying its rows raises; and
+  # (3) recognition items/suggestions/runs cross-reference `media` through FKs with no
+  # `ON DELETE`, so the association order deletes a parent before its child.
+  #
+  # So we delete every descendant explicitly with `unscoped.delete_all` in child-first
+  # FK order (which also reaches discarded rows and skips readonly callbacks), purging
+  # Active Storage blobs by hand since `delete_all` fires no Active Storage callbacks.
   class Destroy < BaseAction
-    # Soft-deletable models owned by a Move (carry `discarded_at` + `move_id`).
-    DISCARDABLE_DESCENDANTS = [Box, Item, Media, Room].freeze
+    # Move-owned tables in child-first order: no row is deleted while a still-present,
+    # no-`ON DELETE` FK references it. (`item_search_documents` is omitted — its
+    # item_id/move_id FKs are `ON DELETE CASCADE`, so the DB removes it for us.)
+    DELETE_ORDER = [
+      RecognitionSuggestion, RecognitionRun, Item, Media,
+      Activity, IndexingRun, LabelPrintRun, MoveIntegrationToken, MoveMembership,
+      Box, Room
+    ].freeze
+
+    # Models holding Active Storage attachments whose blobs we purge explicitly.
+    ATTACHMENT_MODELS = [Media, LabelPrintRun].freeze
 
     def call(move:)
       move_id = move.id
@@ -25,32 +38,38 @@ module Moves
 
     private
 
-    def emit_event(move_id)
-      Rails.event.notify("move.destroyed", move_id: move_id)
-      Success()
-    end
-
     def teardown(move)
+      # Capture attachment ids before any row is gone (delete_all skips the purge
+      # callback, so blobs would otherwise orphan in storage).
+      attachment_ids = attachment_ids_for(move)
       ActiveRecord::Base.transaction do
-        undiscard_descendants(move)
-        # Activities are append-only (`Activity#readonly?` ⇒ true), so the cascade's
-        # `dependent: :destroy` would raise ActiveRecord::ReadOnlyRecord on the
-        # sample's `move.created` row. SQL-delete them (no instantiation) up front.
-        move.activities.delete_all
-        move.destroy!
+        DELETE_ORDER.each { |model| model.unscoped.where(move_id: move.id).delete_all }
+        Move.unscoped.where(id: move.id).delete_all
       end
+      purge_blobs(attachment_ids)
       Success()
-    rescue ActiveRecord::RecordNotDestroyed, ActiveRecord::InvalidForeignKey => e
+    rescue ActiveRecord::InvalidForeignKey, ActiveRecord::StatementInvalid => e
       Failure(e.message)
     end
 
-    def undiscard_descendants(move)
-      DISCARDABLE_DESCENDANTS.each do |model|
-        model.unscoped
-             .where(move_id: move.id)
-             .where.not(discarded_at: nil)
-             .update_all(discarded_at: nil) # rubocop:disable Rails/SkipsModelValidations -- about to destroy
+    def attachment_ids_for(move)
+      ATTACHMENT_MODELS.flat_map do |model|
+        record_ids = model.unscoped.where(move_id: move.id).pluck(:id)
+        next [] if record_ids.empty?
+
+        ActiveStorage::Attachment
+          .where(record_type: model.name, record_id: record_ids).pluck(:id)
       end
+    end
+
+    # After the rows are gone, purge the (now-orphaned) attachments + their blobs.
+    def purge_blobs(attachment_ids)
+      ActiveStorage::Attachment.where(id: attachment_ids).find_each(&:purge_later)
+    end
+
+    def emit_event(move_id)
+      Rails.event.notify("move.destroyed", move_id: move_id)
+      Success()
     end
   end
 end
