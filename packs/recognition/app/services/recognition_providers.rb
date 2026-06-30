@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/recognition: the per-Move provider registry (.for_move / .default_model — boxes, moves, settings panel).
+# Kept in its layer (not app/public) so the architecture fitness tests keep
+# governing it; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 # Provider-agnostic image recognition (Domain §6, Technical Foundation §10).
 # Domain code talks to RecognitionProviders, never to a vendor API directly. The
 # selected adapter returns a normalized RecognitionProviders::Result.

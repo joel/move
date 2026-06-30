@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/recognition: enqueues a recognition run (Captures::Create calls it).
+# Kept in its layer (not app/public) so the architecture fitness tests keep
+# governing it; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module RecognitionRuns
   # Creates a queued RecognitionRun for a Media and enqueues the processing job,
   # capturing the active tenant so the job can restore it across the enqueue
