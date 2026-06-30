@@ -1,0 +1,16 @@
+# packs/image_generation — per-Move BYO AI image-generation providers.
+#   PUBLIC (sigil): ImageProviders (registry) + ImageProviders::Base (+ its
+#     MissingApiKey error) — Items::GenerateImage calls .for_move and rescues
+#     Base::MissingApiKey. PRIVATE: Fake / Openai / Result adapters/structs.
+# The Items::GenerateImage action + Items::GenerateImageJob stay with items.
+# dependencies: TBD by packwerk; visible_to: ['.'].
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+layer: domain
+dependencies:
+  - "."
+  - "packs/utility"
+visible_to:
+  - "."

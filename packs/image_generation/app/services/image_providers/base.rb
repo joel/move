@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/image_generation: the provider base + Base::MissingApiKey error (Items::GenerateImage rescues it).
+# Kept in its layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module ImageProviders
   # Adapter contract + shared machinery for item-image generation. Subclasses turn
   # a text prompt into a normalized Result (raw image bytes + content type) and
