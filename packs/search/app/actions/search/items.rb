@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/search: the search query action (controller + MCP tool call it).
+# Kept in its layer (not app/public) so the architecture fitness tests keep
+# governing it; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module Search
   # Move-scoped hybrid item search (Domain §7; Technical Foundation §11.4).
   # Combines full-text (tsvector), trigram fuzzy (pg_trgm), and semantic
