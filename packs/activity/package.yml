@@ -1,0 +1,34 @@
+# packs/activity — the append-only audit feed: the Activity record + the
+# event→activity builder + the subscriber that records every domain event.
+#
+#   PUBLIC (app/public):
+#     Activity   the feed record (named in Moves::Destroy::DELETE_ORDER; read by the
+#                ActivitiesController / ActivityFeed / ActivityPresenter in root).
+#   PRIVATE:
+#     Activity::Builder           maps a domain event → an Activity attribute hash.
+#                                 Its SUBJECTS table keys event names to subject-type
+#                                 STRINGS ("Box"/"Item"/"Move"/…), not constants — so
+#                                 it has no domain-constant dependency Packwerk sees.
+#     Activity::RecordSubscriber  records the event. Both are referenced only by
+#                                 config/initializers/activity_log.rb (config is
+#                                 outside Packwerk's `include`).
+#
+# dependencies: ['.', 'packs/utility'] — Activity < ApplicationRecord and Builder
+#   reads Current.source (kernel); the Activity model also references Move (root) in
+#   code. visible_to: ['.'] — Moves::Destroy + the root presentation layer reference
+#   Activity. The controller, the activities view, the ActivityFeed/ActivityPresenter
+#   presenters, and the activity-log initializer stay in root.
+
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+
+layer: domain
+
+dependencies:
+  - "."
+  - "packs/utility"
+
+visible_to:
+  - "."
