@@ -35,4 +35,12 @@ RSpec.describe DemoData::Provision do
 
     expect(ItemSearchDocument.where(move_id: move.id).count).to eq(move.items.count)
   end
+
+  it "rolls back the whole sample if the build fails (no half-built Move persists)" do
+    allow(DemoData::SampleBuilder).to receive(:call).and_raise(StandardError, "storage down")
+
+    expect { described_class.new.call(owner: owner) }.to raise_error(StandardError, "storage down")
+    expect(Move.where(sample: true)).to be_empty
+    expect(Move.count).to eq(0)
+  end
 end
