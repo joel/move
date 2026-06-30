@@ -3,8 +3,21 @@
 require "rails_helper"
 
 RSpec.describe Moves::Destroy do
+  it "refuses to delete a non-sample Move (guards real customer data)" do
+    move = create(:move) # not a sample
+    box = create(:box, move: move)
+    create(:item, box: box, move: move)
+
+    result = described_class.new.call(move: move)
+
+    expect(result).to be_failure
+    expect(result.failure).to eq(:not_sample)
+    expect(Move.unscoped.where(id: move.id)).to be_present
+    expect(Box.unscoped.where(move_id: move.id)).to be_present
+  end
+
   it "removes the Move and every descendant, leaving no orphans" do
-    move = create(:move)
+    move = create(:move, :sample)
     box = create(:box, move: move)
     create(:item, box: box, move: move)
     create(:media, box: box, move: move)
@@ -44,7 +57,7 @@ RSpec.describe Moves::Destroy do
   end
 
   it "hard-deletes soft-deleted (discarded) descendants too" do
-    move = create(:move)
+    move = create(:move, :sample)
     box = create(:box, move: move)
     create(:item, box: box, move: move).discard!
     move_id = move.id
@@ -56,8 +69,8 @@ RSpec.describe Moves::Destroy do
     expect(Box.unscoped.where(move_id: move_id)).to be_empty
   end
 
-  it "destroys an archived Move (cleanup is valid regardless of status)" do
-    move = create(:move, :archived)
+  it "destroys an archived sample Move (cleanup is valid regardless of status)" do
+    move = create(:move, :archived, :sample)
 
     result = described_class.new.call(move: move)
 
