@@ -8,10 +8,33 @@ require "rails_helper"
 # Complements the line-level `Move/*` RuboCop cops with layer/structure checks.
 # See .github/codex/review-rubric.md.
 RSpec.describe "Architecture conventions" do
-  # Code lines (comments stripped) in `glob` matching `pattern`, as "path:line",
-  # skipping any file whose path contains an `except:` fragment.
+  # The layer conventions apply to code wherever it lives — both the flat root
+  # tree (app/…) and the extracted Packwerk domain packs (packs/*/app/…). These
+  # globs keep the fitness tests governing a domain after it is carved into a pack.
+  # Model files in a pack live in app/models (private) or app/public (the public
+  # data contract); public *actions* stay in app/actions and are exposed with the
+  # `# pack_public: true` sigil, so the action-layer globs/excludes below catch them
+  # via the shared `app/actions/` path fragment. See doc/project/packwerk-boundaries.md.
+  #
+  # `model_globs` deliberately scans a pack's app/public/ as part of the model layer:
+  # app/public is reserved for persistence/data contracts (ApplicationRecord
+  # subclasses + pure-data structs), which — like models — must not use Dry::Monads
+  # or emit events. A file there that does is a misplaced action, and failing these
+  # checks is the intended signal (move it to app/actions + the sigil).
+  def model_globs
+    ["app/models/**/*.rb", "packs/*/app/models/**/*.rb", "packs/*/app/public/**/*.rb"]
+  end
+
+  def all_code_glob
+    "{app,packs/*/app}/**/*.rb"
+  end
+
+  # Code lines (comments stripped) in `glob`(s) matching `pattern`, as "path:line",
+  # skipping any file whose path contains an `except:` fragment. `glob` may be a
+  # single pattern or an array of patterns.
   def grep_app(glob, pattern, except: [])
-    relative_paths(glob, except).flat_map { |rel| matches_in(rel, pattern) }
+    Array(glob).flat_map { |g| relative_paths(g, except) }
+               .flat_map { |rel| matches_in(rel, pattern) }
   end
 
   def relative_paths(glob, except)
@@ -39,27 +62,30 @@ RSpec.describe "Architecture conventions" do
 
   describe "models stay persistence-focused (associations / validations / scopes)" do
     it "do not invoke domain actions (business logic belongs in app/actions)" do
-      expect(grep_app("app/models/**/*.rb", /[A-Z]\w*::[A-Z]\w*\.new\.call/)).to be_empty
+      expect(grep_app(model_globs, /[A-Z]\w*::[A-Z]\w*\.new\.call/)).to be_empty
     end
 
     it "do not use Dry::Monads (the action layer's railway)" do
-      expect(grep_app("app/models/**/*.rb", /Dry::Monads/)).to be_empty
+      expect(grep_app(model_globs, /Dry::Monads/)).to be_empty
     end
 
     it "do not emit domain events (actions emit them)" do
-      expect(grep_app("app/models/**/*.rb", /Rails\.event\.notify/)).to be_empty
+      expect(grep_app(model_globs, /Rails\.event\.notify/)).to be_empty
     end
   end
 
   describe "controllers stay thin (authorize → call action → render)" do
     it "do not open database transactions (multi-step persistence belongs in actions)" do
-      expect(grep_app("app/controllers/**/*.rb", /\.transaction\b/)).to be_empty
+      expect(grep_app(["app/controllers/**/*.rb", "packs/*/app/controllers/**/*.rb"],
+                      /\.transaction\b/)).to be_empty
     end
   end
 
   describe "domain events are emitted from the action layer" do
     it "Rails.event.notify lives only in app/actions (+ MCP audit infrastructure)" do
-      hits = grep_app("app/**/*.rb", /Rails\.event\.notify/,
+      # The `app/actions/` fragment also matches a pack's packs/*/app/actions/ path,
+      # so publicized entry-point actions inside a pack are correctly excluded.
+      hits = grep_app(all_code_glob, /Rails\.event\.notify/,
                       except: ["app/actions/", "app/mcp/move_mcp/audit.rb"])
 
       expect(hits).to be_empty, "Rails.event.notify outside the action layer: #{hits.join(", ")}"

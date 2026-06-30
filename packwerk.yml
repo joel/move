@@ -1,0 +1,44 @@
+# Packwerk — domain boundary enforcement. See doc/project/packwerk-boundaries.md.
+#
+# Packwerk maps every constant to the package (directory subtree) that defines it,
+# then enforces, per referencing package: declared dependencies, privacy (only a
+# pack's app/public/ constants are referenceable), visibility (who may depend on a
+# pack), and architecture (layer ordering). Constant resolution is derived from the
+# Rails/Zeitwerk load paths — including the Phlex `Views`/`Components` namespaced
+# roots pushed in config/initializers/phlex.rb (verified by `packwerk validate`).
+
+# Load the enforce_privacy / enforce_visibility / enforce_architecture checkers.
+require:
+  - packwerk-extensions
+
+# Only the application's own production code participates in boundary checks. Specs
+# are intentionally excluded: a test may reference any constant (incl. another
+# pack's private internals) without it counting as a boundary violation.
+include:
+  - "app/**/*.{rb,rake,erb}"
+  - "packs/**/*.{rb,rake,erb}"
+
+exclude:
+  - "{bin,node_modules,script,tmp,vendor,storage,log,public,coverage,db}/**/*"
+  - "spec/**/*"
+  # A pack's own specs (packs/*/spec/**) reference its private internals to test
+  # them — exclude them too, or they would report privacy violations. (`spec/**`
+  # above only matches the root spec/ tree, not a nested packs/*/spec/.)
+  - "packs/*/spec/**/*"
+
+# Cache the constant-resolution + reference scan (tmp/cache/packwerk) for fast reruns.
+cache: true
+
+# Architecture tiers (top → bottom). A pack with `enforce_architecture: true` may
+# only reference packs in its own layer or a LOWER one — never a higher one. A
+# reference to a package with no `layer:` is always allowed, so the unlayered root
+# (which still holds the shared kernel + controllers) does not block the domain
+# packs that currently depend on it. The kernel is extracted to `utility` in a
+# later PR; until then `application` has no member pack.
+#   - application : controllers / orchestration (lives in the unlayered root for now)
+#   - domain      : the per-domain packs (packs/labels, and future boxes/items/…)
+#   - utility     : the shared kernel (BaseAction, ApplicationRecord, Current, …)
+architecture_layers:
+  - application
+  - domain
+  - utility

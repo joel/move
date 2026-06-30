@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/labels (the controller's entry point).
+# Kept in the action layer (not app/public) so the architecture fitness tests keep
+# governing it; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module LabelPrintRuns
   # Starts a bulk label-print generation pass (#303): validates the box-number
   # range, snapshots the box COUNT in SQL (never by loading rows), creates the run,
