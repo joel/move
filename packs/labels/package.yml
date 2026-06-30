@@ -39,3 +39,4 @@ dependencies:
 
 visible_to:
   - "."
+  - "packs/accounts"
