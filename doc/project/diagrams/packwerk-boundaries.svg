@@ -7,10 +7,11 @@
 <text x="70" y="123" font-family="Inter,sans-serif" font-size="13" font-weight="normal" fill="#ECE7DC">root  (enforce_* off)</text>
 <rect x="40" y="168" width="740" height="150" rx="8" fill="#241F1A" stroke="#ECE7DC" stroke-width="1"/>
 <text x="56" y="190" font-family="Inter,sans-serif" font-size="13" font-weight="bold" fill="#ECE7DC">domain  (per-domain packs — extracted one PR at a time)</text>
-<text x="56" y="214" font-family="Inter,sans-serif" font-size="12" font-weight="normal" fill="#7FC8A0">✅ extracted (13): labels · manifests · search · recognition · activity · qr · terms ·</text>
-<text x="56" y="234" font-family="Inter,sans-serif" font-size="12" font-weight="normal" fill="#7FC8A0">reviews · photos · integration_tokens · move_memberships · session_handoffs · accounts</text>
-<text x="56" y="258" font-family="Inter,sans-serif" font-size="12" font-weight="normal" fill="#6B6357">remaining: boxes · items · moves · captures · image_generation · demo_data · vocabularies ·</text>
-<text x="56" y="278" font-family="Inter,sans-serif" font-size="12" font-weight="normal" fill="#6B6357">organizations · auth</text>
+<text x="56" y="214" font-family="Inter,sans-serif" font-size="12" font-weight="normal" fill="#7FC8A0">✅ extracted (14): labels · manifests · search · recognition · activity · qr · terms ·</text>
+<text x="56" y="234" font-family="Inter,sans-serif" font-size="12" font-weight="normal" fill="#7FC8A0">reviews · photos · integration_tokens · move_memberships · session_handoffs · accounts ·</text>
+<text x="56" y="254" font-family="Inter,sans-serif" font-size="12" font-weight="normal" fill="#7FC8A0">vocabularies</text>
+<text x="56" y="278" font-family="Inter,sans-serif" font-size="12" font-weight="normal" fill="#6B6357">remaining: boxes · items · moves · captures · image_generation · demo_data · organizations ·</text>
+<text x="56" y="298" font-family="Inter,sans-serif" font-size="12" font-weight="normal" fill="#6B6357">auth</text>
 <rect x="40" y="340" width="740" height="64" rx="8" fill="#241F1A" stroke="#ECE7DC" stroke-width="1"/>
 <text x="56" y="362" font-family="Inter,sans-serif" font-size="13" font-weight="bold" fill="#ECE7DC">utility  (shared kernel)</text>
 <rect x="56" y="372" width="700" height="24" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
