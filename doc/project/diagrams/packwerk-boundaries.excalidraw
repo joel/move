@@ -384,13 +384,13 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "\u2705 extracted (15): labels \u00b7 manifests \u00b7 search \u00b7 recognition \u00b7 activity \u00b7 qr \u00b7 terms \u00b7",
+      "text": "\u2705 extracted (16): labels \u00b7 manifests \u00b7 search \u00b7 recognition \u00b7 activity \u00b7 qr \u00b7 terms \u00b7",
       "fontSize": 12,
       "fontFamily": 3,
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "\u2705 extracted (15): labels \u00b7 manifests \u00b7 search \u00b7 recognition \u00b7 activity \u00b7 qr \u00b7 terms \u00b7",
+      "originalText": "\u2705 extracted (16): labels \u00b7 manifests \u00b7 search \u00b7 recognition \u00b7 activity \u00b7 qr \u00b7 terms \u00b7",
       "lineHeight": 1.25
     },
     {
@@ -454,13 +454,13 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "vocabularies \u00b7 image_generation",
+      "text": "vocabularies \u00b7 image_generation \u00b7 demo_data",
       "fontSize": 12,
       "fontFamily": 3,
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "vocabularies \u00b7 image_generation",
+      "originalText": "vocabularies \u00b7 image_generation \u00b7 demo_data",
       "lineHeight": 1.25
     },
     {
@@ -489,13 +489,13 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "remaining: boxes \u00b7 items \u00b7 moves \u00b7 captures \u00b7 demo_data \u00b7 organizations \u00b7 auth",
+      "text": "remaining: boxes \u00b7 items \u00b7 moves \u00b7 captures \u00b7 organizations \u00b7 auth",
       "fontSize": 12,
       "fontFamily": 3,
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "remaining: boxes \u00b7 items \u00b7 moves \u00b7 captures \u00b7 demo_data \u00b7 organizations \u00b7 auth",
+      "originalText": "remaining: boxes \u00b7 items \u00b7 moves \u00b7 captures \u00b7 organizations \u00b7 auth",
       "lineHeight": 1.25
     }
   ],
