@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/terms: AgreementsController calls Terms::Accept.
+# Kept in the action layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module Terms
   # Records an account's acceptance of the current terms version (#369).
   # Idempotent: re-accepting the same version returns the existing row as a

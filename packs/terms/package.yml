@@ -1,0 +1,18 @@
+# packs/terms — versioned terms/agreement: the content module, the acceptance
+# record, and the accept action.
+#   PUBLIC (app/public): Terms (content + CURRENT_VERSION, referenced by
+#     ApplicationController, the agreements view, and Rodauth auth_methods) and
+#     TermsAcceptance (public-schema model, in apartment excluded_models).
+#   PUBLIC (sigil): Terms::Accept — AgreementsController calls it.
+# dependencies: ['.', 'packs/utility'] — Accept < BaseAction (root) + references User
+#   (root); TermsAcceptance < ApplicationRecord (kernel). visible_to: ['.'].
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+layer: domain
+dependencies:
+  - "."
+  - "packs/utility"
+visible_to:
+  - "."
