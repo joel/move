@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/image_generation: the per-Move provider registry (.for_move — Items::GenerateImage calls it).
+# Kept in its layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 # Provider-agnostic item-image generation (#416, the opt-in "✨ generate image"
 # for photo-less manual items). Domain code asks ImageProviders for an image; the
 # selected adapter returns a normalized ImageProviders::Result. Mirrors
