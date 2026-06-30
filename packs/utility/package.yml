@@ -1,0 +1,37 @@
+# packs/utility — the shared kernel: the universal base classes + cross-cutting
+# infrastructure every other pack and the root depend on.
+#
+#   Members (all PUBLIC by design — this is the universal foundation):
+#     ApplicationRecord                       superclass of every model
+#     ApplicationJob / ApplicationMailer      superclass of every job / mailer
+#     Current                                 request-scoped attributes
+#     Discardable / Roleable                  shared model concerns (no domain coupling)
+#     ProviderHttp                            shared HTTP client for AI adapters
+#
+# NOT here — these carry an INVISIBLE (method-call) dependency on the Move domain
+# that Packwerk can't see, so a "self-contained" kernel can't hold them; they stay
+# in the root until their Move coupling is factored out:
+#     BaseAction                  #ensure_writable(move) → move.writable? / :move_archived
+#     Discards::Cascade/Restore   ensure_writable(record.move)
+# Decoupling them (so they can be promoted here) is a tracked follow-up.
+#
+# Enforcement — only the two axes that give a real guarantee here:
+#   enforce_dependencies + dependencies: []   the kernel is SELF-CONTAINED; it may
+#                                             not reference any domain or application
+#                                             constant (e.g. BaseAction can't touch Box).
+#   enforce_architecture + layer: utility     the BOTTOM layer; nothing it holds may
+#                                             depend upward (on domain/application).
+#
+# enforce_privacy / enforce_visibility are intentionally OFF: the kernel is the
+# universal public foundation — every constant here is public API referenced
+# everywhere, so per-constant privacy/visibility would be pure ceremony (a
+# visible_to listing every pack). Domain packs (packs/labels, …) keep both strict.
+
+enforce_dependencies: true
+enforce_privacy: false
+enforce_visibility: false
+enforce_architecture: true
+
+layer: utility
+
+dependencies: []

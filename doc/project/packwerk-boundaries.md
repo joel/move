@@ -51,13 +51,34 @@ utility       →  the shared kernel (BaseAction, ApplicationRecord, Current, �
 
 A `domain` pack may reference `domain` + `utility`, never `application`.
 
-**The unlayered-root escape hatch.** The root package has **no `layer:`**. The
+A `utility` pack may reference only `utility` (itself).
+
+**The shared kernel → `packs/utility`.** The cross-cutting framework infrastructure
+(`ApplicationRecord`, `ApplicationJob`, `ApplicationMailer`, `Current`, `Discardable`,
+`Roleable`, `ProviderHttp`) lives in `packs/utility` (`layer: utility`). It enforces
+**dependencies** (`dependencies: []` — the kernel is self-contained; it can never
+reference a domain or application constant) and **architecture** (bottom layer).
+Privacy/visibility are **off** there: the kernel is the universal public foundation,
+so per-constant privacy/visibility would be ceremony (a `visible_to` listing every
+pack). Domain packs keep both strict.
+
+> **Self-contained means *no domain coupling at all* — including method calls
+> Packwerk can't see.** `BaseAction` and `Discards::Cascade`/`CascadeRestore` are
+> deliberately **not** in utility: both call `ensure_writable(move)` →
+> `move.writable?` / `Failure(:move_archived)`, a method-call dependency on the Move
+> domain's archived-invariant. Packwerk only tracks *constants*, so it wouldn't flag
+> it — but a bottom-layer kernel that has to change when Move's writable/archive
+> contract changes isn't a kernel. They stay in the root until `ensure_writable` is
+> factored out of the action base (tracked follow-up), after which they can be
+> promoted to `utility`.
+
+**The unlayered-root escape hatch.** The root package still has **no `layer:`**. The
 architecture checker treats a reference to a layer-less package as always allowed
-(`Layer::Package#can_depend_on?` returns `true` when the target layer is `nil`). So
-while the shared kernel (`BaseAction`, `Box`, `Move`, …) still lives in the root, a
-`domain` pack depending on it is **not** a violation. When the kernel is extracted to
-`packs/utility` in a later PR, the domains' `dependencies: ['.']` is swapped for the
-specific packs and the root is reclassified.
+(`Layer::Package#can_depend_on?` returns `true` when the target layer is `nil`). The
+root still holds the other ~14 domains' models + controllers that `packs/labels`
+references (`Move`, `Box`, `BoxLabelsPdf`), so a `domain` pack depending on the root
+is **not** a violation. The root is reclassified as `application` only once **all**
+domains have been extracted.
 
 ---
 
@@ -112,8 +133,9 @@ packs/labels/
   point).
 - **Private**: the progress recorder, the broadcasting mixin, the generation job —
   referenced only inside the pack.
-- `dependencies: ['.']` — reaches the kernel still in root (`BaseAction`,
-  `ApplicationRecord`, `Move`, `Box`, `BoxLabelsPdf`).
+- `dependencies: ['.', 'packs/utility']` — reaches the shared kernel in
+  `packs/utility` (`BaseAction`, `ApplicationRecord`, `ApplicationJob`) and the
+  domain constants still in root (`Move`, `Box`, `BoxLabelsPdf`).
 - `visible_to: ['.']` — only the root app references labels today. When
   `accounts`/`moves` become packs, add them here.
 
@@ -132,10 +154,11 @@ the rest are still in the root and follow in later PRs.
 ```mermaid
 graph TD
     subgraph application [" "]
-      root["root (application)<br/>controllers, views, kernel*"]
+      root["root (unlayered)<br/>controllers, views, unextracted domains"]
     end
 
     labels["labels ✅"]
+    utility["utility ✅ (kernel)"]
     boxes["boxes"]
     items["items"]
     moves["moves"]
@@ -149,9 +172,8 @@ graph TD
     demo["demo_data"]
     tenancy["tenancy"]
     auth["auth"]
-    utility["utility (kernel)*"]
 
-    labels --> root
+    labels --> root & utility
     boxes --> moves & discards & search & captures
     items --> boxes & moves & captures & discards & image_gen & search
     captures --> moves & boxes & items
@@ -166,12 +188,14 @@ graph TD
     discards --> moves
 
     classDef done fill:#2f6f4e,stroke:#ECE7DC,color:#fff;
-    class labels done;
+    class labels,utility done;
 ```
 
-\* **kernel** = the shared constants every domain needs (`BaseAction`,
-`ApplicationRecord`, `Current`, `Discardable`, `Apartment`, `Rails.event`,
-`ProviderHttp`). Lives in the root today; extracted to `packs/utility` later.
+**kernel** = the domain-free framework infrastructure (`ApplicationRecord`,
+`ApplicationJob`, `ApplicationMailer`, `Current`, `Discardable`, `Roleable`,
+`ProviderHttp`) — extracted into **`packs/utility`** (the `utility` layer).
+`BaseAction` stays in root for now (its `ensure_writable` couples it to Move).
+`Apartment` + `Rails.event` are gem/framework globals, not packaged.
 
 **Known coupling hotspots** (to untangle as domains are extracted):
 

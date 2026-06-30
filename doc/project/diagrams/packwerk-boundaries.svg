@@ -2,7 +2,7 @@
 <rect x="0" y="0" width="800" height="500" rx="0" fill="#15120E" stroke="#15120E" stroke-width="0"/>
 <text x="40" y="46" font-family="Inter,Segoe UI,sans-serif" font-size="22" font-weight="bold" fill="#ECE7DC">Packwerk boundaries — layers &amp; packs</text>
 <rect x="40" y="80" width="720" height="90" rx="8" fill="#2A2620" stroke="#ECE7DC" stroke-width="1"/>
-<text x="56" y="104" font-family="Inter,Segoe UI,sans-serif" font-size="14" font-weight="normal" fill="#ECE7DC">application  (unlayered root: controllers, views, shared kernel*)</text>
+<text x="56" y="104" font-family="Inter,Segoe UI,sans-serif" font-size="14" font-weight="normal" fill="#ECE7DC">application  (unlayered root: controllers, views, unextracted domains)</text>
 <rect x="56" y="116" width="300" height="44" rx="8" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
 <text x="70" y="143" font-family="Inter,Segoe UI,sans-serif" font-size="14" font-weight="normal" fill="#ECE7DC">root  (enforce_* off)</text>
 <rect x="40" y="200" width="720" height="110" rx="8" fill="#241F1A" stroke="#ECE7DC" stroke-width="1"/>
@@ -21,10 +21,10 @@
 <text x="582" y="270" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="normal" fill="#ECE7DC">captures</text>
 <rect x="654" y="238" width="78" height="52" rx="8" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
 <text x="668" y="270" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="normal" fill="#ECE7DC">…</text>
-<rect x="40" y="340" width="720" height="70" rx="8" fill="#201C18" stroke="#ECE7DC" stroke-width="1"/>
-<text x="56" y="364" font-family="Inter,Segoe UI,sans-serif" font-size="14" font-weight="normal" fill="#ECE7DC">utility  (shared kernel* — extracted to packs/utility later)</text>
-<rect x="56" y="374" width="680" height="26" rx="8" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="70" y="392" font-family="Inter,Segoe UI,sans-serif" font-size="12" font-weight="normal" fill="#ECE7DC">BaseAction · ApplicationRecord · Current · Apartment · Rails.event</text>
+<rect x="40" y="340" width="720" height="70" rx="8" fill="#241F1A" stroke="#ECE7DC" stroke-width="1"/>
+<text x="56" y="364" font-family="Inter,Segoe UI,sans-serif" font-size="14" font-weight="normal" fill="#ECE7DC">utility  (shared kernel)</text>
+<rect x="56" y="374" width="680" height="26" rx="8" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
+<text x="70" y="392" font-family="Inter,Segoe UI,sans-serif" font-size="11" font-weight="bold" fill="#ECE7DC">packs/utility ✅  ApplicationRecord · ApplicationJob · Current · Discardable · ProviderHttp · Roleable</text>
 <text x="40" y="440" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="normal" fill="#6B6357">Rule: a domain pack may reference domain/utility (and the unlayered root), never application.</text>
-<text x="40" y="464" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="normal" fill="#6B6357">Public API: model → app/public/ ;  entry-point action → app/actions/ + “# pack_public: true”.</text>
+<text x="40" y="464" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="normal" fill="#6B6357">utility is self-contained (dependencies: []) — the kernel can never reference a domain constant.</text>
 </svg>

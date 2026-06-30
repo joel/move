@@ -1,14 +1,16 @@
 # Root package — the permissive catch-all that holds everything not yet extracted
-# into a domain pack under packs/ (the shared kernel, controllers, the other 15
-# domains). It is deliberately UNENFORCED and UNLAYERED during the staged migration:
+# into a pack under packs/ (controllers, views, and the ~14 domains still to carve).
+# The shared kernel has already moved to packs/utility. It is deliberately
+# UNENFORCED and UNLAYERED during the staged migration:
 #
 #   * enforce_* are all false, so the root may freely reference any pack's public
 #     API while domains are carved out one PR at a time;
-#   * it has no `layer:`, so a `domain`-layer pack referencing the kernel that still
-#     lives here is NOT an architecture violation (see packwerk.yml).
+#   * it has no `layer:`, so a `domain`-layer pack referencing a root domain
+#     constant (Move, Box, …) it still depends on is NOT an architecture violation
+#     (see packwerk.yml).
 #
-# As each domain (and finally the shared kernel → packs/utility) is extracted, this
-# package shrinks. See doc/project/packwerk-boundaries.md for the migration plan.
+# As each remaining domain is extracted this package shrinks, and once they all are,
+# the root becomes the `application` layer. See doc/project/packwerk-boundaries.md.
 
 enforce_dependencies: false
 enforce_privacy: false
