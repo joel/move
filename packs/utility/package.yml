@@ -1,0 +1,32 @@
+# packs/utility — the shared kernel: the universal base classes + cross-cutting
+# infrastructure every other pack and the root depend on.
+#
+#   Members (all PUBLIC by design — this is the universal foundation):
+#     BaseAction                              superclass of every action
+#     ApplicationRecord                       superclass of every model
+#     ApplicationJob / ApplicationMailer      superclass of every job / mailer
+#     Current                                 request-scoped attributes
+#     Discardable / Roleable                  shared model concerns
+#     ProviderHttp                            shared HTTP client for AI adapters
+#     Discards::Cascade / ::CascadeRestore    generic soft-delete cascade (→ BaseAction)
+#
+# Enforcement — only the two axes that give a real guarantee here:
+#   enforce_dependencies + dependencies: []   the kernel is SELF-CONTAINED; it may
+#                                             not reference any domain or application
+#                                             constant (e.g. BaseAction can't touch Box).
+#   enforce_architecture + layer: utility     the BOTTOM layer; nothing it holds may
+#                                             depend upward (on domain/application).
+#
+# enforce_privacy / enforce_visibility are intentionally OFF: the kernel is the
+# universal public foundation — every constant here is public API referenced
+# everywhere, so per-constant privacy/visibility would be pure ceremony (a
+# visible_to listing every pack). Domain packs (packs/labels, …) keep both strict.
+
+enforce_dependencies: true
+enforce_privacy: false
+enforce_visibility: false
+enforce_architecture: true
+
+layer: utility
+
+dependencies: []

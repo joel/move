@@ -18,11 +18,11 @@
 # PRIVATE (app/actions, app/jobs):
 #   LabelPrintRuns::{RecordProgress, Broadcasting, GenerateJob}.
 #
-# `dependencies: ['.']` — labels reaches the shared kernel (BaseAction,
-# ApplicationRecord, Move, Box, BoxLabelsPdf, …) which still lives in the root
-# package. As those are extracted into packs/utility / domain packs, swap '.' for
-# the specific packs. `visible_to: ['.']` — only the root app references labels
-# today; when accounts/moves become their own packs, add them here.
+# Dependencies: `packs/utility` for the shared kernel (BaseAction, ApplicationRecord,
+# ApplicationJob, …) and `.` (root) for the domain constants still there (Move, Box,
+# BoxLabelsPdf). As more domains are extracted, swap '.' for the specific packs.
+# `visible_to: ['.']` — only the root app references labels today; when
+# accounts/moves become their own packs, add them here.
 
 enforce_dependencies: true
 enforce_privacy: true
@@ -33,6 +33,7 @@ layer: domain
 
 dependencies:
   - "."
+  - "packs/utility"
 
 visible_to:
   - "."

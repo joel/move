@@ -34,9 +34,9 @@ cache: true
 # Architecture tiers (top → bottom). A pack with `enforce_architecture: true` may
 # only reference packs in its own layer or a LOWER one — never a higher one. A
 # reference to a package with no `layer:` is always allowed, so the unlayered root
-# (which still holds the shared kernel + controllers) does not block the domain
-# packs that currently depend on it. The kernel is extracted to `utility` in a
-# later PR; until then `application` has no member pack.
+# (which still holds the unextracted domains' models + controllers) does not block
+# the domain packs that currently depend on it. The shared kernel now lives in
+# `packs/utility`; the root is reclassified as `application` once all domains move.
 #   - application : controllers / orchestration (lives in the unlayered root for now)
 #   - domain      : the per-domain packs (packs/labels, and future boxes/items/…)
 #   - utility     : the shared kernel (BaseAction, ApplicationRecord, Current, …)
