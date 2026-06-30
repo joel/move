@@ -384,13 +384,13 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "\u2705 extracted (11): labels \u00b7 manifests \u00b7 search \u00b7 recognition \u00b7 activity \u00b7 qr \u00b7 terms \u00b7",
+      "text": "\u2705 extracted (12): labels \u00b7 manifests \u00b7 search \u00b7 recognition \u00b7 activity \u00b7 qr \u00b7 terms \u00b7",
       "fontSize": 12,
       "fontFamily": 3,
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "\u2705 extracted (11): labels \u00b7 manifests \u00b7 search \u00b7 recognition \u00b7 activity \u00b7 qr \u00b7 terms \u00b7",
+      "originalText": "\u2705 extracted (12): labels \u00b7 manifests \u00b7 search \u00b7 recognition \u00b7 activity \u00b7 qr \u00b7 terms \u00b7",
       "lineHeight": 1.25
     },
     {
@@ -419,13 +419,13 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "reviews \u00b7 photos \u00b7 integration_tokens \u00b7 move_memberships",
+      "text": "reviews \u00b7 photos \u00b7 integration_tokens \u00b7 move_memberships \u00b7 session_handoffs",
       "fontSize": 12,
       "fontFamily": 3,
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "reviews \u00b7 photos \u00b7 integration_tokens \u00b7 move_memberships",
+      "originalText": "reviews \u00b7 photos \u00b7 integration_tokens \u00b7 move_memberships \u00b7 session_handoffs",
       "lineHeight": 1.25
     },
     {
@@ -489,13 +489,13 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "vocabularies \u00b7 session_handoffs \u00b7 organizations \u00b7 auth",
+      "text": "vocabularies \u00b7 organizations \u00b7 auth",
       "fontSize": 12,
       "fontFamily": 3,
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "vocabularies \u00b7 session_handoffs \u00b7 organizations \u00b7 auth",
+      "originalText": "vocabularies \u00b7 organizations \u00b7 auth",
       "lineHeight": 1.25
     }
   ],
