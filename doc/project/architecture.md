@@ -214,6 +214,47 @@ the create-account step.
 - **Re-agreement, for free.** Bumping `CURRENT_VERSION` re-gates every account on
   its next request — the (not-yet-built) re-acceptance flow needs no new mechanism.
 
+### Onboarding sample provisioning: a new account starts populated (#432)
+
+So a new user never lands on an empty app, creating an Organization auto-provisions
+a curated **sample Move** (boxes, photos with recognized items) into the new tenant.
+It is an event-driven side effect, never inline in the auth path: `Organizations::Create`
+already emits `organization.created`, which `DemoData::ProvisionSubscriber` consumes
+to enqueue a tenancy-aware `DemoData::ProvisionJob`. The job builds the sample from the
+**committed demo catalog** (`db/seed_images/*` + recorded recognition JSON) via the
+shared `DemoData::SampleBuilder` — the same code the dev seed uses — so it makes **no
+AI call** and costs nothing. The sample runs on the network-free `fake` providers and
+is marked `moves.sample` (which surfaces a one-tap "Remove sample" → `Moves::Destroy`).
+
+The reveal is live and poll-free. `organizations.demo_data_status`
+(`provisioning`→`provisioned`/`failed`) drives the Moves index: while provisioning it
+renders a placeholder subscribed to a Turbo Stream anchored on the Organization; the
+job persists the terminal status **then** broadcasts the real list — so a page that
+loads after the broadcast reads the right state and never shows a stuck spinner.
+
+```mermaid
+sequenceDiagram
+  participant U as New user
+  participant Auth as Rodauth (apex)
+  participant OC as Organizations::Create
+  participant Sub as ProvisionSubscriber
+  participant Job as ProvisionJob (tenant)
+  participant Idx as Moves index (subdomain)
+
+  U->>Auth: verify account / sign in
+  Auth->>OC: ensure_personal_organization
+  OC->>OC: Apartment::Tenant.create(slug)
+  OC-->>Sub: emit organization.created
+  Sub->>Sub: org.demo_data_status = "provisioning"
+  Sub-->>Job: perform_later(org_id, tenant: slug)
+  U->>Idx: GET /moves
+  Idx-->>U: placeholder + turbo_stream_from(org, :demo_provisioning)
+  Job->>Job: switch(tenant) → SampleBuilder (no AI)
+  Job->>Job: org.demo_data_status = "provisioned"
+  Job-->>Idx: broadcast_replace_to(org, :demo_provisioning)
+  Idx-->>U: sample Move card (no reload)
+```
+
 ---
 
 ## 3. Per-request tenant resolution

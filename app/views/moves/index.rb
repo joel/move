@@ -4,14 +4,15 @@ module Views
   module Moves
     # A1 — Select Move (list view) / empty state.
     class Index < Views::Base
-      def initialize(moves:)
+      def initialize(moves:, organization: nil)
         @moves = moves
+        @organization = organization
       end
 
       def view_template
         div(class: "mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8") do
           header
-          @moves.any? ? list : empty_state
+          render Components::Moves::Collection.new(moves: @moves, organization: @organization)
         end
       end
 
@@ -27,24 +28,6 @@ module Views
             label: I18n.t("moves.index.create"),
             href: view_context.new_move_path,
             full_width: false
-          )
-        end
-      end
-
-      def list
-        section(class: "flex flex-col gap-4") do
-          @moves.each { |move| render Components::MoveCard.new(move: move) }
-        end
-      end
-
-      def empty_state
-        render Components::Ui::EmptyState.new(
-          title: I18n.t("moves.empty.title"),
-          description: I18n.t("moves.empty.description")
-        ) do
-          render Components::Ui::Button.new(
-            label: I18n.t("moves.empty.create"),
-            href: view_context.new_move_path
           )
         end
       end
