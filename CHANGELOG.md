@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.70.0] — 2026-06-30
+
+### Added
+- **Start with a sample move to explore.** A brand-new account no longer lands on
+  an empty app — it arrives with a ready-made **sample move** already filled with
+  boxes and photographed items across a few rooms and packing states, so you can
+  try browsing, search, the gallery and labels straight away. It appears on your
+  moves list on its own (no setup), is clearly marked **Sample**, and you can remove
+  it in one tap once you've had a look (#432).
+
 ## [v0.68.0] — 2026-06-29
 
 ### Changed
