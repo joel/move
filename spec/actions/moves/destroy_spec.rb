@@ -49,6 +49,21 @@ RSpec.describe Moves::Destroy do
     expect(ActiveStorage::Blob.where(id: blob_id)).to be_empty
   end
 
+  it "removes a Move that has activity-feed rows (readonly cascade)" do
+    # A real Move (via Moves::Create) records a move.created Activity, which is
+    # append-only (readonly?) — the cascade's dependent: :destroy would raise.
+    move = Moves::Create.new.call(
+      params: { name: "Real move", unit_system: "metric" }, creator: create(:user)
+    ).value!
+    expect(move.activities).to be_any
+
+    result = described_class.new.call(move: move)
+
+    expect(result).to be_success
+    expect(Move.unscoped.where(id: move.id)).to be_empty
+    expect(Activity.where(move_id: move.id)).to be_empty
+  end
+
   it "destroys an archived Move (cleanup is valid regardless of status)" do
     move = create(:move, :archived)
 

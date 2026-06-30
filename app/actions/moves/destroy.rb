@@ -33,6 +33,10 @@ module Moves
     def teardown(move)
       ActiveRecord::Base.transaction do
         undiscard_descendants(move)
+        # Activities are append-only (`Activity#readonly?` ⇒ true), so the cascade's
+        # `dependent: :destroy` would raise ActiveRecord::ReadOnlyRecord on the
+        # sample's `move.created` row. SQL-delete them (no instantiation) up front.
+        move.activities.delete_all
         move.destroy!
       end
       Success()

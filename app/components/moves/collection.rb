@@ -61,7 +61,7 @@ module Components
 
       def list
         section(class: "flex flex-col gap-4") do
-          @moves.each { |move| render Components::MoveCard.new(move: move) }
+          @moves.each { |move| render Components::MoveCard.new(move: move, user: @user) }
         end
       end
 

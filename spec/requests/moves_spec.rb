@@ -106,6 +106,25 @@ RSpec.describe "Moves" do
       expect(response).to have_http_status(:forbidden)
       expect(Move.exists?(move.id)).to be(true)
     end
+
+    it "shows the Remove affordance to an admin of the sample Move" do
+      create(:move, name: "Mine", created_by: user, sample: true)
+
+      get moves_path
+
+      expect(response.body).to include(I18n.t("moves.sample.remove"))
+    end
+
+    it "hides the Remove affordance from a non-admin member of a sample Move" do
+      owner = create(:user)
+      move = create(:move, name: "Shared sample", created_by: owner, sample: true)
+      move.move_memberships.create!(user: user, role: "viewer")
+
+      get moves_path
+
+      expect(response.body).to include("Shared sample")
+      expect(response.body).not_to include(I18n.t("moves.sample.remove"))
+    end
   end
 
   describe "without a tenant (apex/public)" do

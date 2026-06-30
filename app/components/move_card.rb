@@ -14,8 +14,9 @@ module Components
       "archived" => "bg-surface-container-high text-muted"
     }.freeze
 
-    def initialize(move:)
+    def initialize(move:, user: nil)
       @move = move
+      @user = user
     end
 
     def view_template
@@ -37,11 +38,17 @@ module Components
           progress_bar
           metrics
         end
-        remove_sample_control if @move.sample?
+        remove_sample_control if removable?
       end
     end
 
     private
+
+    # Only an admin of the Move can delete it (MovePolicy#destroy?), so don't render
+    # a destructive affordance that a viewer/contributor would only get a 403 from.
+    def removable?
+      @move.sample? && @move.membership_for(@user)&.admin?
+    end
 
     def sample_badge
       span(class: "inline-flex items-center rounded-full bg-secondary/20 px-2.5 py-0.5 " \
