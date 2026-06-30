@@ -165,8 +165,9 @@ action emits and returns; it **never** calls a subscriber directly.
 | `MediaVariants::PrewarmSubscriber` | `media_variants.rb` | `media.captured` | Enqueues `MediaVariants::PrewarmJob` to warm display variants (async, #316) |
 | `Manifests::AuditSubscriber` | `manifest_audit.rb` | `manifest.*` | Logs the authenticated sensitive read |
 | `MoveMcp::AuditSubscriber` | `mcp_audit.rb` | `integration_token.` / `mcp.` | MCP / token audit trail |
+| `DemoData::ProvisionSubscriber` | `demo_data.rb` | `organization.created` | Enqueues `DemoData::ProvisionJob` to build + live-reveal the onboarding sample Move (async, #432) |
 
-**Event catalog** (consumers: **A** activity · **S** search · **P** prewarm · **M** manifest · **X** MCP · **—** none):
+**Event catalog** (consumers: **A** activity · **S** search · **P** prewarm · **M** manifest · **X** MCP · **D** demo-data · **—** none):
 
 | Domain | Events | Key payload | Consumers |
 |---|---|---|---|
@@ -174,7 +175,7 @@ action emits and returns; it **never** calls a subscriber directly.
 | `box` | `description_suggested` | `box_id, source` | — (advisory) |
 | `item` | `created` `updated` `moved` `removed` `deleted` `restored` `undeleted` | `item_id, box_id, move_id` (+ `created_via`, `to_box_id`, `batch_id`) | A; **S** for `created`/`updated`/`moved` |
 | `media` | `captured` `moved` | `media_id, box_id, move_id` (+ `to_box_id` for `moved`) | A, **P** for `captured`; (`moved` also emits an `item.moved` per co-located item → **S**) |
-| `move` | `created` `unit_system_changed` `auto_confirm_threshold_changed` `recognition_provider_changed` `recognition_model_changed` `provider_key_set` `provider_key_removed` `embedding_provider_changed` `summary_viewed` | `move_id` (+ changed value / `provider`) | A (`summary_viewed` low-signal) |
+| `move` | `created` `destroyed` `unit_system_changed` `auto_confirm_threshold_changed` `recognition_provider_changed` `recognition_model_changed` `provider_key_set` `provider_key_removed` `embedding_provider_changed` `summary_viewed` | `move_id` (+ changed value / `provider`) | A (`summary_viewed` low-signal; `destroyed` advisory — #432) |
 | `move_membership` | `added` `role_changed` `removed` | `move_id, user_id, role` | A |
 | `integration_token` | `created` `revoked` | `move_id, token_id` | A, **X** |
 | `vocabulary` | `created` `updated` `removed` | `move_id, kind, record_id` | A |
@@ -182,6 +183,7 @@ action emits and returns; it **never** calls a subscriber directly.
 | `qr` | `resolved` | `box_id, move_id, actor_id` | A (low-signal) |
 | `recognition_run` | `queued` `processing` `succeeded` `failed` | `recognition_run_id, box_id` (+ `item_count`/`error_code`) | — (drives run state / UI) |
 | `session_handoff` | `minted` `consumed` | `token_id, user_id, organization_slug` | — (audit trail; apex→subdomain handoff, #280) |
+| `organization` | `created` | `organization_id, slug` | **D** — provisions the onboarding sample Move (#432) |
 
 > **Rails 8.1 events.** Subscribers respond to `#emit(event)` (not `#call`); the
 > event is a hash — `event[:name]`, `event[:payload]`. See root `AGENTS.md` §4.

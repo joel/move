@@ -312,4 +312,17 @@ module SeedData
   def self.authored_detection(item)
     { name: item[:name], confidence: item[:confidence], review: item[:review] }
   end
+
+  # Active Storage attachable for a photo slug: the committed db/seed_images/<slug>.jpg
+  # when present, else the placeholder icon (so seeding/provisioning works offline / on
+  # a fresh DB / in CI with no generated photos). Shared by DemoData::SampleBuilder and
+  # db/seeds.rb so the two never drift.
+  def self.image_attachable(slug)
+    path = Rails.root.join("db/seed_images/#{slug}.jpg")
+    if path.exist?
+      { io: path.open, filename: "#{slug}.jpg", content_type: "image/jpeg" }
+    else
+      { io: Rails.public_path.join("icon.png").open, filename: "#{slug}.png", content_type: "image/png" }
+    end
+  end
 end

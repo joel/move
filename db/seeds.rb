@@ -26,6 +26,11 @@ return unless Apartment::Tenant.current == "public"
 require "securerandom"
 require Rails.root.join("db/seed_data/catalog").to_s
 
+# This seed builds the dev showcase Move explicitly, so suppress the signup
+# auto-provisioner (#432) — otherwise creating the demo org would also enqueue an
+# auto "Sample move", duplicating contents into the demo tenant.
+DemoData.auto_provision = false
+
 # --- Demo accounts + organization (tenant) ----------------------------------
 # Sign in (passwordless) with these emails on the org subdomain
 # `<slug>.<tenant_zone>` (dev: acme.move-easy.docker). The first three are
@@ -124,7 +129,13 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     # image" button on a photo-less manual item works offline; an admin switches to
     # OpenAI by adding a key in Settings (the default for a real Move).
     m.image_provider = "fake"
+    # In dev this showcase Move doubles as the onboarding sample exemplar (#432), so
+    # it carries the Sample badge + "Remove sample" affordance for /product-review.
+    m.sample = true
   end
+  move.update!(sample: true) unless move.sample?
+  # No live "preparing…" placeholder in dev — this Move is built synchronously.
+  organization.update!(demo_data_status: "provisioned") unless organization.demo_data_status == "provisioned"
   # #187 — showcase a per-provider model override. The demo keeps `fake` active
   # (offline), but OpenAI is pinned to a custom model: switching the provider pill
   # in the Settings "Recognition & AI" panel reveals "gpt-5" pre-filled in the
@@ -161,119 +172,20 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   Moves::DefaultVocabularies.apply(move)
   rooms = move.rooms.index_by(&:name)
 
-  # Boxes across every lifecycle state (packing/sealed/in_transit/unpacking/
-  # unpacked), a full/partial/no dimension spread, a roomless box (the
-  # seal-requires-room guard) and repeated sizes (the Add Box "Reuse dimensions"
-  # chips) — see SeedData::BOXES. This spread also exercises the Menu's "Bulk box
-  # steps" surface (Phase 44). `desc` exercises the contents-description surface;
-  # packing boxes 2/6/9 deliberately have none so the ✨ AI-suggest field and the
-  # seal-time "describe before sealing" modal are demoable.
-  SeedData::BOXES.each do |attrs|
-    length, width, height, weight = attrs[:dims]
-    box = move.boxes.find_or_create_by!(number: attrs[:number]) do |b|
-      b.qr_token = SecureRandom.urlsafe_base64(16)
-      b.room = attrs[:room] && rooms[attrs[:room]]
-      b.status = attrs[:status]
-      b.description = attrs[:desc]
-      b.length_cm = length
-      b.width_cm = width
-      b.height_cm = height
-      b.weight_kg = weight
-      b.fragile = attrs[:fragile] || false
-    end
-    # Backfill a showcase description onto a box seeded before this feature
-    # existed, so a re-seed shows it (the create block runs only on first insert).
-    # Only fills a blank, leaving developer edits and lifecycle state untouched.
-    box.update!(description: attrs[:desc]) if attrs[:desc].present? && box.description.blank?
-    # Same for the Phase A fragile flag: re-assert the catalog's fragile boxes on a
-    # re-seed (the create block ran only on first insert) so the FRAGILE chip +
-    # printed label are showcase-ready without a full DB reset.
-    box.update!(fragile: true) if attrs[:fragile] && !box.fragile?
-  end
+  # Build the Move's belongings from the full committed catalog via the shared
+  # builder — boxes across every lifecycle state, photos with replayed recognition
+  # + items, and photo-less manual items — the SAME code the signup sample Move
+  # provisions through (#432), so the dev showcase and the production sample never
+  # drift. `box_numbers: nil` = the whole catalog (the sample passes a subset).
+  # Idempotent: boxes keyed on number, a box's photos skipped once it has media,
+  # manual items keyed on name.
+  DemoData::SampleBuilder.call(move: move)
 
-  # Attach the generated 1:1 demo photo for a slug once it's been generated and
-  # committed (db/seed_images/<slug>.jpg via `rails seed_images:generate`); else
-  # fall back to the placeholder icon so db:seed works offline / on a fresh DB / CI.
-  seed_image_attachable = lambda do |slug|
-    path = Rails.root.join("db/seed_images/#{slug}.jpg")
-    if path.exist?
-      { io: path.open, filename: "#{slug}.jpg", content_type: "image/jpeg" }
-    else
-      { io: Rails.public_path.join("icon.png").open, filename: "#{slug}.png", content_type: "image/png" }
-    end
-  end
-
-  # Recognition replay: prefer the recorded REAL recognition output per photo
-  # (db/seed_data/recognition/<slug>.json, written by `seed_recognition:record`)
-  # so the demo shows authentic detections; fall back to the authored catalog
-  # `items:` offline. review_state splits on the Move's auto-confirm threshold,
-  # exactly like RecognitionRuns::Process. An item is just a name now.
-  threshold = move.auto_confirm_threshold.to_f
-
-  # Photos → one Media + one generated image each (SeedData::PHOTOS). Covers the
-  # per-photo review walk (box 1), the recovery tiles (a FAILED run + a
-  # SUCCEEDED-with-zero-detections run = orphaned photos), and the phase-aware
-  # removal demo (#288: box 9 sources two in-box items; box 7's items are all
-  # already unpacked → "Unpacked" badge). Idempotent per box: skipped once the
-  # box already has any media.
-  SeedData::PHOTOS.group_by { |photo| photo[:box] }.each do |box_number, photos|
-    box = move.boxes.find_by(number: box_number)
-    next unless box&.media&.none?
-
-    photos.each do |photo|
-      recorded = photo[:status] == "succeeded" ? SeedData.recorded_recognition(photo[:slug]) : nil
-      provider = recorded&.dig("provider") || photo[:provider]
-      provider_model = recorded&.dig("provider_model") || photo[:provider_model]
-
-      media = box.media.new(
-        move: move, media_type: "image", captured_via: "web",
-        # Stagger capture times so the box-1 walk orders the photos as listed.
-        captured_at: photo[:captured_at].seconds.ago
-      )
-      # Attach before save — Media validates image presence.
-      media.image.attach(seed_image_attachable.call(photo[:slug]))
-      media.save!
-
-      run_attrs = { move: move, media: media, provider: provider, provider_model: provider_model,
-                    started_at: 1.minute.ago, completed_at: Time.current }
-      if photo[:status] == "failed"
-        box.recognition_runs.create!(run_attrs.merge(
-                                       status: "failed", error_code: photo[:error_code],
-                                       error_message: photo[:error_message]
-                                     ))
-        next
-      end
-
-      detections = SeedData.detections_for(photo, threshold: threshold)
-      presence = photo[:presence] || "in_box"
-      run = box.recognition_runs.create!(run_attrs.merge(
-                                           status: "succeeded",
-                                           metadata: { "item_count" => detections.size, "provider" => provider }
-                                         ))
-      detections.each do |attrs|
-        suggestion = run.recognition_suggestions.create!(
-          move: move, box: box, media: media, proposed_name: attrs[:name],
-          confidence_score: attrs[:confidence],
-          state: attrs[:review] == "auto_confirmed" ? "auto_accepted" : "pending"
-        )
-        item = box.items.create!(
-          move: move, source_media: media, source_recognition_suggestion_id: suggestion.id,
-          name: attrs[:name],
-          confidence_score: attrs[:confidence], created_via: "recognition",
-          review_state: attrs[:review], presence_state: presence
-        )
-        suggestion.update!(item: item)
-      end
-    end
-  end
-
-  # Upgrade placeholder photos in place once the real generated image is
-  # committed. The per-box gate above only attaches images when a box has NO
-  # media yet, so a tenant first seeded with the icon fallback would keep the
-  # placeholders forever on a plain re-seed (Codex #323). This idempotent pass
-  # re-attaches the real db/seed_images/<slug>.jpg onto its placeholder media
-  # (matched by the slug-named blob), so `db:seed` picks up newly-generated
-  # photos without a full DB reset. Skips media already on the real JPEG.
+  # Dev-seed-only upgrade pass: re-attach a newly-committed real photo onto any media
+  # first seeded with the icon.png fallback (e.g. after `seed_images:generate`), so a
+  # plain re-seed picks it up without a full DB reset. SampleBuilder skips a box once
+  # it has media, so this lives here (not in the shared builder — the prod sample
+  # provisions once and never re-seeds). Idempotent: skips media already on the JPEG.
   SeedData::PHOTOS.each do |photo|
     real_image = Rails.root.join("db/seed_images/#{photo[:slug]}.jpg")
     next unless real_image.exist?
@@ -283,26 +195,6 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     next if media.nil? || media.image.blob&.content_type == "image/jpeg"
 
     media.image.attach(io: real_image.open, filename: "#{photo[:slug]}.jpg", content_type: "image/jpeg")
-  end
-
-  # Manual items with NO photo (SeedData::MANUAL_ITEMS) spanning the review axis
-  # (confirmed / needs_correction) and presence axis (in_box / removed), some
-  # categorised and tagged. Keyed on name within a box so re-running never
-  # duplicates. The curated default vocabularies above already leave several
-  # *unused* values (Tools / Seasonal / Attic / …) so the non-in-use remove path
-  # stays showcase-ready, alongside these in-use values for remove-with-confirm.
-  SeedData::MANUAL_ITEMS.each do |attrs|
-    box = move.boxes.find_by(number: attrs[:box])
-    next unless box
-
-    item = box.items.find_or_initialize_by(name: attrs[:name])
-    next unless item.new_record?
-
-    item.assign_attributes(
-      move: move, created_via: "manual",
-      review_state: attrs[:review], presence_state: attrs[:presence]
-    )
-    item.save!
   end
 
   # One AI-generated photo (#416) so the Gallery's "Generated" badge state is
@@ -316,7 +208,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
       generated = target.box.media.new(
         move: move, media_type: "image", captured_via: "generated", captured_at: Time.current
       )
-      generated.image.attach(seed_image_attachable.call(SeedData::PHOTOS.first[:slug]))
+      generated.image.attach(SeedData.image_attachable(SeedData::PHOTOS.first[:slug]))
       generated.save!
       target.update!(source_media: generated)
     end

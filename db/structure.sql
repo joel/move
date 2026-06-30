@@ -1088,7 +1088,8 @@ CREATE TABLE public.moves (
     embedding_provider character varying DEFAULT 'fake'::character varying NOT NULL,
     voyage_api_key text,
     labels_per_box integer DEFAULT 2 NOT NULL,
-    image_provider character varying DEFAULT 'openai'::character varying NOT NULL
+    image_provider character varying DEFAULT 'openai'::character varying NOT NULL,
+    sample boolean DEFAULT false NOT NULL
 );
 
 
@@ -1115,7 +1116,8 @@ CREATE TABLE public.organizations (
     slug public.citext NOT NULL,
     name character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    demo_data_status character varying
 );
 
 
@@ -2313,6 +2315,7 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260630120000'),
 ('20260629140000'),
 ('20260629120000'),
 ('20260628130000'),

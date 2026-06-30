@@ -8,7 +8,7 @@ class MovesController < TenantController
   # GET /moves
   def index
     @moves = authorized_scope(Move.all).order(created_at: :desc)
-    render Views::Moves::Index.new(moves: @moves)
+    render Views::Moves::Index.new(moves: @moves, organization: current_organization, user: current_user)
   end
 
   # GET /moves/new
@@ -28,6 +28,23 @@ class MovesController < TenantController
       @move = Move.new(move_params)
       @move.errors.merge!(errors) if errors.respond_to?(:each)
       render Views::Moves::New.new(move: @move), status: :unprocessable_content
+    end
+  end
+
+  # DELETE /moves/:id — currently only the onboarding sample Move is removable from
+  # the UI (the card surfaces the affordance only when sample?); the action itself
+  # is general. Authorize through the same scope the index uses so a non-member or
+  # non-admin can't target another Move.
+  def destroy
+    move = authorized_scope(Move.all).find(params.expect(:id))
+    authorize! move, to: :destroy?, with: MovePolicy
+    result = Moves::Destroy.new.call(move: move)
+
+    case result
+    in Dry::Monads::Success(_)
+      redirect_to moves_path, notice: t(".destroyed", name: move.name)
+    in Dry::Monads::Failure(_)
+      redirect_to moves_path, alert: t(".destroy_failed")
     end
   end
 

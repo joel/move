@@ -44,5 +44,17 @@ en:
       one: "1 pending review"
       other: "%{count} pending review"
     read_only: "Archived — read only"
+    # A curated sample Move auto-provisioned for a brand-new account (#432) so the
+    # app is populated to explore from the first screen, with a one-tap remove.
+    sample:
+      badge: "Sample"
+      preparing: "Setting up a sample move you can explore…"
+      failed_title: "Couldn't set up your sample move"
+      failed_body: "No problem — create your own move to get started."
+      remove: "Remove sample move"
+      remove_confirm: "Remove this sample move and all its boxes, items and photos? This can't be undone."
     create:
       created: "%{name} was created."
+    destroy:
+      destroyed: "%{name} was removed."
+      destroy_failed: "Couldn't remove that move. Please try again."
