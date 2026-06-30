@@ -209,6 +209,14 @@ The layer/pack structure (editable scene:
 8. Extend `spec/architecture/conventions_spec.rb` globs if the pack introduces a new
    layer directory shape.
 
+> **Where do a pack's specs go?** For now, **keep them in the root `spec/` tree**
+> (mirroring the code path, e.g. `spec/actions/label_print_runs/…`). The test runner
+> (`.rspec` + the `rspec spec …` commands in CI/Rakefile) only discovers `spec/`, so
+> a spec placed under `packs/<pack>/spec/` would be **silently skipped**. Wiring
+> pack-local specs to run (the packs-rails RSpec integration) is tracked in #439;
+> until then, `packs/*/spec` is excluded from Packwerk only as a safety net, not as a
+> blessed location.
+
 ---
 
 ## CI & local enforcement

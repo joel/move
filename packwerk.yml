@@ -21,9 +21,11 @@ include:
 exclude:
   - "{bin,node_modules,script,tmp,vendor,storage,log,public,coverage,db}/**/*"
   - "spec/**/*"
-  # A pack's own specs (packs/*/spec/**) reference its private internals to test
-  # them — exclude them too, or they would report privacy violations. (`spec/**`
-  # above only matches the root spec/ tree, not a nested packs/*/spec/.)
+  # Defensive: a pack's specs are kept in the ROOT spec/ tree for now (the test
+  # runner only targets spec/ — pack-local packs/*/spec is not yet wired into CI,
+  # see the follow-up). This exclude is a safety net so that IF someone adds a
+  # packs/*/spec referencing the pack's private internals, packwerk won't flag it
+  # (the `spec/**` glob above only matches the root spec/ tree).
   - "packs/*/spec/**/*"
 
 # Cache the constant-resolution + reference scan (tmp/cache/packwerk) for fast reruns.
