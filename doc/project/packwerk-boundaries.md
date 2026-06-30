@@ -166,7 +166,7 @@ graph TD
     search["search"]
     image_gen["image_generation"]
     activity["activity"]
-    manifests["manifests"]
+    manifests["manifests ✅"]
     discards["discards"]
     accounts["accounts"]
     demo["demo_data"]
@@ -188,7 +188,7 @@ graph TD
     discards --> moves
 
     classDef done fill:#2f6f4e,stroke:#ECE7DC,color:#fff;
-    class labels,utility done;
+    class labels,utility,manifests done;
 ```
 
 **kernel** = the domain-free framework infrastructure (`ApplicationRecord`,

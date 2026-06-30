@@ -1,0 +1,27 @@
+# packs/manifests — the authenticated A4 box-manifest read + its audit (E1).
+#
+# A clean leaf domain: nothing imports it. The controller calls Manifests::Generate
+# to assemble a box's manifest data (and record the sensitive read via a
+# `manifest.viewed` event); the controller itself renders BoxManifestPdf (root).
+#
+#   PUBLIC  (app/actions, # pack_public): Manifests::Generate — the controller's entry point.
+#   PRIVATE: Manifests::AuditSubscriber — wired only by config/initializers/manifest_audit.rb
+#            (config/ is outside packwerk's `include`, so the reference isn't a violation).
+#
+# `dependencies: ['.']` — Generate subclasses BaseAction (still in root). It reads
+# box contents through the passed-in `box` arg (method calls, not constants), so it
+# has no Box/Item constant dependency. `visible_to: ['.']` — only the root controller
+# references Generate.
+
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+
+layer: domain
+
+dependencies:
+  - "."
+
+visible_to:
+  - "."
