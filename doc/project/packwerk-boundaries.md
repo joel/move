@@ -172,6 +172,7 @@ graph TD
     reviews["reviews ✅"]
     photos["photos ✅"]
     integration_tokens["integration_tokens ✅"]
+    move_memberships["move_memberships ✅"]
     manifests["manifests ✅"]
     discards["discards"]
     accounts["accounts"]
@@ -195,7 +196,7 @@ graph TD
     discards --> moves
 
     classDef done fill:#2f6f4e,stroke:#ECE7DC,color:#fff;
-    class labels,utility,manifests,search,recognition,activity,qr,terms,reviews,photos,integration_tokens done;
+    class labels,utility,manifests,search,recognition,activity,qr,terms,reviews,photos,integration_tokens,move_memberships done;
 ```
 
 **kernel** = the domain-free framework infrastructure (`ApplicationRecord`,
