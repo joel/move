@@ -1,0 +1,226 @@
+# Packwerk domain boundaries
+
+[Packwerk](https://github.com/Shopify/packwerk) enforces **horizontal domain
+boundaries** across the app — which domain may reference which, and through what
+public surface. It complements the *vertical* layer rules already enforced by
+[`spec/architecture/conventions_spec.rb`](../../spec/architecture/conventions_spec.rb)
+and the `Move/*` RuboCop cops:
+
+| Mechanism | Axis | Catches |
+|---|---|---|
+| `conventions_spec` + `Move/*` cops | vertical (layers) | a model doing business logic, an action loading rows to aggregate, a broad rescue |
+| **Packwerk** | horizontal (domains) | `Boxes` reaching into `Search`'s internals, a domain using another's private constant, a dependency cycle |
+
+This is a **staged migration**. Today the app is one flat tree under `app/`; each
+domain is carved into a `packs/<domain>/` package one PR at a time. `packs/labels`
+is the first, and the template for the rest.
+
+---
+
+## How Packwerk sees the code
+
+Packwerk maps **every constant to the package (directory subtree) that defines it**,
+derives the constant table from the Rails/Zeitwerk load paths (so it understands the
+Phlex `Views`/`Components` namespaced roots from
+[`config/initializers/phlex.rb`](../../config/initializers/phlex.rb) — verified by
+`packwerk validate`), then, for every reference, checks four axes **on the
+referencing package**:
+
+| Axis (`package.yml` key) | Rule |
+|---|---|
+| `enforce_dependencies` | may only reference packs listed in `dependencies` |
+| `enforce_privacy` | may only reference another pack's **public** constants (those under its `app/public/`, or marked `# pack_public: true`) |
+| `enforce_visibility` | may only depend on a pack that lists it in `visible_to` |
+| `enforce_architecture` | a pack's `layer` may reference its own layer or a **lower** one, never a higher one |
+
+The checkers come from core `packwerk` (dependencies) + `packwerk-extensions`
+(privacy, visibility, architecture), loaded via the `require:` line in
+[`packwerk.yml`](../../packwerk.yml).
+
+---
+
+## Layers (architecture)
+
+`packwerk.yml` defines the tiers, top → bottom:
+
+```
+application   →  controllers / orchestration (lives in the unlayered root for now)
+domain        →  the per-domain packs (packs/labels, future boxes/items/…)
+utility       →  the shared kernel (BaseAction, ApplicationRecord, Current, …)
+```
+
+A `domain` pack may reference `domain` + `utility`, never `application`.
+
+**The unlayered-root escape hatch.** The root package has **no `layer:`**. The
+architecture checker treats a reference to a layer-less package as always allowed
+(`Layer::Package#can_depend_on?` returns `true` when the target layer is `nil`). So
+while the shared kernel (`BaseAction`, `Box`, `Move`, …) still lives in the root, a
+`domain` pack depending on it is **not** a violation. When the kernel is extracted to
+`packs/utility` in a later PR, the domains' `dependencies: ['.']` is swapped for the
+specific packs and the root is reclassified.
+
+---
+
+## The public-API convention
+
+A pack exposes the **minimum** surface. Two complementary mechanisms:
+
+1. **Public data → `app/public/`.** A model/value object that is a domain's public
+   contract lives in `packs/<pack>/app/public/`. Everything else (`app/models`,
+   `app/services`, …) is private. **`app/public/` is reserved for persistence/data
+   contracts** (`ApplicationRecord` subclasses + pure-data structs) — never an action:
+   it must not use `Dry::Monads` or emit events. The architecture fitness tests scan
+   `app/public/` as part of the model layer, so a misplaced action there fails them
+   (move it to `app/actions/` + the sigil, per (2)).
+2. **Public actions → stay in `app/actions/` + `# pack_public: true`.** The
+   entry-point *action* a controller calls is the domain's public API too, but it
+   must stay in the action layer so the architecture fitness tests keep governing it
+   (an action in `app/public/` would escape the "events/business-logic live in
+   `app/actions/`" check). Expose it with the
+   [publicize sigil](https://github.com/rubyatscale/packwerk-extensions) — a
+   `# pack_public: true` comment in the **first 5 lines** of the defining file.
+
+> List a pack's public surface with `grep -rl "pack_public: true" packs/<pack>` plus
+> `ls packs/<pack>/app/public`.
+
+**Specs are excluded** from Packwerk (`exclude: spec/**/*` in `packwerk.yml`): a test
+may reference any constant — including another pack's private internals — without it
+counting as a boundary violation.
+
+---
+
+## `packs/labels` — the first pack
+
+The bulk box-label printing domain (the async `LabelPrintRun` lifecycle, #303).
+
+```
+packs/labels/
+  package.yml                                   # enforce_* all true, layer: domain
+  app/
+    public/
+      label_print_run.rb                         # LabelPrintRun           (PUBLIC — model)
+    actions/label_print_runs/
+      start.rb                                   # LabelPrintRuns::Start    (PUBLIC — # pack_public)
+      record_progress.rb                         # LabelPrintRuns::RecordProgress (private)
+      broadcasting.rb                            # LabelPrintRuns::Broadcasting   (private)
+    jobs/label_print_runs/
+      generate_job.rb                            # LabelPrintRuns::GenerateJob    (private)
+```
+
+- **Public**: `LabelPrintRun` (referenced by `Accounts::Delete`, `Moves::Destroy`,
+  `PurgeStaleLabelPrintRunsJob`) and `LabelPrintRuns::Start` (the controller's entry
+  point).
+- **Private**: the progress recorder, the broadcasting mixin, the generation job —
+  referenced only inside the pack.
+- `dependencies: ['.']` — reaches the kernel still in root (`BaseAction`,
+  `ApplicationRecord`, `Move`, `Box`, `BoxLabelsPdf`).
+- `visible_to: ['.']` — only the root app references labels today. When
+  `accounts`/`moves` become packs, add them here.
+
+The controller, Phlex views, the `Ui::LabelPrintStatus` component, the
+`BoxLabelsPdf`, and `PurgeStaleLabelPrintRunsJob` stay in the root (`application`)
+layer for now — they reference only the labels **public** API.
+
+---
+
+## The full domain map (migration target)
+
+The candidate packages and their dependencies, mapped from the current code. Arrows
+point **from a domain to what it depends on**. `packs/labels` (bold) is extracted;
+the rest are still in the root and follow in later PRs.
+
+```mermaid
+graph TD
+    subgraph application [" "]
+      root["root (application)<br/>controllers, views, kernel*"]
+    end
+
+    labels["labels ✅"]
+    boxes["boxes"]
+    items["items"]
+    moves["moves"]
+    captures["captures"]
+    search["search"]
+    image_gen["image_generation"]
+    activity["activity"]
+    manifests["manifests"]
+    discards["discards"]
+    accounts["accounts"]
+    demo["demo_data"]
+    tenancy["tenancy"]
+    auth["auth"]
+    utility["utility (kernel)*"]
+
+    labels --> root
+    boxes --> moves & discards & search & captures
+    items --> boxes & moves & captures & discards & image_gen & search
+    captures --> moves & boxes & items
+    search --> moves & items & boxes
+    moves --> tenancy & auth & search
+    image_gen --> moves & captures
+    activity --> moves & boxes & items & captures
+    manifests --> boxes & items
+    labels --> moves & boxes
+    accounts --> tenancy & auth & captures & labels
+    demo --> moves & boxes & captures & items & search & tenancy
+    discards --> moves
+
+    classDef done fill:#2f6f4e,stroke:#ECE7DC,color:#fff;
+    class labels done;
+```
+
+\* **kernel** = the shared constants every domain needs (`BaseAction`,
+`ApplicationRecord`, `Current`, `Discardable`, `Apartment`, `Rails.event`,
+`ProviderHttp`). Lives in the root today; extracted to `packs/utility` later.
+
+**Known coupling hotspots** (to untangle as domains are extracted):
+
+- `Moves::Destroy::DELETE_ORDER` names constants from six domains — the worst
+  fan-out; it forces `moves` to depend on captures/items/search/activity/labels.
+- `Items::GenerateImage` builds a `Media` record directly (`item.box.media.new`) —
+  couples `items` to the `captures` model; wants a `Captures::AttachGenerated`.
+- `Search::Reindexing` is a mixin included by `Boxes`/`Vocabularies` actions.
+- `Activity::Builder::SUBJECTS` is a string-keyed catalog of every domain's events
+  (string names, so Packwerk-invisible, but a real semantic dependency).
+
+The layer/pack structure (editable scene:
+[`diagrams/packwerk-boundaries.excalidraw`](diagrams/packwerk-boundaries.excalidraw)):
+
+![Packwerk layers and packs](diagrams/packwerk-boundaries.svg)
+
+---
+
+## How to extract a new pack
+
+1. **Pick a leaf-ish domain** (few inbound references). Map its constants and every
+   *external* reference (`grep -rn '\bConstantName\b' app packs --include=*.rb`).
+2. **Decide the public surface** — the minimum other packs/root actually reference.
+   Public model → `app/public/`; public action → `app/actions/` + `# pack_public: true`.
+3. **`git mv`** the files into `packs/<domain>/app/{public,models,actions,jobs,…}`
+   (constants are unchanged → no call-site edits).
+4. **Write `packs/<domain>/package.yml`**: `enforce_* : true`, `layer: domain`,
+   `dependencies:` (start with `['.']`), `visible_to:` (the packs that reference it).
+5. **`bundle exec rails zeitwerk:check`** — constants still resolve.
+6. **`bundle exec packwerk validate`** then **`bundle exec packwerk check`**.
+7. **Resolve violations**: declare the missing dependency, widen `visible_to`, or
+   publicize the referenced constant — or, if it's debt you can't fix now,
+   **`bundle exec packwerk update-todo`** records it in `package_todo.yml` so the
+   build stays green while you burn it down (don't let the todo grow).
+8. Extend `spec/architecture/conventions_spec.rb` globs if the pack introduces a new
+   layer directory shape.
+
+---
+
+## CI & local enforcement
+
+- **CI** — the dedicated `packwerk` job in
+  [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs
+  `packwerk validate && packwerk check` (needs Postgres — the app boots to derive
+  load paths). A new violation fails the build, like rubocop. Make it a **required
+  check** in branch protection to block merges.
+- **Local** — the overcommit `Packwerk` pre-commit hook
+  ([`.git-hooks/pre_commit/packwerk.rb`](../../.git-hooks/pre_commit/packwerk.rb))
+  runs `packwerk check` on staged Ruby files under `app/`/`packs/` for fast local
+  fail.
+
+_Last updated: 2026-06-30 (PR1 — Packwerk foundation + packs/labels)._
