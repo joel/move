@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/reviews: ReviewsController calls it.
+# Kept in the action layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module Reviews
   # "Reviewed when its photo is shown" (C2 review flow): opening a photo's review
   # screen surfaces every item detected in it for verification, so the still-
