@@ -100,6 +100,13 @@ group :development do
   gem "rubocop-rspec", require: false
   gem "rubocop-rspec_rails", require: false
 
+  # Modular boundary analysis (domain dependencies + privacy). `packwerk` is the
+  # static analyzer; `packwerk-extensions` adds the `enforce_architecture` (layer
+  # tiers) and `enforce_visibility` checkers on top of core dependencies/privacy.
+  # Loaded only by the `packwerk` CLI / CI step, never by the app runtime.
+  gem "packwerk", require: false
+  gem "packwerk-extensions", require: false
+
   # Add speed badges [https://github.com/MiniProfiler/rack-mini-profiler]
   # gem "rack-mini-profiler"
 
@@ -173,6 +180,13 @@ gem "chunky_png", "~> 1.4"
 gem "prawn", "~> 2.5"
 gem "prawn-table", "~> 0.2"
 gem "rqrcode", "~> 3.0"
+
+# Modular boundaries — Packwerk. `packs-rails` is a RUNTIME dependency (not
+# dev-only): it adds `packs/**/app/**` to the autoload + eager_load paths, so the
+# domain code physically living under `packs/` is loaded in every environment
+# (including production). The Packwerk analyzer + its enforcement extensions are
+# dev-only (see the :development group). See doc/project/packwerk-boundaries.md.
+gem "packs-rails"
 
 group :test do
   gem "phlex-testing-capybara", require: false
