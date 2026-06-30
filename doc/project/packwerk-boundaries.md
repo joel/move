@@ -55,13 +55,20 @@ A `utility` pack may reference only `utility` (itself).
 
 **The shared kernel → `packs/utility`.** The universal base classes + cross-cutting
 infrastructure (`BaseAction`, `ApplicationRecord`, `ApplicationJob`,
-`ApplicationMailer`, `Current`, `Discardable`, `Roleable`, `ProviderHttp`,
-`Discards::Cascade/CascadeRestore`) live in `packs/utility` (`layer: utility`). It
-enforces **dependencies** (`dependencies: []` — the kernel is self-contained; it can
-never reference a domain or application constant) and **architecture** (bottom layer).
-Privacy/visibility are **off** there: the kernel is the universal public foundation,
-so per-constant privacy/visibility would be ceremony (a `visible_to` listing every
-pack). Domain packs keep both strict.
+`ApplicationMailer`, `Current`, `Discardable`, `Roleable`, `ProviderHttp`) live in
+`packs/utility` (`layer: utility`). It enforces **dependencies** (`dependencies: []`
+— the kernel is self-contained; it can never reference a domain or application
+constant) and **architecture** (bottom layer). Privacy/visibility are **off** there:
+the kernel is the universal public foundation, so per-constant privacy/visibility
+would be ceremony (a `visible_to` listing every pack). Domain packs keep both strict.
+
+> **Self-contained means *no domain coupling at all* — including method calls
+> Packwerk can't see.** `Discards::Cascade`/`CascadeRestore` are deliberately **not**
+> in utility: they `ensure_writable(record.move)`, a method-call dependency on the
+> Move domain. Packwerk only tracks *constants*, so it wouldn't flag it — but a
+> bottom-layer kernel that changes for Move-specific reasons isn't a kernel. They
+> stay in the root (Move-coupled soft-delete infrastructure) until a discards/domain
+> pack claims them.
 
 **The unlayered-root escape hatch.** The root package still has **no `layer:`**. The
 architecture checker treats a reference to a layer-less package as always allowed
@@ -183,9 +190,9 @@ graph TD
 ```
 
 **kernel** = the shared constants every domain needs (`BaseAction`,
-`ApplicationRecord`, `ApplicationJob`, `Current`, `Discardable`, `ProviderHttp`,
-`Discards::Cascade`, …) — extracted into **`packs/utility`** (the `utility` layer).
-`Apartment` + `Rails.event` are gem/framework globals, not packaged.
+`ApplicationRecord`, `ApplicationJob`, `ApplicationMailer`, `Current`, `Discardable`,
+`Roleable`, `ProviderHttp`) — extracted into **`packs/utility`** (the `utility`
+layer). `Apartment` + `Rails.event` are gem/framework globals, not packaged.
 
 **Known coupling hotspots** (to untangle as domains are extracted):
 

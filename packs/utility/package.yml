@@ -6,9 +6,12 @@
 #     ApplicationRecord                       superclass of every model
 #     ApplicationJob / ApplicationMailer      superclass of every job / mailer
 #     Current                                 request-scoped attributes
-#     Discardable / Roleable                  shared model concerns
+#     Discardable / Roleable                  shared model concerns (no domain coupling)
 #     ProviderHttp                            shared HTTP client for AI adapters
-#     Discards::Cascade / ::CascadeRestore    generic soft-delete cascade (→ BaseAction)
+#
+# NOT here: Discards::Cascade/CascadeRestore — they `ensure_writable(record.move)`,
+# a method-call dependency on the Move domain that Packwerk can't see, so they are
+# Move-coupled infrastructure (stay in the root) rather than universal kernel.
 #
 # Enforcement — only the two axes that give a real guarantee here:
 #   enforce_dependencies + dependencies: []   the kernel is SELF-CONTAINED; it may
