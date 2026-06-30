@@ -224,8 +224,9 @@ The layer/pack structure (editable scene:
 - **CI** — the dedicated `packwerk` job in
   [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs
   `packwerk validate && packwerk check` (needs Postgres — the app boots to derive
-  load paths). A new violation fails the build, like rubocop. Make it a **required
-  check** in branch protection to block merges.
+  load paths). A new violation fails the build, like rubocop. It is a **required
+  status check** on `main` (alongside `lint` and `test`), so a boundary violation
+  hard-blocks merges.
 - **Local** — the overcommit `Packwerk` pre-commit hook
   ([`.git-hooks/pre_commit/packwerk.rb`](../../.git-hooks/pre_commit/packwerk.rb))
   runs `packwerk check` on staged Ruby files under `app/`/`packs/` for fast local
