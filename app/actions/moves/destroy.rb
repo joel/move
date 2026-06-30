@@ -19,10 +19,16 @@ module Moves
     def call(move:)
       move_id = move.id
       yield teardown(move)
+      yield emit_event(move_id)
       Success(move_id)
     end
 
     private
+
+    def emit_event(move_id)
+      Rails.event.notify("move.destroyed", move_id: move_id)
+      Success()
+    end
 
     def teardown(move)
       ActiveRecord::Base.transaction do

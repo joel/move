@@ -35,6 +35,20 @@ RSpec.describe Moves::Destroy do
     expect(Box.unscoped.where(move_id: move_id)).to be_empty
   end
 
+  it "purges the Active Storage blobs of its media (no orphaned storage)" do
+    move = create(:move)
+    box = create(:box, move: move)
+    media = create(:media, box: box, move: move)
+    attachment_id = media.image.attachment.id
+    blob_id = media.image.blob.id
+
+    # Test env runs jobs inline, so the cascade's purge_later runs synchronously.
+    described_class.new.call(move: move)
+
+    expect(ActiveStorage::Attachment.where(id: attachment_id)).to be_empty
+    expect(ActiveStorage::Blob.where(id: blob_id)).to be_empty
+  end
+
   it "destroys an archived Move (cleanup is valid regardless of status)" do
     move = create(:move, :archived)
 

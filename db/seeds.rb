@@ -181,18 +181,6 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   # manual items keyed on name.
   DemoData::SampleBuilder.call(move: move)
 
-  # Attach the generated 1:1 demo photo for a slug once it's been generated and
-  # committed (db/seed_images/<slug>.jpg via `rails seed_images:generate`); else
-  # fall back to the placeholder icon so db:seed works offline / on a fresh DB / CI.
-  seed_image_attachable = lambda do |slug|
-    path = Rails.root.join("db/seed_images/#{slug}.jpg")
-    if path.exist?
-      { io: path.open, filename: "#{slug}.jpg", content_type: "image/jpeg" }
-    else
-      { io: Rails.public_path.join("icon.png").open, filename: "#{slug}.png", content_type: "image/png" }
-    end
-  end
-
   # One AI-generated photo (#416) so the Gallery's "Generated" badge state is
   # showcase-ready — the per-Move Gallery shows ALL media (generated included),
   # unlike the box review walk which excludes them. Attach a committed seed image
@@ -204,7 +192,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
       generated = target.box.media.new(
         move: move, media_type: "image", captured_via: "generated", captured_at: Time.current
       )
-      generated.image.attach(seed_image_attachable.call(SeedData::PHOTOS.first[:slug]))
+      generated.image.attach(SeedData.image_attachable(SeedData::PHOTOS.first[:slug]))
       generated.save!
       target.update!(source_media: generated)
     end

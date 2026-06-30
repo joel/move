@@ -8,7 +8,7 @@ class MovesController < TenantController
   # GET /moves
   def index
     @moves = authorized_scope(Move.all).order(created_at: :desc)
-    render Views::Moves::Index.new(moves: @moves, organization: current_organization)
+    render Views::Moves::Index.new(moves: @moves, organization: current_organization, user: current_user)
   end
 
   # GET /moves/new

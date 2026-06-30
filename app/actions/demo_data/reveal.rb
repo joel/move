@@ -10,17 +10,23 @@ module DemoData
   module Reveal
     module_function
 
+    # Broadcast to a PER-USER stream with that user's own membership-scoped Move
+    # list — mirroring MovePolicy.relation_scope / MovesController#index — so the
+    # reveal never pushes Moves a recipient isn't a member of (a latent IDOR if the
+    # stream were org-wide once an org has more than its founding owner).
+    #
     # The org's demo_data_status MUST already be persisted to its terminal value
     # before this runs, so a page that loads after the broadcast reads the correct
     # state from the DB and never shows a stuck placeholder (the broadcast may land
     # in the void if no one is subscribed yet).
-    def broadcast(organization)
-      moves = Move.order(created_at: :desc).to_a
+    def broadcast(organization, user)
+      moves = Move.where(id: MoveMembership.where(user_id: user.id).select(:move_id))
+                  .order(created_at: :desc).to_a
       Turbo::StreamsChannel.broadcast_replace_to(
-        organization, :demo_provisioning,
+        organization, user, :demo_provisioning,
         target: Components::Moves::Collection::ID,
         html: ApplicationController.render(
-          Components::Moves::Collection.new(moves: moves, organization: organization),
+          Components::Moves::Collection.new(moves: moves, organization: organization, user: user),
           layout: false
         )
       )

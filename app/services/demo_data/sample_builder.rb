@@ -117,7 +117,7 @@ module DemoData
         move: @move, media_type: "image", captured_via: "web",
         captured_at: photo[:captured_at].seconds.ago
       )
-      media.image.attach(seed_image_attachable(photo[:slug]))
+      media.image.attach(SeedData.image_attachable(photo[:slug]))
       media.save!
       media
     end
@@ -169,16 +169,6 @@ module DemoData
     def index_items
       @move.items.includes(box: :room).find_each do |item|
         Search::RefreshDocument.new.call(item: item)
-      end
-    end
-
-    def seed_image_attachable(slug)
-      path = Rails.root.join("db/seed_images/#{slug}.jpg")
-      if path.exist?
-        { io: path.open, filename: "#{slug}.jpg", content_type: "image/jpeg" }
-      else
-        # Fresh DB / CI without committed photos: fall back to the placeholder icon.
-        { io: Rails.public_path.join("icon.png").open, filename: "#{slug}.png", content_type: "image/png" }
       end
     end
   end

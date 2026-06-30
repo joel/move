@@ -27,10 +27,10 @@ module DemoData
       return unless owner
 
       result = DemoData::Provision.new.call(owner: owner)
-      finalize(organization, result)
+      mark(organization, owner, result.success? ? "provisioned" : "failed")
     rescue StandardError => e # rubocop:disable Move/BroadRescue -- best-effort: a provisioning failure marks the org failed and reveals a fallback card, never crashing the worker or stranding the user
       Rails.logger.error("[demo_data] provision failed for #{tenant}: #{e.class}: #{e.message}")
-      mark(organization, "failed")
+      mark(organization, owner, "failed") if owner
     end
 
     def organization_owner(organization)
@@ -38,20 +38,11 @@ module DemoData
       User.find_by(id: user_id)
     end
 
-    def finalize(organization, result)
-      case result
-      in Dry::Monads::Success(_move)
-        mark(organization, "provisioned")
-      in Dry::Monads::Failure(_)
-        mark(organization, "failed")
-      end
-    end
-
     # Persist the terminal status BEFORE broadcasting so a page that loads after the
     # broadcast reads the right state (no stuck placeholder if the broadcast is lost).
-    def mark(organization, status)
+    def mark(organization, owner, status)
       organization.update!(demo_data_status: status)
-      DemoData::Reveal.broadcast(organization)
+      DemoData::Reveal.broadcast(organization, owner)
     end
   end
 end

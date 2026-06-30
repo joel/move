@@ -17,15 +17,20 @@ module Components
 
       ID = "moves-collection"
 
-      def initialize(moves:, organization:)
+      def initialize(moves:, organization:, user: nil)
         @moves = moves
         @organization = organization
+        @user = user
       end
 
       def view_template
         div(id: ID, class: "flex flex-col gap-4") do
           if provisioning?
-            turbo_stream_from(@organization, :demo_provisioning)
+            # Per-user stream: the reveal broadcast carries this user's own
+            # membership-scoped Move list, so it must only reach this user — never
+            # the whole org subdomain (which would leak other members' Moves once an
+            # org has more than its founding owner). The signed name is the boundary.
+            turbo_stream_from(@organization, @user, :demo_provisioning)
             preparing_card
           elsif failed?
             failed_card

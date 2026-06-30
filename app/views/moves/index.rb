@@ -4,15 +4,16 @@ module Views
   module Moves
     # A1 — Select Move (list view) / empty state.
     class Index < Views::Base
-      def initialize(moves:, organization: nil)
+      def initialize(moves:, organization: nil, user: nil)
         @moves = moves
         @organization = organization
+        @user = user
       end
 
       def view_template
         div(class: "mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8") do
           header
-          render Components::Moves::Collection.new(moves: @moves, organization: @organization)
+          render Components::Moves::Collection.new(moves: @moves, organization: @organization, user: @user)
         end
       end
 
