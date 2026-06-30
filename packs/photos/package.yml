@@ -1,0 +1,12 @@
+# packs/photos — moving a captured photo (Media) to another box.
+#   PUBLIC (sigil): Photos::Move — ReviewsController calls it.
+# dependencies: ['.'] (BaseAction + Media/Box are root). visible_to: ['.'].
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+layer: domain
+dependencies:
+  - "."
+visible_to:
+  - "."

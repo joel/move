@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/photos: ReviewsController calls Photos::Move.
+# Kept in the action layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module Photos
   # Moves a photo (Media) and the items it sourced to another Box within the same
   # Move (#317). "Photo" is the user-facing word for a Media; the action lives under
