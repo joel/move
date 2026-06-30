@@ -175,7 +175,7 @@ graph TD
     move_memberships["move_memberships ✅"]
     manifests["manifests ✅"]
     discards["discards"]
-    accounts["accounts"]
+    accounts["accounts ✅"]
     demo["demo_data"]
     tenancy["tenancy"]
     session_handoffs["session_handoffs ✅"]
@@ -197,7 +197,7 @@ graph TD
     discards --> moves
 
     classDef done fill:#2f6f4e,stroke:#ECE7DC,color:#fff;
-    class labels,utility,manifests,search,recognition,activity,qr,terms,reviews,photos,integration_tokens,move_memberships,session_handoffs done;
+    class labels,utility,manifests,search,recognition,activity,qr,terms,reviews,photos,integration_tokens,move_memberships,session_handoffs,accounts done;
 ```
 
 **kernel** = the domain-free framework infrastructure (`ApplicationRecord`,

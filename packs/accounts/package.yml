@@ -1,0 +1,16 @@
+# packs/accounts — account deletion + sole-member tenant teardown.
+#   PUBLIC (sigil): Accounts::Delete — Accounts/UsersController call it.
+# dependencies: TBD by packwerk check (it references root models + other packs'
+# public constants — LabelPrintRun, SessionHandoffToken). visible_to: ['.'].
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+layer: domain
+dependencies:
+  - "."
+  - "packs/utility"
+  - "packs/labels"
+  - "packs/session_handoffs"
+visible_to:
+  - "."

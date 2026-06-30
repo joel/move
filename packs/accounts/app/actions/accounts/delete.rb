@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/accounts: Accounts/UsersController call Accounts::Delete.
+# Kept in the action layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module Accounts
   # Permanently deletes a user account and everything it owns — the single
   # source of truth for what the "Delete account" danger zone promises
