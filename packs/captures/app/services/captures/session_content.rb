@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/captures: the capture-session panel content (CapturesController).
+# Kept in its layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module Captures
   # Single source of truth for the capture "Items" panel's data — the box's recent
   # media and its recognised in-box items grouped by source photo. Shared by

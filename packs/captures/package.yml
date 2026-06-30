@@ -1,0 +1,19 @@
+# packs/captures — photo capture/ingestion + media variants.
+#   PUBLIC (app/public): Media (model — referenced by accounts/activity/
+#     image_generation/photos/recognition + root). PUBLIC (sigil): Captures::Create,
+#     Captures::SessionContent. PRIVATE: ImageNormalizer, MediaVariants::Prewarm+Job,
+#     the capture/prewarm subscribers.
+# dependencies + visible_to discovered via packwerk check.
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+layer: domain
+dependencies:
+  - "."
+  - "packs/utility"
+  - "packs/recognition"
+visible_to:
+  - "."
+  - "packs/accounts"
+  - "packs/recognition"
