@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/move_memberships: removes a member (MembersController).
+# Kept in the action layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module MoveMemberships
   # Removes a member from a Move (F1, D11). Admin-only (enforced in the
   # controller via MovePolicy#manage_members?).
