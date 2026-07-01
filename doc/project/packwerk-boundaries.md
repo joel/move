@@ -262,6 +262,21 @@ The layer/pack structure (editable scene:
 
 ![Packwerk layers and packs](diagrams/packwerk-boundaries.svg)
 
+### Inter-pack dependency map
+
+The actual **pack → pack** dependency edges (from each `package.yml`'s
+`dependencies:`), rendered from the real config. `organizations` is the main hub
+(five packs depend on it); `search` and the identity packs form the rest. Every
+domain pack also depends on the root (for the Move aggregate) and `utility` (the
+kernel) — those 34 universal edges are omitted for clarity. The graph is **acyclic**
+(`packwerk validate ✓`). Editable scene:
+[`diagrams/packwerk-dependencies.excalidraw`](diagrams/packwerk-dependencies.excalidraw).
+
+![Packwerk inter-pack dependency map](diagrams/packwerk-dependencies.svg)
+
+Regenerate both diagrams from the live `package.yml` files whenever a pack or a
+dependency changes (Step 8b / §7 — the `/code-review` and Codex passes flag drift).
+
 ---
 
 ## How to extract a new pack

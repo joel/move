@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="490" viewBox="0 0 980 490">
+<rect x="0" y="0" width="980" height="490" fill="#15120E"/>
+<text x="30" y="40" font-family="Inter,sans-serif" font-size="21" font-weight="bold" fill="#ECE7DC">Packwerk inter-pack dependency map — move (18 packs)</text>
+<rect x="30" y="70" width="920" height="32" rx="7" fill="#4A4033" stroke="#ECE7DC" stroke-width="2"/>
+<text x="42" y="91" font-family="Inter,sans-serif" font-size="13" fill="#ECE7DC">root (unlayered) — Move aggregate (Move/Box/Item/Room) · identity (User/Rodauth) · controllers/views/MCP · BaseAction · Discards</text>
+<rect x="30" y="430" width="920" height="32" rx="7" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
+<text x="42" y="451" font-family="Inter,sans-serif" font-size="13" font-weight="bold" fill="#ECE7DC">packs/utility (kernel) — ApplicationRecord · ApplicationJob · ApplicationMailer · Current · Discardable · Roleable · ProviderHttp</text>
+<text x="30" y="478" font-family="Inter,sans-serif" font-size="11.5" fill="#6B6357">Every domain pack also depends on root (▲, for Move/Box/…) and utility (▼); those 34 edges are omitted for clarity. Coloured arrows = pack→pack deps. Acyclic (packwerk validate ✓).</text>
+<line x1="129" y1="184" x2="129" y2="250" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="129,250 125,241 133,241" fill="#C99A5B" opacity="1.0"/>
+<line x1="129" y1="184" x2="489" y2="250" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="489,250 479,252 481,245" fill="#C99A5B" opacity="1.0"/>
+<line x1="129" y1="184" x2="309" y2="250" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="309,250 299,250 302,243" fill="#C99A5B" opacity="1.0"/>
+<line x1="129" y1="184" x2="869" y2="250" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="869,250 859,253 860,245" fill="#C99A5B" opacity="1.0"/>
+<line x1="309" y1="150" x2="679" y2="150" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="679,150 670,154 670,146" fill="#C99A5B" opacity="1.0"/>
+<line x1="309" y1="184" x2="309" y2="250" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="309,250 305,241 313,241" fill="#C99A5B" opacity="1.0"/>
+<line x1="309" y1="184" x2="679" y2="250" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="679,250 669,252 671,245" fill="#C99A5B" opacity="1.0"/>
+<line x1="489" y1="184" x2="309" y2="250" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="309,250 316,243 319,250" fill="#C99A5B" opacity="1.0"/>
+<line x1="679" y1="184" x2="309" y2="250" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="309,250 317,245 319,252" fill="#C99A5B" opacity="1.0"/>
+<line x1="869" y1="250" x2="309" y2="250" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="309,250 318,246 318,254" fill="#C99A5B" opacity="1.0"/>
+<line x1="869" y1="184" x2="679" y2="250" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="679,250 686,243 689,251" fill="#C99A5B" opacity="1.0"/>
+<rect x="70" y="150" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="129" y="171" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">accounts</text>
+<rect x="250" y="150" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="309" y="171" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">demo_data</text>
+<rect x="430" y="150" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="489" y="171" text-anchor="middle" font-family="Inter,sans-serif" font-size="10.5" fill="#ECE7DC">move_integ_tokens</text>
+<rect x="620" y="150" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="679" y="171" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">move_members</text>
+<rect x="810" y="150" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="869" y="171" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">vocabularies</text>
+<rect x="250" y="250" width="118" height="34" rx="6" fill="#40514a" stroke="#2F6F4E" stroke-width="2"/>
+<text x="309" y="271" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">organizations</text>
+<rect x="620" y="250" width="118" height="34" rx="6" fill="#40514a" stroke="#2F6F4E" stroke-width="2"/>
+<text x="679" y="271" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">search</text>
+<rect x="70" y="250" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="129" y="271" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">captures</text>
+<rect x="430" y="250" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="489" y="271" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">labels</text>
+<rect x="810" y="250" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="869" y="271" text-anchor="middle" font-family="Inter,sans-serif" font-size="10.5" fill="#ECE7DC">session_handoffs</text>
+<rect x="70" y="345" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="129" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">activity</text>
+<rect x="198" y="345" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="257" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">image_gen</text>
+<rect x="326" y="345" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="385" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">manifests</text>
+<rect x="454" y="345" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="513" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">photos</text>
+<rect x="582" y="345" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="641" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">qr</text>
+<rect x="710" y="345" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="769" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">reviews</text>
+<rect x="838" y="345" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="897" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">terms</text>
+<text x="730" y="40" font-family="Inter,sans-serif" font-size="11.5" fill="#2F6F4E">green outline = hub (depended-on)</text>
+</svg>
