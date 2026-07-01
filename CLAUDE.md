@@ -12,150 +12,14 @@ This document provides instructions and protocols for AI Agents interacting with
 
 - **URLs:** Local development (via `bin/cli`): `https://move.move-easy.docker` (mail at `https://mail.move-easy.docker`). Production: `https://move-easy.org` (apex/login; org subdomains `<slug>.move-easy.org`), behind Cloudflare (Full Strict, Origin CA wildcard cert served by kamal-proxy).
 
-### Design source of truth (Google Stitch)
+### Foundational Architecture & Design Standards
 
-**The visual design lives in Google Stitch, reached through the Stitch MCP server — not in the codebase or your imagination.** Before building or changing any **customer-facing** screen, you MUST open the real design and build against it. Never guess a layout, colour, spacing, radius, or type value.
+Read the memory anchors below before implementing any feature or major refactor. These are non-negotiable patterns, enforced by cops, tests, and review:
 
-> **Exception — the `/execution-plan` design pass.** When UI work runs through the
-> `execution-plan` skill, its design pass intentionally **inverts this rule**: the
-> `frontend-design` plugin *leads* the visual direction and Stitch becomes a
-> *secondary reference*, with the settled design pushed back into Stitch afterward.
-> Everywhere else (and for the build substrate — Phase D0 tokens + Phlex components),
-> Stitch remains the source of truth as described here. See
-> `.claude/skills/execution-plan/SKILL.md` § "Design Phase".
-
-- **Project:** `Move Design` → `projects/13869765800416404511` (a separate `Move Inventory Manager` project also exists — do not confuse them).
-- **Design system (tokens):** `mcp__stitch__get_project name=projects/13869765800416404511` → `designTheme.designMd`. This is the authoritative colour/typography/spacing/radius/component sheet. It is mirrored in `doc/phases/Phase D0 - Design Foundation.md` and consolidated for quick reference in [`DESIGN.md`](DESIGN.md) (the flat human reference for tokens + the `Ui::*` component library; keep it in sync per §7).
-- **Screens:** `mcp__stitch__list_screens projectId=13869765800416404511`, then `mcp__stitch__get_screen name=projects/13869765800416404511/screens/<id>` for the HTML + screenshot. (`list_projects`/`list_screens` outputs are large — they spill to a file you can `jq`.)
-- **Canonical screen ↔ phase ↔ Design-Spec map:** `doc/phases/README.md` §2.
-- **Palette rule:** the **"Refined Palette"** variants are canonical for surfaces/accent; the Material-3 token set is the semantic system for state colours. Prefer `… - Refined Palette` screens. See `doc/phases/DESIGN-DISCREPANCIES.md` §PALETTE.
-
-**Workflow for any UI work:**
-1. Open the canonical Stitch screen(s) for the surface and read the HTML + screenshot.
-2. Build with Phlex components + the Phase D0 design tokens — no magic values.
-3. Reproduce **every** state the Design Spec lists (empty, loading, processing, failed, error, dark).
-4. Live-verify with `/product-review` and compare screenshot-to-screenshot against Stitch.
-
-**If a screen you need does not exist in Stitch, STOP — do not invent it.** Either generate it with `mcp__stitch__generate_screen_from_text` (use `designSystem=<project system id>`, dark-first, the brand prompt in the relevant phase file) and record the new `screens/<id>` in `doc/phases/README.md`, or request it from the user/product. Log the gap and remediation in `doc/phases/DESIGN-DISCREPANCIES.md`. As of this writing **all 16 Design-Spec screens have a Stitch design** (the previously-missing A1, E2, E3, and F3 screens were created in the Stitch UI — see `DESIGN-DISCREPANCIES.md`), so no phase is design-blocked.
-
-**Design-led phase plan:** `doc/phases/` re-organises the v0.2 work around screens so each customer-facing surface ships against a real design. `Phase D0` (design foundation) must land before any other UI phase. The domain-led companion plan is `doc/ai/v0.2/prompts/`.
-
-### UX / interaction conventions (MUST follow for user-facing changes)
-
-Phase D0 / Stitch govern how surfaces **look**; these govern how they **behave**.
-The full rubric (principles, rules table, planning checklist) lives in
-[`doc/project/ux-conventions.md`](doc/project/ux-conventions.md) and is applied at
-plan-time by the `/execution-plan` design pass. The non-negotiable rules — review
-(`/code-review`) flags violations on any user-facing change:
-
-1. **Make the result of an action visible.** After create/edit/move, the affected
-   record must be visible without scrolling (insert at its sorted position with a
-   scroll-to + transient highlight, or top when order is recency) plus a linking
-   confirmation toast. **Never silently append a new record off-screen.**
-2. **Default to the most *useful* order, not insertion or alphabetical.** Choose the
-   order that serves the task (recency / weight / count / priority); make the active
-   sort visible and changeable.
-3. **Hide what doesn't earn its place.** No zero-value chrome in **read-only**
-   surfaces — empty facets, zero-count filters, always-blank columns. (Does **not**
-   apply to *selection* surfaces: a picker/management list keeps unused options
-   selectable; order them most-used-first instead.)
-4. **Remember the user's context.** Prefer the user's last useful input/result over a
-   generic placeholder or reset (recent searches, last-used room/filter).
-5. **Cover every state deliberately** (empty / sparse / loading / processing / error)
-   and **preserve focus + scroll** across actions and Turbo Stream updates.
-
-New papercuts become a rule in `ux-conventions.md`; if it recurs, mirror it here.
-
-### Architecture & engineering conventions (MUST follow)
-
-These are non-negotiable for all domain work. Do not reinvent these wheels.
-
-1. **Multi-tenancy → use the Apartment gem.** Do **not** hand-roll subdomain
-   resolution, `Current.organization` scoping, or `organization_id` filtering.
-   Tenancy is PostgreSQL **schema-per-tenant** via
-   [`ros-apartment`](https://github.com/rails-on-services/apartment): each
-   Organization is a tenant (schema); `Apartment::Elevator::Subdomain` resolves
-   the tenant from the subdomain; shared models (Rodauth/user auth tables, the
-   Organization registry) live in the `public` schema via `excluded_models`.
-   Create/drop tenants with `Apartment::Tenant.create/drop`; scope work with
-   `Apartment::Tenant.switch(name) { … }`. Config in `config/initializers/apartment.rb`.
-
-2. **Business logic → `app/actions/` (never in models).** Models stay
-   persistence-focused (associations, validations, scopes). Controllers stay thin
-   (authorize → call action → pattern-match → render). Every domain operation is a
-   `Domain::Verb < BaseAction` using `Dry::Monads` result/do notation and emitting
-   a `domain.verb` `Rails.event`. Full reference + templates in
-   [`app/actions/AGENTS.md`](app/actions/AGENTS.md). Pattern mirrors the sibling
-   `catalyst` project and https://github.com/joel/trip/tree/main/app/actions.
-
-3. **Live-test authentication after every change.** Auth is fragile (passwordless
-   Rodauth + remember-me + the Apartment elevator). Before pushing, run the
-   **Runtime Test Workflow** (§5 / `/product-review`) and explicitly verify the
-   full auth journey — create account, sign in, sign out, sign back in — works
-   end to end in the running app. A green test suite is **not** sufficient.
-   Auth-layer reference + hard-won gotchas (stale-session-after-DB-reset,
-   verify-before-login, forms dropping query params, remember-me) live in
-   [`app/misc/AGENTS.md`](app/misc/AGENTS.md).
-
-4. **Live updates → ActionCable / Turbo Streams. JS polling is FORBIDDEN.** Never
-   poll the server from the client (`setInterval` + `fetch`, a Stimulus poller, a
-   refresh meta tag, etc.) to reflect server-side progress or state. Push it over
-   **ActionCable** using turbo-rails Turbo Stream broadcasting — the Rails-default
-   mechanism (Solid Cable in prod; `async` in dev). Reference impl: the search
-   indexing progress (#239) and the capture session panel (#241) — an action/job
-   emits a `Rails.event`, a subscriber re-renders the Phlex view via
-   `ApplicationController.render(view, layout: false)` and
-   `Turbo::StreamsChannel.broadcast_replace_to([record, :scope], target:, html:)`,
-   and the page subscribes with `turbo_stream_from`. Conventions/gotchas:
-   - **Signed stream names are the auth boundary** — derive the stream from a
-     tenant-unique record (a uuid); no per-user channel auth is needed. Set
-     `config.action_cable.allowed_request_origins` for the dev **org-subdomain**
-     host and the prod `*.move-easy.org` hosts, or the WS handshake is rejected.
-   - **A broadcast must never break its emitter.** A `Rails.event` subscriber runs
-     synchronously inside the emitting action, so wrap render/broadcast in a
-     `rescue` (or enqueue a job) — a broadcast failure must not fail the action.
-     Such a broad `rescue` is the *only* sanctioned use of `rescue StandardError`;
-     it is flagged by the **`Move/BroadRescue`** cop and must opt out per-site with
-     `# rubocop:disable Move/BroadRescue -- <reason>` so the exception stays
-     conscious. Core domain logic must rescue specific error classes (#293).
-   - turbo-rails' `turbo.min.js` already bundles `@rails/actioncable`; add
-     `ApplicationCable::Connection`/`Channel` (Turbo::StreamsChannel needs them).
-   - The one remaining JS poller (`recognition_poller_controller.js`, recovery
-     surface) is being migrated to cable (#244) — do not add new ones.
-
-5. **Aggregation/filtering → the database, never the application layer.** Do
-   **not** load rows into Ruby to compute what SQL can: no
-   `pluck(...).map/min/max/sum/size`, no `.select { … }.count`, no
-   `.to_a.sum(&:x)`, no Ruby `group_by` for counts. Use SQL — `minimum`/`maximum`/
-   `sum`/`count`/`average`, `pick(Arel.sql("MIN(x), MAX(x), COUNT(*)"))`,
-   `group(:x).count`, `where(...).count`, `exists?`, `distinct`. Let Postgres
-   return the answer (one row), not the rows. **Coerce `Arel.sql` aggregate
-   outputs** (`&.to_i` / `&.to_f`): untyped casts come back as **strings**, so a
-   raw `MAX(number::bigint)` compares lexically (`"9" > "10"`) — the exact bug
-   behind `LabelPrintsController#range_bounds` and `Boxes::Create#next_number`
-   (#283). Loading-and-computing in Ruby is an O(N)-for-O(1) regression; flag it
-   in review. The unambiguous shapes (`pluck(...).<reducer>`, `to_a.<reducer>`,
-   `select { … }.count`) are enforced by the **`Move/DatabaseAggregation`** cop;
-   `group_by` is not copped (it is legitimate on already-in-memory collections).
-
-6. **Domain boundaries → Packwerk, never ad-hoc cross-domain reaching.** Each
-   domain is being carved into a `packs/<domain>/` package that declares its
-   dependencies and exposes a minimal **public API** (a public model in
-   `app/public/`; a public entry-point action stays in `app/actions/` marked
-   `# pack_public: true`). A pack may only reference packs it lists in
-   `dependencies`, only their public constants (`enforce_privacy`), only packs that
-   list it in `visible_to` (`enforce_visibility`), and only its own/lower
-   architecture `layer` (`enforce_architecture`). Don't reach into another domain's
-   internals — depend on its public surface, or extend that surface deliberately.
-   The migration is staged (one pack per PR); `packs/labels` is the template. Full
-   reference: [`doc/project/packwerk-boundaries.md`](doc/project/packwerk-boundaries.md).
-
-> **These cops live in `lib/rubocop/cop/move/`** (wired via `require:` in
-> `.rubocop.yml`, with RuboCop::RSpec specs). They make rules #4/#5 deterministic
-> and merge-blocking instead of review-enforced. When a recurring class of defect
-> escapes review, prefer adding/extending a cop over re-reminding. The **horizontal**
-> (domain) counterpart to these **vertical** (layer) cops is **Packwerk** (rule #6),
-> run merge-blocking by the `packwerk` CI job + the overcommit pre-commit hook.
+- **[[design-source-of-truth]]** — Google Stitch is authoritative for customer-facing UI; fetch the real design before building.
+- **[[ux-interaction-conventions]]** — Four rules: visible results, useful order, hide zero-value, remember context.
+- **[[architecture-engineering-conventions]]** — Six rules: Apartment tenancy, action-based logic, live auth testing, ActionCable for live updates, database aggregation, Packwerk boundaries.
+- **[[deployment-and-release-rules]]** — Kamal deployment, PG18 accessory management, SemVer release, squash-merge hygiene.
 
 ---
 
@@ -272,90 +136,14 @@ When a PR receives code review comments (human **or** Codex):
 7. **Resolve every conversation** after replying using the GraphQL `resolveReviewThread` mutation.
 8. Never leave review comments unanswered or unresolved.
 
-### Deployment
+### Deployment & Release
 
-- `.github/workflows/deploy.yml` deploys to production (`move-easy.org`) via **Kamal** on **every push to `main`** (i.e. every merge).
-- Secrets come from **Doppler** (`move/prd`), synced into GitHub Actions secrets. `.kamal/secrets` is gated on `KAMAL_SECRETS_FROM_ENV` (set in the Deploy workflow): **CI** reads the synced env values; a **local** deploy ignores the ambient shell/`.env` and always reads from the Doppler CLI / `config/master.key` — so a stale exported secret can't shadow Doppler (local deploys therefore need Doppler auth). Force a rotated value live with a redeploy (`kamal deploy`); a `kamal app start/stop` only restarts the existing container with its baked-in env.
-- Skip a deploy for a given commit with `[skip deploy]` in the commit **subject**. **Beware:** a squash-merge whose body quotes the literal `[skip deploy]` (for example, by referencing this document) will skip the deploy unintentionally.
-- **Never use `[skip ci]` / `[ci skip]` / `[no ci]` / `[skip actions]` in commit messages.** GitHub treats them anywhere in the message as a platform-level skip that suppresses **all** workflow runs for the push — including the deploy — and it **cannot** be overridden in workflow YAML. Docs are excluded from CI via `paths-ignore` in `ci.yml`, never via a marker. A `commit-msg` overcommit hook (`ForbidSkipMarkers`) rejects these locally.
-- **Recover a skipped deploy** by re-running it manually: `unset GITHUB_TOKEN && gh workflow run Deploy --ref main` (the deploy workflow has `workflow_dispatch`), or from the Actions tab.
-
-#### Squash-and-merge hygiene
-
-Squash merges aggregate the branch's commit messages into the merge commit body
-**by default**, which is how stray `[skip ci]` markers reach `main` and skip the
-deploy. To prevent it, set the repo to use the PR title + description for squash
-commits (one-time, requires admin):
-
-```bash
-unset GITHUB_TOKEN && gh api -X PATCH repos/joel/move \
-  -f squash_merge_commit_title=PR_TITLE \
-  -f squash_merge_commit_message=PR_BODY
-```
-
-Then **write a real PR description** — it becomes the squash commit body, so keep
-it marker-free and meaningful. At merge time, double-check the squash message
-contains no `[skip ci]` / `[skip deploy]`.
-
-#### Database accessory (PostgreSQL 18)
-
-The database is a **Kamal accessory** defined in `config/deploy.yml` (`accessories.db`):
-`image: postgres:18`, mounted at `directories: - data:/var/lib/postgresql`.
-
-- **Pinned to `postgres:18`.** `schema_format :sql` dumps and Apartment tenant
-  cloning need a `pg_dump` matching the server, so the app image ships
-  `postgresql-client-18` and **every** Postgres image (dev `bin/cli`, CI service,
-  prod accessory) is pinned to 18. Do not float on `postgres:latest`.
-- **Mount the parent, not `/data`.** `postgres:18+` stores the cluster in a
-  major-version subdirectory (`/var/lib/postgresql/18/docker`) for `pg_upgrade
-  --link`, and refuses to start against an old-style cluster at
-  `/var/lib/postgresql/data`. The mount target must be `/var/lib/postgresql`
-  (already set for dev and prod).
-- **Accessories are not rebooted by an app deploy.** A push to `main` redeploys
-  the app but leaves `accessories.db` untouched — image/mount changes to the
-  accessory require a manual `kamal accessory` cutover.
-
-##### One-time PG 18 cutover (Kamal 2)
-
-Needed when the prod accessory still runs an old image/layout. **Destroys the
-cluster — only safe when there is no data to keep** (back up first otherwise, or
-use `pg_upgrade`). Run from a checkout with the merged `deploy.yml`:
-
-```bash
-kamal accessory remove db          # stop/remove the old container…
-# …then on the db host, ensure the accessory's bind-mounted `data` dir is empty
-# (Kamal may leave it): rm -rf the accessory data dir if so.
-kamal accessory boot db            # pull postgres:18, init the new layout fresh
-
-# verify
-docker exec <db-container> cat /var/lib/postgresql/18/docker/PG_VERSION   # => 18
-docker exec <db-container> psql -U move -d move_production -c 'select version();'
-
-# load the schema (creates move_production + cache/queue/cable, loads
-# structure.sql, migrates) — or just redeploy; the app entrypoint runs db:prepare
-kamal app exec --reuse 'bin/rails db:prepare'
-```
-
-Then smoke-test the live auth journey at `https://move-easy.org` and
-create a Move on an org subdomain. Order: merge → accessory cutover → `db:prepare`
-→ smoke test.
-
-### Release Rules
-
-Run after a PR is merged to `main` and its `main` CI/Deploy run is green.
-
-1. **Sync and verify.** `git checkout main && git pull origin main`; confirm the merge commit is present and CI is green.
-2. **Tag convention: SemVer `vMAJOR.MINOR.PATCH`** (e.g. `v0.2.0`). One release per meaningful set of changes.
-3. **Idempotent.** If the tag/release already exists, stop — never recreate or overwrite a published release.
-4. **Tag + publish in one step** (auto-generated notes from merged PRs/commits since the previous tag):
-   ```bash
-   unset GITHUB_TOKEN && gh release create vX.Y.Z \
-     --repo joel/move --target main \
-     --title "vX.Y.Z" \
-     --generate-notes
-   ```
-   `--generate-notes` honours `.github/release.yml`, which **excludes Dependabot / `dependencies`-labelled PRs** — do not re-add them.
-5. **Tags do not deploy.** `deploy.yml` triggers on the merge commit (push to `main`), not on tags. A `v*` tag instead triggers the **Release Bug Scan** (`.github/workflows/release-bug-scan.yml`, a read-only Codex scan over the diff since the previous tag) — review its findings and open issues for anything real.
+Read **[[deployment-and-release-rules]]** for the full runbook:
+- Kamal deployment on every `main` push
+- Doppler secrets management
+- Skip-deploy markers and gotchas
+- PG18 accessory cutover procedures
+- SemVer release workflow
 
 ### Workflow Rules
 
@@ -458,64 +246,12 @@ This repository ships agent skills under `.claude/skills/`. Prefer them for the 
 - **`/qa-review`**, **`/ux-review`**, **`/ui-polish`** — review passes before a PR is merged.
 - **`/ui-designer`** — build Tailwind + Phlex UI from the component library.
 
-## 7. Documentation after implementation (Mandatory)
+## 7. Documentation & Seed Data (Mandatory)
 
-Every change that touches **architecture, infrastructure, deployment, tenancy,
-auth, or any cross-cutting flow** MUST update the project documentation **and its
-diagrams** before the PR merges — code without docs is incomplete.
-
-- **Where:** operational/architectural docs live in [`doc/project/`](doc/project)
-  ([`README.md`](doc/project/README.md) index, [`architecture.md`](doc/project/architecture.md),
-  [`new-app-recipe.md`](doc/project/new-app-recipe.md)). Product/phase docs stay in
-  `doc/phases/`. Per-effort step logs (the flight recorder) stay in
-  `doc/phases/<Phase> - Steps.md`.
-- **Always include visual schemas**, not just prose:
-  - **Mermaid** diagrams embedded in the markdown (render inline on GitHub) for
-    request flows, schema/tenancy models, and sequence/lifecycle.
-  - An **editable Excalidraw scene** in [`doc/project/diagrams/`](doc/project/diagrams)
-    (`*.excalidraw`, openable at <https://excalidraw.com/>) for the headline
-    architecture diagram. If an **Excalidraw MCP server** is connected, use it to
-    author/regenerate the scene; otherwise hand-author the `.excalidraw` JSON.
-- **Keep the recipe reproducible:** when you add/alter a setup step (a gem, a
-  Kamal/Cloudflare/Doppler/CI setting, an install command), update
-  `new-app-recipe.md` with the exact command/config so the next app is a copy-paste.
-- **Keep the design system in sync — [`DESIGN.md`](DESIGN.md).** Any change that
-  adds or alters a **design token** (`app/assets/tailwind/application.css` — the
-  `@theme` block or the `--c-*` light/dark runtime palette) **or** the **`Ui::*`
-  Phlex component library** (`app/components/ui/` — a new component, or a new
-  variant/state on an existing one) MUST update `DESIGN.md` in the **same PR**.
-  `DESIGN.md` is a hand-maintained mirror, so it drifts the moment a token/component
-  ships undocumented; `application.css` stays authoritative (the doc says so) and
-  `DESIGN.md` is the consolidated human reference. **`/code-review` flags a
-  token/`Ui::*` change whose diff doesn't also touch `DESIGN.md`.**
-- **Record hard-won gotchas** in the recipe's gotcha table and in agent memory.
-- Reference these docs from the PR description.
-
-## 8. Seed data after implementation (Mandatory)
-
-Every phase that adds a user-facing surface MUST extend
-[`db/seeds.rb`](db/seeds.rb) so that, after `bin/rails db:seed`, a developer can
-sign in and **immediately showcase and play with** the new feature — no manual
-record-building. The seed data is part of the deliverable, not an afterthought.
-
-- **Comprehensive states.** Seed records across the meaningful states the surface
-  can render (e.g. for Boxes: sealed/packing/in-transit, with and without
-  dimensions, multiple rooms, an empty case). Reviewers and the `/product-review`
-  pass rely on this coverage.
-- **Idempotent.** Use `find_or_create_by`/`find_or_initialize_by` keyed on a
-  natural attribute so re-running `db:seed` never duplicates.
-- **Never seed production.** Keep the `return if Rails.env.production?` guard —
-  `db:prepare` auto-runs seeds on a fresh DB and demo accounts/tenants must not
-  reach the live registry (this leaked before).
-- **Tenancy-aware.** Provision the demo tenant via `Organizations::Create`, then
-  `Apartment::Tenant.switch` to seed Move-scoped records. Guard the demo to the
-  base schema (`return unless Apartment::Tenant.current == "public"`) — Apartment
-  re-runs `db:seed` per tenant.
-- **Loginable account.** Seeded sign-in accounts need `status: 2` (verified) to
-  use the passwordless email link. Document the demo email + org subdomain in a
-  comment at the top of `db/seeds.rb`.
-- **Verify.** Run `bin/rails db:seed` twice (idempotency) and confirm the new
-  records render during `/product-review`.
+Read **[[documentation-and-seed-mandate]]** for the full requirements:
+- Every architecture/infrastructure/auth change must update docs + diagrams before merge
+- Keep [`DESIGN.md`](DESIGN.md) in sync with design tokens and `Ui::*` components (`/code-review` flags mismatches)
+- Every user-facing feature must extend [`db/seeds.rb`](db/seeds.rb) with comprehensive test data
 
 ## Skill Self-Evaluation
 
