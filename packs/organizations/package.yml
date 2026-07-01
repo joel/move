@@ -1,0 +1,22 @@
+# packs/organizations — the tenancy registry: Organization + OrganizationMembership
+# (public-schema, Apartment-excluded) and the tenant-provisioning action.
+#   PUBLIC (app/public): Organization, OrganizationMembership (referenced by
+#     accounts/captures/demo_data/move_integration_tokens/move_memberships/session_handoffs).
+#   PUBLIC (sigil): Organizations::Create.
+# dependencies: ['.', 'packs/utility'] (references User/Move in root + kernel).
+# visible_to: root + the consumer packs (added below).
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+layer: domain
+dependencies:
+  - "."
+  - "packs/utility"
+visible_to:
+  - "."
+  - "packs/accounts"
+  - "packs/demo_data"
+  - "packs/move_integration_tokens"
+  - "packs/move_memberships"
+  - "packs/session_handoffs"

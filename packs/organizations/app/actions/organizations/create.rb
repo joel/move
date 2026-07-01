@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/organizations: creates an Organization + its tenant.
+# Kept in the action layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 module Organizations
   # Creates an Organization (tenant registry row), makes the creator its owner,
   # and provisions the Apartment tenant schema. All in the public schema.
