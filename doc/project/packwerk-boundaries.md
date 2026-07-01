@@ -145,11 +145,54 @@ layer for now — they reference only the labels **public** API.
 
 ---
 
-## The full domain map (migration target)
+## Migration status — what's a pack, and what stays in the root (and why)
+
+The migration is **complete**: every domain that *can* be a self-contained pack is
+one. **18 packs** now exist — the `utility` kernel plus 17 peripheral domains
+(labels, manifests, search, activity, qr, terms, reviews, photos,
+move_integration_tokens, move_memberships, session_handoffs, accounts, vocabularies,
+image_generation, demo_data, organizations, and **captures** — which absorbed
+recognition, see below).
+
+**The core stays in the root — on purpose.** These are **not** un-migrated TODOs;
+they are irreducible and correctly belong in the unlayered root:
+
+- **The Move aggregate — `Move`, `Box`, `Item`, `Room`** (+ their `Moves::*`,
+  `Boxes::*`, `Items::*` actions). These models are **bidirectionally** associated
+  (`Move has_many :boxes`, `Box has_many :items`/`:media`, and the children
+  `belong_to` back). Two packs with a mutual dependency are a **cycle**, which
+  `packwerk validate` rejects (the graph must be acyclic). An aggregate root and its
+  children are one bounded context — you don't split them. They live in the root, and
+  the peripheral packs depend *on* them (one direction).
+- **Identity — `User`** (+ Rodauth in `app/misc`). `User` is bidirectionally tied to
+  the extracted identity packs (`User has_many :terms_acceptances` ↔ `TermsAcceptance
+  belongs_to :user`; likewise session-handoff tokens, memberships). Extracting `User`
+  would cycle with `packs/terms` / `packs/session_handoffs` / `packs/move_memberships`,
+  so it stays in the root.
+- **The application layer** — controllers, Phlex `Views::`/`Components::`, presenters,
+  policies, mailers, channels, MCP — orchestrates the domains and belongs at the top.
+- **`BaseAction`** and **`Discards::Cascade`/`CascadeRestore`** — the action base and
+  the soft-delete cascade both carry Move-domain coupling (`ensure_writable(move)`),
+  so they stay in the root until decoupled (#443).
+
+This is a **standard, healthy Packwerk end state**: extract the *periphery* (which
+depends inward on the core), and leave the core aggregate + identity + application in
+the unlayered root. Because the root is unlayered and unenforced, a pack ↔ root
+back-reference (e.g. `Media belongs_to :box` while `Box` is in the root) is **not** a
+cycle — the acyclic rule only governs pack-to-pack edges.
+
+> **captures = capture **and** recognition.** Recognition was briefly its own pack
+> (#448), but `Media has_many :recognition_runs, dependent: :destroy` ↔ `RecognitionRun
+> belongs_to :media` is an irreducible data-model cycle: a captured photo and its AI
+> recognition are one lifecycle. They were folded into a single `packs/captures`
+> (#478). This is the same aggregate rule that keeps the Move core in the root — the
+> boundary is drawn by the ownership graph, not by wishful decomposition.
+
+## The full domain map
 
 The candidate packages and their dependencies, mapped from the current code. Arrows
-point **from a domain to what it depends on**. `packs/labels` (bold) is extracted;
-the rest are still in the root and follow in later PRs.
+point **from a domain to what it depends on**. Extracted packs are green; the Move
+aggregate + identity remain in the root (see the status section above).
 
 ```mermaid
 graph TD
