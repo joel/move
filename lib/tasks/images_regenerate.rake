@@ -13,7 +13,7 @@ namespace :images do
       next if tenant == "public"
 
       Apartment::Tenant.switch(tenant) do
-        media_list = Media.where.not(image_blob_id: nil)
+        media_list = Media.joins(:image_attachment).distinct
         media_count = media_list.count
         puts "\n[#{tenant}] Found #{media_count} media"
 
