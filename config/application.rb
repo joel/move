@@ -40,7 +40,7 @@ module MoveApp
     # own runner via `.rubocop.yml`; they subclass `RuboCop::Cop::Base`, which the
     # Rails app runtime never requires — so eager-loading them (CI sets
     # `eager_load = true`) would raise. Keep them out of the app autoloaders.
-    config.autoload_lib(ignore: %w[assets tasks templates rubocop])
+    config.autoload_lib(ignore: %w[assets tasks templates rubocop middleware])
 
     # Configuration for the application, engines, and railties goes here.
     #
