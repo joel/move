@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/captures: ingests a captured photo (captures + MCP controllers).
+# Kept in its layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
+
 require "stringio"
 
 # Namespaced `Captures` (not `Media`) because Media is a model class.
