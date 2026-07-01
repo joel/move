@@ -28,8 +28,13 @@ class ActiveStorageErrorCacheGuard
   # option degrades to nil/positional-hash and would leave `@prefix` unset.
   def initialize(app, prefix = DEFAULT_PREFIX)
     @app = app
-    prefix = DEFAULT_PREFIX if prefix.to_s.empty?
-    @prefix = prefix.end_with?("/") ? prefix : "#{prefix}/"
+    # `config.active_storage.routes_prefix` is handed to Rails `scope`, so it may be
+    # a String or a Hash of scope options (e.g. `{ path: "/files", subdomain: … }`).
+    # Take the path component and normalise; fall back to the default when there
+    # isn't one (a bare-subdomain mount, which path matching can't cover anyway).
+    path = prefix.is_a?(Hash) ? prefix[:path] : prefix
+    path = DEFAULT_PREFIX if path.to_s.empty?
+    @prefix = path.end_with?("/") ? path : "#{path}/"
   end
 
   def call(env)

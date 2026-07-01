@@ -77,6 +77,21 @@ RSpec.describe ActiveStorageErrorCacheGuard do
     expect(headers["cache-control"]).to eq("no-store")
   end
 
+  # routes_prefix is passed to Rails `scope`, so it can be a Hash of scope options.
+  it "accepts a Hash routes_prefix and uses its :path (no NoMethodError at boot)" do
+    app = ->(_env) { [404, immutable.dup, ["body"]] }
+    expect { described_class.new(app, { path: "/files" }) }.not_to raise_error
+    _s, headers, _b = described_class.new(app, { path: "/files" }).call("PATH_INFO" => "/files/x.jpg")
+    expect(headers["cache-control"]).to eq("no-store")
+  end
+
+  it "falls back to the default prefix for a Hash with no :path" do
+    app = ->(_env) { [404, immutable.dup, ["body"]] }
+    _s, headers, _b = described_class.new(app, { subdomain: "assets" })
+                                     .call("PATH_INFO" => "/rails/active_storage/x.jpg")
+    expect(headers["cache-control"]).to eq("no-store")
+  end
+
   # Guards the Rails middleware contract: options are passed POSITIONALLY via
   # `klass.new(app, *args)`. A keyword-only constructor would leave the prefix
   # unset here (nil) and raise on `start_with?` — this builds through the real
