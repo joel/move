@@ -268,6 +268,32 @@ version manager needs activation (rv/mise/etc.), prefix Ruby commands accordingl
 
 **Live updates → ActionCable, never JS polling.** To reflect server-side progress or state in the UI, push it over ActionCable / turbo-rails Turbo Stream broadcasting — `setInterval`+`fetch`, Stimulus pollers, and refresh meta tags are **forbidden**. See `AGENTS.md` §1 convention #4 (signed stream from a tenant-unique record; subscriber re-renders via `ApplicationController.render(view, layout: false)` + `Turbo::StreamsChannel.broadcast_replace_to`; wrap the broadcast in a `rescue` so it can't fail the emitting action). Reference impls: #239 (indexing progress), #241 (capture panel).
 
+**Respect the Packwerk domain boundaries (`AGENTS.md` §1 convention #6).** The
+codebase is organized into enforced Packwerk packs (`packs/<domain>/`, the `utility`
+kernel, and the root that holds the Move aggregate + identity + application layer).
+When implementing, place code in the pack that owns it and touch other packs only
+through their **public API** (a constant in `app/public/` or marked `# pack_public:
+true`), never their internals. **Before writing, decide where the code lives:**
+- *Extending an existing pack* — add to that pack; if you need another pack's
+  constant, it must be public, that pack must be in your pack's `dependencies:`, and
+  your pack must be in *its* `visible_to:` (add reciprocally). `bundle exec packwerk
+  check` names the exact edit when you miss one.
+- *A cross-domain side effect* (touching another domain's records/actions) — emit a
+  `Rails.event` and subscribe, **do not** call the other domain's action directly (a
+  direct call couples the packs and can create a dependency cycle — this is what
+  §1#4/§2 mean, and what `packwerk validate`'s acyclic rule enforces).
+- *A whole new domain* — follow **`doc/project/packwerk-boundaries.md` → "How to
+  extract a new pack"** (git-mv into `packs/<domain>/`, minimal public surface,
+  declare deps/visibility, `packwerk validate` + `check` green) and update that doc's
+  map + the SVG/Excalidraw diagrams **in the same PR** (Step 8b / §7).
+- *The core (`Move`/`Box`/`Item`/`Room`, `User`/Rodauth, controllers/views)* stays in
+  the root — see the doc's "what stays in root and why". Don't try to pack it.
+
+Never weaken enforcement to make a change pass (no `enforce_*: false`, no
+`package_todo.yml` for a fresh violation, no disabling the acyclic check). If a
+boundary genuinely blocks a legitimate change, the boundary/public-API is what should
+change, deliberately — not the enforcement.
+
 ### Step 5b: Seed data (Mandatory for any new user-facing surface)
 
 Extend `db/seeds.rb` so that after `bin/reset` a developer can sign in and **immediately showcase and play with** the surface this phase adds — no manual record-building. See the project's `AGENTS.md` §8 for the full rule. In short:
@@ -375,6 +401,26 @@ bundle exec rake
 ```
 
 If the project splits them out (e.g. fix-lint, lint, tests, system-tests tasks), run each in turn. Confirm the task names against the project's Rakefile rather than assuming they exist.
+
+**Packwerk boundary gate — run it explicitly, it must be green (it is a REQUIRED,
+merge-blocking CI check + an overcommit pre-commit hook, so a violation blocks the
+PR anyway; catch it here first):**
+
+```bash
+bundle exec packwerk validate   # package graph is valid + ACYCLIC (no pack-to-pack cycles)
+bundle exec packwerk check      # no undeclared-dependency / privacy / visibility / architecture violations
+```
+
+- A **`check`** violation prints the exact fix (add a `dependencies:` entry, make a
+  constant public, add the referencing pack to `visible_to:`). Apply it — do **not**
+  suppress with `enforce_*: false` or `packwerk update-todo` for a *new* violation.
+- A **`validate`** failure that says *"circular dependencies"* means two packs now
+  reference each other (often a fresh `belongs_to`/`has_many`, or a direct call into
+  another domain's action — Packwerk resolves AR associations to constants). Break the
+  cycle with an event (§1#4/§2), or recognize the two domains are one bounded context
+  (see `doc/project/packwerk-boundaries.md`). **Never** disable the acyclic check.
+- If the diff added/altered a **pack** (new `packs/*`, a `package.yml`, or a token/
+  component), confirm the boundaries doc + its diagrams were updated (Step 8b / §7).
 
 > **`:js`/system specs needing a real browser CANNOT be validated in the dev app
 > container — chromedriver is absent there.** Such specs run in real Chrome even
@@ -857,11 +903,11 @@ and expensive to reconstruct later.
 2.  gh project item-add                                → Add to Kanban (Backlog)
 3.  gh project item-edit                               → Move to Ready, then In Progress
 4.  git checkout -b feature/                           → Create branch
-5.  <implement the architect blueprint>                → Write code
+5.  <implement the architect blueprint>                → Write code (respect Packwerk pack boundaries — §1#6; public API only, no cycles)
 5b. extend db/seeds.rb (+ bundle exec rails db:seed)   → Showcase-ready demo data
 5c. /code-review (loop until clean; mind the stop rule) → Internal CR before push (skip if trivial)
 5d. /security-review (when security-sensitive; loop until clean) → Adversarial SR before push
-6.  bundle exec rake                                   → Lint + tests + system tests
+6.  bundle exec rake + packwerk validate && packwerk check → Lint + tests + system tests + boundary gate (must be green)
 7.  git commit (+ append sha to audit log)             → Overcommit hooks validate
 8.  /product-review (or /verify, or agent-browser+curl) → Live verification (curl Set-Cookie scope for auth/cookie changes)
 9.  git push + gh pr create                            → Push and open PR (Closes #N)
