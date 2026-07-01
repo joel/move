@@ -92,6 +92,34 @@ mise x -- kamal app exec -i --reuse 'bin/rails images:repair'
 To audit without changing anything, iterate `ActiveStorage::VariantRecord` per tenant
 and check `blob.service.exist?(blob.key)` — a non-empty result is the orphan set.
 
+## Edge-cached 404s (#490) — why "fixed at the origin" wasn't "fixed in the browser"
+
+After #486 the data + origin were healthy fleet-wide, yet two gallery photos still
+rendered broken in the browser. Cause: **Cloudflare had cached the pre-repair 404s**.
+Active Storage's proxy controller wraps the response in `http_cache_forever`
+(`Cache-Control: public, max-age=<100y>, immutable`) *before* streaming, so a missing
+variant's 404 inherited that immutable header and got pinned at the edge. Live proof
+(media `bf41e88f` `:thumb`):
+
+| Fetch | Result |
+|---|---|
+| canonical proxy URL | **404**, `cf-cache-status: HIT`, `age ~21560s` (~6h), 0 bytes |
+| same URL + cache-buster | **200**, `image/jpeg`, `cf-cache-status: MISS`, 13,737 bytes |
+
+**One-time remediation:** purge the Cloudflare cache (Purge Everything) to drop the
+stuck 404s (media `bf41e88f`, `e551c7d4`). A browser hard-reload does not help — the
+edge keeps serving the cached 404 on the canonical URL until purged/expired.
+
+**Durable fix (#490):** `ActiveStorageErrorCacheGuard`
+(`lib/middleware/active_storage_error_cache_guard.rb`, registered before
+`ActionDispatch::ShowExceptions`) forces any **non-2xx** response under
+`/rails/active_storage/` to `Cache-Control: no-store` (stripping the inherited
+`etag`/`expires`), so an error can never be cached by a CDN/browser. Successful (2xx)
+and conditional (304) responses keep their immutable caching. Verified end-to-end
+against the real proxy stack (orphaned variant → 404 + `no-store`; healthy variant →
+200 + immutable). Optional belt-and-suspenders: a Cloudflare cache rule that bypasses
+cache for non-200 on `/rails/active_storage/*`.
+
 ## Historical commits
 
 | Commit | What it did | Verdict |
