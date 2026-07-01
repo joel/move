@@ -13,5 +13,6 @@ dependencies:
   - "packs/labels"
   - "packs/session_handoffs"
   - "packs/captures"
+  - "packs/organizations"
 visible_to:
   - "."

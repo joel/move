@@ -14,4 +14,5 @@ dependencies:
   - "packs/utility"
   - "packs/move_memberships"
   - "packs/search"
+  - "packs/organizations"
 visible_to: []

@@ -12,6 +12,7 @@ layer: domain
 dependencies:
   - "."
   - "packs/utility"
+  - "packs/organizations"
 visible_to:
   - "."
   - "packs/accounts"
