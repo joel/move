@@ -5,6 +5,17 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.71.0] — 2026-07-01
+
+### Changed
+- **Modular architecture with Packwerk (internal — no user-facing change).** The
+  codebase now enforces horizontal domain boundaries via Packwerk: **18 packages**
+  (a shared `utility` kernel plus 17 domain packs) with strict dependency, privacy,
+  visibility, and layered-architecture rules, merge-blocked in CI and checked at
+  commit time. The core Move aggregate, identity, and application layer stay in the
+  root; the periphery depends inward. Nothing changes for people using the app —
+  this hardens the codebase against architectural drift (#437).
+
 ## [v0.70.0] — 2026-06-30
 
 ### Added
