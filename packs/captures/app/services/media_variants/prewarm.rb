@@ -33,8 +33,11 @@ module MediaVariants
     private
 
     def process(media, variant)
-      variant_record = media.image.variant(variant)
-      variant_record.processed
+      variant_obj = media.image.variant(variant)
+      # .processed creates the DB record but may not upload the file. Download to force
+      # file generation and storage upload (idempotent — subsequent calls are cheap).
+      variant_obj.download
+      variant_obj.processed
       Rails.logger.debug { "[media_variants:prewarm] success media #{media.id} #{variant}" }
       true
     rescue StandardError => e # rubocop:disable Move/BroadRescue -- best-effort prewarm; lazy generation is the fallback
