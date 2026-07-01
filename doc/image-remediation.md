@@ -2,105 +2,103 @@
 
 ## Problem Statement
 
-Production reported broken image variants on gallery photos in v0.71.0. Two specific photos showed broken image icons in the gallery view, though the issue appeared inconsistent across different surfaces.
+Production reported broken image variants on gallery photos in v0.71.0. Two photos
+showed broken-image icons in the gallery, on two boxes:
 
-**Affected URLs:**
-- https://joel-azemar.move-easy.org/moves/09f49c81-4745-42df-8c57-b84680c79442/boxes/85699c95-427c-4967-9b74-a07eb1c7e661
-- https://joel-azemar.move-easy.org/moves/09f49c81-4745-42df-8c57-b84680c79442/boxes/f47e7b1e-1876-47f2-b15f-2707f55484c7
+- https://joel-azemar.move-easy.org/moves/09f49c81-4745-42df-8c57-b84680c79442/boxes/85699c95-427c-4967-9b74-a07eb1c7e661 (box 16)
+- https://joel-azemar.move-easy.org/moves/09f49c81-4745-42df-8c57-b84680c79442/boxes/f47e7b1e-1876-47f2-b15f-2707f55484c7 (box 15)
 
-## Root Cause Investigation
+## Resolution status: RESOLVED ✅ (verified 2026-07-01)
 
-### Finding 1: Variant Records vs Variant Files Mismatch
-- Variant **records** existed in `active_storage_variant_records` table
-- Variant **files** existed in S3/SeaweedFS storage
-- However, some variant records appeared to point to master blobs instead of variant blobs
-- This created a proxy-serving mismatch: the URL-encoded blob_id didn't match what the proxy could locate
+The data was repaired and then **verified healthy fleet-wide** by direct inspection of
+production storage + the Active Storage tables (`kamal app exec … bin/rails runner`):
 
-### Finding 2: Pre-Packwerk Migration Code Bug
-During the Packwerk migration (PR #478), the `MediaVariants::Prewarm` service was moved to `packs/captures` but the implementation was broken:
-- **Old (broken) code:** Called `.processed` which only created DB records without uploading files
-- **Root cause:** No `.download` call to force variant file generation to storage
+| Check | Result |
+|---|---|
+| Both reported boxes (22 photos) | master + `:thumb` + `:detail` files all present; none orphaned; none pointing at the master blob |
+| The two originally-broken photos (`e551c7d4…`, `bf41e88f…`) | serve valid JPEG bytes for both variants through the **exact proxy code path** (`variant.processed` → `.image.download`) |
+| Whole-fleet sweep (every tenant) | **223 masters, 1,332 variant records — 0 missing files, 0 orphans** |
 
-## Remediation Attempts
+So the "Current State (Uncertain)" of the original effort is closed: it is fixed. The
+browser appeared to work because it *was* working.
 
-### Attempt 1: Fix Prewarm Logic (Commit e3543b8)
-**File:** `packs/captures/app/services/media_variants/prewarm.rb`
+## Root Cause (corrected)
 
-```ruby
-def process(media, variant)
-  variant_obj = media.image.variant(variant)
-  # Force file generation and storage upload (idempotent)
-  variant_obj.download
-  variant_obj.processed
-  ...
-end
-```
+The earlier investigation misdiagnosed the code. The truth, from the Active Storage
+internals (`ActiveStorage::VariantWithRecord`):
 
-**Status:** Code deployed but unclear if it fixed the browser issue.
+1. **The original code was already correct.** `media.image.variant(v).processed`
+   transforms the master **and uploads** the variant file on create
+   (`create_or_find_record` → `record.image.attach(image)`). The claim that
+   `.processed` "only creates DB records without uploading files" is false.
 
-### Attempt 2: Delete Orphaned Variant Records
-- Identified variant records pointing to master blobs (wrong)
-- Deleted two orphaned records:
-  - `bd32bcf8-433e-49d8-ad48-64c82a1dd9cd` (photo e551c7d4-9655-4670-9520-2f1db6577931)
-  - `17ac686a-7298-419b-9af0-ad62d4f786fc` (photo bf41e88f-de45-4c97-bb5b-b099ea8d4d2e)
+2. **The real failure was isolated object-store file loss.** 2 variant *files* of
+   1,332 vanished from SeaweedFS while their Postgres rows survived — an **orphaned
+   variant record** (row present, file missing). This is a storage-layer event, not
+   an app-code bug. Nothing in the app produced it, and (until now) nothing detected
+   or repaired it.
 
-**Status:** Database records deleted but unclear if this resolved browser display.
+3. **`.processed` cannot self-heal an orphan.** It checks only that the *row* exists
+   (`VariantWithRecord#processed?` → `record.present?`), never that the file exists —
+   so a broken variant is served forever and `images:prewarm`/`images:regenerate`
+   no-op on it. What actually fixed prod was **manually deleting the 2 orphan
+   records** so the backfill rebuilt them.
 
-### Attempt 3: Backfill Regeneration (Commit 1d05c55)
-**File:** `lib/tasks/images_regenerate.rake`
+### Why the `.download` "hotfix" (commit `e3543b8`) did not help
 
-Created a rake task to backfill all variants across all tenants:
+Adding `variant_obj.download` before `.processed` was based on the false premise
+above. It is counterproductive:
+
+- **Normal path (no record yet):** `.download` delegates to `record&.image` with
+  `allow_nil` → `record` is nil → **no-op**. `.processed` does all the real work, so
+  `.download` adds nothing.
+- **Genuine orphan (record present, file missing):** `.download` hits the missing key
+  → **raises `FileNotFoundError` → rescued → skipped**, so `.processed` never runs and
+  the orphan is *never repaired* — the one case it was meant to fix.
+- **Every healthy variant:** downloads-and-discards the full file on each backfill run
+  — wasted bandwidth.
+
+## Fix (#486)
+
+Replace the misguided hotfix with a real, opt-in repair capability:
+
+1. **`packs/captures/app/services/media_variants/prewarm.rb`** — reverted the
+   `.download`; restored lean `media.image.variant(v).processed`. Added a
+   `repair: true` mode that detects a variant record whose file is missing from
+   storage (`blob&.service&.exist?` false, or no blob) and **destroys the stale
+   record** so `.processed` rebuilds it from the master. Repair-only, because it costs
+   a storage existence check per variant — too dear for the per-capture hot path.
+   `Prewarm.call` keeps its Integer return contract (the capture `PrewarmJob` and
+   existing specs are unchanged).
+
+2. **`lib/tasks/images.rake`** — added `images:repair` (mirrors the `images:prewarm`
+   tenant sweep; runs `Prewarm.call(media, repair: true)`). Removed the redundant,
+   divergent `lib/tasks/images_regenerate.rake` the hotfix had added.
+
+3. **Specs** — `spec/services/media_variants/prewarm_spec.rb` (repair rebuilds a
+   variant whose file was deleted from storage; leaves healthy variants untouched;
+   still warms missing ones) and `spec/tasks/images_repair_spec.rb`.
+
+### Remediation runbook (if it recurs)
+
+Isolated storage-file loss can happen again (it's a SeaweedFS-side event). To detect
+and heal:
+
 ```bash
-bin/rails images:regenerate
+# Repair every tenant: rebuild any variant whose file is missing from storage.
+mise x -- kamal app exec -i --reuse 'bin/rails images:repair'
 ```
 
-**Results:**
-- Processed 221 total media records
-- Generated 442 variants (221 × 2: thumb + detail)
-- 0 errors reported
-- All variants downloaded successfully from S3
+To audit without changing anything, iterate `ActiveStorage::VariantRecord` per tenant
+and check `blob.service.exist?(blob.key)` — a non-empty result is the orphan set.
 
-**Status:** Task completed successfully but browser display status remains unclear.
+## Historical commits
 
-## Current State (Uncertain)
+| Commit | What it did | Verdict |
+|---|---|---|
+| `e3543b8` | added `.download` before `.processed` | **counterproductive** — reverted in #486 (see above) |
+| `f21db12` | added logging + the `images:regenerate` task | logging kept; task superseded by `images:repair` (#486) |
+| `1d05c55` | fixed the `images:regenerate` Media query | moot — task removed in #486 |
 
-After deployment and regeneration:
-- Browser screenshots show images displaying in galleries ✅
-- All variant files exist in S3 storage ✅
-- Database records point to variant blobs ✅
-- BUT: Cannot definitively confirm the original broken image issue is fixed
-
-**The problem:** The browser *appears* to show working images, but:
-1. We saw broken images earlier
-2. We can't compare before/after objectively
-3. The regeneration may have worked, or the display may be misleading
-
-## Commits Included
-
-1. **e3543b8** - `fix: force variant file generation in storage (v0.71 hotfix)`
-   - Added `.download` to force S3 upload before `.processed`
-
-2. **f21db12** - `fix: media variant prewarm after packwerk extraction (#478)`
-   - Added logging and backfill task creation
-
-3. **1d05c55** - `fix: correct Media query in regenerate task`
-   - Fixed rake task to use `joins(:image_attachment)` instead of non-existent column
-
-## Uncertainty & Next Steps
-
-This document captures work that *may* have fixed the issue but cannot be definitively verified. The changes made are:
-- **Safe:** All changes are additive or corrective to existing logic
-- **Tested:** Rake task ran successfully with 0 errors
-- **Logged:** New logging added to track variant prewarm operations
-
-However, the original symptom (broken image icons in gallery) may persist due to:
-1. Browser caching of old URLs
-2. Proxy/CDN caching issues
-3. A different underlying cause not yet identified
-4. The issue being intermittent or user-specific
-
-**For future investigation:**
-- Enable detailed logging on variant serving to identify URL mismatches
-- Capture network requests showing 404s when they occur
-- Check if issue reproduces on a fresh browser/incognito session
-- Verify variant files actually exist before assuming proxy errors
+The orphan records were only ever fixed by **manually deleting them** + re-running the
+backfill; #486 makes that a first-class, tested operation.

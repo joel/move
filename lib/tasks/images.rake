@@ -85,4 +85,33 @@ namespace :images do
 
     puts "[images:prewarm] total variants warmed: #{grand_total}"
   end
+
+  desc "Repair broken display variants — rebuild any whose file is missing from storage (#486)"
+  task repair: :environment do
+    grand_total = 0
+    # Same tenant sweep as :prewarm, but in repair mode: MediaVariants::Prewarm
+    # drops any variant record whose file has gone missing from object storage
+    # (isolated SeaweedFS loss) so it is rebuilt from the master, rather than
+    # no-opping on the stale record and serving a broken image forever. Costs a
+    # storage existence check per variant, so it's a deliberate maintenance run,
+    # not the per-capture hot path. Skips discarded media (never displayed).
+    grand_repaired = 0
+    Organization.pluck(:slug).each do |slug|
+      Apartment::Tenant.switch(slug) do
+        # One accumulating warmer per tenant so `#repaired` reports how many broken
+        # variants this run actually healed — the summary otherwise can't tell a
+        # fully-healthy sweep from one that fixed real orphans.
+        warmer = MediaVariants::Prewarm.new(repair: true)
+        ensured = 0
+        Media.with_attached_image.find_each { |media| ensured += warmer.call(media) }
+        grand_total += ensured
+        grand_repaired += warmer.repaired
+        line = "[images:repair] #{slug}: #{warmer.repaired} repaired, #{ensured} variants ensured present"
+        Rails.logger.info(line)
+        puts line
+      end
+    end
+
+    puts "[images:repair] total: #{grand_repaired} repaired, #{grand_total} variants ensured present"
+  end
 end
