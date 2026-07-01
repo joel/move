@@ -9,7 +9,9 @@ namespace :images do
 
     puts "Regenerating variants for all Media across all tenants..."
 
-    Apartment::Tenant.each(except: ["public"]) do |tenant|
+    Apartment::Tenant.each do |tenant|
+      next if tenant == "public"
+
       Apartment::Tenant.switch(tenant) do
         media_list = Media.where.not(image_blob_id: nil)
         media_count = media_list.count
