@@ -529,3 +529,22 @@ After using any skill from this project, append a brief retrospective:
 - Any step where you deviated from the skill's instructions → explain why
 
 **Improvement suggestion**: One concrete, actionable edit to the SKILL.md that would fix the most significant issue found. If none, write "No changes suggested."
+
+<!-- code-graph-mcp:begin v2 -->
+## Code Graph (repo-wide AST index)
+
+AST + FTS + vector index of the whole repo — prefer over multi-round Grep/Read for
+structural queries (LSP only sees open files; this sees everything). Fastest path = Bash CLI:
+
+| Intent | Command |
+|--------|---------|
+| Who calls X / what X calls | `code-graph-mcp callgraph X` |
+| Impact before editing a fn | `code-graph-mcp impact X` |
+| Unfamiliar dir / module | `code-graph-mcp overview <dir>` |
+| Symbol source / signature | `code-graph-mcp show X` |
+| Concept search (no exact name) | `code-graph-mcp search "…"` (vector: MCP `semantic_code_search`) |
+| grep + AST context | `code-graph-mcp grep "pat" [paths] [-t lang] [-g glob] [-c]` |
+
+Still use Grep for literal strings/regex in non-code files; still Read files you'll edit.
+Full command + MCP-tool table: `.claude/plugin_code_graph_mcp.md`
+<!-- code-graph-mcp:end -->
