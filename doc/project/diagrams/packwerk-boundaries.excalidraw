@@ -384,13 +384,13 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "\u2705 extracted (16): labels \u00b7 manifests \u00b7 search \u00b7 activity \u00b7 qr \u00b7 terms \u00b7 reviews \u00b7 photos \u00b7",
+      "text": "\u2705 extracted (17): labels \u00b7 manifests \u00b7 search \u00b7 activity \u00b7 qr \u00b7 terms \u00b7 reviews \u00b7 photos \u00b7",
       "fontSize": 12,
       "fontFamily": 3,
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "\u2705 extracted (16): labels \u00b7 manifests \u00b7 search \u00b7 activity \u00b7 qr \u00b7 terms \u00b7 reviews \u00b7 photos \u00b7",
+      "originalText": "\u2705 extracted (17): labels \u00b7 manifests \u00b7 search \u00b7 activity \u00b7 qr \u00b7 terms \u00b7 reviews \u00b7 photos \u00b7",
       "lineHeight": 1.25
     },
     {
@@ -454,13 +454,13 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "image_generation \u00b7 demo_data \u00b7 captures(+recognition)",
+      "text": "image_generation \u00b7 demo_data \u00b7 captures(+recognition) \u00b7 organizations",
       "fontSize": 12,
       "fontFamily": 3,
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "image_generation \u00b7 demo_data \u00b7 captures(+recognition)",
+      "originalText": "image_generation \u00b7 demo_data \u00b7 captures(+recognition) \u00b7 organizations",
       "lineHeight": 1.25
     },
     {
@@ -489,13 +489,13 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "remaining: boxes \u00b7 items \u00b7 moves \u00b7 organizations \u00b7 auth",
+      "text": "remaining: boxes(core) \u00b7 items(core) \u00b7 moves(core) \u00b7 auth(core)",
       "fontSize": 12,
       "fontFamily": 3,
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "remaining: boxes \u00b7 items \u00b7 moves \u00b7 organizations \u00b7 auth",
+      "originalText": "remaining: boxes(core) \u00b7 items(core) \u00b7 moves(core) \u00b7 auth(core)",
       "lineHeight": 1.25
     }
   ],
