@@ -384,13 +384,13 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "\u2705 extracted (17): labels \u00b7 manifests \u00b7 search \u00b7 recognition \u00b7 activity \u00b7 qr \u00b7 terms \u00b7",
+      "text": "\u2705 extracted (16): labels \u00b7 manifests \u00b7 search \u00b7 activity \u00b7 qr \u00b7 terms \u00b7 reviews \u00b7 photos \u00b7",
       "fontSize": 12,
       "fontFamily": 3,
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "\u2705 extracted (17): labels \u00b7 manifests \u00b7 search \u00b7 recognition \u00b7 activity \u00b7 qr \u00b7 terms \u00b7",
+      "originalText": "\u2705 extracted (16): labels \u00b7 manifests \u00b7 search \u00b7 activity \u00b7 qr \u00b7 terms \u00b7 reviews \u00b7 photos \u00b7",
       "lineHeight": 1.25
     },
     {
@@ -419,13 +419,13 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "reviews \u00b7 photos \u00b7 integration_tokens \u00b7 move_memberships \u00b7 session_handoffs \u00b7 accounts \u00b7",
+      "text": "integration_tokens \u00b7 move_memberships \u00b7 session_handoffs \u00b7 accounts \u00b7 vocabularies \u00b7",
       "fontSize": 12,
       "fontFamily": 3,
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "reviews \u00b7 photos \u00b7 integration_tokens \u00b7 move_memberships \u00b7 session_handoffs \u00b7 accounts \u00b7",
+      "originalText": "integration_tokens \u00b7 move_memberships \u00b7 session_handoffs \u00b7 accounts \u00b7 vocabularies \u00b7",
       "lineHeight": 1.25
     },
     {
@@ -454,13 +454,13 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "vocabularies \u00b7 image_generation \u00b7 demo_data \u00b7 captures",
+      "text": "image_generation \u00b7 demo_data \u00b7 captures(+recognition)",
       "fontSize": 12,
       "fontFamily": 3,
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "vocabularies \u00b7 image_generation \u00b7 demo_data \u00b7 captures",
+      "originalText": "image_generation \u00b7 demo_data \u00b7 captures(+recognition)",
       "lineHeight": 1.25
     },
     {

@@ -162,8 +162,7 @@ graph TD
     boxes["boxes"]
     items["items"]
     moves["moves"]
-    captures["captures ✅"]
-    recognition["recognition ✅"]
+    captures["captures (+recognition) ✅"]
     search["search ✅"]
     image_gen["image_generation ✅"]
     activity["activity ✅"]
@@ -184,8 +183,7 @@ graph TD
     labels --> root & utility
     boxes --> moves & discards & search & captures
     items --> boxes & moves & captures & discards & image_gen & search
-    captures --> moves & boxes & items & recognition
-    recognition --> moves & boxes & items & captures & utility
+    captures --> moves & boxes & items
     search --> moves & items & boxes
     moves --> tenancy & auth & search
     image_gen --> moves & captures
@@ -197,7 +195,7 @@ graph TD
     discards --> moves
 
     classDef done fill:#2f6f4e,stroke:#ECE7DC,color:#fff;
-    class labels,utility,manifests,search,recognition,activity,qr,terms,reviews,photos,integration_tokens,move_memberships,session_handoffs,accounts,vocabularies,image_gen,demo,captures done;
+    class labels,utility,manifests,search,activity,qr,terms,reviews,photos,integration_tokens,move_memberships,session_handoffs,accounts,vocabularies,image_gen,demo,captures done;
 ```
 
 **kernel** = the domain-free framework infrastructure (`ApplicationRecord`,

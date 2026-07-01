@@ -1,9 +1,20 @@
-# packs/captures — photo capture/ingestion + media variants.
-#   PUBLIC (app/public): Media (model — referenced by accounts/activity/
-#     image_generation/photos/recognition + root). PUBLIC (sigil): Captures::Create,
-#     Captures::SessionContent. PRIVATE: ImageNormalizer, MediaVariants::Prewarm+Job,
-#     the capture/prewarm subscribers.
-# dependencies + visible_to discovered via packwerk check.
+# packs/captures — the capture-and-recognition pipeline (one bounded context).
+#
+# Captures and recognition are folded into a single pack because their aggregate
+# roots are bidirectionally coupled at the data-model level: Media `has_many
+# :recognition_runs, dependent: :destroy` (Media owns the runs) and RecognitionRun
+# `belongs_to :media`. That is an irreducible dependency cycle for two separate
+# packs (Packwerk's acyclic rule surfaced it), so they belong together — a captured
+# photo and its AI recognition are one lifecycle.
+#
+#   PUBLIC (app/public): Media, RecognitionRun, RecognitionSuggestion.
+#   PUBLIC (sigil): Captures::Create, Captures::SessionContent, RecognitionRuns::
+#     Enqueue, RecognitionRuns::Retry, RecognitionProviders.
+#   PRIVATE: ImageNormalizer, MediaVariants::Prewarm(+Job), RecognitionRuns::Process
+#     (+Job), the provider adapters, and the capture/prewarm subscribers.
+#
+# dependencies: ['.', 'packs/utility']. visible_to: root + packs/accounts (which
+# references Media). Recognition's own constants are referenced only from the root.
 enforce_dependencies: true
 enforce_privacy: true
 enforce_visibility: true
@@ -12,8 +23,6 @@ layer: domain
 dependencies:
   - "."
   - "packs/utility"
-  - "packs/recognition"
 visible_to:
   - "."
   - "packs/accounts"
-  - "packs/recognition"
