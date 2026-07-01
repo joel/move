@@ -33,10 +33,12 @@ module MediaVariants
     private
 
     def process(media, variant)
-      media.image.variant(variant).processed
+      variant_record = media.image.variant(variant)
+      variant_record.processed
+      Rails.logger.debug { "[media_variants:prewarm] success media #{media.id} #{variant}" }
       true
     rescue StandardError => e # rubocop:disable Move/BroadRescue -- best-effort prewarm; lazy generation is the fallback
-      Rails.logger.warn("[media_variants:prewarm] skip media #{media.id} #{variant}: #{e.class} (#{e.message})")
+      Rails.logger.warn { "[media_variants:prewarm] skip media #{media.id} #{variant}: #{e.class}: #{e.message}" }
       false
     end
   end

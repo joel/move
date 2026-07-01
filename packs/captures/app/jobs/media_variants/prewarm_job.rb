@@ -12,7 +12,10 @@ module MediaVariants
       Apartment::Tenant.switch(tenant) do
         Current.tenant = tenant
         media = Media.find_by(id: media_id)
-        MediaVariants::Prewarm.call(media)
+        return Rails.logger.warn("[media_variants:prewarm_job] media #{media_id} not found") unless media
+
+        warmed_count = MediaVariants::Prewarm.call(media)
+        Rails.logger.info("[media_variants:prewarm_job] warmed #{warmed_count}/2 variants for media #{media_id}")
       end
     end
   end
