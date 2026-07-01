@@ -23,8 +23,10 @@ class ActiveStorageErrorCacheGuard
 
   # `prefix` comes from `config.active_storage.routes_prefix` (passed by the
   # initializer) so the guard tracks a customised mount instead of silently
-  # ceasing to match — #490 would otherwise quietly return.
-  def initialize(app, prefix: DEFAULT_PREFIX)
+  # ceasing to match — #490 would otherwise quietly return. POSITIONAL, not a
+  # keyword: Rails builds middleware with `klass.new(app, *args)`, so a keyword
+  # option degrades to nil/positional-hash and would leave `@prefix` unset.
+  def initialize(app, prefix = DEFAULT_PREFIX)
     @app = app
     prefix = DEFAULT_PREFIX if prefix.to_s.empty?
     @prefix = prefix.end_with?("/") ? prefix : "#{prefix}/"

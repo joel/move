@@ -67,7 +67,27 @@ RSpec.describe ActiveStorageErrorCacheGuard do
 
   it "honours a custom routes prefix (tracks config.active_storage.routes_prefix)" do
     app = ->(_env) { [404, immutable.dup, ["body"]] }
-    _s, headers, _b = described_class.new(app, prefix: "/media").call("PATH_INFO" => "/media/representations/x.jpg")
+    _s, headers, _b = described_class.new(app, "/media").call("PATH_INFO" => "/media/representations/x.jpg")
+    expect(headers["cache-control"]).to eq("no-store")
+  end
+
+  it "falls back to the default prefix when given a blank one" do
+    app = ->(_env) { [404, immutable.dup, ["body"]] }
+    _s, headers, _b = described_class.new(app, nil).call("PATH_INFO" => "/rails/active_storage/x.jpg")
+    expect(headers["cache-control"]).to eq("no-store")
+  end
+
+  # Guards the Rails middleware contract: options are passed POSITIONALLY via
+  # `klass.new(app, *args)`. A keyword-only constructor would leave the prefix
+  # unset here (nil) and raise on `start_with?` — this builds through the real
+  # stack to catch that, which a direct `.new` never would.
+  it "is constructed correctly through the real Rails middleware stack" do
+    downstream = ->(_env) { [404, immutable.dup, ["body"]] }
+    stack = ActionDispatch::MiddlewareStack.new
+    stack.use described_class, "/media"
+    built = stack.build(downstream)
+
+    _s, headers, _b = built.call("PATH_INFO" => "/media/representations/x.jpg")
     expect(headers["cache-control"]).to eq("no-store")
   end
 end
