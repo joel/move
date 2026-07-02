@@ -184,15 +184,22 @@ each with where the control lives, so a finding can be traced to code:
   `account/passkeys` routes) happens on the org subdomain, so pinning the origin to
   the apex would break enrollment/removal there. The one risk this leaves — a
   passkey *login* establishing a session on a subdomain the user does not belong
-  to — is **neutralized by two independent layers**: (1) `login_redirect` mints a
-  handoff token to the user's *own* org and `clear_session`s the just-set session
-  (every verified account has a primary org via `ensure_personal_organization`, so
-  `handoff_target_slug` always resolves), and (2) `TenantController#require_membership!`
-  404s any non-member on every tenant surface. A session established on a foreign
-  subdomain is therefore both wiped by the redirect and, if it lingered, inert.
+  to — is **neutralized in depth**:
+  - The **always-holding** layer is `TenantController#require_membership!`, which
+    404s any non-member on *every* tenant surface, however the session was obtained
+    — so a session on a foreign subdomain is **inert** regardless of the below.
+  - On the **normal successful-handoff path**, `login_redirect` additionally mints a
+    handoff token to the user's *own* org and `clear_session`s the just-set foreign
+    session, so it is usually wiped immediately. This wipe does **not** apply on the
+    fallback paths where `login_redirect` returns `/` with the session intact: an
+    account with **no resolvable target org** (`handoff_target_slug` → nil — e.g. a
+    failed personal-org provision; see `target_resolver_spec`) or a **handoff-token
+    mint failure** (`tenant_handoff_url` returns `/` unless a token was minted, #349).
+    There the foreign session lingers but stays inert via the membership backstop above.
+
   Revisit (e.g. gate only the webauthn-login ceremony to the apex, keeping
-  management on the subdomain) if either layer is weakened. (Audit finding F4 /
-  PR-3 — not pursued for this reason; advisory `GHSA-29rm-pfr6-xc82`.)
+  management on the subdomain) if the membership backstop is weakened. (Audit
+  finding F4 / PR-3 — not pursued for this reason; advisory `GHSA-29rm-pfr6-xc82`.)
 
 ---
 
