@@ -16,8 +16,16 @@ class MovePolicy < ApplicationPolicy
     reader_of?(record)
   end
 
+  # Creating a Move requires membership of the current Organization, not merely a
+  # session — otherwise a session that reached a foreign subdomain could create a
+  # Move and self-assign admin. The tenant boundary (TenantController#require_membership!)
+  # already enforces this; this keeps the policy itself honest (defense in depth).
+  # Apartment::Tenant.current is the active tenant slug, mirroring how the domain
+  # actions resolve the current Organization.
   def create?
-    user.present?
+    return false if user.nil?
+
+    Organization.member?(user_id: user.id, slug: Apartment::Tenant.current)
   end
 
   # Holds an editing role (admin/contributor) on the Move. The controller pairs
