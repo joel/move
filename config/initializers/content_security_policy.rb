@@ -1,11 +1,12 @@
 # frozen_string_literal: true
 
-# Content Security Policy (#493). Shipped REPORT-ONLY first: browsers evaluate the
-# policy and report violations but do NOT block, so a mis-scoped directive cannot
-# break a live surface — notably Google One Tap, which is prod-only (gated on
-# GOOGLE_CLIENT_ID, loading https://accounts.google.com/gsi/client) and cannot be
-# exercised in dev. Flip `content_security_policy_report_only` to false once prod is
-# confirmed violation-free (especially the Google sign-in page). See DESIGN/AGENTS.
+# Content Security Policy (#493), ENFORCING. Rolled out REPORT-ONLY first so a
+# mis-scoped directive could not break a live surface — notably Google One Tap,
+# which is prod-only (gated on GOOGLE_CLIENT_ID, loading
+# https://accounts.google.com/gsi/client) and cannot be exercised in dev. Flipped to
+# enforcing after prod ran violation-free (12h of traffic + an active browser pass
+# over the apex, the sign-in page with gsi/client executing, an org subdomain, and
+# create-account — zero [csp-violation] reports).
 #
 # `script-src` stays strict — `:self` + a per-request nonce, no `unsafe-inline` —
 # which is the real XSS backstop. `style-src` allows `unsafe-inline` because the UI
@@ -40,8 +41,8 @@ Rails.application.configure do
     # not worth the fragility for a minor secondary control — the strict `script-src`
     # is the XSS backstop. Revisit if the auth flow stops crossing hosts.
     policy.frame_ancestors :none
-    # Collect violations centrally during the report-only rollout (CspReportsController
-    # logs them), so prod can be confirmed clean before enforcing. Same-origin path —
+    # Keep collecting violations while enforcing (CspReportsController logs them) —
+    # ongoing telemetry for anything a future change breaks. Same-origin path —
     # resolves to the current host (apex or subdomain).
     policy.report_uri "/csp-violation-report"
   end
@@ -54,6 +55,6 @@ Rails.application.configure do
   config.content_security_policy_nonce_generator = ->(_request) { SecureRandom.base64(16) }
   config.content_security_policy_nonce_directives = %w[script-src]
 
-  # Roll out REPORT-ONLY first (see header comment). Flip to false to enforce.
-  config.content_security_policy_report_only = true
+  # Enforcing since the report-only rollout ran clean in prod (see header comment).
+  config.content_security_policy_report_only = false
 end
