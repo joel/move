@@ -18,7 +18,8 @@ class CspReportsController < ActionController::API
     if report
       Rails.logger.warn(
         "[csp-violation] directive=#{report["violated-directive"].inspect} " \
-        "blocked=#{report["blocked-uri"].inspect} document=#{report["document-uri"].inspect}"
+        "blocked=#{redact_url(report["blocked-uri"]).inspect} " \
+        "document=#{redact_url(report["document-uri"]).inspect}"
       )
     end
     head :no_content
@@ -33,5 +34,19 @@ class CspReportsController < ActionController::API
     parsed["csp-report"] if parsed.is_a?(Hash) && parsed["csp-report"].is_a?(Hash)
   rescue JSON::ParserError
     nil
+  end
+
+  # Drop the query string + fragment before logging a report URL. A violation on a
+  # token-bearing URL — a Rodauth magic link (`/email-auth?key=…`) or the session
+  # handoff (`/session/handoff?token=…`) — would otherwise persist an auth secret in
+  # the logs, bypassing `filter_parameters` (same class as #492). CSP keywords
+  # (`inline`/`eval`/`self`) and relative values pass through with any `?…` stripped.
+  def redact_url(value)
+    return value if value.blank?
+
+    uri = URI.parse(value.to_s)
+    uri.host ? "#{uri.scheme}://#{uri.host}#{uri.path}" : value.to_s.split("?", 2).first
+  rescue URI::InvalidURIError
+    value.to_s.split("?", 2).first
   end
 end

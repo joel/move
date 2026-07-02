@@ -51,5 +51,16 @@ RSpec.describe "Content Security Policy" do
       post "/csp-violation-report", params: "}{ not json", headers: { "Content-Type" => "application/csp-report" }
       expect(response).to have_http_status(:no_content)
     end
+
+    it "redacts token-bearing query strings from the logged summary" do
+      allow(Rails.logger).to receive(:warn)
+      body = { "csp-report" => { "violated-directive" => "script-src",
+                                 "document-uri" => "https://move.move-easy.docker/email-auth?key=SUPERSECRET" } }
+      post "/csp-violation-report", params: body.to_json, headers: { "Content-Type" => "application/csp-report" }
+
+      expect(Rails.logger).to have_received(:warn).with(
+        satisfy { |m| m.include?("/email-auth") && m.exclude?("SUPERSECRET") }
+      )
+    end
   end
 end
