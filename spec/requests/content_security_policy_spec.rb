@@ -35,4 +35,21 @@ RSpec.describe "Content Security Policy" do
   it "names a wss origin in connect-src for ActionCable (:self is not honoured for ws)" do
     expect(header).to match(/connect-src [^;]*wss/)
   end
+
+  it "points report-uri at the collection endpoint" do
+    expect(header).to include("report-uri /csp-violation-report")
+  end
+
+  describe "POST /csp-violation-report (the report sink)" do
+    it "accepts a violation report and returns 204" do
+      body = { "csp-report" => { "violated-directive" => "script-src", "blocked-uri" => "inline" } }
+      post "/csp-violation-report", params: body.to_json, headers: { "Content-Type" => "application/csp-report" }
+      expect(response).to have_http_status(:no_content)
+    end
+
+    it "does not raise on a malformed body" do
+      post "/csp-violation-report", params: "}{ not json", headers: { "Content-Type" => "application/csp-report" }
+      expect(response).to have_http_status(:no_content)
+    end
+  end
 end

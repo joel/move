@@ -168,6 +168,11 @@ Rails.application.routes.draw do
   get "test/login", to: "test_sessions#show" if Rails.env.test?
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
+  # CSP violation report sink (#493). The report-only Content-Security-Policy points
+  # `report-uri` here; browsers POST violations (unauthenticated) and the controller
+  # logs a bounded summary. Top-level so it resolves on the apex and every subdomain.
+  post "csp-violation-report", to: "csp_reports#create"
+
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check

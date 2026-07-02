@@ -40,6 +40,10 @@ Rails.application.configure do
     # not worth the fragility for a minor secondary control — the strict `script-src`
     # is the XSS backstop. Revisit if the auth flow stops crossing hosts.
     policy.frame_ancestors :none
+    # Collect violations centrally during the report-only rollout (CspReportsController
+    # logs them), so prod can be confirmed clean before enforcing. Same-origin path —
+    # resolves to the current host (apex or subdomain).
+    policy.report_uri "/csp-violation-report"
   end
 
   # Per-request nonce for legitimate inline <script> (the theme-boot script and the
