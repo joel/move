@@ -28,6 +28,11 @@ class McpUploadsController < ActionController::API
     # so narrowing here would reject images the pipeline can actually handle.
     content_type = Marcel::MimeType.for(StringIO.new(body))
     return head :unsupported_media_type unless content_type.to_s.start_with?("image/")
+    # SVG sniffs as image/* (Marcel) but is markup, not a raster the pipeline can
+    # transcode — ImageNormalizer rejects it at attach, so without this guard the
+    # blob is created then orphaned, and hostile SVG (embedded <script>) is stored.
+    # Reject before any blob exists (#498).
+    return head :unsupported_media_type if content_type.to_s == "image/svg+xml"
 
     blob = ActiveStorage::Blob.create_and_upload!(
       io: StringIO.new(body), filename: params[:filename].presence || "upload",
