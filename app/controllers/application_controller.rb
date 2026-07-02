@@ -53,6 +53,21 @@ class ApplicationController < ActionController::Base
     tenant unless tenant == Apartment.default_tenant || tenant == "public"
   end
 
+  # Whether the signed-in user belongs to the current tenant's Organization.
+  # The tenant boundary (TenantController#require_membership!) authorizes on this,
+  # so a session that lands on an org subdomain the user is not a member of gets a
+  # non-disclosing 404 instead of reaching tenant surfaces. False on the apex/no
+  # tenant or when unauthenticated. Indexed `exists?` — no rows loaded into Ruby.
+  # Defined here (not on TenantController) so it resolves for the whole controller
+  # tree and is a single, stubbable seam.
+  def member_of_current_tenant?
+    return @member_of_current_tenant if defined?(@member_of_current_tenant)
+
+    @member_of_current_tenant =
+      current_user.present? && current_tenant.present? &&
+      Organization.member?(user_id: current_user.id, slug: current_tenant)
+  end
+
   # True when the request is on an org subdomain whose tenant SCHEMA was just
   # dropped — used after account/user deletion to fall back to the apex instead
   # of routing back through a now-missing tenant (the elevator would 404).
@@ -119,6 +134,10 @@ class ApplicationController < ActionController::Base
     # (incl. account management/deletion); the gate re-engages the moment they
     # reach their subdomain.
     return if current_tenant.nil?
+    # A non-member is 404'd at the tenant boundary (TenantController#require_membership!);
+    # don't redirect them to the terms wall first, which would reveal the subdomain
+    # resolves to a real tenant (non-disclosing posture). Members fall through.
+    return unless member_of_current_tenant?
     # Logout must stay reachable so an unaccepted account can leave from the wall.
     # Rodauth renders through RodauthController (so this gate DOES run for its
     # views); exempt only the logout path. Login/verify/email-auth render
