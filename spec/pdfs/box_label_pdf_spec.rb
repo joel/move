@@ -28,7 +28,8 @@ RSpec.describe BoxLabelPdf do
     box = create(:box, move:, room:, number: "9", qr_token: "tok-pages")
     pdf = described_class.new(box:, scan_url: "https://acme.example/scan/tok-pages").render
 
-    # No pdf-reader dependency: the page-tree /Count is authoritative.
+    # The raw page-tree /Count is authoritative for page count (content-level
+    # assertions live in box_labels_pdf_spec via PdfHelpers).
     expect(pdf).to include("/Count 2")
   end
 

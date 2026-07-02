@@ -129,6 +129,9 @@ end
 group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem "capybara"
+  # Extract text/content streams from generated PDFs so specs can assert what
+  # actually prints (not just that rendering doesn't raise) — #508.
+  gem "pdf-reader", require: false
   gem "rspec-rails"
   gem "selenium-webdriver"
 end
