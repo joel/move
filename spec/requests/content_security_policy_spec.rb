@@ -31,4 +31,8 @@ RSpec.describe "Content Security Policy" do
   it "allows inline style attributes (progress bars, display toggles)" do
     expect(header).to match(/style-src [^;]*'unsafe-inline'/)
   end
+
+  it "names a wss origin in connect-src for ActionCable (:self is not honoured for ws)" do
+    expect(header).to match(/connect-src [^;]*wss/)
+  end
 end

@@ -17,13 +17,20 @@ Rails.application.configure do
   # (mirrors how the UI gates the One Tap/OAuth affordances).
   google = ENV["GOOGLE_CLIENT_ID"].present? ? [google_gsi] : []
 
+  # ActionCable (turbo_stream_from on the capture / label-print pages) connects to
+  # wss://<host>/cable. `:self` is NOT honoured for WebSocket in every browser (older
+  # Safari), so name the wss origins explicitly: the apex + every tenant subdomain of
+  # the configured zone. Falls back to the wss scheme where the zone is unset (test).
+  zone = Rails.application.config.x.tenant_zone.to_s.presence
+  cable_origins = zone ? ["wss://#{zone}", "wss://*.#{zone}"] : ["wss:"]
+
   config.content_security_policy do |policy|
     policy.default_src :self
     policy.script_src(:self, *google)                       # + nonce (below); no unsafe-inline
     policy.style_src(:self, :unsafe_inline, *google)        # inline style="…" attrs
     policy.img_src(:self, :data, :blob, *google, *(google.empty? ? [] : ["https://*.googleusercontent.com"]))
     policy.font_src :self, :data
-    policy.connect_src(:self, *google)                      # ActionCable wss is same-origin (:self)
+    policy.connect_src(:self, *cable_origins, *google)      # + ActionCable wss (see above)
     policy.frame_src(*(google.empty? ? [:none] : google))   # One Tap iframe
     policy.object_src :none
     policy.base_uri :self
