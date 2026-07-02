@@ -33,6 +33,9 @@ class BoxLabelsPdf
   LABEL_LENGTH_MM = 90
   MARGIN = 6 # ≈2mm — keeps content off the tape edges
   GAP = 8 # vertical gap between the QR and the text region
+  # The *_MIN_SIZE floors are preferred, not absolute: fit_text caps a floor to what
+  # its slice can physically hold, so a squeezed layout prints smaller text instead
+  # of dropping it (#508 — a vanished number is worse than a small one).
   NUMBER_SIZE = 28
   NUMBER_MIN_SIZE = 16
   ROOM_SIZE = 16 # destination room name; shrinks toward ROOM_MIN_SIZE if long
@@ -50,6 +53,12 @@ class BoxLabelsPdf
   # Move-configured `labels_per_box` is passed (a bare builder call, or a bulk job
   # enqueued before Phase 45 deployed), so behaviour is unchanged by default.
   DEFAULT_COPIES = 2
+
+  # Safety slack (pt) when capping a shrink-to-fit floor to its slice height: the
+  # cap comes out of a float division and Prawn's fit check is strict, so a line
+  # sized to fit *exactly* can still be dropped at the boundary. 0.05pt is far below
+  # print resolution — pure slack, not a tuning knob.
+  FIT_EPSILON = 0.05
 
   # entries: [{ box:, scan_url: }, ...] in print order. copies: the Move's
   # labels_per_box (1..10) — how many identical pages to emit per box.
@@ -109,15 +118,24 @@ class BoxLabelsPdf
   # label per page — #162 / #255). +top+ is the region's top y.
   def details(doc, box, top:)
     top = fragile_band(doc, top) if box.fragile?
-    number_height = top * 0.40
-    room_height = top * 0.38
+    # 0.46 is tuned so a full NUMBER_MIN_SIZE line still fits below the FRAGILE band
+    # (band + GAP leave ~48pt of region; 0.46 × 48 ≥ 16pt × the 1.362em line height),
+    # and 0.34 keeps two ROOM_MIN_SIZE lines viable on a plain label — both margins
+    # are thin, so they're pinned by specs, not just this comment. The token slice is
+    # the remainder, so the stack can never overrun the page bottom.
+    number_height = top * 0.46
+    room_height = top * 0.34
+    token_top = top - number_height - room_height
     fit_text(doc, "##{format("%03d", box.number.to_i)}",
              top: top, height: number_height, size: NUMBER_SIZE, min_size: NUMBER_MIN_SIZE)
     fit_text(doc, box.room&.name.presence || "Unassigned",
              top: top - number_height, height: room_height, size: ROOM_SIZE, min_size: ROOM_MIN_SIZE)
+    # The token stays near-black: the design's muted gray (8A8A8A) dithers faint and
+    # patchy on the monochrome thermal printer, and the token is the QR's manual-entry
+    # fallback — print legibility beats on-screen hierarchy here.
     fit_text(doc, box.qr_token,
-             top: top - number_height - room_height, height: top * 0.22,
-             size: TOKEN_SIZE, min_size: TOKEN_MIN_SIZE, color: "8A8A8A")
+             top: token_top, height: token_top,
+             size: TOKEN_SIZE, min_size: TOKEN_MIN_SIZE)
   end
 
   # The terracotta FRAGILE handling band, drawn at the top of the text region for a fragile
@@ -129,22 +147,33 @@ class BoxLabelsPdf
     height = top * 0.22
     doc.fill_color FRAGILE_COLOR
     doc.fill_rounded_rectangle([0, top], doc.bounds.width, height, 4)
-    doc.text_box(
-      "FRAGILE", at: [0, top], width: doc.bounds.width, height: height,
-                 align: :center, valign: :center, size: FRAGILE_SIZE, style: :bold,
-                 color: "FFFFFF", overflow: :shrink_to_fit, min_font_size: FRAGILE_MIN_SIZE
-    )
     doc.fill_color "000000"
+    fit_text(doc, "FRAGILE", top: top, height: height, size: FRAGILE_SIZE,
+                             min_size: FRAGILE_MIN_SIZE, color: "FFFFFF", valign: :center)
     top - height - GAP
   end
 
   # Centered bold text scaled to fit a fixed slice of the page. +top+ is the y of the
   # slice's top edge (bounds-relative); +height+ is its height.
-  def fit_text(doc, text, top:, height:, size:, min_size:, color: "1A1A1A")
-    doc.text_box(
-      text, at: [0, top], width: doc.bounds.width, height: height, align: :center,
-            size: size, style: :bold, color: color,
-            overflow: :shrink_to_fit, min_font_size: min_size
+  #
+  # Colored text must go through a formatted fragment: Prawn's plain `text_box`
+  # silently IGNORES a `color:` option, so the text inherits the document's current
+  # fill color — which painted "FRAGILE" terracotta-on-terracotta (#508; see
+  # PdfFonts' header).
+  #
+  # The +min_size+ floor is capped to the tallest single line the slice can hold:
+  # when even the floor overflows the box vertically, shrink_to_fit TRUNCATES the
+  # whole line — how the box number vanished under the FRAGILE band (#508). The
+  # metric is measured on the bold face — the one the fragment renders — so a font
+  # swap can't quietly desynchronize the cap. (Wrapped text still drops lines after
+  # the first when the slice can't hold them; only the first line is guaranteed.)
+  def fit_text(doc, text, top:, height:, size:, min_size:, color: "1A1A1A", valign: :top)
+    line_height = doc.find_font(PdfFonts::FAMILY, style: :bold).height_at(1)
+    min_size = [min_size, (height / line_height) - FIT_EPSILON].min.clamp(1, size)
+    doc.formatted_text_box(
+      [{ text: text, color: color, styles: [:bold] }],
+      at: [0, top], width: doc.bounds.width, height: height, align: :center,
+      valign: valign, size: size, overflow: :shrink_to_fit, min_font_size: min_size
     )
   end
 end
