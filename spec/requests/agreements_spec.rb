@@ -35,11 +35,10 @@ RSpec.describe "Terms agreement gate" do
       expect(response).to redirect_to(agreement_path)
     end
 
-    it "gates other authenticated non-tenant surfaces too (admin /users)" do
-      admin = create(:user, :admin)
-      stub_current_user(admin, accept_terms: false)
+    it "gates other authenticated non-tenant surfaces too (/account)" do
+      stub_current_user(create(:user), accept_terms: false)
 
-      get users_path
+      get account_path
 
       expect(response).to redirect_to(agreement_path)
     end
