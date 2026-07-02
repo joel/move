@@ -6,10 +6,16 @@
 # the surface exists. Subclasses: MovesController (tenant-scoped, no Move) and
 # MoveScopedController (everything nested under /moves/:move_id).
 class TenantController < ApplicationController
+  # require_membership! is PREPENDED so it runs BEFORE the inherited terms gate
+  # (ApplicationController#require_terms_agreement!): an authenticated non-member of
+  # the current Organization gets a non-disclosing 404 on every tenant surface
+  # uniformly — never a terms redirect that would reveal the subdomain resolves to a
+  # real tenant (or store the foreign path as terms_return_to). The terms gate is
+  # left untouched on non-tenant controllers (e.g. AccountsController), which still
+  # block unaccepted accounts there.
+  prepend_before_action :require_membership!
   before_action :require_authenticated_user!
   before_action :require_tenant!
-  before_action :require_membership!
-  # The terms-agreement gate (#369) is applied globally in ApplicationController.
 
   private
 
@@ -23,8 +29,11 @@ class TenantController < ApplicationController
   # only get a session on a subdomain you belong to" — so a session that reaches a
   # foreign subdomain cannot act on it (e.g. create a Move and self-assign admin).
   # Non-disclosing 404 to match the tenancy posture (never reveal the org exists).
-  # Runs after require_tenant!, so current_tenant is present here.
+  # Unauthenticated requests fall through to require_authenticated_user! (the
+  # login/unauthorized response) instead of being 404'd here.
   def require_membership!
+    return if current_user.nil?
+
     head :not_found unless member_of_current_tenant?
   end
 

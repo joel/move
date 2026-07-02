@@ -51,5 +51,18 @@ RSpec.describe "Tenant membership boundary" do
         .not_to change(Move, :count)
       expect(response).to have_http_status(:not_found)
     end
+
+    it "404s a non-member who hasn't accepted terms (membership precedes the terms gate)" do
+      # require_membership! is prepended ahead of the terms gate, so a non-member is
+      # 404'd uniformly — not redirected to /agreement (which would disclose the
+      # subdomain resolves to a real tenant). Fresh user: the context accepts terms.
+      stub_current_user(create(:user), accept_terms: false)
+      allow_any_instance_of(ApplicationController) # rubocop:disable RSpec/AnyInstance
+        .to receive(:member_of_current_tenant?).and_call_original
+
+      get moves_path
+
+      expect(response).to have_http_status(:not_found)
+    end
   end
 end
