@@ -2,10 +2,10 @@
 
 module Components
   # A1 Move list item: status badge, name, packed progress, and pending-review
-  # count. +metrics+ carries the move's real aggregates ({ packed:, total:,
-  # pending_review: } from Move.card_metrics — #513 replaced the A1 placeholder
-  # zeros) and is REQUIRED so a new render site can't silently regress to fake
-  # zeros. Archived moves render visibly muted (read-only treatment).
+  # count. +metrics+ carries the move's real aggregates (a
+  # Moves::CardMetrics::Metrics — #513 replaced the A1 placeholder zeros) and is
+  # REQUIRED so a new render site can't silently regress to fake zeros. Archived
+  # moves render visibly muted (read-only treatment).
   class MoveCard < Components::Base
     include Phlex::Rails::Helpers::ButtonTo
 
@@ -97,18 +97,17 @@ module Components
     end
 
     def packed_percent
-      total = @metrics[:total]
-      return 0 if total.zero?
+      return 0 if @metrics.total.zero?
 
-      (@metrics[:packed] * 100.0 / total).round
+      (@metrics.packed * 100.0 / @metrics.total).round
     end
 
     def metrics
       div(class: "flex items-center justify-between text-body-md text-on-surface-variant") do
         span(class: "text-text-warm") do
-          I18n.t("moves.packed_hint", packed: @metrics[:packed], total: @metrics[:total])
+          I18n.t("moves.packed_hint", packed: @metrics.packed, total: @metrics.total)
         end
-        span { I18n.t("moves.pending_review", count: @metrics[:pending_review]) }
+        span { I18n.t("moves.pending_review", count: @metrics.pending_review) }
       end
     end
   end

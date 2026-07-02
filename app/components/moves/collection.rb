@@ -17,9 +17,15 @@ module Components
 
       ID = "moves-collection"
 
-      def initialize(moves:, organization:, user: nil)
+      # +metrics+ — { move_id => Moves::CardMetrics::Metrics } from the
+      # Moves::CardMetrics action (#513), computed by the caller (the controller,
+      # or DemoData::Reveal for the broadcast path). REQUIRED, and each card's
+      # entry is fetched strictly, so a render site that forgets it fails loudly
+      # instead of silently regressing to the old placeholder zeros.
+      def initialize(moves:, organization:, metrics:, user: nil)
         @moves = moves
         @organization = organization
+        @metrics = metrics
         @user = user
       end
 
@@ -59,14 +65,10 @@ module Components
         status == "failed" && @moves.none?
       end
 
-      # Card metrics are computed HERE (one grouped query set per render, #513) so
-      # every render path gets real numbers — the controller-rendered index AND the
-      # DemoData::Reveal broadcast, which renders this component outside a controller.
       def list
-        metrics = Move.card_metrics(@moves.map(&:id))
         section(class: "flex flex-col gap-4") do
           @moves.each do |move|
-            render Components::MoveCard.new(move: move, user: @user, metrics: metrics.fetch(move.id))
+            render Components::MoveCard.new(move: move, user: @user, metrics: @metrics.fetch(move.id))
           end
         end
       end
