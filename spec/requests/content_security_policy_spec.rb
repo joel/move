@@ -2,17 +2,18 @@
 
 require "rails_helper"
 
-# #493 — the app ships a Content-Security-Policy (report-only initially). script-src
-# stays strict (self + nonce, no unsafe-inline) as the XSS backstop; style-src allows
+# #493 — the app ships an ENFORCING Content-Security-Policy (rolled out report-only
+# first; flipped after prod was confirmed violation-free). script-src stays strict
+# (self + nonce, no unsafe-inline) as the XSS backstop; style-src allows
 # unsafe-inline for the UI's inline style="…" attributes.
 RSpec.describe "Content Security Policy" do
-  subject(:header) { response.headers["Content-Security-Policy-Report-Only"] }
+  subject(:header) { response.headers["Content-Security-Policy"] }
 
   before { get "/" }
 
-  it "sends the policy report-only (not enforcing) during rollout" do
+  it "enforces the policy (report-only rollout complete — #493)" do
     expect(header).to be_present
-    expect(response.headers["Content-Security-Policy"]).to be_nil
+    expect(response.headers["Content-Security-Policy-Report-Only"]).to be_nil
   end
 
   it "keeps script-src strict: self + a non-empty nonce, and no unsafe-inline" do
