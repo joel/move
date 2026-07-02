@@ -61,11 +61,9 @@ class ApplicationController < ActionController::Base
   # Defined here (not on TenantController) so it resolves for the whole controller
   # tree and is a single, stubbable seam.
   def member_of_current_tenant?
-    return @member_of_current_tenant if defined?(@member_of_current_tenant)
+    return false if current_user.nil? || current_tenant.nil?
 
-    @member_of_current_tenant =
-      current_user.present? && current_tenant.present? &&
-      Organization.member?(user_id: current_user.id, slug: current_tenant)
+    Organization.member?(user_id: current_user.id, slug: current_tenant)
   end
 
   # True when the request is on an org subdomain whose tenant SCHEMA was just
@@ -134,10 +132,6 @@ class ApplicationController < ActionController::Base
     # (incl. account management/deletion); the gate re-engages the moment they
     # reach their subdomain.
     return if current_tenant.nil?
-    # A non-member is 404'd at the tenant boundary (TenantController#require_membership!);
-    # don't redirect them to the terms wall first, which would reveal the subdomain
-    # resolves to a real tenant (non-disclosing posture). Members fall through.
-    return unless member_of_current_tenant?
     # Logout must stay reachable so an unaccepted account can leave from the wall.
     # Rodauth renders through RodauthController (so this gate DOES run for its
     # views); exempt only the logout path. Login/verify/email-auth render

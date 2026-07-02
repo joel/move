@@ -99,4 +99,21 @@ RSpec.describe "/account" do
     get account_url
     expect(response).to have_http_status(:unauthorized)
   end
+
+  it "keeps the terms gate active on /account even for a non-member (no bypass)" do
+    # Regression: the tenant-membership work must not let the GLOBAL terms gate be
+    # skipped on non-tenant controllers. AccountsController isn't membership-gated,
+    # so an account that hasn't accepted the current terms must still be sent to the
+    # agreement wall — member of the current tenant or not. (Fresh user: the top-level
+    # `before` accepts terms for `user`, so we need one that hasn't.)
+    outsider = create(:user)
+    stub_current_user(outsider, accept_terms: false)
+    stub_current_tenant("acme")
+    allow_any_instance_of(ApplicationController) # rubocop:disable RSpec/AnyInstance
+      .to receive(:member_of_current_tenant?).and_call_original # non-member (no org row)
+
+    get account_url
+
+    expect(response).to redirect_to(agreement_path)
+  end
 end

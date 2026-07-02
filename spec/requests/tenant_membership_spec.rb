@@ -51,17 +51,5 @@ RSpec.describe "Tenant membership boundary" do
         .not_to change(Move, :count)
       expect(response).to have_http_status(:not_found)
     end
-
-    it "404s a non-member who hasn't accepted terms (no 302 to the terms wall)" do
-      # The terms gate must not redirect a non-member (that would disclose the
-      # subdomain resolves to a real tenant); the membership 404 wins uniformly.
-      stub_current_user(create(:user), accept_terms: false)
-      allow_any_instance_of(ApplicationController) # rubocop:disable RSpec/AnyInstance
-        .to receive(:member_of_current_tenant?).and_call_original
-
-      get moves_path
-
-      expect(response).to have_http_status(:not_found)
-    end
   end
 end
