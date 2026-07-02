@@ -146,6 +146,27 @@ each with where the control lives, so a finding can be traced to code:
   with interpolation outside `bin/cli` is **not** covered by this acceptance and
   must be flagged.
 
+- **Active Storage blob bytes are not tenant-isolated; delivery relies on
+  signed-id secrecy, not membership authorization.** `ActiveStorage::Blob`,
+  `Attachment`, and `VariantRecord` are Apartment-**excluded** and live in the
+  shared `public` schema (`config/initializers/apartment.rb`) — deliberately, so
+  Rails 8.1's Active Storage proxy (which leases a fresh pool connection that
+  Apartment resets to `public`) can resolve them regardless of the active tenant.
+  Files are served via `rails_storage_proxy` URLs, and the default proxy
+  controller performs **no** authorization beyond validating the (non-expiring)
+  signed id. So while the domain `Media` row is per-tenant, the file it points to
+  is **not** — anyone holding a valid proxy URL can fetch that blob without an
+  Organization/Move membership check. Accepted because: (a) proxy signed ids are
+  unguessable (HMAC over the app secret), (b) the schema-per-tenant model still
+  isolates every *domain* record and the `Media`→blob mapping, and (c) fronting
+  blob delivery with a per-request membership check conflicts with the
+  fresh-`public`-connection constraint above. **Residual risk:** a signed-id /
+  proxy URL that leaks (shared link, server/CDN log, CDN cache) grants
+  cross-tenant read of that single image with no membership gate — there is no
+  second authorization layer behind the URL. Revisit if blob contents ever hold
+  higher-sensitivity data than move-inventory photos, or wrap proxy delivery in an
+  authorization check at that point. (Audit finding F5, 2026-07-02.)
+
 ---
 
 ## Related references
@@ -158,4 +179,4 @@ each with where the control lives, so a finding can be traced to code:
 - [`app/mcp/AGENTS.md`](../../app/mcp/AGENTS.md) — MCP token + upload handshake.
 - CI static checks: Brakeman + bundle-audit in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).
 
-_Last updated: 2026-06-29 (initial security model + dedicated review pass)._
+_Last updated: 2026-07-02 (added accepted risk: shared-schema Active Storage blob delivery — audit finding F5)._
