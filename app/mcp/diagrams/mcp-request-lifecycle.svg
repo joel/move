@@ -43,7 +43,7 @@
   <text class="terra" x="422" y="252" font-size="10.5">401 if absent / revoked</text>
   <text class="t mono" x="422" y="276" font-size="10.5">Current.move</text>
   <text class="t mono" x="422" y="292" font-size="10.5">source = :mcp</text>
-  <text class="sub" x="422" y="308" font-size="10">touch last_used_at</text>
+  <text class="terra" x="422" y="308" font-size="10.5">rate-limit → 429</text>
 
   <!-- Server -->
   <rect class="accent" x="622" y="166" width="200" height="152" rx="12"/>

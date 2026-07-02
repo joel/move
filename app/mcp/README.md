@@ -37,12 +37,21 @@ end
 
 ## Authentication & tenancy
 
-Two layers, both required (`app/controllers/concerns/mcp_authentication.rb`):
+Three layers, in order (`app/controllers/concerns/mcp_authentication.rb`):
 
 1. **Tenant** — `require_tenant!` rejects the apex with **404**; the
    `MoveTenantElevator` has already switched to the org schema by subdomain.
 2. **Token** — `authenticate_integration_token!` resolves the Bearer token *within*
-   that schema; **401** if absent or revoked, then `touch_last_used!`.
+   that schema; **401** if absent or revoked.
+3. **Rate limit** — a per-token cap (`POST /mcp` 60/min, `POST /mcp/uploads` 30/min —
+   tighter, each upload is up to 25 MB) runs *after* the token is resolved but before
+   the tool; over quota → **429**. Backed by `Rails.cache` (Solid Cache in prod), so
+   the window is shared across app instances.
+
+`last_used_at` is recorded in an **after_action**, deliberately — a **401** or **429**
+request halts before the action, so it performs **no** DB write. Only a request that
+passed auth *and* the rate limit *and* ran the tool touches `last_used_at`, which keeps
+a rejected flood from amplifying DB writes.
 
 ```ruby
 # app/models/move_integration_token.rb
@@ -200,6 +209,9 @@ actions emit (`item.created`, etc.) flow to their own subscribers — see the
   guard, authorization, tenancy, and audit apply.
 - **Uploads** — byte-sniffed, size-capped, Move-scoped `signed_id`; bytes never
   transit the JSON-RPC body.
+- **Rate-limited** — a per-token cap (60/min JSON-RPC, 30/min uploads) via
+  `Rails.cache`, so a compromised token can't exhaust resources; `last_used_at` is an
+  after_action, so a **429**/**401** performs no DB write.
 
 ---
 
