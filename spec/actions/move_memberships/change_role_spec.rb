@@ -46,4 +46,28 @@ RSpec.describe MoveMemberships::ChangeRole do
 
     expect(result.failure).to eq(:invalid_role)
   end
+
+  it "revokes the member's active MCP tokens when demoting them out of admin" do
+    membership = create(:move_membership, move:, user: other, role: "admin")
+    token = create(:move_integration_token, move:, created_by: other)
+    allow(Rails.event).to receive(:notify)
+
+    result = described_class.new.call(membership:, role: "viewer", actor: admin)
+
+    expect(result).to be_success
+    expect(token.reload.revoked_at).to be_present
+    expect(Rails.event).to have_received(:notify).with(
+      "integration_token.revoked", hash_including(token_id: token.id)
+    )
+  end
+
+  it "leaves MCP tokens intact when the change is not a demotion out of admin" do
+    membership = create(:move_membership, move:, user: other, role: "viewer")
+    token = create(:move_integration_token, move:, created_by: other)
+
+    result = described_class.new.call(membership:, role: "contributor", actor: admin)
+
+    expect(result).to be_success
+    expect(token.reload.revoked_at).to be_nil
+  end
 end

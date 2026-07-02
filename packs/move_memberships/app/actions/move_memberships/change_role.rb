@@ -13,12 +13,14 @@ module MoveMemberships
   # slip past the check and leave the Move with no admin.
   class ChangeRole < BaseAction
     include AdminGuard
+    include TokenRevocation
 
     def call(membership:, role:, actor:)
       role = role.to_s
       yield ensure_known_role(role)
-      yield change_role(membership, role)
+      revoked = yield change_role(membership, role)
       yield emit_event(membership, actor)
+      emit_token_revocations(revoked, actor)
       Success(membership)
     end
 
@@ -34,8 +36,12 @@ module MoveMemberships
       MoveMembership.transaction do
         next Failure(:last_admin) if demoting?(membership, role) && would_orphan_last_admin?(membership)
 
+        # Demotion out of admin removes the token-management privilege, so revoke
+        # this member's MCP tokens in the same transaction (deprovisioning — see
+        # TokenRevocation). Returns [] when the change isn't a demotion.
+        revoked = demoting?(membership, role) ? revoke_member_tokens(membership.move, membership.user_id) : []
         membership.update!(role: role)
-        Success(membership)
+        Success(revoked)
       end
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
