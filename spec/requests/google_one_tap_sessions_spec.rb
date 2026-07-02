@@ -213,6 +213,15 @@ RSpec.describe "POST /auth/google/one_tap" do
     end
   end
 
+  context "with a non-string credential (#495)" do
+    it "returns invalid_token instead of 500ing on CGI.escape" do
+      post "/auth/google/one_tap", params: { credential: { nested: "object" } }, as: :json
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["error"]).to eq("invalid_token")
+    end
+  end
+
   context "with CSRF protection enabled (production-like)" do
     around do |example|
       original = ActionController::Base.allow_forgery_protection

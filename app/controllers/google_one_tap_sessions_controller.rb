@@ -58,7 +58,9 @@ class GoogleOneTapSessionsController < ApplicationController
   end
 
   def verify_google_token(token)
-    return nil if token.blank?
+    # A credential must be a non-blank string. Rejecting non-strings here also stops a
+    # posted object/array from reaching CGI.escape, which raises TypeError (→ 500) (#495).
+    return nil unless token.is_a?(String) && token.present?
 
     # URL-encode the user-supplied credential (#495) — it's spliced into the query
     # string, and an un-encoded exotic value would otherwise raise URI::InvalidURIError.
@@ -67,14 +69,18 @@ class GoogleOneTapSessionsController < ApplicationController
     return nil unless response.is_a?(Net::HTTPSuccess)
 
     data = JSON.parse(response.body)
-    return nil unless data["aud"] == ENV["GOOGLE_CLIENT_ID"]
-    # Assert the issuer locally rather than trusting the tokeninfo round-trip alone (#495).
-    return nil unless GOOGLE_ISSUERS.include?(data["iss"])
-    return nil unless data["email_verified"] == "true"
-
-    data
+    valid_google_payload?(data) ? data : nil
   rescue URI::InvalidURIError, JSON::ParserError, SocketError, Timeout::Error
     nil
+  end
+
+  # The tokeninfo payload is trustworthy only when it is for THIS app (`aud`), issued
+  # by Google (`iss` — asserted locally, not just trusted from the round-trip, #495),
+  # and the email is verified.
+  def valid_google_payload?(data)
+    data["aud"] == ENV["GOOGLE_CLIENT_ID"] &&
+      GOOGLE_ISSUERS.include?(data["iss"]) &&
+      data["email_verified"] == "true"
   end
 
   # Schema-qualify the omniauth identities table to `public`: it has no AR
