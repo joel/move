@@ -82,7 +82,12 @@ The headline boundaries an attacker probes:
 1. **Apex vs org-subdomain.** The apex (`move.<zone>` locally, `move-easy.org` in
    prod) is **broker-only** — login, the org registry, and single-use session
    handoff. An authenticated session is established and lingers **only** on the org
-   subdomain, never the apex. Cookies are host-only.
+   subdomain, never the apex. Cookies are host-only. On a tenant subdomain,
+   `TenantController#require_membership!` (prepended ahead of the terms gate) rejects
+   with a non-disclosing 404 any authenticated user who is **not** a member of that
+   Organization — so a session that reaches a subdomain it doesn't belong to cannot
+   act on it (e.g. create a Move and self-assign admin). Membership is authorized at
+   the boundary, not assumed from how the session was obtained.
 2. **`public` schema vs tenant schema.** Each Organization is a PostgreSQL
    **schema**. Auth (Rodauth) tables and the Organization registry live in `public`
    via Apartment `excluded_models`; everything Move-scoped lives in the tenant
@@ -101,7 +106,7 @@ The headline boundaries an attacker probes:
 
 | Asset | Threat | Control | Where it lives |
 |---|---|---|---|
-| Other tenants' data | Cross-tenant read/write | Apartment schema-per-tenant + per-request elevator; unknown subdomain ⇒ 404 (no disclosure) | `config/initializers/apartment.rb`, `config/initializers/apartment_elevator.rb` (`EXCLUDED_SUBDOMAINS = %w[move mail storage bucket www]`) |
+| Other tenants' data | Cross-tenant read/write | Apartment schema-per-tenant + per-request elevator; unknown subdomain ⇒ 404 (no disclosure); `TenantController#require_membership!` ⇒ 404 for an authenticated non-member of the org | `config/initializers/apartment.rb`, `config/initializers/apartment_elevator.rb` (`EXCLUDED_SUBDOMAINS = %w[move mail storage bucket www]`), `app/controllers/tenant_controller.rb` |
 | Auth / account tables | Empty-tenant-clone footgun, cross-tenant auth | `excluded_models` + `persistent_schemas %w[public]`; schema-qualify auth SQL to `public.` | `config/initializers/apartment.rb`, `app/misc/` |
 | Per-resource access | IDOR / privilege escalation | ActionPolicy `authorize` on every action + `authorized_scope` for row visibility; membership gate | `app/policies/` (`*_policy.rb`, `concerns/move_membership_authorization.rb`) |
 | Domain invariants | Forged param / stale form / direct MCP call | Phase/state + ownership guards in the **shared action**, gating on the validated result | `app/actions/` |
@@ -121,9 +126,12 @@ each with where the control lives, so a finding can be traced to code:
   `Apartment::Tenant.switch` block are re-wrapped; signed Turbo Stream names derive
   from a tenant-unique uuid (that signed name **is** the channel auth); no
   `default_scope` widening leaks other-tenant/soft-deleted rows. → `config/initializers/apartment*.rb`, ActionCable `turbo_stream_from` sites.
-- **Authorization / IDOR** — `authorize` + `authorized_scope` everywhere;
-  selection-only vocabulary rejects out-of-Move ids; ownership/phase guards in the
-  action, gating on the validated result not the raw param. → `app/policies/`, `app/actions/`.
+- **Authorization / IDOR** — org membership enforced at the tenant boundary
+  (`TenantController#require_membership!`, prepended ahead of the terms gate; a
+  non-member 404s on every tenant surface); `authorize` + `authorized_scope`
+  everywhere; selection-only vocabulary rejects out-of-Move ids; ownership/phase
+  guards in the action, gating on the validated result not the raw param.
+  → `app/controllers/tenant_controller.rb`, `app/policies/`, `app/actions/`.
 - **Authentication** — no Rodauth bypass; verify-before-login; status checks;
   remember-me on subdomain only; single-use handoff tokens; WebAuthn RP id = apex;
   social sign-in respects account-creation guards. → `app/misc/`.
@@ -179,4 +187,4 @@ each with where the control lives, so a finding can be traced to code:
 - [`app/mcp/AGENTS.md`](../../app/mcp/AGENTS.md) — MCP token + upload handshake.
 - CI static checks: Brakeman + bundle-audit in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).
 
-_Last updated: 2026-07-02 (added accepted risk: shared-schema Active Storage blob delivery — audit finding F5)._
+_Last updated: 2026-07-02 (documented the tenant-membership boundary — `TenantController#require_membership!`, audit finding F4; earlier: shared-schema Active Storage blob delivery accepted risk — F5)._

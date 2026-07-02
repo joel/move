@@ -19,6 +19,7 @@ class MovesController < TenantController
 
   # POST /moves
   def create
+    authorize! Move, to: :create?, with: MovePolicy
     result = Moves::Create.new.call(params: move_params.to_h.symbolize_keys, creator: current_user)
 
     case result

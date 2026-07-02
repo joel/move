@@ -64,6 +64,24 @@ RSpec.describe MovePolicy do
     end
   end
 
+  describe "create? (requires Organization membership)" do
+    before { allow(Apartment::Tenant).to receive(:current).and_return("acme") }
+
+    it "permits a member of the current Organization" do
+      create(:organization, slug: "acme").organization_memberships.create!(user:, role: "member")
+      expect(described_class.new(Move, user:).apply(:create?)).to be(true)
+    end
+
+    it "denies a non-member (e.g. a session that reached a foreign subdomain)" do
+      create(:organization, slug: "acme") # user is not a member
+      expect(described_class.new(Move, user:).apply(:create?)).to be(false)
+    end
+
+    it "denies an anonymous user" do
+      expect(described_class.new(Move, user: nil).apply(:create?)).to be(false)
+    end
+  end
+
   describe "relation_scope" do
     it "returns only the moves the user belongs to" do
       mine = create(:move)

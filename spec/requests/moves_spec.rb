@@ -38,6 +38,13 @@ RSpec.describe "Moves" do
   end
 
   describe "POST /moves" do
+    before do
+      # MovePolicy#create? requires membership of the current Organization (F4);
+      # model that real state (the boundary itself is covered in tenant_membership_spec).
+      allow(Apartment::Tenant).to receive(:current).and_return("acme")
+      create(:organization, slug: "acme").organization_memberships.create!(user:, role: "member")
+    end
+
     it "creates a move and redirects to the list" do
       expect do
         post moves_path, params: { move: { name: "Beach House", unit_system: "imperial" } }
