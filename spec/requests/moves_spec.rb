@@ -26,6 +26,43 @@ RSpec.describe "Moves" do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(I18n.t("moves.empty.title"))
     end
+
+    # #513 — the A1 card shipped placeholder zeros ("0 of 0 boxes packed") that read
+    # as real data. The card must carry the move's actual aggregates, with the same
+    # definitions as the boxes-page header (packed = past packing; pending review =
+    # in-box items awaiting review).
+    it "shows each move's real packed / total / pending-review counts on its card" do
+      move = create(:move, name: "Lake House", created_by: user)
+      create(:box, move:, number: "1", status: "sealed")
+      create(:box, move:, number: "2", status: "in_transit")
+      packing_box = create(:box, move:, number: "3", status: "packing")
+      create(:item, move:, box: packing_box, review_state: "pending_review")
+
+      get moves_path
+
+      expect(response.body).to include(I18n.t("moves.packed_hint", packed: 2, total: 3))
+      expect(response.body).to include(I18n.t("moves.pending_review", count: 1))
+      expect(response.body).not_to include(I18n.t("moves.packed_hint", packed: 0, total: 0))
+    end
+
+    it "renders a zero-box move's card with true zeros (empty case, not placeholder)" do
+      create(:move, name: "Fresh Move", created_by: user)
+
+      get moves_path
+
+      expect(response.body).to include(I18n.t("moves.packed_hint", packed: 0, total: 0))
+      expect(response.body).to include(I18n.t("moves.pending_review", count: 0))
+    end
+
+    it "fills the card progress bar proportionally to packed boxes" do
+      move = create(:move, name: "Lake House", created_by: user)
+      create(:box, move:, number: "1", status: "sealed")
+      create(:box, move:, number: "2", status: "packing")
+
+      get moves_path
+
+      expect(response.body).to include("width: 50%")
+    end
   end
 
   describe "GET /moves/new" do

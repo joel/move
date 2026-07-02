@@ -59,9 +59,15 @@ module Components
         status == "failed" && @moves.none?
       end
 
+      # Card metrics are computed HERE (one grouped query set per render, #513) so
+      # every render path gets real numbers — the controller-rendered index AND the
+      # DemoData::Reveal broadcast, which renders this component outside a controller.
       def list
+        metrics = Move.card_metrics(@moves.map(&:id))
         section(class: "flex flex-col gap-4") do
-          @moves.each { |move| render Components::MoveCard.new(move: move, user: @user) }
+          @moves.each do |move|
+            render Components::MoveCard.new(move: move, user: @user, metrics: metrics.fetch(move.id))
+          end
         end
       end
 

@@ -78,6 +78,22 @@ class Move < ApplicationRecord
   validates :openai_model, :anthropic_model, :gemini_model,
             length: { maximum: 100 }, allow_blank: true
 
+  # Per-move card aggregates for the Moves index (#513): packed / total box counts
+  # and the pending-review count, as { move_id => { packed:, total:, pending_review: } }.
+  # One grouped query per metric across ALL listed moves (no per-card N+1 — AGENTS
+  # §1 rule 5), with the SAME definitions as the boxes-page header
+  # (BoxesController#move_summary): packed = past "packing"; pending review =
+  # in-box items awaiting review.
+  def self.card_metrics(move_ids)
+    totals = Box.where(move_id: move_ids).group(:move_id).count
+    packed = Box.where(move_id: move_ids).where.not(status: "packing").group(:move_id).count
+    pending = Item.pending_review.where(move_id: move_ids).group(:move_id).count
+    move_ids.index_with do |id|
+      { packed: packed.fetch(id, 0), total: totals.fetch(id, 0),
+        pending_review: pending.fetch(id, 0) }
+    end
+  end
+
   # This Move's stored key for +provider+, or nil for fake/unknown (which need no
   # key). Used by RecognitionProviders.for_move to configure the adapter.
   def recognition_api_key_for(provider)
