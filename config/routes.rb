@@ -157,7 +157,6 @@ Rails.application.routes.draw do
           to: "settings#update_embedding_provider", as: :settings_embedding_provider
     resources :integration_tokens, only: %i[create destroy]
   end
-  resources :users
   get "welcome/home"
 
   # Internal design-system reference (Phase D0). Gated to local envs / admins

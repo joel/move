@@ -9,6 +9,11 @@
 class McpUploadsController < ActionController::API
   include McpAuthentication
 
+  # Tighter per-token rate limit than the JSON-RPC endpoint (#497): each upload can be
+  # up to Media::MAX_IMAGE_BYTES (25 MB), so cap them harder. Runs after auth (@token
+  # set); Rails.cache (Solid Cache in prod) shares the window across app instances.
+  rate_limit to: 30, within: 1.minute, by: -> { @token&.id }, with: -> { head :too_many_requests }
+
   # POST /mcp/uploads  (raw image bytes in the body; ?filename optional)
   def create
     return head :forbidden if @token.move.archived?

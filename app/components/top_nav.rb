@@ -13,7 +13,6 @@ module Components
                    "gap-4 px-6 py-3 sm:px-10") do
           render_brand
           nav(class: "flex items-center gap-2 sm:gap-3") do
-            render_primary_links
             render_theme_toggle
             render_auth_actions
           end
@@ -35,12 +34,6 @@ module Components
       end
     end
 
-    def render_primary_links
-      return unless current_user && view_context.allowed_to?(:index?, User)
-
-      link_to("Users", view_context.users_path, class: nav_link_class)
-    end
-
     def render_theme_toggle
       render Components::Ui::ThemeToggle.new
     end
@@ -58,11 +51,6 @@ module Components
         link_to("Sign in", view_context.rodauth.login_path,
                 class: "ha-button ha-button-primary !px-4 !py-2 text-sm")
       end
-    end
-
-    def nav_link_class
-      "rounded-full px-3 py-2 text-sm font-medium text-[var(--ha-muted)] " \
-        "transition hover:bg-[var(--ha-surface-high)] hover:text-[var(--ha-text)]"
     end
 
     def current_user

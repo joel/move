@@ -10,6 +10,11 @@ module McpAuthentication
   included do
     before_action :require_tenant!
     before_action :authenticate_integration_token!
+    # Record last-used as an after_action, NOT in the auth before_action: it must run
+    # only once the per-token rate limit (a later before_action) and the action have
+    # passed, so a rate-limited (429) or unauthorized (401) request performs no DB
+    # write (#497 — otherwise a compromised-token flood keeps writing uncapped).
+    after_action :touch_token_last_used
   end
 
   private
@@ -20,9 +25,12 @@ module McpAuthentication
 
   def authenticate_integration_token!
     @token = MoveIntegrationToken.authenticate(bearer_token)
-    return unauthorized! if @token.nil?
+    unauthorized! if @token.nil?
+  end
 
-    @token.touch_last_used!
+  # Best-effort; @token is present here (the action only runs when auth passed).
+  def touch_token_last_used
+    @token&.touch_last_used!
   end
 
   def bearer_token
