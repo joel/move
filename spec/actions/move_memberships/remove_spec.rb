@@ -38,4 +38,20 @@ RSpec.describe MoveMemberships::Remove do
     expect(result).to be_success
     expect(move.move_memberships.find_by(user: admin)).to be_nil
   end
+
+  it "revokes the removed member's active MCP tokens and emits a revoked event" do
+    membership = create(:move_membership, move:, user: other, role: "contributor")
+    token = create(:move_integration_token, move:, created_by: other)
+    admins_token = create(:move_integration_token, move:, created_by: admin)
+    allow(Rails.event).to receive(:notify)
+
+    result = described_class.new.call(membership:, actor: admin)
+
+    expect(result).to be_success
+    expect(token.reload.revoked_at).to be_present
+    expect(admins_token.reload.revoked_at).to be_nil # other members' tokens untouched
+    expect(Rails.event).to have_received(:notify).with(
+      "integration_token.revoked", hash_including(token_id: token.id, move_id: move.id)
+    )
+  end
 end

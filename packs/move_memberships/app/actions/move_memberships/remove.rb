@@ -11,11 +11,13 @@ module MoveMemberships
   # (AdminGuard) so concurrent admin removals cannot both slip past the check.
   class Remove < BaseAction
     include AdminGuard
+    include TokenRevocation
 
     def call(membership:, actor:)
       details = capture(membership)
-      yield remove(membership)
+      revoked = yield remove(membership)
       yield emit_event(details, actor)
+      emit_token_revocations(revoked, actor)
       Success(details)
     end
 
@@ -25,8 +27,11 @@ module MoveMemberships
       MoveMembership.transaction do
         next Failure(:last_admin) if would_orphan_last_admin?(membership)
 
+        # A removed member holds no role, so revoke their MCP tokens in the same
+        # transaction (deprovisioning — see TokenRevocation).
+        revoked = revoke_member_tokens(membership.move, membership.user_id)
         membership.destroy!
-        Success()
+        Success(revoked)
       end
     rescue ActiveRecord::RecordNotDestroyed => e
       Failure(e.record.errors)

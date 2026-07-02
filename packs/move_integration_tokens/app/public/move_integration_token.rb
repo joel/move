@@ -7,8 +7,11 @@ require "digest"
 # presents the raw token as an HTTP bearer credential; only the SHA-256 digest is
 # persisted, so the raw value is shown once at creation and never recoverable.
 #
-# Revocation is independent of MoveMembership — revoking a token does not touch
-# who can sign in to the web app, and vice versa. A revoked token fails auth.
+# Revoking a token does not touch who can sign in to the web app. The reverse is
+# NOT independent: a token is only valid while its creator is an admin of the Move
+# (minting/revoking is admin-only), so removing the member — or demoting them out
+# of admin — revokes their tokens (deprovisioning; see
+# MoveMemberships::TokenRevocation). A revoked token fails auth.
 #
 # Minting, revoking, and the audit trail belong in app/actions, not here; this
 # model stays persistence-focused (digesting, scopes, the auth finder).
