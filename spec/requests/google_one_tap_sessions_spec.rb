@@ -17,7 +17,8 @@ RSpec.describe "POST /auth/google/one_tap" do
       "email" => user.email,
       "email_verified" => "true",
       "name" => "Jane Doe",
-      "aud" => "test-google-client-id"
+      "aud" => "test-google-client-id",
+      "iss" => "https://accounts.google.com"
     }
   end
 
@@ -40,6 +41,15 @@ RSpec.describe "POST /auth/google/one_tap" do
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body).to include("ok" => true)
+    end
+
+    it "resets the session before establishing identity (fixation hygiene, #496)" do
+      expect_any_instance_of(GoogleOneTapSessionsController) # rubocop:disable RSpec/AnyInstance
+        .to receive(:reset_session).and_call_original
+
+      post "/auth/google/one_tap", params: { credential: "valid-jwt" }, as: :json
+
+      expect(response).to have_http_status(:ok) # reset_session didn't break login
     end
 
     it "does not keep an apex session or remember cookie (broker hands off)" do
@@ -186,6 +196,17 @@ RSpec.describe "POST /auth/google/one_tap" do
     it "returns invalid_token error" do
       post "/auth/google/one_tap",
            params: { credential: "valid-jwt" }, as: :json
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["error"]).to eq("invalid_token")
+    end
+  end
+
+  context "with a non-Google issuer (#495)" do
+    before { stub_google_tokeninfo(google_payload.merge("iss" => "https://evil.example")) }
+
+    it "returns invalid_token error" do
+      post "/auth/google/one_tap", params: { credential: "valid-jwt" }, as: :json
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body["error"]).to eq("invalid_token")
