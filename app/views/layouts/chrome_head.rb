@@ -40,7 +40,9 @@ module Views
       # Apply the persisted theme before first paint (no flash of light). Dark is
       # the default; an explicit "light" choice or "system" preference is honoured.
       def render_theme_boot_script
-        script do
+        # Carries the CSP nonce so this inline boot script is allowed under the
+        # strict `script-src` (no unsafe-inline). See config/initializers/content_security_policy.rb.
+        script(nonce: helpers.content_security_policy_nonce) do
           # Static, developer-authored boot script with no user input — safe.
           raw(safe( # rubocop:disable Rails/OutputSafety
                 '(function(){try{var t=localStorage.getItem("theme");' \
