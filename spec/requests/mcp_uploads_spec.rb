@@ -44,6 +44,12 @@ RSpec.describe "MCP uploads" do
     expect(response).to have_http_status(:unsupported_media_type)
   end
 
+  it "rejects an SVG without creating a blob (sniffs as image/* but is markup, #498)" do
+    svg = %(<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>)
+    expect { upload(svg) }.not_to change(ActiveStorage::Blob, :count)
+    expect(response).to have_http_status(:unsupported_media_type)
+  end
+
   it "rejects an empty body" do
     upload("")
     expect(response).to have_http_status(:unprocessable_content)

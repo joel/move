@@ -77,5 +77,6 @@ end
 - `mcp.tool_called` + `integration_token.{created,revoked}` → `MoveMcp::AuditSubscriber`
   (`config/initializers/mcp_audit.rb`, `AUDITED_PREFIXES = %w[integration_token. mcp.]`).
 - **Direct Upload (#110):** `create_media_upload` → `POST /mcp/uploads`
-  (`McpUploadsController`: magic-byte sniff `image/*`, ≤`Media::MAX_IMAGE_BYTES`,
+  (`McpUploadsController`: magic-byte sniff `image/*` **excluding `image/svg+xml`**
+  — SVG is markup, not a transcodable raster (#498) — ≤`Media::MAX_IMAGE_BYTES`,
   Move-scoped `signed_id`) → `add_media_to_box` → `Captures::Create`.
