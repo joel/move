@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.71.2] — 2026-07-02
+
+### Fixed
+- **Fragile box labels print correctly again.** On a box marked fragile, the
+  printed label showed an empty colored bar instead of the FRAGILE banner and the
+  box number was missing entirely. The banner now shows white FRAGILE text and the
+  box number always prints at a readable size. Labels printed earlier from a
+  completed bulk run keep the old rendering — start a new print run to regenerate
+  (#508).
+
 ## [v0.71.1] — 2026-07-02
 
 ### Fixed
