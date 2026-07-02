@@ -12,6 +12,13 @@
 class McpController < ActionController::API
   include McpAuthentication
 
+  # Per-token rate limit (#497). The token can't be brute-forced (256-bit), so this
+  # caps resource use by an already-authenticated (or compromised) token rather than
+  # gating discovery. Declared after McpAuthentication, so it runs once @token is set
+  # (an unauthenticated request 401s earlier and never reaches here). Uses Rails.cache
+  # (Solid Cache in prod) so the window is shared across app instances.
+  rate_limit to: 60, within: 1.minute, by: -> { @token&.id }, with: -> { rate_limited! }
+
   # POST /mcp
   def handle
     Current.tenant = Apartment::Tenant.current
@@ -30,5 +37,14 @@ class McpController < ActionController::API
     headers.each { |key, value| response.set_header(key, value) unless key.casecmp?("content-type") }
     render body: Array(body).join, status: status,
            content_type: headers["Content-Type"] || headers["content-type"] || "application/json"
+  end
+
+  private
+
+  def rate_limited!
+    render json: {
+      jsonrpc: "2.0", id: nil,
+      error: { code: -32_000, message: "Rate limit exceeded — retry shortly." }
+    }, status: :too_many_requests
   end
 end
