@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.71.4] — 2026-07-02
+
+### Security
+- **Content-Security-Policy is now enforced.** The strict CSP shipped earlier in
+  report-only mode (nonce-based `script-src`, locked-down framing and object
+  sources) is now enforcing, after production ran violation-free: browsers block
+  any script or resource the policy doesn't allow, closing the loop on the
+  defense-in-depth baseline for a public multi-tenant app. Violation reports keep
+  flowing to the built-in collector as ongoing telemetry (#493).
+
 ## [v0.71.3] — 2026-07-02
 
 ### Changed
