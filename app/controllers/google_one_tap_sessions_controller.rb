@@ -1,9 +1,14 @@
 # frozen_string_literal: true
 
+require "cgi"
+
 # Handles the Google "One Tap" credential posted by the
 # google-one-tap Stimulus controller. Active only when GOOGLE_CLIENT_ID
 # is configured; otherwise the One Tap prompt never renders.
 class GoogleOneTapSessionsController < ApplicationController
+  # Valid `iss` claims for a Google ID token (with and without scheme).
+  GOOGLE_ISSUERS = ["accounts.google.com", "https://accounts.google.com"].freeze
+
   # Establishes the login session itself; the terms gate (#369) doesn't apply —
   # the post-login redirect lands on a gated app surface, which enforces it.
   skip_before_action :require_terms_agreement!, raise: false
@@ -53,21 +58,29 @@ class GoogleOneTapSessionsController < ApplicationController
   end
 
   def verify_google_token(token)
-    return nil if token.blank?
+    # A credential must be a non-blank string. Rejecting non-strings here also stops a
+    # posted object/array from reaching CGI.escape, which raises TypeError (→ 500) (#495).
+    return nil unless token.is_a?(String) && token.present?
 
-    uri = URI(
-      "https://oauth2.googleapis.com/tokeninfo?id_token=#{token}"
-    )
+    # URL-encode the user-supplied credential (#495) — it's spliced into the query
+    # string, and an un-encoded exotic value would otherwise raise URI::InvalidURIError.
+    uri = URI("https://oauth2.googleapis.com/tokeninfo?id_token=#{CGI.escape(token)}")
     response = Net::HTTP.get_response(uri)
     return nil unless response.is_a?(Net::HTTPSuccess)
 
     data = JSON.parse(response.body)
-    return nil unless data["aud"] == ENV["GOOGLE_CLIENT_ID"]
-    return nil unless data["email_verified"] == "true"
-
-    data
-  rescue JSON::ParserError, SocketError, Timeout::Error
+    valid_google_payload?(data) ? data : nil
+  rescue URI::InvalidURIError, JSON::ParserError, SocketError, Timeout::Error
     nil
+  end
+
+  # The tokeninfo payload is trustworthy only when it is for THIS app (`aud`), issued
+  # by Google (`iss` — asserted locally, not just trusted from the round-trip, #495),
+  # and the email is verified.
+  def valid_google_payload?(data)
+    data["aud"] == ENV["GOOGLE_CLIENT_ID"] &&
+      GOOGLE_ISSUERS.include?(data["iss"]) &&
+      data["email_verified"] == "true"
   end
 
   # Schema-qualify the omniauth identities table to `public`: it has no AR
@@ -115,6 +128,10 @@ class GoogleOneTapSessionsController < ApplicationController
       user.update!(status: open_status)
     end
 
+    # Session-fixation hygiene: rotate the session before establishing the
+    # authenticated identity (#496). CSRF was already verified by the before_action,
+    # and the response is JSON, so nothing of value is lost.
+    reset_session
     rodauth.account_from_id(user.id)
     session[rodauth.session_key] = user.id
     session[rodauth.authenticated_by_session_key] = ["google_one_tap"]

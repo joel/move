@@ -12,6 +12,7 @@ class TestSessionsController < ApplicationController
 
     user = find_user
     user.update!(status: rodauth.account_open_status_value)
+    reset_session # match the real session-establishment paths (#496)
     session[rodauth.session_key] = user.id
     session[rodauth.authenticated_by_session_key] = ["test"]
 

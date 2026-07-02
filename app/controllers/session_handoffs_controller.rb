@@ -37,6 +37,11 @@ class SessionHandoffsController < ApplicationController
     # refuse to establish a session for it.
     return render_expired unless user.status == rodauth.account_open_status_value
 
+    # Session-fixation hygiene: rotate the session before establishing the
+    # authenticated identity, so a value planted pre-auth can't survive it (#496).
+    # The credential is the handoff token (a URL param), not session state, so
+    # nothing of value is lost.
+    reset_session
     rodauth.account_from_id(user.id)
     session[rodauth.session_key] = user.id
     session[rodauth.authenticated_by_session_key] = ["session_handoff"]
