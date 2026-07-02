@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
 module Components
-  # A1 Move list item: status badge, name, a progress hint, box count and
-  # pending-review count. Box metrics arrive in D2; they render as zero for now.
-  # Archived moves render visibly muted (read-only treatment).
+  # A1 Move list item: status badge, name, packed progress, and pending-review
+  # count. +metrics+ carries the move's real aggregates (a
+  # Moves::CardMetrics::Metrics — #513 replaced the A1 placeholder zeros) and is
+  # REQUIRED so a new render site can't silently regress to fake zeros. Archived
+  # moves render visibly muted (read-only treatment).
   class MoveCard < Components::Base
     include Phlex::Rails::Helpers::ButtonTo
 
@@ -14,8 +16,9 @@ module Components
       "archived" => "bg-surface-container-high text-muted"
     }.freeze
 
-    def initialize(move:, user: nil)
+    def initialize(move:, metrics:, user: nil)
       @move = move
+      @metrics = metrics
       @user = user
     end
 
@@ -89,14 +92,22 @@ module Components
 
     def progress_bar
       div(class: "h-2 w-full overflow-hidden rounded-full bg-surface-container-high") do
-        div(class: "h-full rounded-full bg-accent-sage", style: "width: 0%")
+        div(class: "h-full rounded-full bg-accent-sage", style: "width: #{packed_percent}%")
       end
+    end
+
+    def packed_percent
+      return 0 if @metrics.total.zero?
+
+      (@metrics.packed * 100.0 / @metrics.total).round
     end
 
     def metrics
       div(class: "flex items-center justify-between text-body-md text-on-surface-variant") do
-        span(class: "text-text-warm") { I18n.t("moves.packed_hint", packed: 0, total: 0) }
-        span { I18n.t("moves.pending_review", count: 0) }
+        span(class: "text-text-warm") do
+          I18n.t("moves.packed_hint", packed: @metrics.packed, total: @metrics.total)
+        end
+        span { I18n.t("moves.pending_review", count: @metrics.pending_review) }
       end
     end
   end

@@ -22,11 +22,16 @@ module DemoData
     def broadcast(organization, user)
       moves = Move.where(id: MoveMembership.where(user_id: user.id).select(:move_id))
                   .order(created_at: :desc).to_a
+      # Card aggregates (#513) — same action the controller-rendered index uses, so
+      # the revealed list carries real numbers. Total (never Failure) → value!.
+      metrics = Moves::CardMetrics.new.call(move_ids: moves.map(&:id)).value!
       Turbo::StreamsChannel.broadcast_replace_to(
         organization, user, :demo_provisioning,
         target: Components::Moves::Collection::ID,
         html: ApplicationController.render(
-          Components::Moves::Collection.new(moves: moves, organization: organization, user: user),
+          Components::Moves::Collection.new(
+            moves: moves, organization: organization, user: user, metrics: metrics
+          ),
           layout: false
         )
       )

@@ -17,9 +17,15 @@ module Components
 
       ID = "moves-collection"
 
-      def initialize(moves:, organization:, user: nil)
+      # +metrics+ — { move_id => Moves::CardMetrics::Metrics } from the
+      # Moves::CardMetrics action (#513), computed by the caller (the controller,
+      # or DemoData::Reveal for the broadcast path). REQUIRED, and each card's
+      # entry is fetched strictly, so a render site that forgets it fails loudly
+      # instead of silently regressing to the old placeholder zeros.
+      def initialize(moves:, organization:, metrics:, user: nil)
         @moves = moves
         @organization = organization
+        @metrics = metrics
         @user = user
       end
 
@@ -61,7 +67,9 @@ module Components
 
       def list
         section(class: "flex flex-col gap-4") do
-          @moves.each { |move| render Components::MoveCard.new(move: move, user: @user) }
+          @moves.each do |move|
+            render Components::MoveCard.new(move: move, user: @user, metrics: @metrics.fetch(move.id))
+          end
         end
       end
 
