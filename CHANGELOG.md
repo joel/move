@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.71.3] — 2026-07-02
+
+### Changed
+- **Slimmer, safer production image (internal — no user-facing change).** The
+  production Docker image no longer installs the test and development gem groups
+  (`BUNDLE_WITHOUT="development:test"`): test frameworks and dev tooling — and the
+  combined dev/test gems the un-excluded test group had silently kept in — are gone
+  from the deployed image, shrinking its size and audit surface. Nothing changes for
+  people using the app (#509).
+
 ## [v0.71.2] — 2026-07-02
 
 ### Fixed
