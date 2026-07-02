@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.71.1] — 2026-07-02
+
+### Fixed
+- **Broken photo thumbnails in the gallery and box views now display.** After
+  v0.71.0 a couple of photos showed a broken-image icon. Two causes were fixed:
+  display-image variants whose file had gone missing from storage are now detected
+  and rebuilt (a new `images:repair` maintenance task), and Active Storage error
+  responses are no longer cached by the CDN/browser — so a transiently-missing image
+  can never stay broken after the file is restored (#486, #490).
+
 ## [v0.71.0] — 2026-07-01
 
 ### Changed
