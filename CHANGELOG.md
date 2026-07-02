@@ -5,6 +5,15 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.71.5] — 2026-07-02
+
+### Fixed
+- **Move cards now show real progress.** The moves list claimed "0 of 0 boxes
+  packed" with an empty progress bar for every move — leftover placeholder
+  numbers from an early build. Each card now shows the move's actual packed
+  count, a proportional progress bar, and its true pending-review count,
+  matching the numbers on the move's boxes page (#513).
+
 ## [v0.71.4] — 2026-07-02
 
 ### Security
