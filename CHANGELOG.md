@@ -5,6 +5,18 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.73.0] — 2026-07-03
+
+### Added
+- **Static type checking now covers the whole actions layer (internal — no
+  user-facing change).** Completing the rollout started in v0.72.0, every pack's
+  business-logic actions (all 15 packs, 31 more files) now carry checked inline
+  RBS type signatures, with architecture tests that fail both drift directions:
+  a method without an annotation, and a pack whose actions aren't wired into the
+  checker. Adopting the wider net surfaced and hardened one latent edge — an
+  account-deletion helper whose best-effort rescue could return `nil` against
+  its declared array contract (#519).
+
 ## [v0.72.0] — 2026-07-03
 
 ### Added
