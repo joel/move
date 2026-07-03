@@ -13,7 +13,7 @@ require "rails_helper"
 RSpec.describe "Type annotation coverage" do
   # Must mirror the `check` path(s) of the :actions target in the Steepfile.
   def steep_checked_globs
-    ["app/actions/**/*.rb"]
+    ["app/actions/**/*.rb", "packs/labels/app/actions/**/*.rb"]
   end
 
   # A def is annotated when the nearest preceding non-blank line is an inline

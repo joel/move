@@ -40,9 +40,13 @@ PreCommit:
   Steep:
     enabled: true
     required_executable: bundle
-    description: "Type-checking app/actions with Steep"
+    description: "Type-checking the actions layer with Steep"
     include:
       - "app/actions/**/*.rb"
+      # All packs on purpose (not just Steepfile-checked ones): an unchecked
+      # pack's action triggers a harmless green whole-target run (~2s), and a
+      # pack added to the Steepfile later needs no hook edit.
+      - "packs/*/app/actions/**/*.rb"
       - "sig/**/*.rbs"
       - "Steepfile"
 

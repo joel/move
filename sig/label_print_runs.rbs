@@ -1,0 +1,10 @@
+# Singleton-method declarations for LabelPrintRuns::Start
+# (packs/labels/app/actions/label_print_runs/start.rb). Inline RBS does not
+# support `def self.` yet, so the def carries `# @rbs skip` and its type lives
+# here — same pattern as sig/default_vocabularies.rbs. Fold back into inline
+# annotations once rbs/steep ship inline singleton support.
+module LabelPrintRuns
+  class Start
+    def self.box_cap: (untyped copies) -> Integer
+  end
+end

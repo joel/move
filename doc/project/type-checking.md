@@ -1,6 +1,7 @@
 # Static type checking — RBS + Steep
 
-Move type-checks the **actions layer** (`app/actions/**`) with
+Move type-checks the **actions layer** (`app/actions/**` plus annotated packs —
+currently `packs/labels/app/actions/**`) with
 [Steep](https://github.com/soutaro/steep) 2.0 reading **inline RBS
 annotations** (`#:` / `@rbs` comments) natively from the Ruby files — the
 [RBS 4 inline syntax](https://github.com/ruby/rbs/blob/master/docs/inline.md),
@@ -136,7 +137,7 @@ annotation was written).
 
 | Trigger | Action |
 |---|---|
-| A pack's actions get annotated | Add `check "packs/<name>/app/actions", inline: true` to the target; delete any shim the pack now declares inline (`sig/search_reindexing.rbs` first) |
+| A pack's actions get annotated | Add `check "packs/<name>/app/actions", inline: true` to the target **and** the matching glob to `steep_checked_globs` in `spec/architecture/type_annotations_spec.rb`; delete any shim the pack now declares inline (`sig/search_reindexing.rbs` when `packs/search` goes). `packs/labels` (#517) is the template: 3 files, one `def self.` → `# @rbs skip` + `sig/label_print_runs.rbs`, zero surprises |
 | Real model types wanted (cross-model mix-ups start hurting) | Adopt `rbs_rails` (generated model sigs, needs DB — pair with the `packwerk` CI job the way structure.sql freshness works) and/or `rbs collection` (community gem sigs; commit `rbs_collection.lock.yaml`, gitignore `.gem_rbs_collection/`; beware activesupport sigs lag Rails 8.1) |
 | An ActiveSupport core-ext on a known type blocks an annotation | Add the one method to `sig/active_support.rbs` |
 | rbs/steep ship inline `def self.` support | Fold `sig/default_vocabularies.rbs` back into inline annotations |

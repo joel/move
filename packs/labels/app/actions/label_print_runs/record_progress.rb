@@ -10,6 +10,7 @@ module LabelPrintRuns
   class RecordProgress < BaseAction
     include Broadcasting
 
+    #: (run_id: untyped, completed: untyped) -> Dry::Monads::Success[untyped]
     def call(run_id:, completed:)
       return Success() if run_id.blank?
 

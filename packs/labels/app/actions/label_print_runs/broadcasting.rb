@@ -14,6 +14,8 @@ module LabelPrintRuns
     # failure here must not fail the job or the action — the worst case is a missed
     # live update; the next progress event (or the run show page on load) re-renders
     # the correct state. Mirrors Captures::SessionBroadcastSubscriber#broadcast (#241).
+
+    #: (untyped run) -> void
     def broadcast_status(run)
       Turbo::StreamsChannel.broadcast_replace_to(
         run, :progress,
