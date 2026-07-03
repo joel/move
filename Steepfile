@@ -21,6 +21,9 @@
 
 target :actions do
   check "app/actions", inline: true
+  # Pack-by-pack growth (doc/project/type-checking.md roadmap): one `check` line
+  # per annotated pack, in the SAME target — a second target crashes, see above.
+  check "packs/labels/app/actions", inline: true
 
   signature "sig"
 

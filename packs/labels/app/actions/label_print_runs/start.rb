@@ -32,11 +32,15 @@ module LabelPrintRuns
 
     # Effective box cap for a Move's labels_per_box: the lesser of the box cap and
     # the page budget. copies is 1..10 (Move-validated); floored to ≥1 so a bad
-    # value can't divide by zero.
+    # value can't divide by zero. Singleton defs aren't supported by inline RBS
+    # yet; skipped here, declared in sig/label_print_runs.rbs instead.
+
+    # @rbs skip
     def self.box_cap(copies)
       [MAX_LABELS, MAX_PAGES / [copies.to_i, 1].max].min
     end
 
+    #: (move: untyped, from: untyped, to: untyped, host: untyped, protocol: untyped, ?confirmed: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, from:, to:, host:, protocol:, confirmed: false)
       return Failure(:invalid_range) if from.nil? || to.nil? || from > to
 
@@ -69,6 +73,8 @@ module LabelPrintRuns
 
     # The confirm payload when a run would print more than WARN_LABELS labels and the
     # user hasn't confirmed yet, else nil (small batch, or already confirmed).
+
+    #: (untyped boxes, untyped copies, bool confirmed) -> (Hash[Symbol, untyped] | nil)
     def confirmation_prompt(boxes, copies, confirmed)
       labels = boxes * copies
       return if confirmed || labels <= WARN_LABELS
@@ -76,6 +82,7 @@ module LabelPrintRuns
       { confirm: true, boxes:, copies:, labels: }
     end
 
+    #: (untyped run, untyped box_ids, untyped host, untyped protocol) -> untyped
     def enqueue(run, box_ids, host, protocol)
       # Snapshot labels_per_box at click time (like box_ids/host) so a Settings
       # change while the job waits in the queue can't alter the in-flight PDF (#303).
