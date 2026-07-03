@@ -14,7 +14,7 @@ module Moves
     private
 
     def persist(params, creator)
-      move = nil
+      move = nil #: untyped
       ActiveRecord::Base.transaction do
         move = Move.create!(params.merge(created_by: creator))
         move.move_memberships.create!(user: creator, role: "admin")

@@ -48,7 +48,7 @@ module Moves
     # the row keeps tracking the adapter's DEFAULT_MODEL as it evolves.
     def persist(move, provider, model)
       attrs = { recognition_provider: provider }
-      attrs["#{provider}_model"] = model_override(provider, model) if Move::REAL_RECOGNITION_PROVIDERS.include?(provider)
+      attrs[:"#{provider}_model"] = model_override(provider, model) if Move::REAL_RECOGNITION_PROVIDERS.include?(provider)
       move.update!(attrs)
       Success(move)
     rescue ActiveRecord::RecordInvalid => e

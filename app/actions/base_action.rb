@@ -12,6 +12,9 @@
 # and returns Success/Failure. Controllers pattern-match on the result.
 # See app/actions/AGENTS.md.
 class BaseAction
+  # Dynamic include (RBS can't model the module `Dry::Monads.[]` builds); the
+  # Success/Failure surface it provides is declared in sig/dry_monads.rbs.
+  # @rbs skip
   include Dry::Monads[:result, :do]
 
   private

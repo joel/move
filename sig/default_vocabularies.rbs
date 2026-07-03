@@ -1,0 +1,15 @@
+# Singleton-method declarations for Moves::DefaultVocabularies
+# (app/actions/moves/default_vocabularies.rb). Inline RBS does not support
+# `def self.` definitions yet ("Singleton method definition is not supported
+# yet"), so the defs carry `# @rbs skip` and their types live here instead.
+# Fold these back into inline annotations once rbs/steep ship inline singleton
+# support.
+module Moves
+  module DefaultVocabularies
+    def self.apply: (untyped move) -> void
+
+    def self.existing: (untyped relation, String name) -> untyped
+
+    def self.find_or_create: (untyped relation, String name) -> untyped
+  end
+end

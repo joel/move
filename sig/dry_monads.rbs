@@ -1,0 +1,52 @@
+# Hand-written shim for dry-monads (~> 1.10) — no community RBS exists for the
+# gem (checked against ruby/gem_rbs_collection). Only the surface the actions
+# layer actually uses is declared; grow it deliberately, method by method.
+#
+# `BaseAction`'s `include Dry::Monads[:result, :do]` is a dynamic method call
+# (Dry::Monads.[] builds an anonymous module at runtime), which RBS cannot
+# express — the inline parser ignores non-constant includes. Instead, this file
+# re-opens BaseAction's signature and grants it the Success/Failure constructor
+# methods directly. RBS class declarations are additive across files (like
+# Ruby's open classes), so this merges with base_action.rb's inline annotations.
+#
+# Deliberate simplifications:
+#   - `Success()` / `Failure()` with no argument are typed as a `nil` payload
+#     (the real gem uses a `Unit` sentinel) — fine for shape checking.
+#   - Do-notation's bare `yield step(...)` unwrapping is Ruby metaprogramming
+#     Steep cannot model: each step method's declared contract is checked, the
+#     unwrap hand-off is `untyped` by construction. Annotated methods containing
+#     a bare `yield` declare an optional untyped block for this reason.
+
+module Dry
+  module Monads
+    # `Dry::Monads[:result, :do]` — the mixin-builder BaseAction includes.
+    def self.[]: (*Symbol) -> Module
+
+    class Result[F, S]
+    end
+
+    class Success[S] < Result[bot, S]
+      def value!: () -> S
+      def success?: () -> true
+      def failure?: () -> false
+    end
+
+    class Failure[F] < Result[F, bot]
+      def failure: () -> F
+      def success?: () -> false
+      def failure?: () -> true
+    end
+
+    interface _ResultConstructors
+      def Success: [S] (S) -> Success[S]
+                 | () -> Success[nil]
+
+      def Failure: [F] (F) -> Failure[F]
+                 | () -> Failure[nil]
+    end
+  end
+end
+
+class BaseAction
+  include Dry::Monads::_ResultConstructors
+end
