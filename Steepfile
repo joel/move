@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Static type checking — RBS + Steep. See doc/project/type-checking.md.
 #
 # Scope: the actions layer (AGENTS.md §1 rule 2) — packs' actions are staged in
@@ -22,5 +24,7 @@ target :actions do
 
   signature "sig"
 
-  configure_code_diagnostics(Steep::Diagnostic::Ruby.default)
+  # Diagnostics run on Steep's default preset (configure_code_diagnostics
+  # defaults to Ruby.default when omitted); the blocking threshold is the
+  # --severity-level=error flag at the invocation sites (CI + overcommit hook).
 end

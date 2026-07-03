@@ -7,9 +7,5 @@
 module Search
   module Reindexing
     def reindex_items: (untyped item_ids, ?indexing_run: untyped) -> void
-
-    def reembed_move: (untyped move, ?run: untyped, ?item_ids: untyped) -> void
-
-    def affected_item_ids: (untyped record) -> untyped
   end
 end

@@ -6,5 +6,9 @@
 # with the gem_rbs_collection activesupport signatures if/when they catch up
 # with Rails 8.1 (documented follow-up in doc/project/type-checking.md).
 class Time
-  def self.current: () -> Time
+  # Really ActiveSupport::TimeWithZone (Time.zone is always set — Rails defaults
+  # to UTC), which is NOT an RBS subtype of Time (it only fakes is_a?(Time) at
+  # runtime). Deliberately `untyped` rather than a false `Time` contract; add a
+  # TimeWithZone class stub if a call site ever needs to chain off the result.
+  def self.current: () -> untyped
 end

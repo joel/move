@@ -7,7 +7,7 @@ module Discards
   # discarded earlier for its own reasons carries a different batch id and so is
   # left discarded. Runs in a single transaction. Returns the restored record.
   class CascadeRestore < BaseAction
-    #: (record: untyped, actor: untyped, ?source: untyped) -> Dry::Monads::Result[untyped, untyped]
+    #: (record: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(record:, actor:, source: :web) # rubocop:disable Lint/UnusedMethodArgument
       yield ensure_writable(record.move)
       batch_id = record.discard_batch_id
