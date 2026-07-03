@@ -169,6 +169,17 @@ jobs:
         name: "Lint / erb_lint"
         run: bin/erb_lint --lint-all
       -
+        # Steep + rbs come from the Gemfile (bundler-cache above), NOT `gem
+        # install`: the inline-RBS parser/checker pairing is version-sensitive,
+        # so the two gems are pinned and bumped together. --no-daemon: the
+        # `steep server` daemon can deadlock in headless environments; the
+        # direct check is ~2s at this scope anyway. --severity-level=error:
+        # unknown app/Rails constants (models have no RBS yet) surface as
+        # warnings/hints and must not block; genuine contract violations are
+        # errors. See doc/project/type-checking.md.
+        name: "Types / steep"
+        run: bundle exec steep check --no-daemon --severity-level=error
+      -
         name: "Security / brakeman"
         run: |
           gem install brakeman

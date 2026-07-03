@@ -37,6 +37,15 @@ PreCommit:
     command: ["bundle", "exec", "rubocop"]
     on_warn: fail
 
+  Steep:
+    enabled: true
+    required_executable: bundle
+    description: "Type-checking app/actions with Steep"
+    include:
+      - "app/actions/**/*.rb"
+      - "sig/**/*.rbs"
+      - "Steepfile"
+
   TrailingWhitespace:
     enabled: true
     exclude:

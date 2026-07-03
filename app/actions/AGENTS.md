@@ -93,11 +93,18 @@ end
     in-flight runs during the transition (while still writable).
 - **Tests**: actions are plain Ruby — unit-test them directly with `.new.call(...)`
   and assert on `Success`/`Failure`.
+- **Types**: every method gets an inline RBS annotation (`#:` on its own line
+  directly above the `def`; domain objects are `untyped`, `call` returns
+  `Dry::Monads::Result[untyped, untyped]`) — checked merge-blocking by Steep.
+  Conventions + gotchas: [`doc/project/type-checking.md`](../../doc/project/type-checking.md).
 
 ## Adding an action
 
 1. Create `app/actions/<domain>/<verb>.rb` inheriting `BaseAction`.
 2. Implement `call(...)` chaining `persist` + `emit_event` with `yield`.
-3. Emit a `domain.verb` event; register a subscriber if there's downstream work.
-4. Call it from the controller and pattern-match the result.
-5. Unit-test the action.
+3. Annotate each method with its `#:` inline RBS type (see
+   [`doc/project/type-checking.md`](../../doc/project/type-checking.md));
+   `bundle exec steep check --no-daemon --severity-level=error` must stay green.
+4. Emit a `domain.verb` event; register a subscriber if there's downstream work.
+5. Call it from the controller and pattern-match the result.
+6. Unit-test the action.
