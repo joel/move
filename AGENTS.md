@@ -156,7 +156,7 @@ These are non-negotiable for all domain work. Do not reinvent these wheels.
    `@rbs` comments, read natively by Steep 2.0) checked merge-blocking by the
    `Types / steep` step in CI's `lint` job and locally by the `Steep`
    overcommit hook. Model types are real: schema-derived signatures are
-   generated into `sig/rbs_rails/` (regenerate with `bin/rails rbs_rails:all`
+   generated into `sig/rbs_rails/` (regenerate with `bin/rails rbs_rails:generate_rbs_for_models`
    after schema changes — CI fails on drift) over the community gem sigs
    (`rbs collection install` once per clone). Every new/changed
    method in the checked scope gets a `#:` annotation (domain objects stay

@@ -28,9 +28,9 @@ flowchart LR
 Business logic lives in `app/actions` (AGENTS.md §1 rule 2): plain Ruby, one
 `call` per class, already unit-tested in isolation — the highest-value,
 lowest-friction layer to type. Growth is staged like the Packwerk migration:
-pack-by-pack (`packs/<domain>/app/actions` next), each addition a `check` line
-in the Steepfile. Models, controllers, and Phlex views are deliberately out of
-scope for now (see *Known gaps*).
+pack-by-pack, each addition a `check` line in the Steepfile — completed for
+actions in #519 and extended to the models (with real model types) in #521.
+Controllers and Phlex views are deliberately out of scope for now.
 
 ## Running it
 
@@ -38,7 +38,9 @@ scope for now (see *Known gaps*).
 mise x -- bundle exec steep check --no-daemon --severity-level=error
 ```
 
-~2s at the current scope; no DB, no Rails boot. It runs automatically:
+~6s at the current scope; no DB, no Rails boot (the one-time
+`bundle exec rbs collection install` per clone is the only setup). It runs
+automatically:
 
 - **CI** — a step in the `lint` job (merge-blocking via branch protection).
 - **Pre-commit** — the `Steep` Overcommit hook (`.git-hooks/pre_commit/steep.rb`)
@@ -52,12 +54,12 @@ Two non-obvious flags, both mandatory:
   deadlock in headless environments (observed locally: master thread crash →
   workers wait forever at 0% CPU). The direct check is fast enough not to care.
 - **`--severity-level=error`** — the default gate is `warning`, which would
-  block on every unknown constant. Domain models have **no RBS signatures
-  yet**, so `Move`/`Box`/`Rails` references inside actions surface as
-  `UnknownConstant` *warnings* and degrade to `untyped` — non-blocking by
-  design. Genuine contract violations (wrong arity, a body that can't produce
-  its declared return type, a method call on a *known* type that doesn't
-  exist) are errors and block.
+  block on every unknown constant. Constants without signatures (gems outside
+  the collection, controllers, Phlex views) surface as `UnknownConstant`
+  *warnings* and degrade to `untyped` — non-blocking by design. Genuine
+  contract violations (wrong arity, a body that can't produce its declared
+  return type, a method call on a *known* type that doesn't exist) are errors
+  and block.
 
 ## The annotation convention
 
@@ -108,12 +110,12 @@ House rules (`spec/architecture` of the type system, so to speak):
 ## Model types (#521): three signature sources
 
 1. **Generated, schema-derived** — `sig/rbs_rails/` (committed). `bin/rails
-   rbs_rails:all` introspects the booted app (columns, associations, AR
+   rbs_rails:generate_rbs_for_models` introspects the booted app (columns, associations, AR
    methods — pack-nested models included) and writes one `.rbs` per model.
    Config in `config/rbs_rails.rb`. **Freshness is CI-enforced** in the
    `packwerk` job (regenerate + `git diff --exit-code`), the model-signature
    analogue of `RailsSchemaUpToDate`: after a migration touching a model,
-   rerun `bin/rails rbs_rails:all` and commit the diff.
+   rerun `bin/rails rbs_rails:generate_rbs_for_models` and commit the diff (models only — the path-helpers output is environment-dependent and is not committed).
 2. **Community gem signatures** — the rbs collection (`rbs_collection.yaml`,
    committed `rbs_collection.lock.yaml`, gitignored `.gem_rbs_collection/`).
    A fresh clone runs `bundle exec rbs collection install` once; CI installs
@@ -182,7 +184,7 @@ annotation was written).
 | Trigger | Action |
 |---|---|
 | A NEW pack gains an `app/actions`, `app/public`, or `app/models` directory | Add its `check` line to the target and annotate from day one — the fitness spec's globs cover it (unannotated defs fail) and its Steepfile-mirror example fails a missing `check` line |
-| A migration changes a model's columns/associations | `bin/rails rbs_rails:all`, commit the `sig/rbs_rails/` diff (the packwerk CI job fails on drift) |
+| A migration changes a model's columns/associations | `bin/rails rbs_rails:generate_rbs_for_models`, commit the `sig/rbs_rails/` diff (the packwerk CI job fails on drift) |
 | Community rails sigs catch up (activerecord/activesupport ≥ 8.1) | Re-audit `sig/rails_gaps.rbs` and the two `steep:ignore` sites — delete whatever the collection now covers |
 | Real model types wanted (cross-model mix-ups start hurting) | Adopt `rbs_rails` (generated model sigs, needs DB — pair with the `packwerk` CI job the way structure.sql freshness works) and/or `rbs collection` (community gem sigs; commit `rbs_collection.lock.yaml`, gitignore `.gem_rbs_collection/`; beware activesupport sigs lag Rails 8.1) |
 | An ActiveSupport core-ext on a known type blocks an annotation | Add the one method to `sig/active_support.rbs` |

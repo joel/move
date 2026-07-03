@@ -140,13 +140,16 @@ jobs:
       -
         # sig/rbs_rails/ freshness — the model-signature analogue of
         # RailsSchemaUpToDate: the committed, schema-derived signatures must
-        # match what `rbs_rails:all` generates from the migrated schema. Rides
-        # in this job because it needs the same booted app + DB the boundary
-        # check already paid for. On drift: run `bin/rails rbs_rails:all`
-        # locally and commit the diff. See doc/project/type-checking.md.
+        # match what regeneration produces from the migrated schema. Rides in
+        # this job because it needs the same booted app + DB the boundary
+        # check already paid for. MODELS ONLY — rbs_rails' path-helpers output
+        # is environment-dependent (dev-only rails_info_* routes vs test-only
+        # routes), so it is neither generated nor committed. On drift: run
+        # `bin/rails rbs_rails:generate_rbs_for_models` locally and commit the
+        # diff. See doc/project/type-checking.md.
         name: "Types / model signature freshness"
         run: |
-          bin/rails rbs_rails:all
+          bin/rails rbs_rails:generate_rbs_for_models
           git diff --exit-code -- sig/rbs_rails
 
   lint:
