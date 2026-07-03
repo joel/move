@@ -24,17 +24,23 @@ class RecognitionSuggestion < ApplicationRecord
   # Review item-by-item walks lowest-confidence first; NULLs (no score) last.
   scope :by_confidence, -> { order(Arel.sql("confidence_score ASC NULLS LAST")) }
 
+  #: () -> bool
   def unresolved?
     UNRESOLVED.include?(state)
   end
 
+  #: () -> bool
   def conflict?
     state == "conflict"
   end
 
+  #: () -> untyped
   def confidence_percent
-    return nil if confidence_score.nil?
+    # Bind once: two separate attribute reads defeat nil-narrowing (Steep is
+    # right — a method call isn't a stable local), and one read is better anyway.
+    score = confidence_score
+    return nil if score.nil?
 
-    (confidence_score * 100).round
+    (score * 100).round
   end
 end

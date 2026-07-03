@@ -30,12 +30,16 @@ class MoveIntegrationToken < ApplicationRecord
   scope :active, -> { where(revoked_at: nil) }
 
   # Generate a fresh raw token. Returned to the caller once; never stored.
+
+  # @rbs skip
   def self.generate_raw_token
     "#{TOKEN_PREFIX}#{SecureRandom.urlsafe_base64(32)}"
   end
 
   # SHA-256 hex digest of a raw token. Used both to persist on create and to
   # look the token up on auth (constant-table lookup, not a per-row compare).
+
+  # @rbs skip
   def self.digest(raw_token)
     Digest::SHA256.hexdigest(raw_token.to_s)
   end
@@ -43,18 +47,23 @@ class MoveIntegrationToken < ApplicationRecord
   # Resolve a presented raw bearer token to its active (non-revoked) record
   # within the current tenant schema, or nil. The unique digest index makes this
   # a single indexed lookup; a blank/garbage token simply misses.
+
+  # @rbs skip
   def self.authenticate(raw_token)
     return nil if raw_token.blank?
 
     active.find_by(token_digest: digest(raw_token))
   end
 
+  #: () -> bool
   def revoked?
     revoked_at.present?
   end
 
   # Record that the token was just used for an MCP request. Best-effort and
   # outside the auth decision, so a write race never blocks a valid call.
+
+  #: () -> void
   def touch_last_used!
     update_column(:last_used_at, Time.current) # rubocop:disable Rails/SkipsModelValidations
   end

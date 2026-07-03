@@ -37,7 +37,10 @@ module LabelPrintRuns
 
     # @rbs skip
     def self.box_cap(copies)
-      [MAX_LABELS, MAX_PAGES / [copies.to_i, 1].max].min
+      # The assertion keeps sig/label_print_runs.rbs' Integer contract: with the
+      # rbs collection loaded, Integer#/ against the untyped operand resolves to
+      # an (Integer | BigDecimal) overload union.
+      [MAX_LABELS, MAX_PAGES / [copies.to_i, 1].max].min #: Integer
     end
 
     #: (move: untyped, from: untyped, to: untyped, host: untyped, protocol: untyped, ?confirmed: bool) -> Dry::Monads::Result[untyped, untyped]

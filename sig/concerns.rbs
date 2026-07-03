@@ -1,0 +1,11 @@
+# The two model concerns are deliberately UNCHECKED (see the Steepfile — their
+# `included do` DSL bodies are unmodellable), so their modules aren't
+# inline-declared anywhere. These declarations make the models'
+# `include Discardable` / `include Roleable` resolve; the instance/class
+# surface each concern provides is declared only as checked call sites demand
+# (per-model class methods live in sig/discard.rbs / sig/model_singletons.rbs).
+module Discardable
+end
+
+module Roleable
+end

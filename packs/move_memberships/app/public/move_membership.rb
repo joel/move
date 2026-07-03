@@ -16,20 +16,25 @@ class MoveMembership < ApplicationRecord
   validates :role, inclusion: { in: ROLES }
   validates :user_id, uniqueness: { scope: :move_id }
 
+  #: () -> bool
   def admin?
     role == "admin"
   end
 
+  #: () -> bool
   def contributor?
     role == "contributor"
   end
 
+  #: () -> bool
   def viewer?
     role == "viewer"
   end
 
   # Whether this member may mutate the Move's contents (subject to the Move
   # still being writable). Viewers are read-only.
+
+  #: () -> bool
   def can_edit?
     admin? || contributor?
   end

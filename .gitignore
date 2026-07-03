@@ -44,3 +44,4 @@
 # Ignore locally-installed gems.
 /vendor/bundle/
 .code-graph/
+.gem_rbs_collection/

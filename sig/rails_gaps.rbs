@@ -1,0 +1,42 @@
+# Gaps in the community gem signatures (gem_rbs_collection) that real call
+# sites in the checked scope hit. Each entry is a Rails API that EXISTS at
+# runtime but is missing from the (Rails-7.0-era) community sigs — reopened
+# additively here. Re-audit when the collection's rails sigs catch up.
+
+# Rails 8.1 structured events (`Rails.event.notify` — AGENTS.md §1 rule 4's
+# emission mechanism, used by every action's emit_event). Untyped on purpose —
+# the reporter's surface isn't worth modelling until community sigs catch up.
+module Rails
+  def self.event: () -> untyped
+end
+
+# Gem class-macros used in model class bodies (known singleton types now that
+# model files are checked). Logidze and neighbor have no community RBS;
+# discard_cascade_to is this app's own Discardable concern macro (the concern
+# files are Steepfile-ignored — see there — so its macro is declared here).
+class ApplicationRecord
+  def self.has_logidze: (?ignore_log_data: bool) -> void
+
+  def self.has_neighbors: (*untyped, **untyped) -> void
+
+  def self.discard_cascade_to: (*untyped associations) -> void
+end
+
+# The 7.0-era activestorage sigs miss the blob-delegation readers that
+# has_one_attached proxies provide (Media uses both), and the ActiveRecord
+# query surface on Attachment (engine models are excluded from rbs_rails
+# generation — env-dependent paths — so the community sig is all Attachment
+# has, and it lacks `.where`).
+module ActiveStorage
+  class Attachment
+    def self.where: (**untyped) -> untyped
+  end
+
+  class Attached
+    class One
+      def content_type: () -> untyped
+
+      def blob: () -> untyped
+    end
+  end
+end

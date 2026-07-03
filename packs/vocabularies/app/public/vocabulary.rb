@@ -16,42 +16,55 @@ class Vocabulary
 
   # Returns a Vocabulary for a valid kind, or nil — lets the controller treat an
   # unknown kind as a 404 without raising.
+
+  # @rbs skip
   def self.find(kind)
     new(kind) if KINDS.include?(kind)
   end
 
+  #: (untyped kind) -> void
   def initialize(kind)
     @kind = kind
   end
 
+  #: () -> untyped
   def model
     CONFIG.fetch(kind)[:model]
   end
 
+  #: () -> Symbol
   def chip_kind
     CONFIG.fetch(kind)[:chip_kind]
   end
 
+  #: () -> untyped
   def icon
     CONFIG.fetch(kind)[:icon]
   end
 
   # The plural association on Move (move.rooms).
+
+  #: () -> Symbol
   def association
     kind.to_sym
   end
 
+  #: (untyped move) -> untyped
   def records(move)
     move.public_send(association)
   end
 
   # Strong-params keys this vocabulary accepts.
+
+  #: () -> Array[Symbol]
   def permitted_params
     %i[name]
   end
 
   # Bulk { record_id => usage_count } so the index never N+1s its rows. Usage
   # drives the in-use removal confirmation (Domain §4.5–4.7).
+
+  #: (untyped move) -> untyped
   def usage_counts(move)
     move.boxes.where.not(room_id: nil).group(:room_id).count
   end

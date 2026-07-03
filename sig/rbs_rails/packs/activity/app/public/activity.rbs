@@ -1,0 +1,616 @@
+# resolve-type-names: false
+
+class ::Activity < ::ApplicationRecord
+  extend ::ActiveRecord::Base::ClassMethods[::Activity, ::Activity::ActiveRecord_Relation, ::String]
+
+  module ::Activity::GeneratedAttributeMethods
+    def id: () -> ::String
+
+    def id=: (::String) -> ::String
+
+    def id?: () -> bool
+
+    def id_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def id_change: () -> [ ::String?, ::String? ]
+
+    def id_will_change!: () -> void
+
+    def id_was: () -> ::String?
+
+    def id_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def id_previous_change: () -> ::Array[::String?]?
+
+    def id_previously_was: () -> ::String?
+
+    def id_before_last_save: () -> ::String?
+
+    def id_change_to_be_saved: () -> ::Array[::String?]?
+
+    def id_in_database: () -> ::String?
+
+    def saved_change_to_id: () -> ::Array[::String?]?
+
+    def saved_change_to_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_id!: () -> void
+
+    def clear_id_change: () -> void
+
+    def id_before_type_cast: () -> ::String
+
+    def id_for_database: () -> ::String
+
+    def move_id: () -> ::String
+
+    def move_id=: (::String) -> ::String
+
+    def move_id?: () -> bool
+
+    def move_id_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def move_id_change: () -> [ ::String?, ::String? ]
+
+    def move_id_will_change!: () -> void
+
+    def move_id_was: () -> ::String?
+
+    def move_id_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def move_id_previous_change: () -> ::Array[::String?]?
+
+    def move_id_previously_was: () -> ::String?
+
+    def move_id_before_last_save: () -> ::String?
+
+    def move_id_change_to_be_saved: () -> ::Array[::String?]?
+
+    def move_id_in_database: () -> ::String?
+
+    def saved_change_to_move_id: () -> ::Array[::String?]?
+
+    def saved_change_to_move_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_move_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_move_id!: () -> void
+
+    def clear_move_id_change: () -> void
+
+    def move_id_before_type_cast: () -> ::String
+
+    def move_id_for_database: () -> ::String
+
+    def actor_id: () -> ::String?
+
+    def actor_id=: (::String?) -> ::String?
+
+    def actor_id?: () -> bool
+
+    def actor_id_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def actor_id_change: () -> [ ::String?, ::String? ]
+
+    def actor_id_will_change!: () -> void
+
+    def actor_id_was: () -> ::String?
+
+    def actor_id_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def actor_id_previous_change: () -> ::Array[::String?]?
+
+    def actor_id_previously_was: () -> ::String?
+
+    def actor_id_before_last_save: () -> ::String?
+
+    def actor_id_change_to_be_saved: () -> ::Array[::String?]?
+
+    def actor_id_in_database: () -> ::String?
+
+    def saved_change_to_actor_id: () -> ::Array[::String?]?
+
+    def saved_change_to_actor_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_actor_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_actor_id!: () -> void
+
+    def clear_actor_id_change: () -> void
+
+    def actor_id_before_type_cast: () -> ::String?
+
+    def actor_id_for_database: () -> ::String?
+
+    def action: () -> ::String
+
+    def action=: (::String) -> ::String
+
+    def action?: () -> bool
+
+    def action_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def action_change: () -> [ ::String?, ::String? ]
+
+    def action_will_change!: () -> void
+
+    def action_was: () -> ::String?
+
+    def action_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def action_previous_change: () -> ::Array[::String?]?
+
+    def action_previously_was: () -> ::String?
+
+    def action_before_last_save: () -> ::String?
+
+    def action_change_to_be_saved: () -> ::Array[::String?]?
+
+    def action_in_database: () -> ::String?
+
+    def saved_change_to_action: () -> ::Array[::String?]?
+
+    def saved_change_to_action?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_action?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_action!: () -> void
+
+    def clear_action_change: () -> void
+
+    def action_before_type_cast: () -> ::String
+
+    def action_for_database: () -> ::String
+
+    def subject_type: () -> ::String?
+
+    def subject_type=: (::String?) -> ::String?
+
+    def subject_type?: () -> bool
+
+    def subject_type_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def subject_type_change: () -> [ ::String?, ::String? ]
+
+    def subject_type_will_change!: () -> void
+
+    def subject_type_was: () -> ::String?
+
+    def subject_type_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def subject_type_previous_change: () -> ::Array[::String?]?
+
+    def subject_type_previously_was: () -> ::String?
+
+    def subject_type_before_last_save: () -> ::String?
+
+    def subject_type_change_to_be_saved: () -> ::Array[::String?]?
+
+    def subject_type_in_database: () -> ::String?
+
+    def saved_change_to_subject_type: () -> ::Array[::String?]?
+
+    def saved_change_to_subject_type?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_subject_type?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_subject_type!: () -> void
+
+    def clear_subject_type_change: () -> void
+
+    def subject_type_before_type_cast: () -> ::String?
+
+    def subject_type_for_database: () -> ::String?
+
+    def subject_id: () -> ::String?
+
+    def subject_id=: (::String?) -> ::String?
+
+    def subject_id?: () -> bool
+
+    def subject_id_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def subject_id_change: () -> [ ::String?, ::String? ]
+
+    def subject_id_will_change!: () -> void
+
+    def subject_id_was: () -> ::String?
+
+    def subject_id_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def subject_id_previous_change: () -> ::Array[::String?]?
+
+    def subject_id_previously_was: () -> ::String?
+
+    def subject_id_before_last_save: () -> ::String?
+
+    def subject_id_change_to_be_saved: () -> ::Array[::String?]?
+
+    def subject_id_in_database: () -> ::String?
+
+    def saved_change_to_subject_id: () -> ::Array[::String?]?
+
+    def saved_change_to_subject_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_subject_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_subject_id!: () -> void
+
+    def clear_subject_id_change: () -> void
+
+    def subject_id_before_type_cast: () -> ::String?
+
+    def subject_id_for_database: () -> ::String?
+
+    def metadata: () -> untyped
+
+    def metadata=: (untyped) -> untyped
+
+    def metadata?: () -> bool
+
+    def metadata_changed?: (?from: untyped, ?to: untyped) -> bool
+
+    def metadata_change: () -> [ untyped, untyped ]
+
+    def metadata_will_change!: () -> void
+
+    def metadata_was: () -> untyped
+
+    def metadata_previously_changed?: (?from: untyped, ?to: untyped) -> bool
+
+    def metadata_previous_change: () -> ::Array[untyped]?
+
+    def metadata_previously_was: () -> untyped
+
+    def metadata_before_last_save: () -> untyped
+
+    def metadata_change_to_be_saved: () -> ::Array[untyped]?
+
+    def metadata_in_database: () -> untyped
+
+    def saved_change_to_metadata: () -> ::Array[untyped]?
+
+    def saved_change_to_metadata?: (?from: untyped, ?to: untyped) -> bool
+
+    def will_save_change_to_metadata?: (?from: untyped, ?to: untyped) -> bool
+
+    def restore_metadata!: () -> void
+
+    def clear_metadata_change: () -> void
+
+    def metadata_before_type_cast: () -> untyped
+
+    def metadata_for_database: () -> untyped
+
+    def source: () -> ::String
+
+    def source=: (::Integer | ::String | ::Symbol) -> ::String
+
+    def source?: () -> bool
+
+    def source_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def source_change: () -> [ ::String?, ::String? ]
+
+    def source_will_change!: () -> void
+
+    def source_was: () -> ::String?
+
+    def source_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def source_previous_change: () -> ::Array[::String?]?
+
+    def source_previously_was: () -> ::String?
+
+    def source_before_last_save: () -> ::String?
+
+    def source_change_to_be_saved: () -> ::Array[::String?]?
+
+    def source_in_database: () -> ::String?
+
+    def saved_change_to_source: () -> ::Array[::String?]?
+
+    def saved_change_to_source?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_source?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_source!: () -> void
+
+    def clear_source_change: () -> void
+
+    def source_before_type_cast: () -> ::Integer
+
+    def source_for_database: () -> ::Integer
+
+    def low_signal: () -> bool
+
+    def low_signal=: (bool) -> bool
+
+    def low_signal?: () -> bool
+
+    def low_signal_changed?: (?from: bool?, ?to: bool?) -> bool
+
+    def low_signal_change: () -> [ bool?, bool? ]
+
+    def low_signal_will_change!: () -> void
+
+    def low_signal_was: () -> bool?
+
+    def low_signal_previously_changed?: (?from: bool?, ?to: bool?) -> bool
+
+    def low_signal_previous_change: () -> ::Array[bool?]?
+
+    def low_signal_previously_was: () -> bool?
+
+    def low_signal_before_last_save: () -> bool?
+
+    def low_signal_change_to_be_saved: () -> ::Array[bool?]?
+
+    def low_signal_in_database: () -> bool?
+
+    def saved_change_to_low_signal: () -> ::Array[bool?]?
+
+    def saved_change_to_low_signal?: (?from: bool?, ?to: bool?) -> bool
+
+    def will_save_change_to_low_signal?: (?from: bool?, ?to: bool?) -> bool
+
+    def restore_low_signal!: () -> void
+
+    def clear_low_signal_change: () -> void
+
+    def low_signal_before_type_cast: () -> bool
+
+    def low_signal_for_database: () -> bool
+
+    def occurred_at: () -> ::ActiveSupport::TimeWithZone
+
+    def occurred_at=: (::ActiveSupport::TimeWithZone) -> ::ActiveSupport::TimeWithZone
+
+    def occurred_at?: () -> bool
+
+    def occurred_at_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def occurred_at_change: () -> [ ::ActiveSupport::TimeWithZone?, ::ActiveSupport::TimeWithZone? ]
+
+    def occurred_at_will_change!: () -> void
+
+    def occurred_at_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def occurred_at_previously_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def occurred_at_previous_change: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def occurred_at_previously_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def occurred_at_before_last_save: () -> ::ActiveSupport::TimeWithZone?
+
+    def occurred_at_change_to_be_saved: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def occurred_at_in_database: () -> ::ActiveSupport::TimeWithZone?
+
+    def saved_change_to_occurred_at: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def saved_change_to_occurred_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def will_save_change_to_occurred_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def restore_occurred_at!: () -> void
+
+    def clear_occurred_at_change: () -> void
+
+    def occurred_at_before_type_cast: () -> ::Time
+
+    def occurred_at_for_database: () -> ::Time
+
+    def created_at: () -> ::ActiveSupport::TimeWithZone
+
+    def created_at=: (::ActiveSupport::TimeWithZone) -> ::ActiveSupport::TimeWithZone
+
+    def created_at?: () -> bool
+
+    def created_at_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def created_at_change: () -> [ ::ActiveSupport::TimeWithZone?, ::ActiveSupport::TimeWithZone? ]
+
+    def created_at_will_change!: () -> void
+
+    def created_at_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def created_at_previously_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def created_at_previous_change: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def created_at_previously_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def created_at_before_last_save: () -> ::ActiveSupport::TimeWithZone?
+
+    def created_at_change_to_be_saved: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def created_at_in_database: () -> ::ActiveSupport::TimeWithZone?
+
+    def saved_change_to_created_at: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def saved_change_to_created_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def will_save_change_to_created_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def restore_created_at!: () -> void
+
+    def clear_created_at_change: () -> void
+
+    def created_at_before_type_cast: () -> ::Time
+
+    def created_at_for_database: () -> ::Time
+
+    def updated_at: () -> ::ActiveSupport::TimeWithZone
+
+    def updated_at=: (::ActiveSupport::TimeWithZone) -> ::ActiveSupport::TimeWithZone
+
+    def updated_at?: () -> bool
+
+    def updated_at_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def updated_at_change: () -> [ ::ActiveSupport::TimeWithZone?, ::ActiveSupport::TimeWithZone? ]
+
+    def updated_at_will_change!: () -> void
+
+    def updated_at_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def updated_at_previously_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def updated_at_previous_change: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def updated_at_previously_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def updated_at_before_last_save: () -> ::ActiveSupport::TimeWithZone?
+
+    def updated_at_change_to_be_saved: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def updated_at_in_database: () -> ::ActiveSupport::TimeWithZone?
+
+    def saved_change_to_updated_at: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def saved_change_to_updated_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def will_save_change_to_updated_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def restore_updated_at!: () -> void
+
+    def clear_updated_at_change: () -> void
+
+    def updated_at_before_type_cast: () -> ::Time
+
+    def updated_at_for_database: () -> ::Time
+  end
+  include ::Activity::GeneratedAttributeMethods
+  module ::Activity::GeneratedAliasAttributeMethods
+    include ::Activity::GeneratedAttributeMethods
+
+    alias id_value id
+
+    alias id_value= id=
+
+    alias id_value? id?
+
+    alias id_value_changed? id_changed?
+
+    alias id_value_change id_change
+
+    alias id_value_will_change! id_will_change!
+
+    alias id_value_was id_was
+
+    alias id_value_previously_changed? id_previously_changed?
+
+    alias id_value_previous_change id_previous_change
+
+    alias id_value_previously_was id_previously_was
+
+    alias id_value_before_last_save id_before_last_save
+
+    alias id_value_change_to_be_saved id_change_to_be_saved
+
+    alias id_value_in_database id_in_database
+
+    alias saved_change_to_id_value saved_change_to_id
+
+    alias saved_change_to_id_value? saved_change_to_id?
+
+    alias will_save_change_to_id_value? will_save_change_to_id?
+
+    alias restore_id_value! restore_id!
+
+    alias clear_id_value_change clear_id_change
+
+    alias id_value_before_type_cast id_before_type_cast
+
+    alias id_value_for_database id_for_database
+  end
+  include ::Activity::GeneratedAliasAttributeMethods
+
+  def move: () -> ::Move
+  def move=: (::Move?) -> ::Move?
+  def reload_move: () -> ::Move?
+  def build_move: (?untyped) -> ::Move
+  def create_move: (?untyped) -> ::Move
+  def create_move!: (?untyped) -> ::Move
+  def subject: () -> untyped?
+  def subject=: (untyped?) -> untyped?
+  def reload_subject: () -> untyped?
+
+  module ::Activity::GeneratedAssociationMethods
+  end
+  include ::Activity::GeneratedAssociationMethods
+
+  def web!: () -> bool
+  def web?: () -> bool
+  def mcp!: () -> bool
+  def mcp?: () -> bool
+  def system!: () -> bool
+  def system?: () -> bool
+  def self.sources: () -> ::ActiveSupport::HashWithIndifferentAccess[::String, ::Integer]
+  def self.web: () -> ::Activity::ActiveRecord_Relation
+  def self.not_web: () -> ::Activity::ActiveRecord_Relation
+  def self.mcp: () -> ::Activity::ActiveRecord_Relation
+  def self.not_mcp: () -> ::Activity::ActiveRecord_Relation
+  def self.system: () -> ::Activity::ActiveRecord_Relation
+  def self.not_system: () -> ::Activity::ActiveRecord_Relation
+  def self.recent: () -> ::Activity::ActiveRecord_Relation
+  def self.high_signal: () -> ::Activity::ActiveRecord_Relation
+  def self.before: (untyped time, ?untyped id) -> ::Activity::ActiveRecord_Relation
+
+  module ::Activity::GeneratedRelationMethods
+    def sources: () -> ::ActiveSupport::HashWithIndifferentAccess[::String, ::Integer]
+
+    def web: () -> ::Activity::ActiveRecord_Relation
+
+    def not_web: () -> ::Activity::ActiveRecord_Relation
+
+    def mcp: () -> ::Activity::ActiveRecord_Relation
+
+    def not_mcp: () -> ::Activity::ActiveRecord_Relation
+
+    def system: () -> ::Activity::ActiveRecord_Relation
+
+    def not_system: () -> ::Activity::ActiveRecord_Relation
+
+    def recent: () -> ::Activity::ActiveRecord_Relation
+
+    def high_signal: () -> ::Activity::ActiveRecord_Relation
+
+    def before: (untyped time, ?untyped id) -> ::Activity::ActiveRecord_Relation
+  end
+
+  class ::Activity::ActiveRecord_Relation < ::ActiveRecord::Relation
+    include ::Enumerable[::Activity]
+    include ::Activity::GeneratedRelationMethods
+    include ::ActiveRecord::Relation::Methods[::Activity, ::String]
+  end
+
+  class ::Activity::ActiveRecord_Associations_CollectionProxy < ::ActiveRecord::Associations::CollectionProxy
+    include ::Enumerable[::Activity]
+    include ::Activity::GeneratedRelationMethods
+    include ::ActiveRecord::Relation::Methods[::Activity, ::String]
+
+    def build: (?::ActiveRecord::Associations::CollectionProxy::_EachPair attributes) ?{ () -> untyped } -> ::Activity
+             | (::Array[::ActiveRecord::Associations::CollectionProxy::_EachPair] attributes) ?{ () -> untyped } -> ::Array[::Activity]
+    def create: (?::ActiveRecord::Associations::CollectionProxy::_EachPair attributes) ?{ () -> untyped } -> ::Activity
+              | (::Array[::ActiveRecord::Associations::CollectionProxy::_EachPair] attributes) ?{ () -> untyped } -> ::Array[::Activity]
+    def create!: (?::ActiveRecord::Associations::CollectionProxy::_EachPair attributes) ?{ () -> untyped } -> ::Activity
+               | (::Array[::ActiveRecord::Associations::CollectionProxy::_EachPair] attributes) ?{ () -> untyped } -> ::Array[::Activity]
+    def reload: () -> ::Array[::Activity]
+
+    def replace: (::Array[::Activity]) -> void
+    def delete: (*::Activity | ::String) -> ::Array[::Activity]
+    def destroy: (*::Activity | ::String) -> ::Array[::Activity]
+    def <<: (*::Activity | ::Array[::Activity]) -> self
+    def prepend: (*::Activity | ::Array[::Activity]) -> self
+  end
+end
+
+class ::ApplicationRecord < ::ActiveRecord::Base
+end
+class ::Move < ::ApplicationRecord
+end

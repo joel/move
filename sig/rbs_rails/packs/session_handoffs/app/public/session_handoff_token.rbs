@@ -1,0 +1,420 @@
+# resolve-type-names: false
+
+class ::SessionHandoffToken < ::ApplicationRecord
+  extend ::ActiveRecord::Base::ClassMethods[::SessionHandoffToken, ::SessionHandoffToken::ActiveRecord_Relation, ::String]
+
+  module ::SessionHandoffToken::GeneratedAttributeMethods
+    def id: () -> ::String
+
+    def id=: (::String) -> ::String
+
+    def id?: () -> bool
+
+    def id_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def id_change: () -> [ ::String?, ::String? ]
+
+    def id_will_change!: () -> void
+
+    def id_was: () -> ::String?
+
+    def id_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def id_previous_change: () -> ::Array[::String?]?
+
+    def id_previously_was: () -> ::String?
+
+    def id_before_last_save: () -> ::String?
+
+    def id_change_to_be_saved: () -> ::Array[::String?]?
+
+    def id_in_database: () -> ::String?
+
+    def saved_change_to_id: () -> ::Array[::String?]?
+
+    def saved_change_to_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_id!: () -> void
+
+    def clear_id_change: () -> void
+
+    def id_before_type_cast: () -> ::String
+
+    def id_for_database: () -> ::String
+
+    def token_digest: () -> ::String
+
+    def token_digest=: (::String) -> ::String
+
+    def token_digest?: () -> bool
+
+    def token_digest_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def token_digest_change: () -> [ ::String?, ::String? ]
+
+    def token_digest_will_change!: () -> void
+
+    def token_digest_was: () -> ::String?
+
+    def token_digest_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def token_digest_previous_change: () -> ::Array[::String?]?
+
+    def token_digest_previously_was: () -> ::String?
+
+    def token_digest_before_last_save: () -> ::String?
+
+    def token_digest_change_to_be_saved: () -> ::Array[::String?]?
+
+    def token_digest_in_database: () -> ::String?
+
+    def saved_change_to_token_digest: () -> ::Array[::String?]?
+
+    def saved_change_to_token_digest?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_token_digest?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_token_digest!: () -> void
+
+    def clear_token_digest_change: () -> void
+
+    def token_digest_before_type_cast: () -> ::String
+
+    def token_digest_for_database: () -> ::String
+
+    def user_id: () -> ::String
+
+    def user_id=: (::String) -> ::String
+
+    def user_id?: () -> bool
+
+    def user_id_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def user_id_change: () -> [ ::String?, ::String? ]
+
+    def user_id_will_change!: () -> void
+
+    def user_id_was: () -> ::String?
+
+    def user_id_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def user_id_previous_change: () -> ::Array[::String?]?
+
+    def user_id_previously_was: () -> ::String?
+
+    def user_id_before_last_save: () -> ::String?
+
+    def user_id_change_to_be_saved: () -> ::Array[::String?]?
+
+    def user_id_in_database: () -> ::String?
+
+    def saved_change_to_user_id: () -> ::Array[::String?]?
+
+    def saved_change_to_user_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_user_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_user_id!: () -> void
+
+    def clear_user_id_change: () -> void
+
+    def user_id_before_type_cast: () -> ::String
+
+    def user_id_for_database: () -> ::String
+
+    def organization_slug: () -> ::String
+
+    def organization_slug=: (::String) -> ::String
+
+    def organization_slug?: () -> bool
+
+    def organization_slug_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def organization_slug_change: () -> [ ::String?, ::String? ]
+
+    def organization_slug_will_change!: () -> void
+
+    def organization_slug_was: () -> ::String?
+
+    def organization_slug_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def organization_slug_previous_change: () -> ::Array[::String?]?
+
+    def organization_slug_previously_was: () -> ::String?
+
+    def organization_slug_before_last_save: () -> ::String?
+
+    def organization_slug_change_to_be_saved: () -> ::Array[::String?]?
+
+    def organization_slug_in_database: () -> ::String?
+
+    def saved_change_to_organization_slug: () -> ::Array[::String?]?
+
+    def saved_change_to_organization_slug?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_organization_slug?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_organization_slug!: () -> void
+
+    def clear_organization_slug_change: () -> void
+
+    def organization_slug_before_type_cast: () -> ::String
+
+    def organization_slug_for_database: () -> ::String
+
+    def expires_at: () -> ::ActiveSupport::TimeWithZone
+
+    def expires_at=: (::ActiveSupport::TimeWithZone) -> ::ActiveSupport::TimeWithZone
+
+    def expires_at?: () -> bool
+
+    def expires_at_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def expires_at_change: () -> [ ::ActiveSupport::TimeWithZone?, ::ActiveSupport::TimeWithZone? ]
+
+    def expires_at_will_change!: () -> void
+
+    def expires_at_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def expires_at_previously_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def expires_at_previous_change: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def expires_at_previously_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def expires_at_before_last_save: () -> ::ActiveSupport::TimeWithZone?
+
+    def expires_at_change_to_be_saved: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def expires_at_in_database: () -> ::ActiveSupport::TimeWithZone?
+
+    def saved_change_to_expires_at: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def saved_change_to_expires_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def will_save_change_to_expires_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def restore_expires_at!: () -> void
+
+    def clear_expires_at_change: () -> void
+
+    def expires_at_before_type_cast: () -> ::Time
+
+    def expires_at_for_database: () -> ::Time
+
+    def consumed_at: () -> ::ActiveSupport::TimeWithZone?
+
+    def consumed_at=: (::ActiveSupport::TimeWithZone?) -> ::ActiveSupport::TimeWithZone?
+
+    def consumed_at?: () -> bool
+
+    def consumed_at_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def consumed_at_change: () -> [ ::ActiveSupport::TimeWithZone?, ::ActiveSupport::TimeWithZone? ]
+
+    def consumed_at_will_change!: () -> void
+
+    def consumed_at_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def consumed_at_previously_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def consumed_at_previous_change: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def consumed_at_previously_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def consumed_at_before_last_save: () -> ::ActiveSupport::TimeWithZone?
+
+    def consumed_at_change_to_be_saved: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def consumed_at_in_database: () -> ::ActiveSupport::TimeWithZone?
+
+    def saved_change_to_consumed_at: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def saved_change_to_consumed_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def will_save_change_to_consumed_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def restore_consumed_at!: () -> void
+
+    def clear_consumed_at_change: () -> void
+
+    def consumed_at_before_type_cast: () -> ::Time?
+
+    def consumed_at_for_database: () -> ::Time?
+
+    def created_at: () -> ::ActiveSupport::TimeWithZone
+
+    def created_at=: (::ActiveSupport::TimeWithZone) -> ::ActiveSupport::TimeWithZone
+
+    def created_at?: () -> bool
+
+    def created_at_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def created_at_change: () -> [ ::ActiveSupport::TimeWithZone?, ::ActiveSupport::TimeWithZone? ]
+
+    def created_at_will_change!: () -> void
+
+    def created_at_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def created_at_previously_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def created_at_previous_change: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def created_at_previously_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def created_at_before_last_save: () -> ::ActiveSupport::TimeWithZone?
+
+    def created_at_change_to_be_saved: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def created_at_in_database: () -> ::ActiveSupport::TimeWithZone?
+
+    def saved_change_to_created_at: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def saved_change_to_created_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def will_save_change_to_created_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def restore_created_at!: () -> void
+
+    def clear_created_at_change: () -> void
+
+    def created_at_before_type_cast: () -> ::Time
+
+    def created_at_for_database: () -> ::Time
+
+    def updated_at: () -> ::ActiveSupport::TimeWithZone
+
+    def updated_at=: (::ActiveSupport::TimeWithZone) -> ::ActiveSupport::TimeWithZone
+
+    def updated_at?: () -> bool
+
+    def updated_at_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def updated_at_change: () -> [ ::ActiveSupport::TimeWithZone?, ::ActiveSupport::TimeWithZone? ]
+
+    def updated_at_will_change!: () -> void
+
+    def updated_at_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def updated_at_previously_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def updated_at_previous_change: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def updated_at_previously_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def updated_at_before_last_save: () -> ::ActiveSupport::TimeWithZone?
+
+    def updated_at_change_to_be_saved: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def updated_at_in_database: () -> ::ActiveSupport::TimeWithZone?
+
+    def saved_change_to_updated_at: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def saved_change_to_updated_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def will_save_change_to_updated_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def restore_updated_at!: () -> void
+
+    def clear_updated_at_change: () -> void
+
+    def updated_at_before_type_cast: () -> ::Time
+
+    def updated_at_for_database: () -> ::Time
+  end
+  include ::SessionHandoffToken::GeneratedAttributeMethods
+  module ::SessionHandoffToken::GeneratedAliasAttributeMethods
+    include ::SessionHandoffToken::GeneratedAttributeMethods
+
+    alias id_value id
+
+    alias id_value= id=
+
+    alias id_value? id?
+
+    alias id_value_changed? id_changed?
+
+    alias id_value_change id_change
+
+    alias id_value_will_change! id_will_change!
+
+    alias id_value_was id_was
+
+    alias id_value_previously_changed? id_previously_changed?
+
+    alias id_value_previous_change id_previous_change
+
+    alias id_value_previously_was id_previously_was
+
+    alias id_value_before_last_save id_before_last_save
+
+    alias id_value_change_to_be_saved id_change_to_be_saved
+
+    alias id_value_in_database id_in_database
+
+    alias saved_change_to_id_value saved_change_to_id
+
+    alias saved_change_to_id_value? saved_change_to_id?
+
+    alias will_save_change_to_id_value? will_save_change_to_id?
+
+    alias restore_id_value! restore_id!
+
+    alias clear_id_value_change clear_id_change
+
+    alias id_value_before_type_cast id_before_type_cast
+
+    alias id_value_for_database id_for_database
+  end
+  include ::SessionHandoffToken::GeneratedAliasAttributeMethods
+
+  def user: () -> ::User
+  def user=: (::User?) -> ::User?
+  def reload_user: () -> ::User?
+  def build_user: (?untyped) -> ::User
+  def create_user: (?untyped) -> ::User
+  def create_user!: (?untyped) -> ::User
+
+  module ::SessionHandoffToken::GeneratedAssociationMethods
+  end
+  include ::SessionHandoffToken::GeneratedAssociationMethods
+
+  def self.purgeable: () -> ::SessionHandoffToken::ActiveRecord_Relation
+
+  module ::SessionHandoffToken::GeneratedRelationMethods
+    def purgeable: () -> ::SessionHandoffToken::ActiveRecord_Relation
+  end
+
+  class ::SessionHandoffToken::ActiveRecord_Relation < ::ActiveRecord::Relation
+    include ::Enumerable[::SessionHandoffToken]
+    include ::SessionHandoffToken::GeneratedRelationMethods
+    include ::ActiveRecord::Relation::Methods[::SessionHandoffToken, ::String]
+  end
+
+  class ::SessionHandoffToken::ActiveRecord_Associations_CollectionProxy < ::ActiveRecord::Associations::CollectionProxy
+    include ::Enumerable[::SessionHandoffToken]
+    include ::SessionHandoffToken::GeneratedRelationMethods
+    include ::ActiveRecord::Relation::Methods[::SessionHandoffToken, ::String]
+
+    def build: (?::ActiveRecord::Associations::CollectionProxy::_EachPair attributes) ?{ () -> untyped } -> ::SessionHandoffToken
+             | (::Array[::ActiveRecord::Associations::CollectionProxy::_EachPair] attributes) ?{ () -> untyped } -> ::Array[::SessionHandoffToken]
+    def create: (?::ActiveRecord::Associations::CollectionProxy::_EachPair attributes) ?{ () -> untyped } -> ::SessionHandoffToken
+              | (::Array[::ActiveRecord::Associations::CollectionProxy::_EachPair] attributes) ?{ () -> untyped } -> ::Array[::SessionHandoffToken]
+    def create!: (?::ActiveRecord::Associations::CollectionProxy::_EachPair attributes) ?{ () -> untyped } -> ::SessionHandoffToken
+               | (::Array[::ActiveRecord::Associations::CollectionProxy::_EachPair] attributes) ?{ () -> untyped } -> ::Array[::SessionHandoffToken]
+    def reload: () -> ::Array[::SessionHandoffToken]
+
+    def replace: (::Array[::SessionHandoffToken]) -> void
+    def delete: (*::SessionHandoffToken | ::String) -> ::Array[::SessionHandoffToken]
+    def destroy: (*::SessionHandoffToken | ::String) -> ::Array[::SessionHandoffToken]
+    def <<: (*::SessionHandoffToken | ::Array[::SessionHandoffToken]) -> self
+    def prepend: (*::SessionHandoffToken | ::Array[::SessionHandoffToken]) -> self
+  end
+end
+
+class ::ApplicationRecord < ::ActiveRecord::Base
+end
+class ::User < ::ApplicationRecord
+end

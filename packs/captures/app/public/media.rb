@@ -49,6 +49,7 @@ class Media < ApplicationRecord
   validate :image_must_be_an_image
   validate :image_within_size_limit
 
+  #: () -> void
   def image_must_be_an_image
     return unless image.attached?
 
@@ -63,6 +64,8 @@ class Media < ApplicationRecord
   end
 
   # Backstop for the up-front ImageNormalizer size check.
+
+  #: () -> void
   def image_within_size_limit
     return unless image.attached?
     return if image.blob.byte_size <= MAX_IMAGE_BYTES
@@ -71,6 +74,8 @@ class Media < ApplicationRecord
   end
 
   # "JPEG, PNG, WEBP, GIF" — for the user-facing rejection message.
+
+  #: () -> String
   def supported_formats_label
     SUPPORTED_IMAGE_TYPES.map { |type| type.split("/").last.upcase }.join(", ")
   end
@@ -82,6 +87,8 @@ class Media < ApplicationRecord
   scope :not_generated, -> { where.not(captured_via: "generated") }
 
   # The latest run's status drives the per-image recognition badge.
+
+  #: () -> String?
   def recognition_state
     recognition_runs.order(created_at: :desc).first&.status
   end
@@ -91,6 +98,8 @@ class Media < ApplicationRecord
   # "recognized" even though no item lives in its original box. `with_discarded`:
   # a soft-deleted item still counts, so discarding it never re-flags the photo as
   # orphaned (which would offer recovery and let it re-source a duplicate — #198).
+
+  #: () -> bool
   def sourced_item?
     move.items.with_discarded.exists?(source_media_id: id)
   end
@@ -101,12 +110,16 @@ class Media < ApplicationRecord
   # offering a manual add would recreate that avoided duplicate). Used by the
   # recovery surface (RecoveriesController, ItemsController#create) and mirrored by
   # the bulk BoxesController#recoverable_media_ids query.
+
+  #: () -> bool
   def orphaned?
     !sourced_item? && !recognition_suggestions.exists?
   end
 
   # A run is queued or processing — recognition may still materialize items, so
   # recovery mutations (re-run, manual-add binding) must wait until it settles.
+
+  #: () -> bool
   def recognition_in_flight?
     recognition_runs.exists?(status: %w[queued processing])
   end

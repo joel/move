@@ -80,7 +80,9 @@ module Captures
     def resolve_upload(box, file, signed_id)
       return { attachable: file, blob: nil } if signed_id.blank?
 
-      blob = ActiveStorage::Blob.find_signed!(signed_id, purpose: self.class.signed_id_purpose(box.move))
+      # The community activestorage sig declares purpose: Symbol; Rails compares
+      # purposes as strings.
+      blob = ActiveStorage::Blob.find_signed!(signed_id, purpose: self.class.signed_id_purpose(box.move)) # steep:ignore ArgumentTypeMismatch
       { attachable: { io: StringIO.new(blob.download), filename: blob.filename.to_s }, blob: blob }
     end
 

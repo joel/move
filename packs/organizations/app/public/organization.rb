@@ -16,6 +16,8 @@ class Organization < ApplicationRecord
 
   # The org an account is "primarily" in (#346): oldest membership first, slug as
   # a stable tiebreaker, so a multi-org user's fallback is deterministic.
+
+  # @rbs skip
   def self.primary_for(user_id)
     joins(:organization_memberships)
       .where(organization_memberships: { user_id: user_id })
@@ -24,6 +26,8 @@ class Organization < ApplicationRecord
   end
 
   # Is `user_id` a member of the org with this slug? (origin-handoff guard, #346)
+
+  # @rbs skip
   def self.member?(user_id:, slug:)
     joins(:organization_memberships)
       .exists?(slug: slug, organization_memberships: { user_id: user_id })

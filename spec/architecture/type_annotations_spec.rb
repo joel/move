@@ -12,10 +12,20 @@ require "rails_helper"
 # See doc/project/type-checking.md.
 RSpec.describe "Type annotation coverage" do
   # Must mirror the `check` path(s) of the :actions target in the Steepfile.
-  # Every pack's actions are checked (#519), so the pack glob is general — a NEW
-  # pack's actions are held to the annotation convention from day one.
+  # Every pack's actions are checked (#519) and so are the models (#521), so
+  # the globs are general — NEW packs/models are held to the annotation
+  # convention from day one. The concerns/ exclusion mirrors the Steepfile's
+  # (their `included do` DSL bodies are unmodellable — see there).
   def steep_checked_globs
-    ["app/actions/**/*.rb", "packs/*/app/actions/**/*.rb"]
+    [
+      "app/actions/**/*.rb", "packs/*/app/actions/**/*.rb",
+      "app/models/**/*.rb", "packs/*/app/public/**/*.rb",
+      "packs/*/app/models/**/*.rb"
+    ]
+  end
+
+  def excluded_from_checking
+    ["packs/utility/app/models/concerns/"]
   end
 
   # A def is annotated when the nearest preceding non-blank line is an inline
@@ -27,10 +37,15 @@ RSpec.describe "Type annotation coverage" do
     /\A\s*#(?::|\s*@rbs\b)/
   end
 
+  def checked_files
+    steep_checked_globs.flat_map { |glob| Rails.root.glob(glob) }
+                       .map { |path| path.relative_path_from(Rails.root).to_s }
+                       .reject { |rel| excluded_from_checking.any? { |fragment| rel.include?(fragment) } }
+  end
+
   def unannotated_defs
-    steep_checked_globs.flat_map { |glob| Rails.root.glob(glob) }.flat_map do |path|
-      rel = path.relative_path_from(Rails.root).to_s
-      lines = File.readlines(path)
+    checked_files.flat_map do |rel|
+      lines = Rails.root.join(rel).readlines
       lines.each_with_index.filter_map do |line, i|
         next unless line.match?(/\A\s*def\s/)
 
@@ -51,17 +66,27 @@ RSpec.describe "Type annotation coverage" do
   end
 
   # The glob above only proves annotations EXIST; this proves Steep actually
-  # CHECKS them — a new pack whose `check` line is missing from the Steepfile
-  # would otherwise carry annotations that are never type-checked, green in CI.
-  it "every pack's app/actions directory has its check line in the Steepfile" do
+  # CHECKS them — a new pack/model dir whose `check` line is missing from the
+  # Steepfile would otherwise carry annotations that are never type-checked,
+  # green in CI. A directory may alternatively be covered file-by-file (the
+  # packs/utility/app/models case — its concerns/ must stay unchecked), in
+  # which case every non-excluded .rb file needs its own check line.
+  it "every checked-scope directory has its check line(s) in the Steepfile" do
     steepfile = Rails.root.join("Steepfile").read
-    missing = Rails.root.glob("packs/*/app/actions").filter_map do |dir|
+    dirs = Rails.root.glob("packs/*/app/{actions,public,models}") + [Rails.root.join("app/models")]
+
+    missing = dirs.filter_map do |dir|
       rel = dir.relative_path_from(Rails.root).to_s
-      rel unless steepfile.include?(%(check "#{rel}"))
+      next if steepfile.include?(%(check "#{rel}"))
+
+      files = Rails.root.glob("#{rel}/**/*.rb")
+                   .map { |f| f.relative_path_from(Rails.root).to_s }
+                   .reject { |f| excluded_from_checking.any? { |fragment| f.include?(fragment) } }
+      rel unless files.any? && files.all? { |f| steepfile.include?(%(check "#{f}")) }
     end
 
     expect(missing).to be_empty, <<~MSG
-      Pack action directories missing from the Steepfile's :actions target
+      Checked-scope directories missing from the Steepfile's :actions target
       (their inline annotations would never be type-checked):
       #{missing.join("\n")}
     MSG
