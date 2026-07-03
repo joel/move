@@ -21,9 +21,25 @@
 
 target :actions do
   check "app/actions", inline: true
-  # Pack-by-pack growth (doc/project/type-checking.md roadmap): one `check` line
-  # per annotated pack, in the SAME target — a second target crashes, see above.
+  # Every pack's actions (doc/project/type-checking.md roadmap, completed #519):
+  # one `check` line per pack, all in the SAME target — a second target crashes,
+  # see above. A NEW pack must add its line here + annotate from day one (the
+  # fitness spec's packs/* glob will fail it otherwise).
+  check "packs/accounts/app/actions", inline: true
+  check "packs/captures/app/actions", inline: true
+  check "packs/demo_data/app/actions", inline: true
   check "packs/labels/app/actions", inline: true
+  check "packs/manifests/app/actions", inline: true
+  check "packs/move_integration_tokens/app/actions", inline: true
+  check "packs/move_memberships/app/actions", inline: true
+  check "packs/organizations/app/actions", inline: true
+  check "packs/photos/app/actions", inline: true
+  check "packs/qr/app/actions", inline: true
+  check "packs/reviews/app/actions", inline: true
+  check "packs/search/app/actions", inline: true
+  check "packs/session_handoffs/app/actions", inline: true
+  check "packs/terms/app/actions", inline: true
+  check "packs/vocabularies/app/actions", inline: true
 
   signature "sig"
 

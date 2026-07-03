@@ -13,6 +13,7 @@ module SessionHandoffs
   # SessionHandoffToken is an excluded Apartment model, so the row lands in public
   # regardless of the caller's schema.
   class Mint < BaseAction
+    #: (user: untyped, organization_slug: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(user:, organization_slug:)
       raw = SessionHandoffToken.generate_raw_token
       token = yield persist(user, organization_slug, raw)
@@ -22,6 +23,7 @@ module SessionHandoffs
 
     private
 
+    #: (untyped user, untyped organization_slug, untyped raw) -> Dry::Monads::Result[untyped, untyped]
     def persist(user, organization_slug, raw)
       token = SessionHandoffToken.create!(
         user: user,
@@ -41,6 +43,7 @@ module SessionHandoffs
       Failure(e.message)
     end
 
+    #: (untyped token) -> Dry::Monads::Success[nil]
     def emit_event(token)
       Rails.event.notify(
         "session_handoff.minted",

@@ -12,6 +12,7 @@ module Search
   module Reindexing
     private
 
+    #: (untyped item_ids, ?indexing_run: untyped) -> void
     def reindex_items(item_ids, indexing_run: nil)
       tenant = Apartment::Tenant.current
       Array(item_ids).uniq.each do |id|
@@ -26,6 +27,8 @@ module Search
     # backlogged/failed job) searches see nil embeddings and fall back to
     # lexical+trigram, instead of scoring the new query vector against stale
     # vectors from the old space. The jobs refill them in the Move's new space.
+
+    #: (untyped move, ?run: untyped, ?item_ids: untyped) -> void
     def reembed_move(move, run: nil, item_ids: nil)
       # Bulk-clear the denormalized projection's vectors; validations are
       # irrelevant to a search projection (same rationale as the #232 migration).
@@ -39,6 +42,8 @@ module Search
 
     # Item ids whose search_text embeds this vocabulary value (rooms only — a
     # room rename changes the box/room context denormalized into search_text).
+
+    #: (untyped record) -> Array[untyped]
     def affected_item_ids(record)
       case record
       when Room then Item.where(box_id: record.boxes.select(:id)).ids

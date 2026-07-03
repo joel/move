@@ -27,10 +27,15 @@ module Captures
     # move.id is a UUID (globally unique), but the tenant schema is included too so the
     # binding stays correct even if Move PKs ever became per-tenant integers — a
     # signed_id from one Organization can never verify under another's.
+    # Singleton defs aren't supported by inline RBS yet; skipped here, declared
+    # in sig/captures.rbs instead.
+
+    # @rbs skip
     def self.signed_id_purpose(move)
       "mcp_media_upload/#{Apartment::Tenant.current}/#{move.id}"
     end
 
+    #: (box: untyped, captured_by: untyped, ?file: untyped, ?signed_id: untyped, ?captured_via: String) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, captured_by:, file: nil, signed_id: nil, captured_via: "web")
       yield ensure_writable(box.move)
       return Failure(:not_capturable) unless box.capturable?
@@ -47,6 +52,8 @@ module Captures
     # captured_via records the origin (web vs mcp). ImageNormalizer sniffs the
     # real type from the bytes (never the client-declared type) and transcodes
     # non-JPEG/PNG/WEBP to JPEG; unsupported/undecodable input fails the capture.
+
+    #: (untyped box, untyped file, untyped signed_id, String captured_via) -> Dry::Monads::Result[untyped, untyped]
     def persist(box, file, signed_id, captured_via)
       upload = resolve_upload(box, file, signed_id)
       normalized = ImageNormalizer.call(upload[:attachable])
@@ -68,6 +75,8 @@ module Captures
     # Active Storage blob already in storage. Read the blob's bytes WITHOUT its
     # (client-declared, untrusted) content type so ImageNormalizer sniffs the real
     # type and Active Storage re-identifies it on re-attach.
+
+    #: (untyped box, untyped file, untyped signed_id) -> Hash[Symbol, untyped]
     def resolve_upload(box, file, signed_id)
       return { attachable: file, blob: nil } if signed_id.blank?
 
@@ -80,6 +89,8 @@ module Captures
     # client-declared one. For a direct upload that means storing a fresh,
     # type-correct blob and purging the reserved one (the parity-with-web choice
     # for #110); web uploads attach in place (no blob to purge).
+
+    #: (untyped box, String captured_via, untyped upload, untyped normalized) -> untyped
     def attach_media(box, captured_via, upload, normalized)
       media = box.media.new(
         move: box.move, media_type: "image", captured_via: captured_via, captured_at: Time.current,
@@ -93,6 +104,7 @@ module Captures
       media
     end
 
+    #: (untyped media, untyped captured_by) -> Dry::Monads::Success[nil]
     def emit_event(media, captured_by)
       Rails.event.notify(
         "media.captured", media_id: media.id, box_id: media.box_id, move_id: media.move_id,

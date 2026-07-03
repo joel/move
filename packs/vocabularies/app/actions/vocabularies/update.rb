@@ -12,6 +12,7 @@ module Vocabularies
   class Update < BaseAction
     include Search::Reindexing
 
+    #: (record: untyped, vocabulary: untyped, params: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(record:, vocabulary:, params:, actor:)
       yield ensure_writable(record.move)
       affected = affected_item_ids(record) # before rename
@@ -23,6 +24,7 @@ module Vocabularies
 
     private
 
+    #: (untyped record, untyped vocabulary, untyped params) -> Dry::Monads::Result[untyped, untyped]
     def persist(record, vocabulary, params)
       record.update!(params.slice(*vocabulary.permitted_params))
       Success(record)
@@ -35,6 +37,7 @@ module Vocabularies
       Failure(record.errors)
     end
 
+    #: (untyped record, untyped vocabulary, untyped actor) -> Dry::Monads::Success[nil]
     def emit_event(record, vocabulary, actor)
       Rails.event.notify(
         "vocabulary.updated",

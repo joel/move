@@ -7,6 +7,7 @@ module RecognitionRuns
   # data or bounding boxes are stored. Provider/persistence errors end the run
   # `failed` (never stuck in processing) and return Failure — they never raise up.
   class Process < BaseAction
+    #: (run: untyped, ?provider: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(run:, provider: nil)
       # Per-Move provider (#185): the active provider + key come from the Move, not
       # a global ENV setting. A real provider with no key fails fast in #identify
@@ -45,6 +46,7 @@ module RecognitionRuns
 
     private
 
+    #: (untyped run) -> untyped
     def mark_processing(run)
       run.update!(status: "processing", started_at: Time.current)
       Rails.event.notify("recognition_run.processing", recognition_run_id: run.id)
@@ -52,10 +54,13 @@ module RecognitionRuns
 
     # The room is the only vocabulary the model is given as context — it nudges the
     # labels without inventing a per-item taxonomy (category/tags were removed).
+
+    #: (untyped run) -> Hash[Symbol, untyped]
     def context(run)
       { room: run.box.room&.name }
     end
 
+    #: (untyped run, untyped result) -> untyped
     def materialize(run, result)
       threshold = run.move.auto_confirm_threshold.to_f
       result.objects.each { |object| materialize_one(run, object, threshold) }
@@ -66,6 +71,8 @@ module RecognitionRuns
     # item of the same name, a late run must NOT overwrite it or silently add a
     # duplicate — record the detection as a `conflict` suggestion linked to the
     # existing item and leave it for human resolution in the review queue (D6).
+
+    #: (untyped run, untyped object, Float threshold) -> untyped
     def materialize_one(run, object, threshold)
       existing = confirmed_match(run.box, object.label)
       return conflict_suggestion(run, object, existing) if existing
@@ -89,6 +96,8 @@ module RecognitionRuns
     end
 
     # A user-confirmed item with the same name already lives in this box.
+
+    #: (untyped box, untyped label) -> untyped
     def confirmed_match(box, label)
       box.items.where(review_state: "confirmed")
          .where("LOWER(name) = ?", label.to_s.strip.downcase).first
@@ -96,6 +105,8 @@ module RecognitionRuns
 
     # Record the duplicate detection as a conflict without touching the existing
     # item or adding a second inventory row, for the reviewer to resolve.
+
+    #: (untyped run, untyped object, untyped existing) -> untyped
     def conflict_suggestion(run, object, existing)
       run.recognition_suggestions.create!(
         move: run.move, box: run.box, media: run.media, item: existing,
@@ -104,6 +115,7 @@ module RecognitionRuns
       )
     end
 
+    #: (untyped run, untyped result) -> untyped
     def finish(run, result)
       run.update!(
         status: "succeeded", completed_at: Time.current,
@@ -113,6 +125,7 @@ module RecognitionRuns
       Rails.event.notify("recognition_run.succeeded", recognition_run_id: run.id, item_count: result.objects.size)
     end
 
+    #: (untyped run, untyped error) -> untyped
     def fail_run(run, error)
       run.update!(
         status: "failed", completed_at: Time.current,

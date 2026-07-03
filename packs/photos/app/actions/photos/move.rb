@@ -21,6 +21,7 @@ module Photos
   # Search::IndexSubscriber + activity feed; only `box_id` changes, so presence
   # stays `in_box`.
   class Move < BaseAction
+    #: (media: untyped, target_box: untyped, mover: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, target_box:, mover:)
       yield ensure_writable(media.move)
       yield validate(media, target_box)
@@ -35,6 +36,7 @@ module Photos
 
     private
 
+    #: (untyped media, untyped target_box) -> Dry::Monads::Result[untyped, untyped]
     def validate(media, target_box)
       return Failure(:box_missing) if target_box.nil?
       return Failure(:same_box) if target_box.id == media.box_id
@@ -52,8 +54,10 @@ module Photos
     # directly (not via Items::Move) because that action's guards — in_box, not
     # same/cross box — are already satisfied by `co_located_items` + `validate`; only
     # `box_id` changes, so presence stays `in_box`.
+
+    #: (untyped media, untyped target_box) -> Dry::Monads::Result[untyped, untyped]
     def relocate(media, target_box)
-      result = nil
+      result = nil #: untyped
       ActiveRecord::Base.transaction do
         # FOR UPDATE: serialize concurrent moves of the same photo. Read the source
         # box only AFTER the lock so the second mover sees the first's committed box
@@ -81,6 +85,8 @@ module Photos
     # box). Locking + the `box_id = source_box_id` predicate means an item moved out
     # before our SELECT is simply not matched (its deliberate move is kept), and one
     # racing us blocks until we commit (Codex #318).
+
+    #: (untyped media, untyped target_box) -> Dry::Monads::Success[untyped]
     def move_rows(media, target_box)
       items = co_located_items(media, media.box_id).lock.to_a
       items.each { |item| item.update!(box: target_box) }
@@ -91,6 +97,8 @@ module Photos
     # Items detected in this photo that are still in its box and present — the
     # photo's "current contents". Items already moved elsewhere (box_id differs) or
     # removed (presence_state) are intentionally excluded (#317 decision 1).
+
+    #: (untyped media, untyped source_box_id) -> untyped
     def co_located_items(media, source_box_id)
       media.move.items.in_box.where(source_media_id: media.id, box_id: source_box_id)
     end
@@ -99,6 +107,8 @@ module Photos
     # the search reindex job (its own queue DB) — observes the committed boxes.
     # `item.moved` mirrors Items::Move's payload (reuses Search::IndexSubscriber and
     # the activity feed); `media.moved` records the photo move itself.
+
+    #: (untyped media, untyped item_ids, untyped target_box, untyped mover) -> void
     def emit_moves(media, item_ids, target_box, mover)
       item_ids.each do |id|
         Rails.event.notify(

@@ -21,6 +21,8 @@ module MoveMemberships
 
     # Revoke every active token +user_id+ created on +move+ and return the revoked
     # records (for post-commit event emission). Token counts per user are tiny.
+
+    #: (untyped move, untyped user_id) -> Array[untyped]
     def revoke_member_tokens(move, user_id)
       now = Time.current
       tokens = move.integration_tokens.active.where(created_by_user_id: user_id).to_a
@@ -31,6 +33,8 @@ module MoveMemberships
     # One `integration_token.revoked` event per revoked token, matching
     # MoveIntegrationTokens::Revoke's payload so MoveMcp::AuditSubscriber records it.
     # Call AFTER the mutation commits.
+
+    #: (untyped tokens, untyped actor) -> untyped
     def emit_token_revocations(tokens, actor)
       tokens.each do |token|
         Rails.event.notify(

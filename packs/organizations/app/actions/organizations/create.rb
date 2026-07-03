@@ -10,6 +10,7 @@ module Organizations
     # Subdomains that route to the app/apex or sibling services, never tenants.
     RESERVED_SLUGS = %w[move mail storage bucket www app admin api].freeze
 
+    #: (name: untyped, slug: untyped, owner: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(name:, slug:, owner:)
       slug = normalize(slug)
       yield ensure_available(slug)
@@ -21,18 +22,21 @@ module Organizations
 
     private
 
+    #: (untyped slug) -> String
     def normalize(slug)
       slug.to_s.downcase.strip
     end
 
+    #: (String slug) -> Dry::Monads::Result[untyped, untyped]
     def ensure_available(slug)
       return Failure(:reserved_slug) if RESERVED_SLUGS.include?(slug)
 
       Success()
     end
 
+    #: (untyped name, String slug, untyped owner) -> Dry::Monads::Result[untyped, untyped]
     def persist(name, slug, owner)
-      organization = nil
+      organization = nil #: untyped
       ActiveRecord::Base.transaction do
         organization = Organization.create!(name: name, slug: slug)
         organization.organization_memberships.create!(user: owner, role: "owner")
@@ -42,6 +46,7 @@ module Organizations
       Failure(e.record.errors)
     end
 
+    #: (untyped organization) -> Dry::Monads::Result[untyped, untyped]
     def provision_tenant(organization)
       Apartment::Tenant.create(organization.slug)
       Success()
@@ -53,6 +58,7 @@ module Organizations
       Failure(e.message)
     end
 
+    #: (untyped organization) -> Dry::Monads::Success[nil]
     def emit_event(organization)
       Rails.event.notify(
         "organization.created",

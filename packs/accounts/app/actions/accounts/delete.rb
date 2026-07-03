@@ -54,6 +54,7 @@ module Accounts
     # files forever (the abandoned-blob job only sweeps *unattached* blobs).
     TENANT_ATTACHMENTS = { Media => :image, LabelPrintRun => :document }.freeze
 
+    #: (user: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(user:)
       snapshot = yield snapshot(user)
       yield ensure_only_solo_data(snapshot)
@@ -65,6 +66,7 @@ module Accounts
 
     private
 
+    #: (untyped user) -> Dry::Monads::Success[untyped]
     def snapshot(user)
       solo = solo_organizations(user)
       solo_ids = solo.map(&:id)
@@ -86,6 +88,8 @@ module Accounts
     # other member can see them, so destroying the org and dropping its tenant
     # affects nobody else. The count is computed in SQL (AGENTS.md §1 #5), never
     # by loading rows into Ruby.
+
+    #: (untyped user) -> Array[untyped]
     def solo_organizations(user)
       org_ids = OrganizationMembership.where(user_id: user.id).pluck(:organization_id)
       return [] if org_ids.empty?
@@ -102,6 +106,8 @@ module Accounts
     # (see the class note): dropping that tenant would destroy others' data and
     # deleting the user would strand their created moves. Never triggers today
     # (solo orgs); it is the guard for when org-sharing lands without transfer.
+
+    #: (untyped snapshot) -> Dry::Monads::Result[untyped, untyped]
     def ensure_only_solo_data(snapshot)
       return Failure(:owns_shared_data) if snapshot[:shared_slugs].any?
 
@@ -111,6 +117,8 @@ module Accounts
     # Tear each solo org down as an irreversible unit. A genuine drop failure
     # aborts the whole deletion; orgs already torn down stay gone, so a retry
     # resumes from where it stopped.
+
+    #: (untyped orgs) -> Dry::Monads::Result[untyped, untyped]
     def teardown_solo_orgs(orgs)
       orgs.each { |org| teardown_solo_org(org) }
       Success()
@@ -119,6 +127,7 @@ module Accounts
       Failure(:tenant_drop_failed)
     end
 
+    #: (untyped org) -> void
     def teardown_solo_org(org)
       # Idempotent on retry: if the schema is already gone (dropped on a prior
       # attempt that failed later), just finish removing the lingering org row.
@@ -138,6 +147,8 @@ module Accounts
     # only risks orphaned storage, never a routable schema, so it must not abort
     # the drop. Accumulate into a local rather than the block's value, since the
     # attachment rows live in the public schema regardless of the active tenant.
+
+    #: (untyped slug) -> Array[untyped]
     def capture_attachment_ids(slug)
       ids = []
       Apartment::Tenant.switch(slug) do
@@ -153,19 +164,22 @@ module Accounts
       ids
     rescue StandardError => e # rubocop:disable Move/BroadRescue -- best-effort capture must not abort the drop
       Rails.logger.error("[accounts.delete] attachment capture failed for #{slug}: #{e.class}: #{e.message}")
-      ids
+      ids || [] # the rescue can technically fire before `ids = []` assigns
     end
 
     # Purges the captured attachments (detaching the public row and enqueuing the
     # blob + variants + stored-file deletion) now that the tenant schema is gone.
     # Best-effort: a failure only orphans storage and must not fail an
     # already-dropped tenant.
+
+    #: (untyped attachment_ids) -> void
     def purge_attachments(attachment_ids)
       ActiveStorage::Attachment.where(id: attachment_ids).find_each(&:purge_later)
     rescue StandardError => e # rubocop:disable Move/BroadRescue -- best-effort purge must not fail an already-dropped tenant
       Rails.logger.error("[accounts.delete] attachment purge failed: #{e.class}: #{e.message}")
     end
 
+    #: (untyped user) -> Dry::Monads::Result[untyped, untyped]
     def delete_user(user)
       # Handoff tokens (public, #280) reference user_id with no FK, so user.destroy!
       # won't cascade them — delete them explicitly so nothing user-owned lingers.
@@ -178,6 +192,7 @@ module Accounts
       Failure(e.message)
     end
 
+    #: (untyped snapshot) -> Dry::Monads::Success[nil]
     def emit_event(snapshot)
       Rails.event.notify(
         "account.deleted",

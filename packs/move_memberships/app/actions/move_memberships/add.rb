@@ -15,6 +15,7 @@ module MoveMemberships
   # are excluded_models (public schema), so they resolve on the public connection
   # even while Apartment has switched to the tenant.
   class Add < BaseAction
+    #: (move: untyped, user_id: untyped, role: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, user_id:, role:, actor:)
       yield ensure_known_role(role)
       organization = yield current_organization
@@ -26,12 +27,14 @@ module MoveMemberships
 
     private
 
+    #: (untyped role) -> Dry::Monads::Result[untyped, untyped]
     def ensure_known_role(role)
       return Failure(:invalid_role) unless MoveMembership::ROLES.include?(role.to_s)
 
       Success()
     end
 
+    #: () -> Dry::Monads::Result[untyped, untyped]
     def current_organization
       organization = Organization.find_by(slug: Apartment::Tenant.current)
       return Failure(:not_found) if organization.nil?
@@ -40,6 +43,8 @@ module MoveMemberships
     end
 
     # The candidate must be a member of this Organization. Non-disclosing on miss.
+
+    #: (untyped organization, untyped user_id) -> Dry::Monads::Result[untyped, untyped]
     def organization_member(organization, user_id)
       member = organization.users.find_by(id: user_id)
       return Failure(:not_found) if member.nil?
@@ -47,6 +52,7 @@ module MoveMemberships
       Success(member)
     end
 
+    #: (untyped move, untyped user, untyped role) -> Dry::Monads::Result[untyped, untyped]
     def persist(move, user, role)
       Success(move.move_memberships.create!(user: user, role: role.to_s))
     rescue ActiveRecord::RecordInvalid => e
@@ -59,6 +65,7 @@ module MoveMemberships
       Failure(:already_member)
     end
 
+    #: (untyped move, untyped membership, untyped actor) -> Dry::Monads::Success[nil]
     def emit_event(move, membership, actor)
       Rails.event.notify(
         "move_membership.added",

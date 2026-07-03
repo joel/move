@@ -22,6 +22,7 @@ module Search
     SEMANTIC_MAX_DISTANCE = 0.55  # max cosine distance to qualify semantically
     WEIGHTS = { lexical: 1.0, trigram: 0.6, name: 1.0, semantic: 0.8, exact: 2.0 }.freeze
 
+    #: (move: untyped, query: untyped, ?include_hidden: bool, ?embedder: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, query:, include_hidden: false, embedder: nil)
       q = query.to_s.strip
       return Success([]) if q.blank?
@@ -43,6 +44,8 @@ module Search
     # and serve lexical/trigram results (Domain §7.3 graceful fallback). Returns
     # [vector, model] so the semantic leg can be pinned to the current provider's
     # model (#251); [nil, nil] drops the leg entirely.
+
+    #: (untyped embedder, untyped query) -> [untyped, untyped]
     def safe_query_embedding(embedder, query)
       result = embedder.embed(query)
       result.vector ? [result.vector, result.model] : [nil, nil]
@@ -51,6 +54,7 @@ module Search
       [nil, nil]
     end
 
+    #: (untyped move, untyped query, untyped vector, untyped model, bool include_hidden) -> untyped
     def run(move, query, vector, model, include_hidden)
       scope = include_hidden ? move.items : move.items.searchable
       scope
@@ -65,10 +69,13 @@ module Search
     # AR's `.select` does not bind params (only `.where` does), so the SELECT is
     # sanitized here. `CAST(:vec AS vector)` is used instead of `::vector` because
     # `::` collides with Rails' `:name` placeholder parsing.
+
+    #: (String sql, untyped query, untyped vector, untyped model) -> String
     def sanitize(sql, query, vector, model)
       ActiveRecord::Base.sanitize_sql_array([sql, binds(query, vector, model)])
     end
 
+    #: (untyped vector) -> String
     def select_sql(vector)
       lexical = "ts_rank_cd(item_search_documents.search_tsvector, plainto_tsquery('english', :q))"
       trigram = "similarity(item_search_documents.search_text, :q)"
@@ -92,6 +99,7 @@ module Search
       SQL
     end
 
+    #: (untyped vector) -> String
     def match_sql(vector)
       conditions = [
         "item_search_documents.search_tsvector @@ plainto_tsquery('english', :q)",
@@ -108,20 +116,25 @@ module Search
     # stale-space vector; pinning to embedding_model = :model ignores it (the row
     # degrades to lexical/trigram) instead of mis-ranking it against a query vector
     # from a different space.
+
+    #: () -> String
     def semantic_match_clause
       "item_search_documents.embedding IS NOT NULL AND item_search_documents.embedding_model = :model"
     end
 
+    #: () -> String
     def semantic_score_sql
       "(CASE WHEN #{semantic_match_clause} " \
         "THEN 1 - (item_search_documents.embedding <=> CAST(:vec AS vector)) ELSE 0 END)"
     end
 
+    #: () -> String
     def semantic_match_sql
       "(#{semantic_match_clause} " \
         "AND (item_search_documents.embedding <=> CAST(:vec AS vector)) <= #{SEMANTIC_MAX_DISTANCE})"
     end
 
+    #: (untyped query, untyped vector, untyped model) -> Hash[Symbol, untyped]
     def binds(query, vector, model)
       h = { q: query, exact: "%#{ActiveRecord::Base.sanitize_sql_like(query)}%" }
       if vector
@@ -131,6 +144,7 @@ module Search
       h
     end
 
+    #: (untyped record) -> untyped
     def to_result(record)
       Result.new(
         item: record,
@@ -142,6 +156,8 @@ module Search
     end
 
     # Strongest signal that qualified, for the UI's match explanation.
+
+    #: (untyped record) -> Symbol
     def matched_on(record)
       return :exact if record.read_attribute("exact_hit").to_i == 1
       return :lexical if record.read_attribute("lexical_score").to_f.positive?

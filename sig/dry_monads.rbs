@@ -23,10 +23,14 @@ module Dry
     def self.[]: (*Symbol) -> Module
 
     class Result[F, S]
+      # On the base class on purpose: callers unwrap an action's declared
+      # `Result[untyped, untyped]` return (e.g. DemoData::Reveal on
+      # Moves::CardMetrics). Success[V] instantiates it as `-> V`; Failure[V]
+      # (S = bot) as `-> bot`, which is runtime-accurate — it raises UnwrapError.
+      def value!: () -> S
     end
 
     class Success[S] < Result[bot, S]
-      def value!: () -> S
       def success?: () -> true
       def failure?: () -> false
     end

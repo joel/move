@@ -12,6 +12,7 @@ module Vocabularies
   class Remove < BaseAction
     include Search::Reindexing
 
+    #: (record: untyped, vocabulary: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(record:, vocabulary:, actor:)
       yield ensure_writable(record.move)
       affected = affected_item_ids(record) # before detach/destroy
@@ -23,8 +24,9 @@ module Vocabularies
 
     private
 
+    #: (untyped record) -> Dry::Monads::Result[untyped, untyped]
     def destroy(record)
-      detached = nil
+      detached = nil #: untyped
       ActiveRecord::Base.transaction do
         detached = usage_count(record)
         record.destroy!
@@ -35,10 +37,13 @@ module Vocabularies
     end
 
     # How many boxes the room was attached to (reported back to the user).
+
+    #: (untyped record) -> Integer
     def usage_count(record)
       record.boxes.count
     end
 
+    #: (untyped record, untyped vocabulary, untyped actor, untyped detached) -> Dry::Monads::Success[nil]
     def emit_event(record, vocabulary, actor, detached)
       Rails.event.notify(
         "vocabulary.removed",

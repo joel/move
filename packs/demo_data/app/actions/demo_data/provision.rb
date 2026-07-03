@@ -15,6 +15,7 @@ module DemoData
     SAMPLE_BOX_NUMBERS = %w[1 2 3 5 11 13].freeze
     SAMPLE_MOVE_NAME = "Sample move"
 
+    #: (owner: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(owner:)
       existing = Move.find_by(sample: true)
       return Success(existing) if existing
@@ -30,6 +31,8 @@ module DemoData
     # by `find_by(sample: true)` above — could never repair. On a rollback the job
     # marks the org "failed", the index shows the fallback card, and re-dispatch
     # starts clean. The build raises out to the job, which is the error boundary.
+
+    #: (untyped owner) -> untyped
     def provision(owner)
       ActiveRecord::Base.transaction do
         move = Moves::Create.new.call(params: sample_params, creator: owner).value!
@@ -38,6 +41,7 @@ module DemoData
       end
     end
 
+    #: () -> Hash[Symbol, untyped]
     def sample_params
       {
         name: SAMPLE_MOVE_NAME, status: "started", unit_system: "metric",

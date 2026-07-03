@@ -19,6 +19,8 @@ module DemoData
     # before this runs, so a page that loads after the broadcast reads the correct
     # state from the DB and never shows a stuck placeholder (the broadcast may land
     # in the void if no one is subscribed yet).
+
+    #: (untyped organization, untyped user) -> void
     def broadcast(organization, user)
       moves = Move.where(id: MoveMembership.where(user_id: user.id).select(:move_id))
                   .order(created_at: :desc).to_a

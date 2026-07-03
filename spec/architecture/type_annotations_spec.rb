@@ -12,8 +12,10 @@ require "rails_helper"
 # See doc/project/type-checking.md.
 RSpec.describe "Type annotation coverage" do
   # Must mirror the `check` path(s) of the :actions target in the Steepfile.
+  # Every pack's actions are checked (#519), so the pack glob is general — a NEW
+  # pack's actions are held to the annotation convention from day one.
   def steep_checked_globs
-    ["app/actions/**/*.rb", "packs/labels/app/actions/**/*.rb"]
+    ["app/actions/**/*.rb", "packs/*/app/actions/**/*.rb"]
   end
 
   # A def is annotated when the nearest preceding non-blank line is an inline
@@ -45,6 +47,23 @@ RSpec.describe "Type annotation coverage" do
       Methods without a `#:` / `@rbs` inline annotation directly above the def
       (see doc/project/type-checking.md for the convention):
       #{offenders.join("\n")}
+    MSG
+  end
+
+  # The glob above only proves annotations EXIST; this proves Steep actually
+  # CHECKS them — a new pack whose `check` line is missing from the Steepfile
+  # would otherwise carry annotations that are never type-checked, green in CI.
+  it "every pack's app/actions directory has its check line in the Steepfile" do
+    steepfile = Rails.root.join("Steepfile").read
+    missing = Rails.root.glob("packs/*/app/actions").filter_map do |dir|
+      rel = dir.relative_path_from(Rails.root).to_s
+      rel unless steepfile.include?(%(check "#{rel}"))
+    end
+
+    expect(missing).to be_empty, <<~MSG
+      Pack action directories missing from the Steepfile's :actions target
+      (their inline annotations would never be type-checked):
+      #{missing.join("\n")}
     MSG
   end
 end
