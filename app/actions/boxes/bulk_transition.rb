@@ -37,6 +37,7 @@ module Boxes
     # can report exactly which box numbers need attention.
     Result = Struct.new(:to, :transitioned, :skipped, keyword_init: true)
 
+    #: (move: untyped, to: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, to:, actor:)
       yield ensure_writable(move)
       to = to.to_s
@@ -58,6 +59,8 @@ module Boxes
     # SQL-scoped to the source state, ordered by numeric label (so a skipped-box
     # report reads in print order). Each row is transitioned through the existing
     # per-box action — every guard, cascade and event preserved.
+
+    #: (untyped move, untyped to, untyped actor) -> untyped
     def transition_each(move, to, actor)
       move.boxes.where(status: SOURCE_FOR.fetch(to)).ordered.map do |box|
         [box, Boxes::TransitionStatus.new.call(box: box, to: to, actor: actor)]

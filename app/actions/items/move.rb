@@ -6,6 +6,7 @@ module Items
   # item is still present, just in a different container. Cross-Move moves are
   # rejected. Returns the failure reason as a symbol for a precise message.
   class Move < BaseAction
+    #: (item: untyped, target_box: untyped, mover: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, target_box:, mover:)
       yield ensure_writable(item.move)
       yield validate(item, target_box)
@@ -16,6 +17,7 @@ module Items
 
     private
 
+    #: (untyped item, untyped target_box) -> Dry::Monads::Result[untyped, untyped]
     def validate(item, target_box)
       # A removed item isn't in any box — restore it before moving (presence and
       # box are independent axes; "moving" a removed item would silently leave it
@@ -28,6 +30,7 @@ module Items
       Success()
     end
 
+    #: (untyped item, untyped target_box) -> Dry::Monads::Result[untyped, untyped]
     def persist(item, target_box)
       item.update!(box: target_box)
       Success(item)
@@ -35,6 +38,7 @@ module Items
       Failure(e.record.errors)
     end
 
+    #: (untyped item, untyped target_box, untyped mover) -> Dry::Monads::Success[nil]
     def emit_event(item, target_box, mover)
       Rails.event.notify(
         "item.moved", item_id: item.id, move_id: item.move_id,

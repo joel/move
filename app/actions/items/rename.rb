@@ -8,6 +8,7 @@ module Items
   # `pending_review`), and it emits `item.updated` so the search projection follows.
   # Caller owns the tenant context + writable-Move guard (controller).
   class Rename < BaseAction
+    #: (item: untyped, name: untyped, editor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, name:, editor:)
       yield ensure_writable(item.move)
       yield with_responsible(editor) { persist(item, name) }
@@ -17,6 +18,7 @@ module Items
 
     private
 
+    #: (untyped item, untyped name) -> Dry::Monads::Result[untyped, untyped]
     def persist(item, name)
       # A human edit confirms the item (machine-vouched → human-vouched).
       item.update!(name: name, review_state: "confirmed")
@@ -28,6 +30,7 @@ module Items
       Failure(e.record.errors)
     end
 
+    #: (untyped item, untyped editor) -> Dry::Monads::Success[nil]
     def emit_event(item, editor)
       Rails.event.notify(
         "item.updated", item_id: item.id, box_id: item.box_id, move_id: item.move_id,

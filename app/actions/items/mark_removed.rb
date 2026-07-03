@@ -14,6 +14,7 @@ module Items
   # item *during packing*, a different use case, so it opts out via
   # `allow_any_phase: true`.
   class MarkRemoved < BaseAction
+    #: (item: untyped, actor: untyped, ?allow_any_phase: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:, allow_any_phase: false)
       yield ensure_writable(item.move)
       yield ensure_unpacking_phase(item.box) unless allow_any_phase
@@ -24,12 +25,14 @@ module Items
 
     private
 
+    #: (untyped box) -> Dry::Monads::Result[untyped, untyped]
     def ensure_unpacking_phase(box)
       return Failure(:wrong_phase) unless box.unpacking? || box.unpacked?
 
       Success()
     end
 
+    #: (untyped item) -> Dry::Monads::Result[untyped, untyped]
     def persist(item)
       item.update!(presence_state: "removed")
       Success(item)
@@ -37,6 +40,7 @@ module Items
       Failure(e.record.errors)
     end
 
+    #: (untyped item, untyped actor) -> Dry::Monads::Success[nil]
     def emit_event(item, actor)
       Rails.event.notify(
         "item.removed", item_id: item.id, box_id: item.box_id, move_id: item.move_id,

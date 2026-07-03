@@ -7,6 +7,7 @@ module Boxes
   # the payload carries `discard_batch_id` so the feed can resolve and offer a
   # one-click cascade restore. Caller owns tenant context.
   class Delete < BaseAction
+    #: (box: untyped, actor: untyped, ?source: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, actor:, source: :web)
       batch_id = yield Discards::Cascade.new.call(record: box, actor: actor, source: source)
       yield emit_event(box, actor, source, batch_id)
@@ -15,6 +16,7 @@ module Boxes
 
     private
 
+    #: (untyped box, untyped actor, untyped source, untyped batch_id) -> Dry::Monads::Success[nil]
     def emit_event(box, actor, source, batch_id)
       Rails.event.notify(
         "box.deleted", box_id: box.id, move_id: box.move_id,

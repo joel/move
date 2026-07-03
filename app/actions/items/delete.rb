@@ -7,6 +7,7 @@ module Items
   # children, so the cascade discards just the one record under its own batch.
   # Emits `item.deleted` for the activity feed. Caller owns tenant context.
   class Delete < BaseAction
+    #: (item: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:, source: :web)
       batch_id = yield Discards::Cascade.new.call(record: item, actor: actor, source: source)
       yield emit_event(item, actor, source, batch_id)
@@ -15,6 +16,7 @@ module Items
 
     private
 
+    #: (untyped item, untyped actor, Symbol source, untyped batch_id) -> Dry::Monads::Success[nil]
     def emit_event(item, actor, source, batch_id)
       Rails.event.notify(
         "item.deleted", item_id: item.id, box_id: item.box_id, move_id: item.move_id,

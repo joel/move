@@ -10,6 +10,7 @@ module Items
   # turns a Failure into an `item.image_generation_failed` event so the card
   # reverts — generation must never corrupt the item.
   class GenerateImage < BaseAction
+    #: (item: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor: nil)
       yield ensure_writable(item.move)
       yield ensure_generatable(item)
@@ -35,6 +36,8 @@ module Items
 
     # Idempotent guard: never overwrite a photo (a real capture or an earlier
     # generation) — so a double-submit / re-run is a no-op, not a clobber.
+
+    #: (untyped item) -> Dry::Monads::Result[untyped, untyped]
     def ensure_generatable(item)
       return Failure(:already_has_image) if item.source_media_id.present?
 
@@ -43,10 +46,13 @@ module Items
 
     # Drop the claim so a failed generation can be retried immediately (success
     # clears it inside the attach transaction instead).
+
+    #: (untyped item) -> untyped
     def release(item)
       item.update_columns(image_generating_at: nil) # rubocop:disable Rails/SkipsModelValidations
     end
 
+    #: (untyped item) -> untyped
     def generate_and_attach(item)
       result = ImageProviders.for_move(item.move).generate(prompt: prompt_for(item))
       # Serialize concurrent generations and commit the Media + link atomically: a
@@ -66,6 +72,8 @@ module Items
     # Same per-tenant Active Storage attach as a capture, but tagged
     # captured_via: "generated" so it's never mistaken for a real photo and never
     # trips the recognition/prewarm pipeline (which keys off media.captured).
+
+    #: (untyped item, untyped result) -> untyped
     def build_media(item, result)
       media = item.box.media.new(
         move: item.move, media_type: "image", captured_via: "generated",
@@ -79,11 +87,13 @@ module Items
       media
     end
 
+    #: (untyped item) -> String
     def prompt_for(item)
       "A clean, well-lit product photo of #{item.name}, centered on a plain neutral " \
         "background, no text, no labels, no watermark."
     end
 
+    #: (untyped item, untyped media, untyped actor) -> untyped
     def emit_generated(item, media, actor)
       Rails.event.notify(
         "item.image_generated", item_id: item.id, media_id: media.id,
@@ -94,6 +104,8 @@ module Items
     # Emits the failure event (so the broadcast reverts the card to a retryable
     # state) AND returns the Failure — keeping every domain event in the action
     # layer (the job stays event-free; architecture fitness #297).
+
+    #: (untyped item, untyped actor, untyped reason) -> Dry::Monads::Result[untyped, untyped]
     def emit_failed(item, actor, reason)
       Rails.event.notify(
         "item.image_generation_failed", item_id: item.id,

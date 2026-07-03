@@ -10,6 +10,7 @@ module Boxes
   class SuggestDescription < BaseAction
     MAX_TERMS = 6
 
+    #: (box: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(box:)
       items = digest_for(box)
       return Success("") if items.empty?
@@ -39,26 +40,35 @@ module Boxes
     # Never hand back a suggestion the Box would reject on length — otherwise the
     # seal modal / form pre-fills an invalid value and the seal/update fails
     # validation with a generic error. Truncate (incl. ellipsis) to the Box cap.
+
+    #: (untyped text) -> String
     def clamp(text)
       text.to_s.truncate(Box::DESCRIPTION_MAX_LENGTH)
     end
 
     # In-box items as { label: }.
+
+    #: (untyped box) -> untyped
     def digest_for(box)
       box.items.in_box.ordered.map { |item| { label: item.name } }
     end
 
     # A real provider selected AND this Move's key present (strict BYO). `fake` and
     # an unconfigured real provider both take the deterministic path.
+
+    #: (untyped move) -> bool
     def ai_available?(move)
       move.recognition_provider != "fake" && move.recognition_ready?
     end
 
     # Key-free summary: distinct item labels, in item order, capped and comma-joined.
+
+    #: (untyped items) -> String
     def deterministic(items)
       items.map { |i| i[:label].to_s.strip }.compact_blank.uniq.first(MAX_TERMS).join(", ")
     end
 
+    #: (untyped box, String source) -> untyped
     def emit(box, source)
       Rails.event.notify(
         "box.description_suggested", box_id: box.id, move_id: box.move_id, source: source

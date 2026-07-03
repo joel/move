@@ -6,6 +6,7 @@ module Boxes
   # Items that were deleted independently before the Box (Domain §11). Emits
   # `box.restored`. The caller resolves the Box with `with_discarded`.
   class Restore < BaseAction
+    #: (box: untyped, actor: untyped, ?source: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, actor:, source: :web)
       batch_id = box.discard_batch_id
       yield Discards::CascadeRestore.new.call(record: box, actor: actor, source: source)
@@ -15,6 +16,7 @@ module Boxes
 
     private
 
+    #: (untyped box, untyped actor, untyped source, untyped batch_id) -> Dry::Monads::Success[nil]
     def emit_event(box, actor, source, batch_id)
       Rails.event.notify(
         "box.restored", box_id: box.id, move_id: box.move_id,

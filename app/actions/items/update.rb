@@ -8,6 +8,7 @@ module Items
   # `pending_review`. Presence state stays an independent axis changed by its own
   # actions. Caller owns tenant context + writable-Move guard.
   class Update < BaseAction
+    #: (item: untyped, params: untyped, editor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, params:, editor:)
       yield ensure_writable(item.move)
       yield with_responsible(editor) { persist(item, params) }
@@ -17,6 +18,7 @@ module Items
 
     private
 
+    #: (untyped item, untyped params) -> Dry::Monads::Result[untyped, untyped]
     def persist(item, params)
       item.update!(
         name: params[:name],
@@ -32,6 +34,7 @@ module Items
       Failure(e.record.errors)
     end
 
+    #: (untyped item, untyped editor) -> Dry::Monads::Success[nil]
     def emit_event(item, editor)
       Rails.event.notify(
         "item.updated", item_id: item.id, box_id: item.box_id, move_id: item.move_id,

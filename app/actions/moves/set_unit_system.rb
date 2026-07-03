@@ -7,6 +7,7 @@ module Moves
   # move.unit_system_changed event for the audit trail (events-not-callbacks).
   # The caller (controller) owns authorization and the archived read-only guard.
   class SetUnitSystem < BaseAction
+    #: (move: untyped, unit_system: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, unit_system:, actor: nil)
       yield ensure_writable(move)
       yield validate(unit_system)
@@ -17,12 +18,14 @@ module Moves
 
     private
 
+    #: (untyped unit_system) -> Dry::Monads::Result[untyped, untyped]
     def validate(unit_system)
       return Failure(:invalid_unit_system) unless Move::UNIT_SYSTEMS.include?(unit_system)
 
       Success(unit_system)
     end
 
+    #: (untyped move, untyped unit_system) -> Dry::Monads::Result[untyped, untyped]
     def persist(move, unit_system)
       move.update!(unit_system: unit_system)
       Success(move)
@@ -30,6 +33,7 @@ module Moves
       Failure(e.record.errors)
     end
 
+    #: (untyped move, untyped actor, untyped unit_system) -> Dry::Monads::Success[nil]
     def emit_event(move, actor, unit_system)
       Rails.event.notify(
         "move.unit_system_changed",
