@@ -15,6 +15,7 @@ module Qr
   # box's status. The archived (read-only) case is a successful resolve; the
   # caller decides how to render it from box.move.writable?.
   class Resolve < BaseAction
+    #: (move: untyped, token: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, token:, actor: nil)
       box = find(move, token)
       return Failure(:unrecognized) if box.nil?
@@ -25,10 +26,12 @@ module Qr
 
     private
 
+    #: (untyped move, untyped token) -> untyped
     def find(move, token)
       move.boxes.includes(:room, :move).find_by(qr_token: token.to_s.presence)
     end
 
+    #: (untyped box, untyped actor) -> Dry::Monads::Success[nil]
     def emit_event(box, actor)
       Rails.event.notify(
         "qr.resolved", box_id: box.id, move_id: box.move_id, actor_id: actor&.id

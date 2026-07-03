@@ -1,0 +1,10 @@
+# Singleton-method declarations for Captures::Create
+# (packs/captures/app/actions/captures/create.rb). Inline RBS does not support
+# `def self.` yet, so the def carries `# @rbs skip` and its type lives here —
+# same pattern as sig/default_vocabularies.rbs / sig/label_print_runs.rbs. Fold
+# back into inline annotations once rbs/steep ship inline singleton support.
+module Captures
+  class Create
+    def self.signed_id_purpose: (untyped move) -> String
+  end
+end

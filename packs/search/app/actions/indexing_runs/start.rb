@@ -16,6 +16,7 @@ module IndexingRuns
     include Search::Reindexing
     include Broadcasting
 
+    #: (move: untyped, ?provider: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, provider: nil)
       provider = (provider || move.embedding_provider).to_s
       supersede_active(move)
@@ -43,6 +44,8 @@ module IndexingRuns
 
     # A new run wins: mark any non-terminal run superseded so its still-running
     # jobs stop recording progress against it (RecordProgress matches ACTIVE only).
+
+    #: (untyped move) -> Integer
     def supersede_active(move)
       move.indexing_runs.active.update_all( # rubocop:disable Rails/SkipsModelValidations
         status: "superseded", finished_at: Time.current, updated_at: Time.current

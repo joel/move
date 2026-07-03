@@ -16,6 +16,8 @@ module Search
     # BYO): a Move on openai with a key embeds with its key, every other Move
     # gets the network-free Fake. Stored item vectors therefore always share the
     # Move's current vector space, matching the query vector Search::Items builds.
+
+    #: (item: untyped, ?embedder: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, embedder: nil)
       embedder ||= EmbeddingProviders.for_move(item.move)
       doc = yield persist(item, embedder)
@@ -24,6 +26,7 @@ module Search
 
     private
 
+    #: (untyped item, untyped embedder) -> Dry::Monads::Result[untyped, untyped]
     def persist(item, embedder)
       write(item.search_document || item.build_search_document(move: item.move), item, embedder)
     rescue ActiveRecord::RecordNotUnique
@@ -39,6 +42,7 @@ module Search
       write(ItemSearchDocument.find_by!(item_id: item.id), item, embedder)
     end
 
+    #: (untyped doc, untyped item, untyped embedder) -> Dry::Monads::Result[untyped, untyped]
     def write(doc, item, embedder)
       doc.search_text = compose_text(item)
       apply_embedding(doc, embedder)
@@ -51,6 +55,8 @@ module Search
     # A provider failure (missing key, timeout, API error) must NOT lose the
     # lexical projection — leave the embedding nil and persist search_text, so the
     # item stays searchable lexically/trigram (graceful degradation, Domain §7.3).
+
+    #: (untyped doc, untyped embedder) -> void
     def apply_embedding(doc, embedder)
       result = embedder.embed(doc.search_text)
       doc.embedding = result.vector
@@ -64,6 +70,8 @@ module Search
     end
 
     # Textual metadata only: name + box number + room.
+
+    #: (untyped item) -> String
     def compose_text(item)
       box = item.box
       [

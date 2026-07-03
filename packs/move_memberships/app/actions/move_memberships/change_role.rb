@@ -15,6 +15,7 @@ module MoveMemberships
     include AdminGuard
     include TokenRevocation
 
+    #: (membership: untyped, role: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(membership:, role:, actor:)
       role = role.to_s
       yield ensure_known_role(role)
@@ -26,12 +27,14 @@ module MoveMemberships
 
     private
 
+    #: (untyped role) -> Dry::Monads::Result[untyped, untyped]
     def ensure_known_role(role)
       return Failure(:invalid_role) unless MoveMembership::ROLES.include?(role)
 
       Success()
     end
 
+    #: (untyped membership, untyped role) -> Dry::Monads::Result[untyped, untyped]
     def change_role(membership, role)
       MoveMembership.transaction do
         next Failure(:last_admin) if demoting?(membership, role) && would_orphan_last_admin?(membership)
@@ -47,10 +50,12 @@ module MoveMemberships
       Failure(e.record.errors)
     end
 
+    #: (untyped membership, untyped role) -> bool
     def demoting?(membership, role)
       membership.admin? && role != "admin"
     end
 
+    #: (untyped membership, untyped actor) -> Dry::Monads::Success[nil]
     def emit_event(membership, actor)
       Rails.event.notify(
         "move_membership.role_changed",

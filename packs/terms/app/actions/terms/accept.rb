@@ -9,6 +9,7 @@ module Terms
   # Success (handles a double-submit and the create/find race via the unique
   # index). Emits `terms.accepted`.
   class Accept < BaseAction
+    #: (user: untyped, ?ip: untyped, ?user_agent: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(user:, ip: nil, user_agent: nil)
       acceptance = yield persist(user, ip, user_agent)
       yield emit_event(acceptance)
@@ -20,6 +21,8 @@ module Terms
     # create_or_find_by! atomically inserts, or falls back to the existing row on
     # the unique-index violation — so concurrent/duplicate accepts converge on one
     # row instead of raising. The block runs only on insert.
+
+    #: (untyped user, untyped ip, untyped user_agent) -> Dry::Monads::Result[untyped, untyped]
     def persist(user, ip, user_agent)
       acceptance = TermsAcceptance.create_or_find_by!(
         user_id: user.id,
@@ -34,6 +37,7 @@ module Terms
       Failure(e.record.errors)
     end
 
+    #: (untyped acceptance) -> Dry::Monads::Success[nil]
     def emit_event(acceptance)
       Rails.event.notify(
         "terms.accepted",

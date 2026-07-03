@@ -12,3 +12,11 @@ class Time
   # TimeWithZone class stub if a call site ever needs to chain off the result.
   def self.current: () -> untyped
 end
+
+class String
+  def squish: () -> String
+end
+
+class Array[unchecked out Elem]
+  def compact_blank: () -> Array[Elem]
+end

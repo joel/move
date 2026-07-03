@@ -10,6 +10,8 @@ module RecognitionRuns
   class Retry < BaseAction
     # Only a failed run is retryable — guards against double-submits / replayed
     # POSTs queuing a duplicate run (and duplicate items) for the same media.
+
+    #: (run: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(run:)
       return Failure(:not_retryable) unless run&.failed?
 

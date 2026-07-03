@@ -13,6 +13,7 @@ module MoveMemberships
     include AdminGuard
     include TokenRevocation
 
+    #: (membership: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(membership:, actor:)
       details = capture(membership)
       revoked = yield remove(membership)
@@ -23,6 +24,7 @@ module MoveMemberships
 
     private
 
+    #: (untyped membership) -> Dry::Monads::Result[untyped, untyped]
     def remove(membership)
       MoveMembership.transaction do
         next Failure(:last_admin) if would_orphan_last_admin?(membership)
@@ -38,10 +40,13 @@ module MoveMemberships
     end
 
     # Capture identifiers before destroy! — the record is gone afterwards.
+
+    #: (untyped membership) -> Hash[Symbol, untyped]
     def capture(membership)
       { move_id: membership.move_id, user_id: membership.user_id, role: membership.role }
     end
 
+    #: (untyped details, untyped actor) -> Dry::Monads::Success[nil]
     def emit_event(details, actor)
       Rails.event.notify(
         "move_membership.removed",

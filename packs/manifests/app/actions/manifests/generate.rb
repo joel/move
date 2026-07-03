@@ -11,6 +11,7 @@ module Manifests
   # never a model callback (see the events-not-callbacks convention used by D8).
   # Read-only: nothing is mutated.
   class Generate < BaseAction
+    #: (box: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, actor:)
       items = box.items.in_box.ordered.to_a
       yield emit_event(box, actor)
@@ -19,6 +20,7 @@ module Manifests
 
     private
 
+    #: (untyped box, untyped actor) -> Dry::Monads::Success[nil]
     def emit_event(box, actor)
       Rails.event.notify(
         "manifest.viewed", box_id: box.id, move_id: box.move_id, actor_id: actor&.id

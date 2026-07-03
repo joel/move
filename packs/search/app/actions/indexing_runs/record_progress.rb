@@ -20,6 +20,7 @@ module IndexingRuns
                "started_at = COALESCE(started_at, NOW()), updated_at = NOW()"
     }.freeze
 
+    #: (run_id: untyped, outcome: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(run_id:, outcome:)
       return Success() if run_id.blank?
 
@@ -33,12 +34,14 @@ module IndexingRuns
 
     private
 
+    #: (untyped run_id, untyped outcome) -> Integer
     def increment(run_id, outcome)
       sql = INCREMENT_SQL.fetch(outcome.to_sym, INCREMENT_SQL.fetch(:success))
       IndexingRun.where(id: run_id, status: IndexingRun::ACTIVE)
                  .update_all(sql) # rubocop:disable Rails/SkipsModelValidations
     end
 
+    #: (untyped run_id) -> Integer
     def finalize_if_done(run_id)
       IndexingRun.where(id: run_id, status: "processing")
                  .where("completed_count + failed_count >= total_count")

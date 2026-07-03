@@ -12,6 +12,7 @@ module MoveIntegrationTokens
   # re-emitting, so a double-submit is harmless. The caller (controller) owns
   # authorization (admin-only).
   class Revoke < BaseAction
+    #: (token: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(token:, actor:)
       return Success(token) if token.revoked?
 
@@ -22,6 +23,7 @@ module MoveIntegrationTokens
 
     private
 
+    #: (untyped token) -> Dry::Monads::Result[untyped, untyped]
     def persist(token)
       token.update!(revoked_at: Time.current)
       Success(token)
@@ -29,6 +31,7 @@ module MoveIntegrationTokens
       Failure(e.record.errors)
     end
 
+    #: (untyped token, untyped actor) -> Dry::Monads::Success[nil]
     def emit_event(token, actor)
       Rails.event.notify(
         "integration_token.revoked",

@@ -13,6 +13,7 @@ module Reviews
   class MarkPhotoReviewed < BaseAction
     UNREVIEWED = %w[pending_review needs_correction].freeze
 
+    #: (media: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, actor:)
       yield ensure_writable(media.move)
       yield persist(media, actor)
@@ -29,6 +30,8 @@ module Reviews
     # false_positive lifecycle (that was the retired per-suggestion UI). Marking it
     # `accepted` on view would mis-record detections the reviewer then renames or
     # removes.
+
+    #: (untyped media, untyped actor) -> Dry::Monads::Result[untyped, untyped]
     def persist(media, actor)
       pending_items(media).find_each do |item|
         item.update!(review_state: "confirmed")
@@ -45,6 +48,8 @@ module Reviews
     # Scoped to the media's box — the same set the screen renders. An item that
     # originated from this photo but was since moved to another box is no longer
     # shown here, so it must not be confirmed out from under the reviewer.
+
+    #: (untyped media) -> untyped
     def pending_items(media)
       media.box.items.where(
         source_media_id: media.id, presence_state: "in_box", review_state: UNREVIEWED

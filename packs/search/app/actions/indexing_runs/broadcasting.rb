@@ -16,6 +16,8 @@ module IndexingRuns
     # here must not 500 the settings page or fail the job, so it is isolated: the
     # worst case is a missed live update, and the next progress event (or a reload)
     # re-renders the control. Mirrors Captures::SessionBroadcastSubscriber#broadcast (#241).
+
+    #: (untyped move) -> void
     def broadcast_control(move)
       Turbo::StreamsChannel.broadcast_replace_to(
         move, :ai_indexing,

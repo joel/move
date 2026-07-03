@@ -13,6 +13,7 @@ module SessionHandoffs
   # `organization_slug` is the request's active tenant; a token minted for another
   # org is rejected, so a leaked/replayed token cannot cross tenants.
   class Consume < BaseAction
+    #: (raw_token: untyped, organization_slug: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(raw_token:, organization_slug:)
       token = yield find(raw_token)
       yield validate(token, organization_slug)
@@ -24,6 +25,7 @@ module SessionHandoffs
 
     private
 
+    #: (untyped raw_token) -> Dry::Monads::Result[untyped, untyped]
     def find(raw_token)
       return Failure(:invalid) if raw_token.blank?
 
@@ -34,6 +36,8 @@ module SessionHandoffs
     # Cheap pre-checks before the atomic claim, so the failure reason is precise
     # (expired vs already-used vs wrong-tenant). Slugs are normalised lowercase;
     # compare case-insensitively to match the citext column.
+
+    #: (untyped token, untyped organization_slug) -> Dry::Monads::Result[untyped, untyped]
     def validate(token, organization_slug)
       return Failure(:already_used) if token.consumed?
       return Failure(:expired) if token.expired?
@@ -48,6 +52,8 @@ module SessionHandoffs
     # consumed_at from NULL wins, so two concurrent requests with the same token
     # can never both establish a session. A 0-row result means it was claimed
     # between #validate and now.
+
+    #: (untyped token) -> Dry::Monads::Result[untyped, untyped]
     def claim(token)
       # rubocop:disable Rails/SkipsModelValidations -- atomic single-use claim:
       # the WHERE consumed_at IS NULL lets exactly one caller win; an AR callback
@@ -59,11 +65,13 @@ module SessionHandoffs
       claimed == 1 ? Success() : Failure(:already_used)
     end
 
+    #: (untyped token) -> Dry::Monads::Result[untyped, untyped]
     def resolve_user(token)
       user = User.find_by(id: token.user_id)
       user ? Success(user) : Failure(:invalid)
     end
 
+    #: (untyped token, untyped user) -> Dry::Monads::Success[nil]
     def emit_event(token, user)
       Rails.event.notify(
         "session_handoff.consumed",

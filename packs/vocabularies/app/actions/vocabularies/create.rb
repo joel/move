@@ -9,6 +9,7 @@ module Vocabularies
   # all three. The caller owns the tenant context and the admin / writable-Move
   # guard (controller + VocabularyPolicy).
   class Create < BaseAction
+    #: (move: untyped, vocabulary: untyped, params: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, vocabulary:, params:, actor:)
       yield ensure_writable(move)
       record = yield with_responsible(actor) { persist(move, vocabulary, params) }
@@ -18,6 +19,7 @@ module Vocabularies
 
     private
 
+    #: (untyped move, untyped vocabulary, untyped params) -> Dry::Monads::Result[untyped, untyped]
     def persist(move, vocabulary, params)
       record = vocabulary.records(move).new(params.slice(*vocabulary.permitted_params))
       record.save!
@@ -32,6 +34,7 @@ module Vocabularies
       Failure(record.errors)
     end
 
+    #: (untyped record, untyped vocabulary, untyped actor) -> Dry::Monads::Success[nil]
     def emit_event(record, vocabulary, actor)
       Rails.event.notify(
         "vocabulary.created",

@@ -1,7 +1,7 @@
 # Static type checking — RBS + Steep
 
-Move type-checks the **actions layer** (`app/actions/**` plus annotated packs —
-currently `packs/labels/app/actions/**`) with
+Move type-checks the **entire actions layer** (`app/actions/**` and every pack's
+`packs/*/app/actions/**` — rollout completed #519) with
 [Steep](https://github.com/soutaro/steep) 2.0 reading **inline RBS
 annotations** (`#:` / `@rbs` comments) natively from the Ruby files — the
 [RBS 4 inline syntax](https://github.com/ruby/rbs/blob/master/docs/inline.md),
@@ -109,10 +109,12 @@ calls. Grow them method-by-method; never bulk-generate.
 
 | File | Declares | Why |
 |---|---|---|
-| `sig/dry_monads.rbs` | Generic `Result`/`Success`/`Failure`, the `Success()`/`Failure()` constructors on `BaseAction`, `Dry::Monads.[]` | No community RBS for dry-monads; `include Dry::Monads[:result, :do]` is a dynamic call RBS can't model (`@rbs skip` on the include, surface declared here) |
-| `sig/active_support.rbs` | `Time.current` | A **known** receiver + unknown method is a hard `NoMethod` error (unlike unknown constants, which degrade). Every ActiveSupport core-ext used on a known type in scope must be declared here |
-| `sig/search_reindexing.rbs` | `Search::Reindexing` mixin surface | Pack-owned module included by `Boxes::Update`; the pack is outside the check scope. Delete when `packs/search` gets its own target |
-| `sig/default_vocabularies.rbs` | `Moves::DefaultVocabularies.*` singleton methods | Inline RBS can't declare `def self.` yet |
+| `sig/dry_monads.rbs` | Generic `Result`/`Success`/`Failure` (`value!` on the base, so unwrapping an action's declared return type-checks), the `Success()`/`Failure()` constructors on `BaseAction`, `Dry::Monads.[]` | No community RBS for dry-monads; `include Dry::Monads[:result, :do]` is a dynamic call RBS can't model (`@rbs skip` on the include, surface declared here) |
+| `sig/active_support.rbs` | `Time.current`, `String#squish`, `Array#compact_blank` | A **known** receiver + unknown method is a hard `NoMethod` error (unlike unknown constants, which degrade). Every ActiveSupport core-ext used on a known type in scope must be declared here |
+| `sig/default_vocabularies.rbs`, `sig/label_print_runs.rbs`, `sig/captures.rbs` | The checked scope's `def self.` methods | Inline RBS can't declare `def self.` yet — each def carries `# @rbs skip` and its type lives in the sig file |
+
+(`sig/search_reindexing.rbs` is gone — `packs/search`'s own inline annotations
+took over when its actions joined the scope, per the shim's deletion trigger.)
 
 ## What the checker actually catches (honesty section)
 
@@ -137,7 +139,7 @@ annotation was written).
 
 | Trigger | Action |
 |---|---|
-| A pack's actions get annotated | Add `check "packs/<name>/app/actions", inline: true` to the target **and** the matching glob to `steep_checked_globs` in `spec/architecture/type_annotations_spec.rb`; delete any shim the pack now declares inline (`sig/search_reindexing.rbs` when `packs/search` goes). `packs/labels` (#517) is the template: 3 files, one `def self.` → `# @rbs skip` + `sig/label_print_runs.rbs`, zero surprises |
+| A NEW pack gains an `app/actions` directory | Add its `check "packs/<name>/app/actions", inline: true` line to the target and annotate from day one — the fitness spec's `packs/*` glob already covers it and will fail unannotated defs |
 | Real model types wanted (cross-model mix-ups start hurting) | Adopt `rbs_rails` (generated model sigs, needs DB — pair with the `packwerk` CI job the way structure.sql freshness works) and/or `rbs collection` (community gem sigs; commit `rbs_collection.lock.yaml`, gitignore `.gem_rbs_collection/`; beware activesupport sigs lag Rails 8.1) |
 | An ActiveSupport core-ext on a known type blocks an annotation | Add the one method to `sig/active_support.rbs` |
 | rbs/steep ship inline `def self.` support | Fold `sig/default_vocabularies.rbs` back into inline annotations |

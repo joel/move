@@ -9,6 +9,7 @@ module RecognitionRuns
   # capturing the active tenant so the job can restore it across the enqueue
   # boundary. Returns the run.
   class Enqueue < BaseAction
+    #: (media: untyped, ?provider: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, provider: nil)
       # Record the Move's active provider on the run for audit (#185). Processing
       # re-resolves from the Move, so this is the provider as of enqueue time.
@@ -21,6 +22,7 @@ module RecognitionRuns
 
     private
 
+    #: (untyped media, untyped provider) -> Dry::Monads::Result[untyped, untyped]
     def create_run(media, provider)
       run = media.recognition_runs.create!(
         move: media.move, box: media.box, provider: provider, status: "queued"
@@ -30,6 +32,7 @@ module RecognitionRuns
       Failure(e.record.errors)
     end
 
+    #: (untyped run) -> Dry::Monads::Success[nil]
     def emit_event(run)
       Rails.event.notify("recognition_run.queued", recognition_run_id: run.id, box_id: run.box_id)
       Success()

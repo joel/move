@@ -16,6 +16,8 @@ module MoveMemberships
     # True if +membership+ ceasing to be an admin (removal or demotion) would
     # leave the Move with no admin. Locks the full admin set — including
     # +membership+ — so concurrent admin changes contend on the same rows.
+
+    #: (untyped membership) -> bool
     def would_orphan_last_admin?(membership)
       return false unless membership.admin?
 

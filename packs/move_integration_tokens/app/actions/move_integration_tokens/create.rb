@@ -17,6 +17,7 @@ module MoveIntegrationTokens
     # Returned on success: the persisted record plus the one-time raw token.
     Result = Data.define(:token, :raw_token)
 
+    #: (move: untyped, name: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, name:, actor:)
       yield ensure_writable(move)
       yield validate_name(name)
@@ -29,12 +30,14 @@ module MoveIntegrationTokens
 
     private
 
+    #: (untyped name) -> Dry::Monads::Result[untyped, untyped]
     def validate_name(name)
       return Failure(:blank_name) if name.to_s.strip.empty?
 
       Success()
     end
 
+    #: () -> Dry::Monads::Result[untyped, untyped]
     def current_organization
       organization = Organization.find_by(slug: Apartment::Tenant.current)
       return Failure(:not_found) if organization.nil?
@@ -42,6 +45,7 @@ module MoveIntegrationTokens
       Success(organization)
     end
 
+    #: (untyped move, untyped organization, untyped name, untyped actor, untyped raw_token) -> Dry::Monads::Result[untyped, untyped]
     def persist(move, organization, name, actor, raw_token)
       Success(
         move.integration_tokens.create!(
@@ -55,6 +59,7 @@ module MoveIntegrationTokens
       Failure(e.record.errors)
     end
 
+    #: (untyped token, untyped actor) -> Dry::Monads::Success[nil]
     def emit_event(token, actor)
       Rails.event.notify(
         "integration_token.created",
