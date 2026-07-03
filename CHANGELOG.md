@@ -5,6 +5,18 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.72.0] — 2026-07-03
+
+### Added
+- **Static type checking (internal — no user-facing change).** The business-logic
+  layer (`app/actions`) is now type-checked by Steep reading inline RBS
+  annotations — every method carries its signature in the code, checked
+  merge-blocking in CI and at commit time, with an architecture test that keeps
+  coverage at 100% as new actions land. Adopting the checker also surfaced and
+  fixed a latent mixed String/Symbol hash key in the recognition-provider
+  settings action. Conventions and roadmap live in
+  `doc/project/type-checking.md` (#515).
+
 ## [v0.71.5] — 2026-07-02
 
 ### Fixed
