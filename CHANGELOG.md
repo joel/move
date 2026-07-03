@@ -5,6 +5,23 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.74.0] — 2026-07-03
+
+### Added
+- **Real model types for the type checker (internal — no user-facing change).**
+  The static type checking introduced in v0.72–v0.73 now extends to every model,
+  with genuine type information: community signatures for the Rails framework,
+  generated schema-derived signatures per model (kept fresh by CI the same way
+  the database schema file is), and checked annotations on every hand-written
+  model method (#521).
+
+### Fixed
+- **Three latent nil-handling edge cases** in box volume math, item
+  image-generation status, and review confidence display — each guarded a
+  possibly-empty database value in a way that couldn't be statically proven
+  safe; all three now read the value once and guard it directly. No behavior
+  change in practice; the code is now provably nil-safe (#521).
+
 ## [v0.73.0] — 2026-07-03
 
 ### Added
