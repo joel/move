@@ -150,6 +150,10 @@ jobs:
         name: "Types / model signature freshness"
         run: |
           bin/rails rbs_rails:generate_rbs_for_models
+          # add -N (intent-to-add): a NEW model's generated sig is otherwise
+          # untracked and invisible to `git diff` — the gate would pass while
+          # the signature is missing from the repo.
+          git add -N sig/rbs_rails
           git diff --exit-code -- sig/rbs_rails
 
   lint:
