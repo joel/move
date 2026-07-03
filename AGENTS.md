@@ -150,12 +150,24 @@ These are non-negotiable for all domain work. Do not reinvent these wheels.
    The migration is staged (one pack per PR); `packs/labels` is the template. Full
    reference: [`doc/project/packwerk-boundaries.md`](doc/project/packwerk-boundaries.md).
 
+7. **Static types → RBS + Steep, actions-first.** `app/actions/**` carries inline
+   RBS annotations (`#:` / `@rbs` comments, read natively by Steep 2.0 — no
+   generated `.rbs` tree) checked merge-blocking by the `Types / steep` step in
+   CI's `lint` job and locally by the `Steep` overcommit hook. Every new/changed
+   method in the checked scope gets a `#:` annotation (domain objects stay
+   `untyped` — models have no signatures yet); hand shims for gem surfaces live
+   in `sig/`. Growth is pack-by-pack, mirroring Packwerk. Conventions, gotchas
+   (`--no-daemon`, `@rbs skip`, severity gate), and the roadmap:
+   [`doc/project/type-checking.md`](doc/project/type-checking.md).
+
 > **These cops live in `lib/rubocop/cop/move/`** (wired via `require:` in
 > `.rubocop.yml`, with RuboCop::RSpec specs). They make rules #4/#5 deterministic
 > and merge-blocking instead of review-enforced. When a recurring class of defect
 > escapes review, prefer adding/extending a cop over re-reminding. The **horizontal**
 > (domain) counterpart to these **vertical** (layer) cops is **Packwerk** (rule #6),
-> run merge-blocking by the `packwerk` CI job + the overcommit pre-commit hook.
+> run merge-blocking by the `packwerk` CI job + the overcommit pre-commit hook;
+> the **contract** counterpart is **Steep** (rule #7), run merge-blocking by the
+> `lint` job's `Types / steep` step + the `Steep` overcommit hook.
 
 ---
 
@@ -193,15 +205,17 @@ Prefix Ruby commands with `mise x --`. Run these and ensure they pass before com
 
 1. **Linting:** `bundle exec rubocop` (autocorrect with `bundle exec rubocop -A`) and `bin/erb_lint --lint-all`.
 
-2. **Security:** `brakeman --exit-on-warn --no-progress` and `bundle-audit check --update`. Reviewed, accepted findings live in `config/brakeman.ignore`.
+2. **Types:** `bundle exec steep check --no-daemon --severity-level=error` (scope: `app/actions` + `sig/`; see [`doc/project/type-checking.md`](doc/project/type-checking.md)).
 
-3. **Testing:** `bundle exec rspec spec --exclude-pattern "spec/system/**/*_spec.rb"` (unit) and `TEST_BROWSER=rack_test bundle exec rspec spec/system` (system).
+3. **Security:** `brakeman --exit-on-warn --no-progress` and `bundle-audit check --update`. Reviewed, accepted findings live in `config/brakeman.ignore`.
+
+4. **Testing:** `bundle exec rspec spec --exclude-pattern "spec/system/**/*_spec.rb"` (unit) and `TEST_BROWSER=rack_test bundle exec rspec spec/system` (system).
 
 ### Git & Overcommit Hooks
 
 The project uses `overcommit`. Commits will fail if the following hooks are not satisfied:
 
-- **Pre-commit:** trailing whitespace, `FIXME` tokens, **RuboCop**, **ErbLint**, **BundleCheck**, **LocalPathsInGemfile**, and **RailsSchemaUpToDate** (the committed `db/structure.sql` must match the migrations — this project is `schema_format :sql`, so there is no `db/schema.rb`).
+- **Pre-commit:** trailing whitespace, `FIXME` tokens, **RuboCop**, **ErbLint**, **BundleCheck**, **LocalPathsInGemfile**, **Packwerk** (domain boundaries), **Steep** (types — runs when `app/actions/`, `sig/`, or the `Steepfile` are staged), and **RailsSchemaUpToDate** (the committed `db/structure.sql` must match the migrations — this project is `schema_format :sql`, so there is no `db/schema.rb`).
 
 - **Commit-msg:** capitalized subject, no trailing period, single-line subject, and a line-width limit.
 

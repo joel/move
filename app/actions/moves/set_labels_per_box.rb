@@ -8,6 +8,7 @@ module Moves
   # with the other Move-setting actions. The caller (controller) owns authorization
   # and the archived read-only guard; ensure_writable is the invariant backstop.
   class SetLabelsPerBox < BaseAction
+    #: (move: untyped, labels_per_box: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, labels_per_box:, actor: nil)
       yield ensure_writable(move)
       value = yield coerce(labels_per_box)
@@ -20,6 +21,8 @@ module Moves
 
     # Accept the form string and validate the 1..10 range up front so an invalid
     # value is a clean Failure rather than a model error. Integer() rejects "2.5".
+
+    #: (untyped raw) -> Dry::Monads::Result[untyped, untyped]
     def coerce(raw)
       value = Integer(raw)
       return Failure(:invalid_labels_per_box) unless Move::LABELS_PER_BOX_RANGE.cover?(value)
@@ -29,6 +32,7 @@ module Moves
       Failure(:invalid_labels_per_box)
     end
 
+    #: (untyped move, untyped value) -> Dry::Monads::Result[untyped, untyped]
     def persist(move, value)
       move.update!(labels_per_box: value)
       Success(move)
@@ -36,6 +40,7 @@ module Moves
       Failure(e.record.errors)
     end
 
+    #: (untyped move, untyped actor, untyped value) -> Dry::Monads::Success[nil]
     def emit_event(move, actor, value)
       Rails.event.notify(
         "move.labels_per_box_changed", move_id: move.id, actor_id: actor&.id, labels_per_box: value

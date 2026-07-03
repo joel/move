@@ -18,6 +18,7 @@ module Moves
       :total_volume_cm3, :total_weight_kg, :box_count, :missing_dimension_count, :rooms
     )
 
+    #: (move: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, actor: nil)
       result = build(move.boxes)
       yield emit_event(move, actor)
@@ -26,6 +27,7 @@ module Moves
 
     private
 
+    #: (untyped boxes) -> untyped
     def build(boxes)
       rooms = room_summaries(boxes)
       Result.new(
@@ -43,6 +45,8 @@ module Moves
     # missing dimension (so SQL excludes it), and SUM over an all-missing bucket
     # is NULL → nil, matching "nothing measured". Arel.sql aggregates come back
     # untyped (strings), so coerce: to_i counts, &.to_d the numeric sums.
+
+    #: (untyped boxes) -> untyped
     def room_summaries(boxes)
       rows = boxes.group(:room_id).pluck(
         :room_id,
@@ -57,6 +61,7 @@ module Moves
       summaries.sort_by { |rs| [rs.room ? 0 : 1, -(rs.volume_cm3 || 0)] }
     end
 
+    #: (untyped row, untyped rooms_by_id) -> untyped
     def to_room_summary(row, rooms_by_id)
       room_id, count, volume, weight, missing = row
       RoomSummary.new(
@@ -69,11 +74,14 @@ module Moves
     end
 
     # nil when nothing contributed, otherwise the summed value.
+
+    #: (untyped values) -> untyped
     def combine(values)
       present = values.compact
       present.empty? ? nil : present.sum
     end
 
+    #: (untyped move, untyped actor) -> Dry::Monads::Success[nil]
     def emit_event(move, actor)
       Rails.event.notify("move.summary_viewed", move_id: move.id, actor_id: actor&.id)
       Success()

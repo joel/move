@@ -14,6 +14,7 @@ module Moves
   class CardMetrics < BaseAction
     Metrics = Data.define(:packed, :total, :pending_review)
 
+    #: (move_ids: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move_ids:)
       totals = Box.where(move_id: move_ids).group(:move_id).count
       packed = Box.where(move_id: move_ids).where.not(status: "packing").group(:move_id).count

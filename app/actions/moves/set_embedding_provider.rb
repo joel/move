@@ -14,6 +14,7 @@ module Moves
   # (same provider) skips the reindex and the event. The caller (controller) owns
   # authorization (admin) and the archived read-only guard.
   class SetEmbeddingProvider < BaseAction
+    #: (move: untyped, provider: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, provider:, actor: nil)
       provider = provider.to_s
 
@@ -32,12 +33,14 @@ module Moves
 
     private
 
+    #: (untyped provider) -> Dry::Monads::Result[untyped, untyped]
     def validate(provider)
       return Failure(:invalid_provider) unless Move::EMBEDDING_PROVIDERS.include?(provider)
 
       Success(provider)
     end
 
+    #: (untyped move, untyped provider) -> Dry::Monads::Result[untyped, untyped]
     def persist(move, provider)
       move.update!(embedding_provider: provider)
       Success(move)
@@ -45,6 +48,7 @@ module Moves
       Failure(e.record.errors)
     end
 
+    #: (untyped move, untyped actor, untyped provider) -> Dry::Monads::Success[nil]
     def emit_event(move, actor, provider)
       Rails.event.notify(
         "move.embedding_provider_changed",

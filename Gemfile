@@ -107,6 +107,12 @@ group :development do
   gem "packwerk", require: false
   gem "packwerk-extensions", require: false
 
+  # Static type checking — RBS signatures (inline `#:`/`@rbs` comments) checked by
+  # Steep. Scope: app/actions (see Steepfile + doc/project/type-checking.md).
+  # Loaded only by the `steep` CLI / CI lint step, never by the app runtime.
+  gem "rbs", "~> 4.0", require: false
+  gem "steep", "~> 2.0", require: false
+
   # Add speed badges [https://github.com/MiniProfiler/rack-mini-profiler]
   # gem "rack-mini-profiler"
 

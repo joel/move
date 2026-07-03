@@ -29,6 +29,7 @@ module Moves
     # Models holding Active Storage attachments whose blobs we purge explicitly.
     ATTACHMENT_MODELS = [Media, LabelPrintRun].freeze
 
+    #: (move: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:)
       # Sample-only for now (#435): the UI surfaces removal only on the onboarding
       # sample, and there is no deliberate "delete any move" feature yet. Guard in
@@ -44,6 +45,7 @@ module Moves
 
     private
 
+    #: (untyped move) -> Dry::Monads::Result[untyped, untyped]
     def teardown(move)
       # Capture attachment ids before any row is gone (delete_all skips the purge
       # callback, so blobs would otherwise orphan in storage).
@@ -58,6 +60,7 @@ module Moves
       Failure(e.message)
     end
 
+    #: (untyped move) -> untyped
     def attachment_ids_for(move)
       ATTACHMENT_MODELS.flat_map do |model|
         record_ids = model.unscoped.where(move_id: move.id).pluck(:id)
@@ -69,10 +72,13 @@ module Moves
     end
 
     # After the rows are gone, purge the (now-orphaned) attachments + their blobs.
+
+    #: (untyped attachment_ids) -> untyped
     def purge_blobs(attachment_ids)
       ActiveStorage::Attachment.where(id: attachment_ids).find_each(&:purge_later)
     end
 
+    #: (untyped move_id) -> Dry::Monads::Success[nil]
     def emit_event(move_id)
       Rails.event.notify("move.destroyed", move_id: move_id)
       Success()

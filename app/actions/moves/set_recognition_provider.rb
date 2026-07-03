@@ -14,6 +14,7 @@ module Moves
   # a provider switch (#187). The caller owns authorization (admin) and the
   # archived read-only guard.
   class SetRecognitionProvider < BaseAction
+    #: (move: untyped, provider: untyped, ?model: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, provider:, model: nil, actor: nil)
       provider = provider.to_s
       model = model.to_s.strip
@@ -29,6 +30,7 @@ module Moves
 
     private
 
+    #: (untyped provider) -> Dry::Monads::Result[untyped, untyped]
     def validate(provider)
       return Failure(:invalid_provider) unless Move::RECOGNITION_PROVIDERS.include?(provider)
 
@@ -37,6 +39,8 @@ module Moves
 
     # Strict BYO: a real provider can only be selected once its key is stored (set
     # in the AI Capability panel). fake needs none.
+
+    #: (untyped move, untyped provider) -> Dry::Monads::Result[untyped, untyped]
     def ensure_key_present(move, provider)
       return Success() unless Move::REAL_RECOGNITION_PROVIDERS.include?(provider)
       return Success() if move.recognition_api_key_for(provider).present?
@@ -46,9 +50,11 @@ module Moves
 
     # The model override is always written: blank or default-matching stores nil so
     # the row keeps tracking the adapter's DEFAULT_MODEL as it evolves.
+
+    #: (untyped move, untyped provider, untyped model) -> Dry::Monads::Result[untyped, untyped]
     def persist(move, provider, model)
       attrs = { recognition_provider: provider }
-      attrs["#{provider}_model"] = model_override(provider, model) if Move::REAL_RECOGNITION_PROVIDERS.include?(provider)
+      attrs[:"#{provider}_model"] = model_override(provider, model) if Move::REAL_RECOGNITION_PROVIDERS.include?(provider)
       move.update!(attrs)
       Success(move)
     rescue ActiveRecord::RecordInvalid => e
@@ -57,6 +63,8 @@ module Moves
 
     # The value to store: nil when blank or equal to the provider's default (so the
     # Move tracks future default changes), otherwise the submitted model.
+
+    #: (untyped provider, untyped model) -> untyped
     def model_override(provider, model)
       return nil if model.blank? || model == RecognitionProviders.default_model(provider)
 
@@ -69,6 +77,8 @@ module Moves
     # otherwise a changed model override emits recognition_model_changed with the
     # provider and the effective model (the override, or the adapter default when
     # cleared).
+
+    #: (untyped move, untyped actor, untyped provider, untyped before) -> Dry::Monads::Success[nil]
     def emit_event(move, actor, provider, before)
       if before[:provider] != provider || !model_override_changed?(move, provider, before[:model])
         notify("move.recognition_provider_changed", move, actor, provider: provider)
@@ -79,14 +89,17 @@ module Moves
       Success()
     end
 
+    #: (untyped move, untyped provider, untyped previous_model) -> bool
     def model_override_changed?(move, provider, previous_model)
       move.recognition_model_for(provider) != previous_model
     end
 
+    #: (untyped move, untyped provider) -> untyped
     def effective_model(move, provider)
       move.recognition_model_for(provider) || RecognitionProviders.default_model(provider)
     end
 
+    #: (untyped name, untyped move, untyped actor, **untyped) -> untyped
     def notify(name, move, actor, **payload)
       Rails.event.notify(name, move_id: move.id, actor_id: actor&.id, **payload)
     end

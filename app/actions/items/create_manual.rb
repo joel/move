@@ -6,6 +6,7 @@ module Items
   # them) unless the name validation fails. An item is just a name now. The caller
   # owns the tenant context and the writable-Move guard (controller).
   class CreateManual < BaseAction
+    #: (box: untyped, params: untyped, creator: untyped, ?source_media: untyped, ?require_open: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, params:, creator:, source_media: nil, require_open: false)
       yield ensure_writable(box.move)
       yield ensure_open(box) if require_open
@@ -21,12 +22,16 @@ module Items
     # (Box#capturable? is packing-only). The photo-correction callers (per-photo
     # review, recovery) leave `require_open` false so a mis-detection can still be
     # fixed on an already-captured photo after the box is sealed/in transit.
+
+    #: (untyped box) -> Dry::Monads::Result[untyped, untyped]
     def ensure_open(box)
       box.capturable? ? Success() : Failure(:not_capturable)
     end
 
     # `source_media` is set when the item is added during per-photo review so it
     # joins that photo's item list.
+
+    #: (untyped box, untyped params, untyped source_media) -> Dry::Monads::Result[untyped, untyped]
     def persist(box, params, source_media)
       item = box.items.create!(
         move: box.move,
@@ -41,6 +46,7 @@ module Items
       Failure(e.record.errors)
     end
 
+    #: (untyped item, untyped creator) -> Dry::Monads::Success[nil]
     def emit_event(item, creator)
       Rails.event.notify(
         "item.created", item_id: item.id, box_id: item.box_id, move_id: item.move_id,

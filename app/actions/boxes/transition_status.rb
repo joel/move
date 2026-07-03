@@ -15,6 +15,8 @@ module Boxes
     # `description` is the optional contents summary captured by the seal modal
     # (B1) — persisted in the same transaction as the seal so the two never
     # diverge. nil leaves any existing description untouched.
+
+    #: (box: untyped, to: untyped, actor: untyped, ?description: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, to:, actor:, description: nil)
       yield ensure_writable(box.move)
       to = to.to_s
@@ -26,6 +28,7 @@ module Boxes
 
     private
 
+    #: (untyped box, untyped to) -> Dry::Monads::Result[untyped, untyped]
     def validate(box, to)
       return Failure(:invalid_transition) unless box.can_transition_to?(to)
       return Failure(:room_required) if to == "sealed" && box.room_id.blank?
@@ -33,6 +36,7 @@ module Boxes
       Success()
     end
 
+    #: (untyped box, untyped to, untyped description) -> Dry::Monads::Result[untyped, untyped]
     def persist(box, to, description)
       ActiveRecord::Base.transaction do
         # `.presence` so a cleared field (blank) is stored as NULL, not "" — and so
@@ -50,10 +54,13 @@ module Boxes
     # keeps a box with many items to a single statement; skipping validations is
     # safe here — "removed" is always a valid presence_state and Item has no
     # callbacks on it. (Rails/SkipsModelValidations is deliberate.)
+
+    #: (untyped box) -> untyped
     def cascade_unpacked(box)
       box.items.in_box.update_all(presence_state: "removed", updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
     end
 
+    #: (untyped box, untyped to, untyped actor) -> Dry::Monads::Success[nil]
     def emit_event(box, to, actor)
       Rails.event.notify(
         "box.status_changed", box_id: box.id, move_id: box.move_id, to: to, actor_id: actor&.id

@@ -8,6 +8,7 @@ module Boxes
   class Create < BaseAction
     include Boxes::RoomResolution
 
+    #: (move: untyped, params: untyped, creator: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, params:, creator:)
       yield ensure_writable(move)
       box = yield with_responsible(creator) { persist(move, params) }
@@ -19,6 +20,8 @@ module Boxes
 
     # Room resolution and box creation share one transaction, so an invalid box
     # rolls back any room the name created (no orphan rooms on a failed create).
+
+    #: (untyped move, untyped params) -> Dry::Monads::Result[untyped, untyped]
     def persist(move, params)
       box = nil
       ActiveRecord::Base.transaction do
@@ -41,6 +44,8 @@ module Boxes
     # restoring it must be lossless. Numbering off the kept-only max would re-pick a
     # discarded box's number, and the plain "Add box" would then fail validation
     # with "Number has already been taken" (#192).
+
+    #: (untyped move) -> String
     def next_number(move)
       # Highest existing number + 1, computed in SQL (MAX), not by loading every
       # number into Ruby. number is a string column, so the Arel.sql cast comes
@@ -48,10 +53,12 @@ module Boxes
       (move.boxes.with_discarded.maximum(Arel.sql("number::bigint")).to_i + 1).to_s
     end
 
+    #: (untyped params) -> untyped
     def dimensions(params)
       params.slice(:length_cm, :width_cm, :height_cm, :weight_kg)
     end
 
+    #: (untyped box, untyped creator) -> Dry::Monads::Success[nil]
     def emit_event(box, creator)
       Rails.event.notify("box.created", box_id: box.id, move_id: box.move_id, created_by_id: creator&.id)
       Success()

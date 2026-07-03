@@ -12,6 +12,7 @@ module Boxes
   module RoomResolution
     private
 
+    #: (untyped move, untyped name) -> untyped
     def find_or_create_room(move, name)
       name = name.to_s.strip
       return nil if name.blank?

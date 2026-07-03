@@ -11,6 +11,7 @@ module Boxes
 
     ATTRS = %i[number length_cm width_cm height_cm weight_kg description].freeze
 
+    #: (box: untyped, params: untyped, editor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, params:, editor:)
       yield ensure_writable(box.move)
       yield with_responsible(editor) { persist(box, params) }
@@ -25,6 +26,8 @@ module Boxes
 
     # Room resolution and the box update share one transaction, so an invalid
     # box rolls back any room the name created (no orphan rooms on a failed edit).
+
+    #: (untyped box, untyped params) -> Dry::Monads::Result[untyped, untyped]
     def persist(box, params)
       ActiveRecord::Base.transaction do
         attrs = params.slice(*ATTRS)
@@ -36,6 +39,7 @@ module Boxes
       Failure(e.record.errors)
     end
 
+    #: (untyped box, untyped editor) -> Dry::Monads::Success[nil]
     def emit_event(box, editor)
       Rails.event.notify("box.updated", box_id: box.id, move_id: box.move_id, editor_id: editor&.id)
       Success()

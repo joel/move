@@ -12,6 +12,9 @@
 # and returns Success/Failure. Controllers pattern-match on the result.
 # See app/actions/AGENTS.md.
 class BaseAction
+  # Dynamic include (RBS can't model the module `Dry::Monads.[]` builds); the
+  # Success/Failure surface it provides is declared in sig/dry_monads.rbs.
+  # @rbs skip
   include Dry::Monads[:result, :do]
 
   private
@@ -22,6 +25,8 @@ class BaseAction
   # read-only (Move#writable?). Returns Failure(:move_archived) — controllers map
   # it to the friendly read-only redirect, MCP tools to a read-only tool error.
   # Reads and token revocation are not guarded (they stay allowed when archived).
+
+  #: (untyped move) -> (Dry::Monads::Failure[Symbol] | Dry::Monads::Success[nil])
   def ensure_writable(move)
     return Failure(:move_archived) unless move.writable?
 
@@ -40,6 +45,8 @@ class BaseAction
   # transaction COMMIT partial writes (e.g. an orphan room on a failed box edit).
   # The non-transactional path sets the responsible via a session GUC (reset in an
   # ensure) without a transaction, so each action keeps its own rollback boundary.
+
+  #: [T] (untyped actor) { () -> T } -> T
   def with_responsible(actor, &)
     Logidze.with_responsible(actor&.id, transactional: false, &)
   end

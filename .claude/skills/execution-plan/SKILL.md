@@ -422,6 +422,21 @@ bundle exec packwerk check      # no undeclared-dependency / privacy / visibilit
 - If the diff added/altered a **pack** (new `packs/*`, a `package.yml`, or a token/
   component), confirm the boundaries doc + its diagrams were updated (Step 8b / §7).
 
+**Steep type gate — run it explicitly, it must be green (like Packwerk it is
+invisible to `bundle exec rake` but REQUIRED merge-blocking in CI's `lint` job +
+an overcommit pre-commit hook; catch it here first):**
+
+```bash
+bundle exec steep check --no-daemon --severity-level=error
+```
+
+- Scope: `app/actions/**` + `sig/` (the Steepfile's `:actions` target). Every new or
+  changed method there needs a `#:` inline annotation — the
+  `spec/architecture/type_annotations_spec.rb` fitness test fails otherwise.
+- Both flags are mandatory (`--no-daemon`: the daemon deadlocks headless;
+  `--severity-level=error`: unknown-constant warnings must not block). Conventions +
+  gotchas: `doc/project/type-checking.md`.
+
 > **`:js`/system specs needing a real browser CANNOT be validated in the dev app
 > container — chromedriver is absent there.** Such specs run in real Chrome even
 > under `TEST_BROWSER=rack_test` (see agent memory), so in the dev container they

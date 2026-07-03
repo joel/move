@@ -8,6 +8,7 @@ module Discards
   # and is therefore left out of this cascade's eventual restore. The whole tree is
   # discarded in a single transaction. Returns the batch id on success.
   class Cascade < BaseAction
+    #: (record: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(record:, actor:, source: :web) # rubocop:disable Lint/UnusedMethodArgument
       yield ensure_writable(record.move)
       batch_id = SecureRandom.uuid
@@ -21,6 +22,7 @@ module Discards
 
     private
 
+    #: (untyped record, batch_id: untyped, parent: untyped) -> untyped
     def discard_node(record, batch_id:, parent:)
       record.class.discard_cascade_associations.each do |assoc|
         record.public_send(assoc).kept.to_a.each do |child|

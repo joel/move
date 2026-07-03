@@ -10,6 +10,7 @@ module Items
   # Items::Delete, so the activity feed already offers a restore). Caller owns
   # tenant context. C3 only exposes this while the box is still packing.
   class Remove < BaseAction
+    #: (item: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:, source: :web)
       yield ensure_packing_phase(item.box)
       media = item.source_media
@@ -27,6 +28,8 @@ module Items
     # right tool. Mirrors the capture/add gating (Box#capturable? is packing-only),
     # and the phase-aware UI must not be the only guard (a stale form or a direct
     # request could otherwise soft-delete closed-box inventory).
+
+    #: (untyped box) -> Dry::Monads::Result[untyped, untyped]
     def ensure_packing_phase(box)
       return Failure(:wrong_phase) unless box.packing?
 
@@ -40,6 +43,8 @@ module Items
     # never report the photo orphaned. Query kept items excluding this one instead.
     # The photo joins the item's batch (parent = the item) so Items::Restore
     # un-discards it too; the blob is kept (soft delete).
+
+    #: (untyped item, untyped media, untyped batch_id) -> Dry::Monads::Success[nil]
     def discard_orphaned_media(item, media, batch_id)
       return Success() unless media
       return Success() if item.move.items.where(source_media_id: media.id).where.not(id: item.id).exists?
@@ -59,6 +64,7 @@ module Items
       Success()
     end
 
+    #: (untyped item, untyped actor, Symbol source, untyped batch_id) -> Dry::Monads::Success[nil]
     def emit_event(item, actor, source, batch_id)
       Rails.event.notify(
         "item.deleted", item_id: item.id, box_id: item.box_id, move_id: item.move_id,

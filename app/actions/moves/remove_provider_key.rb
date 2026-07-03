@@ -12,6 +12,7 @@ module Moves
   # vectors. Emits move.provider_key_removed (provider only, never a key value).
   # The caller owns authorization (admin) and the archived guard.
   class RemoveProviderKey < BaseAction
+    #: (move: untyped, provider: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, provider:, actor: nil)
       provider = provider.to_s
 
@@ -26,12 +27,14 @@ module Moves
 
     private
 
+    #: (untyped provider) -> Dry::Monads::Result[untyped, untyped]
     def validate(provider)
       return Failure(:invalid_provider) unless Move::PROVIDER_KEYS.include?(provider)
 
       Success()
     end
 
+    #: (untyped move, untyped provider) -> Dry::Monads::Result[untyped, untyped]
     def persist(move, provider)
       move.update!("#{provider}_api_key" => nil)
       Success(move)
@@ -39,6 +42,7 @@ module Moves
       Failure(e.record.errors)
     end
 
+    #: (untyped move, untyped provider, untyped was_ready) -> untyped
     def reembed_if_search_space_flipped(move, provider, was_ready)
       return unless provider == move.embedding_provider
       return if move.embedding_provider_ready? == was_ready
@@ -46,6 +50,7 @@ module Moves
       IndexingRuns::Start.new.call(move: move, provider: move.embedding_provider)
     end
 
+    #: (untyped move, untyped actor, untyped provider) -> Dry::Monads::Success[nil]
     def emit_event(move, actor, provider)
       Rails.event.notify(
         "move.provider_key_removed", move_id: move.id, actor_id: actor&.id, provider: provider

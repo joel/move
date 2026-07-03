@@ -16,17 +16,23 @@ module Moves
     # Populates the Move's managed vocabulary (rooms — the only one left) with the
     # curated defaults. Caller owns the transaction (Moves::Create wraps it with the
     # Move + admin membership; db/seeds.rb calls it standalone).
+    # Singleton defs aren't supported by inline RBS yet; skipped here, declared
+    # in sig/default_vocabularies.rbs instead.
+
+    # @rbs skip
     def self.apply(move)
       ROOMS.each { |name| find_or_create(move.rooms, name) }
     end
 
     # Case-insensitive lookup against the lower(name) unique index, so a value
     # renamed to different casing is reused rather than colliding on insert.
+    # @rbs skip
     def self.existing(relation, name)
       relation.where("LOWER(name) = ?", name.downcase).first
     end
     private_class_method :existing
 
+    # @rbs skip
     def self.find_or_create(relation, name)
       existing(relation, name) || relation.create!(name: name)
     end
