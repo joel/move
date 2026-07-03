@@ -15,14 +15,17 @@ class RecognitionRun < ApplicationRecord
   validates :provider, presence: true
   validates :status, inclusion: { in: STATUSES }
 
+  #: () -> bool
   def processing?
     status == "processing"
   end
 
+  #: () -> bool
   def failed?
     status == "failed"
   end
 
+  #: () -> bool
   def terminal?
     TERMINAL.include?(status)
   end
@@ -31,6 +34,8 @@ class RecognitionRun < ApplicationRecord
   # the already-sanitized error_message — no business logic, no side effects.
   # Quota is checked before rate_limit because some vendors (OpenAI's
   # `insufficient_quota`) report an exhausted plan as HTTP 429.
+
+  #: () -> Symbol
   def error_category
     msg = error_message.to_s
     case msg
@@ -52,6 +57,7 @@ class RecognitionRun < ApplicationRecord
   # of leaking implementation detail.
   TRANSPORT_PREFIX = /\A\S+ request failed \(\d+\): /
 
+  #: () -> String?
   def error_detail
     msg = error_message.to_s
     return unless msg.match?(TRANSPORT_PREFIX)

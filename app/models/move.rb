@@ -80,6 +80,8 @@ class Move < ApplicationRecord
 
   # This Move's stored key for +provider+, or nil for fake/unknown (which need no
   # key). Used by RecognitionProviders.for_move to configure the adapter.
+
+  #: (untyped provider) -> String?
   def recognition_api_key_for(provider)
     return nil unless REAL_RECOGNITION_PROVIDERS.include?(provider.to_s)
 
@@ -88,6 +90,8 @@ class Move < ApplicationRecord
 
   # This Move's stored model override for +provider+, or nil to fall back to the
   # adapter's DEFAULT_MODEL. Used by RecognitionProviders.for_move (#187).
+
+  #: (untyped provider) -> String?
   def recognition_model_for(provider)
     return nil unless REAL_RECOGNITION_PROVIDERS.include?(provider.to_s)
 
@@ -96,6 +100,8 @@ class Move < ApplicationRecord
 
   # Whether recognition can run as configured: fake always can; a real provider
   # needs this Move's own key (strict BYO — never falls back to a shared key).
+
+  #: () -> bool
   def recognition_ready?
     return true if recognition_provider == "fake"
 
@@ -105,6 +111,8 @@ class Move < ApplicationRecord
   # This Move's stored key for any key-holding +provider+ (recognition or
   # embedding), or nil for an unknown/keyless one. Used by the shared AI Capability
   # panel + its key actions (#242), which are vendor- rather than feature-scoped.
+
+  #: (untyped provider) -> String?
   def api_key_for(provider)
     return nil unless PROVIDER_KEYS.include?(provider.to_s)
 
@@ -112,6 +120,8 @@ class Move < ApplicationRecord
   end
 
   # The features a stored +provider+ key powers, for the AI Capability badges.
+
+  #: (untyped provider) -> Array[Symbol]
   def provider_powers(provider)
     powers = []
     powers << :recognition if REAL_RECOGNITION_PROVIDERS.include?(provider.to_s)
@@ -123,6 +133,8 @@ class Move < ApplicationRecord
   # This Move's stored key for the image-generation +provider+, or nil for
   # fake/unknown. OpenAI is the only real provider and reuses the openai_api_key
   # column (no separate key). Used by ImageProviders.for_move (#416).
+
+  #: (untyped provider) -> String?
   def image_api_key_for(provider)
     return nil unless REAL_IMAGE_PROVIDERS.include?(provider.to_s)
 
@@ -132,6 +144,8 @@ class Move < ApplicationRecord
   # Whether item-image generation can run as configured: fake always can; a real
   # provider needs this Move's own key (strict BYO). Gates the "✨ generate image"
   # affordance — hidden entirely when false.
+
+  #: () -> bool
   def image_generation_ready?
     return true if image_provider == "fake"
 
@@ -141,6 +155,8 @@ class Move < ApplicationRecord
   # This Move's stored key for the search-embedding +provider+, or nil for
   # fake/unknown (which need no key). OpenAI/Gemini reuse the recognition key
   # columns; Voyage has its own. Used by EmbeddingProviders.for_move (#237).
+
+  #: (untyped provider) -> String?
   def embedding_api_key_for(provider)
     return nil unless REAL_EMBEDDING_PROVIDERS.include?(provider.to_s)
 
@@ -151,14 +167,18 @@ class Move < ApplicationRecord
   # selected AND this Move has that provider's own key (strict BYO — never a
   # shared key). Otherwise EmbeddingProviders.for_move hands back the network-free
   # Fake embedder and search degrades gracefully to lexical + trigram (#232/#237).
+
+  #: () -> bool
   def embedding_provider_ready?
     embedding_api_key_for(embedding_provider).present?
   end
 
+  #: () -> bool
   def archived?
     status == "archived"
   end
 
+  #: () -> bool
   def writable?
     !archived?
   end
@@ -166,6 +186,8 @@ class Move < ApplicationRecord
   # The membership joining +user+ to this Move, or nil if they are not a
   # member. Used by MovePolicy/BoxPolicy to gate reads and mutations on
   # move-level role (D11).
+
+  #: (untyped user) -> untyped
   def membership_for(user)
     return nil if user.nil?
 

@@ -32,6 +32,8 @@ class Activity < ApplicationRecord
   }
 
   # Immutable: the log is append-only.
+
+  #: () -> bool
   def readonly?
     persisted?
   end

@@ -1,0 +1,56 @@
+# Hand-written `def self.` methods on models — the schema-derived
+# sig/rbs_rails/ signatures cover columns/associations/AR methods but not
+# custom class methods, and inline RBS can't declare `def self.` yet, so each
+# def carries `# @rbs skip` in the model file and its type lives here (the
+# sig/default_vocabularies.rbs pattern). Fold back into inline annotations once
+# rbs/steep ship inline singleton support.
+
+class MoveIntegrationToken
+  def self.generate_raw_token: () -> String
+
+  def self.digest: (untyped raw_token) -> String
+
+  def self.authenticate: (untyped raw_token) -> untyped
+end
+
+class SessionHandoffToken
+  def self.generate_raw_token: () -> String
+
+  def self.digest: (untyped raw_token) -> String
+end
+
+class Organization
+  def self.primary_for: (untyped user_id) -> untyped
+
+  def self.member?: (user_id: untyped, slug: untyped) -> bool
+end
+
+class Box
+  def self.dimension_presets: (?min_count: Integer, ?limit: Integer) -> untyped
+end
+
+# Vocabulary is a PORO (not ActiveRecord) — its `find` is a custom factory.
+class Vocabulary
+  def self.find: (untyped kind) -> untyped
+end
+
+class Activity
+  class Builder
+    def self.records?: (untyped name) -> bool
+  end
+end
+
+# ActiveSupport::CurrentAttributes generates a class-level reader per
+# `attribute` — invisible to static analysis, so declared here (untyped, like
+# the runtime accessors).
+class Current
+  def self.tenant: () -> untyped
+
+  def self.move: () -> untyped
+
+  def self.nav_section: () -> untyped
+
+  def self.user: () -> untyped
+
+  def self.source: () -> untyped
+end

@@ -23,14 +23,17 @@ class LabelPrintRun < ApplicationRecord
 
   scope :active, -> { where(status: ACTIVE) }
 
+  #: () -> bool
   def in_progress?
     ACTIVE.include?(status)
   end
 
+  #: () -> bool
   def ready?
     status == "completed" && document.attached?
   end
 
+  #: () -> bool
   def failed?
     status == "failed"
   end
@@ -38,6 +41,8 @@ class LabelPrintRun < ApplicationRecord
   # Whole-number percent for the progress bar. Arithmetic on two scalar columns of
   # this single already-loaded row — NOT a row aggregation (the documented exception
   # to the DB-computation rule). A zero-box run is 100% (nothing to render).
+
+  #: () -> Integer
   def progress_percent
     return 100 if total_count.zero?
 

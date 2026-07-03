@@ -33,20 +33,26 @@ class SessionHandoffToken < ApplicationRecord
   scope :purgeable, -> { where("expires_at <= ? OR consumed_at IS NOT NULL", Time.current) }
 
   # Generate a fresh raw token. Returned to the caller once; never stored.
+
+  # @rbs skip
   def self.generate_raw_token
     SecureRandom.urlsafe_base64(32)
   end
 
   # SHA-256 hex digest of a raw token — persisted on mint, recomputed on consume
   # for a single indexed lookup (not a per-row compare).
+
+  # @rbs skip
   def self.digest(raw_token)
     Digest::SHA256.hexdigest(raw_token.to_s)
   end
 
+  #: () -> bool
   def expired?
     expires_at <= Time.current
   end
 
+  #: () -> bool
   def consumed?
     consumed_at.present?
   end

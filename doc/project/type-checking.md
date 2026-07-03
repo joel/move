@@ -1,7 +1,10 @@
 # Static type checking — RBS + Steep
 
 Move type-checks the **entire actions layer** (`app/actions/**` and every pack's
-`packs/*/app/actions/**` — rollout completed #519) with
+`packs/*/app/actions/**` — rollout completed #519) **and the models**
+(`app/models/**`, packs' `app/public/**` + `app/models/**` — #521, which also
+brought real model types via generated signatures and the community gem
+signatures) with
 [Steep](https://github.com/soutaro/steep) 2.0 reading **inline RBS
 annotations** (`#:` / `@rbs` comments) natively from the Ruby files — the
 [RBS 4 inline syntax](https://github.com/ruby/rbs/blob/master/docs/inline.md),
@@ -102,6 +105,43 @@ House rules (`spec/architecture` of the type system, so to speak):
    hard. RuboCop is configured to leave `#:` comments alone
    (`Layout/LeadingCommentSpace: AllowRBSInlineAnnotation`).
 
+## Model types (#521): three signature sources
+
+1. **Generated, schema-derived** — `sig/rbs_rails/` (committed). `bin/rails
+   rbs_rails:all` introspects the booted app (columns, associations, AR
+   methods — pack-nested models included) and writes one `.rbs` per model.
+   Config in `config/rbs_rails.rb`. **Freshness is CI-enforced** in the
+   `packwerk` job (regenerate + `git diff --exit-code`), the model-signature
+   analogue of `RailsSchemaUpToDate`: after a migration touching a model,
+   rerun `bin/rails rbs_rails:all` and commit the diff.
+2. **Community gem signatures** — the rbs collection (`rbs_collection.yaml`,
+   committed `rbs_collection.lock.yaml`, gitignored `.gem_rbs_collection/`).
+   A fresh clone runs `bundle exec rbs collection install` once; CI installs
+   `--frozen` with a cache keyed on the lockfile. Known gaps in the
+   Rails-7.0-era sigs are bridged in `sig/rails_gaps.rbs` (e.g. `Rails.event`)
+   or suppressed at single call sites with a trailing
+   `# steep:ignore <Diagnostic>` + reason (e.g. `create!` declared
+   kwargs-only). Broken gem-shipped sigs are `ignore:`d in
+   `rbs_collection.yaml` (snaky_hash crashes the whole environment load).
+3. **Inline annotations** for hand-written model methods — same `#:`
+   convention as actions. Model-specific rules:
+   - **`initialize` must be annotated** — unannotated it inherits
+     `Object#initialize`'s `() -> void` and errors on any parameter.
+   - **Bind attribute reads to locals before nil-guards** — Steep correctly
+     refuses to narrow across two separate reads of an AR attribute
+     (`return nil if foo.nil?; foo * 2` fails). Worked examples:
+     `Box#volume_cm3`, `Item#image_generating?`,
+     `RecognitionSuggestion#confidence_percent` — each was a live
+     nil-blind-spot the checker exposed.
+   - **The two model concerns are deliberately unchecked** (Steepfile
+     enumerates `packs/utility/app/models` file-by-file to exclude
+     `concerns/`): a concern's `included do` body runs in the includer's
+     context at runtime, which Steep can't model — the concern counterpart of
+     do-notation's `yield`. Their modules are declared in `sig/concerns.rbs`;
+     macros they provide (`discard_cascade_to`) live in `sig/rails_gaps.rbs`.
+     Note `ignore` in the Steepfile does **not** exclude inline-mode sources —
+     hence file enumeration.
+
 ## The shims (`sig/`)
 
 Hand-written, deliberately minimal — only what the actions layer actually
@@ -110,11 +150,13 @@ calls. Grow them method-by-method; never bulk-generate.
 | File | Declares | Why |
 |---|---|---|
 | `sig/dry_monads.rbs` | Generic `Result`/`Success`/`Failure` (`value!` on the base, so unwrapping an action's declared return type-checks), the `Success()`/`Failure()` constructors on `BaseAction`, `Dry::Monads.[]` | No community RBS for dry-monads; `include Dry::Monads[:result, :do]` is a dynamic call RBS can't model (`@rbs skip` on the include, surface declared here) |
-| `sig/active_support.rbs` | `Time.current`, `String#squish`, `Array#compact_blank` | A **known** receiver + unknown method is a hard `NoMethod` error (unlike unknown constants, which degrade). Every ActiveSupport core-ext used on a known type in scope must be declared here |
-| `sig/default_vocabularies.rbs`, `sig/label_print_runs.rbs`, `sig/captures.rbs` | The checked scope's `def self.` methods | Inline RBS can't declare `def self.` yet — each def carries `# @rbs skip` and its type lives in the sig file |
+| `sig/rails_gaps.rbs` | `Rails.event`, `ApplicationRecord.has_logidze`/`.has_neighbors`/`.discard_cascade_to`, `ActiveStorage::Attached::One#content_type`/`#blob` | Real runtime APIs missing from the Rails-7.0-era community sigs (or from gems with no RBS) that model/action bodies call on **known** types |
+| `sig/model_singletons.rbs`, `sig/default_vocabularies.rbs`, `sig/label_print_runs.rbs`, `sig/captures.rbs` | The checked scope's `def self.` methods (incl. `Current`'s CurrentAttributes readers) | Inline RBS can't declare `def self.` yet — each def carries `# @rbs skip` and its type lives in a sig file |
+| `sig/discard.rbs`, `sig/concerns.rbs` | `Discard::Model` + per-model/proxy discard scopes; the `Discardable`/`Roleable` module names | The discard gem has no RBS; the concerns are unchecked (see above) but their modules must resolve for models' `include` lines |
 
-(`sig/search_reindexing.rbs` is gone — `packs/search`'s own inline annotations
-took over when its actions joined the scope, per the shim's deletion trigger.)
+(`sig/active_support.rbs` and `sig/search_reindexing.rbs` are gone — the
+collection's activesupport sigs and `packs/search`'s inline annotations took
+over, per each shim's deletion trigger.)
 
 ## What the checker actually catches (honesty section)
 
@@ -139,7 +181,9 @@ annotation was written).
 
 | Trigger | Action |
 |---|---|
-| A NEW pack gains an `app/actions` directory | Add its `check "packs/<name>/app/actions", inline: true` line to the target and annotate from day one — the fitness spec's `packs/*` glob already covers it and will fail unannotated defs |
+| A NEW pack gains an `app/actions`, `app/public`, or `app/models` directory | Add its `check` line to the target and annotate from day one — the fitness spec's globs cover it (unannotated defs fail) and its Steepfile-mirror example fails a missing `check` line |
+| A migration changes a model's columns/associations | `bin/rails rbs_rails:all`, commit the `sig/rbs_rails/` diff (the packwerk CI job fails on drift) |
+| Community rails sigs catch up (activerecord/activesupport ≥ 8.1) | Re-audit `sig/rails_gaps.rbs` and the two `steep:ignore` sites — delete whatever the collection now covers |
 | Real model types wanted (cross-model mix-ups start hurting) | Adopt `rbs_rails` (generated model sigs, needs DB — pair with the `packwerk` CI job the way structure.sql freshness works) and/or `rbs collection` (community gem sigs; commit `rbs_collection.lock.yaml`, gitignore `.gem_rbs_collection/`; beware activesupport sigs lag Rails 8.1) |
 | An ActiveSupport core-ext on a known type blocks an annotation | Add the one method to `sig/active_support.rbs` |
 | rbs/steep ship inline `def self.` support | Fold `sig/default_vocabularies.rbs` back into inline annotations |

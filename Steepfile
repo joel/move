@@ -21,6 +21,31 @@
 
 target :actions do
   check "app/actions", inline: true
+  # Models (#521): root + every pack's public/private models. Their
+  # schema-derived signatures are GENERATED into sig/rbs_rails/ by
+  # `bin/rails rbs_rails:all` (freshness-checked in CI); the inline annotations
+  # below cover the hand-written methods on top.
+  check "app/models", inline: true
+  check "packs/activity/app/models", inline: true
+  check "packs/activity/app/public", inline: true
+  check "packs/captures/app/public", inline: true
+  check "packs/labels/app/public", inline: true
+  check "packs/move_integration_tokens/app/public", inline: true
+  check "packs/move_memberships/app/public", inline: true
+  check "packs/organizations/app/public", inline: true
+  check "packs/search/app/public", inline: true
+  check "packs/session_handoffs/app/public", inline: true
+  check "packs/terms/app/public", inline: true
+  # packs/utility models are enumerated as FILES on purpose: the concerns/
+  # subdirectory must stay unchecked (Rails concern `included do` DSL bodies run
+  # in the includer's context at runtime — Steep checks them against the
+  # concern's own bare module, so every AR macro/scope call inside is a false
+  # NoMethod; unmodellable today, like dry-monads' do-notation yield), and
+  # `ignore` does NOT exclude inline-mode sources (Steep 2.0.0), so a directory
+  # `check` can't be carved down after the fact.
+  check "packs/utility/app/models/application_record.rb", inline: true
+  check "packs/utility/app/models/current.rb", inline: true
+  check "packs/vocabularies/app/public", inline: true
   # Every pack's actions (doc/project/type-checking.md roadmap, completed #519):
   # one `check` line per pack, all in the SAME target — a second target crashes,
   # see above. A NEW pack must add its line here + annotate from day one (the

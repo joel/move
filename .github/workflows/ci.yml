@@ -137,6 +137,17 @@ jobs:
         run: |
           bundle exec packwerk validate
           bundle exec packwerk check
+      -
+        # sig/rbs_rails/ freshness — the model-signature analogue of
+        # RailsSchemaUpToDate: the committed, schema-derived signatures must
+        # match what `rbs_rails:all` generates from the migrated schema. Rides
+        # in this job because it needs the same booted app + DB the boundary
+        # check already paid for. On drift: run `bin/rails rbs_rails:all`
+        # locally and commit the diff. See doc/project/type-checking.md.
+        name: "Types / model signature freshness"
+        run: |
+          bin/rails rbs_rails:all
+          git diff --exit-code -- sig/rbs_rails
 
   lint:
 
@@ -169,14 +180,25 @@ jobs:
         name: "Lint / erb_lint"
         run: bin/erb_lint --lint-all
       -
+        # Community gem signatures (activerecord/activesupport/…): gitignored,
+        # resolved from the committed rbs_collection.lock.yaml. Cached on the
+        # lockfile so CI only hits GitHub when the lock changes.
+        name: "Types / rbs collection cache"
+        uses: actions/cache@v4
+        with:
+          path: .gem_rbs_collection
+          key: rbs-collection-${{ hashFiles('rbs_collection.lock.yaml') }}
+      -
+        name: "Types / rbs collection install"
+        run: bundle exec rbs collection install --frozen
+      -
         # Steep + rbs come from the Gemfile (bundler-cache above), NOT `gem
         # install`: the inline-RBS parser/checker pairing is version-sensitive,
         # so the two gems are pinned and bumped together. --no-daemon: the
         # `steep server` daemon can deadlock in headless environments; the
-        # direct check is ~2s at this scope anyway. --severity-level=error:
-        # unknown app/Rails constants (models have no RBS yet) surface as
-        # warnings/hints and must not block; genuine contract violations are
-        # errors. See doc/project/type-checking.md.
+        # direct check is ~6s at this scope anyway. --severity-level=error:
+        # unknown constants surface as warnings/hints and must not block;
+        # genuine contract violations are errors. See doc/project/type-checking.md.
         name: "Types / steep"
         run: bundle exec steep check --no-daemon --severity-level=error
       -

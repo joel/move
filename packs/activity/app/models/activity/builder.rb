@@ -47,16 +47,21 @@ class Activity
                    token_name provider model labels_per_box].freeze
 
     # Whether the subscriber should bother building this event at all.
+
+    # @rbs skip
     def self.records?(name)
       SUBJECTS.key?(name) || VOCAB.include?(name)
     end
 
+    #: (untyped event) -> void
     def initialize(event)
       @name = event[:name]
       @payload = (event[:payload] || {}).symbolize_keys
     end
 
     # Returns the Activity attribute hash, or nil to skip (no mapping / no Move).
+
+    #: () -> Hash[Symbol, untyped]?
     def call
       return nil unless self.class.records?(@name)
 
@@ -73,6 +78,7 @@ class Activity
 
     private
 
+    #: () -> Array[untyped]
     def subject
       if VOCAB.include?(@name)
         [VOCAB_MODELS[@payload[:kind].to_s], @payload[:record_id]]
@@ -82,10 +88,12 @@ class Activity
       end
     end
 
+    #: () -> untyped
     def actor_id
       ACTOR_KEYS.filter_map { |k| @payload[k] }.first
     end
 
+    #: () -> Hash[Symbol, untyped]
     def metadata
       META_KEYS.each_with_object({}) do |key, acc|
         value = @payload[key]
@@ -93,6 +101,7 @@ class Activity
       end
     end
 
+    #: () -> String
     def source
       (@payload[:source] || Current.source || :web).to_s
     end

@@ -18,7 +18,9 @@ module Moves
     def persist(params, creator)
       move = nil #: untyped
       ActiveRecord::Base.transaction do
-        move = Move.create!(params.merge(created_by: creator))
+        # The community activerecord sig declares create! kwargs-only; Rails
+        # accepts a positional attributes hash.
+        move = Move.create!(params.merge(created_by: creator)) # steep:ignore UnexpectedPositionalArgument
         move.move_memberships.create!(user: creator, role: "admin")
         Moves::DefaultVocabularies.apply(move)
       end

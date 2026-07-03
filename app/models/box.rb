@@ -100,6 +100,8 @@ class Box < ApplicationRecord
   # default `min_count` is 1. Most-used first, then most-recent (a freshly-used
   # size stays near the front), capped at `limit` to keep the chip row scannable.
   # Returns [{ length_cm:, width_cm:, height_cm:, count: }].
+
+  # @rbs skip
   def self.dimension_presets(min_count: 1, limit: 6)
     # NB: each NOT NULL needs its own where.not — a single multi-key where.not
     # negates the *conjunction* (matching only all-null rows), not what we want.
@@ -112,63 +114,87 @@ class Box < ApplicationRecord
          .map { |l, w, h, n| { length_cm: l, width_cm: w, height_cm: h, count: n } }
   end
 
+  #: () -> bool
   def packing?
     status == "packing"
   end
 
+  #: () -> bool
   def sealed?
     status == "sealed"
   end
 
   # Anything past packing — used for the "packed" progress on the boxes grid.
+
+  #: () -> bool
   def packed?
     !packing?
   end
 
   # Capture into a sealed (closed) box is blocked until it is unsealed (§5.2).
+
+  #: () -> bool
   def capturable?
     packing?
   end
 
   # Destination-side working state — the unpacking checklist (D10/E3) is active.
+
+  #: () -> bool
   def unpacking?
     status == "unpacking"
   end
 
   # Terminal "everything removed" state — renders the D10 celebration.
+
+  #: () -> bool
   def unpacked?
     status == "unpacked"
   end
 
+  #: () -> Array[String]
   def available_transitions
     TRANSITIONS.fetch(status, [])
   end
 
+  #: (untyped target) -> bool
   def can_transition_to?(target)
     available_transitions.include?(target.to_s)
   end
 
+  #: () -> bool
   def missing_dimensions?
     DIMENSIONS.any? { |dim| self[dim].blank? }
   end
 
+  #: () -> Integer
   def item_count
     items.in_box.count
   end
 
+  #: () -> Integer
   def pending_review_count
     items.pending_review.count
   end
 
   # Latest run status drives the recognition badge on the card / detail.
+
+  #: () -> String?
   def recognition_state
     recognition_runs.order(created_at: :desc).first&.status
   end
 
   # Derived, never stored as source-of-truth (Technical Foundation §6.2).
-  def volume_cm3
-    return nil if missing_dimensions?
 
-    length_cm * width_cm * height_cm
+  #: () -> untyped
+  def volume_cm3
+    # Bound locals (not re-read attributes) so the nil-guard narrows; the guard
+    # is missing_dimensions?'s definition, inlined where the math needs it.
+    length = length_cm
+    width = width_cm
+    height = height_cm
+    return nil if length.nil? || width.nil? || height.nil?
+
+    length * width * height
   end
 end

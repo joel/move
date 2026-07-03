@@ -1,0 +1,21 @@
+# Discard-gem (soft delete) surface, as the checked scope uses it. The gem has
+# no community RBS. `Discard::Model` must exist for the Discardable concern's
+# `include Discard::Model` to resolve; model-specific class methods (scopes the
+# include generates) are declared per model, method-by-method as call sites
+# appear.
+module Discard
+  module Model
+  end
+end
+
+class Media
+  def self.with_discarded: () -> untyped
+end
+
+# The discard scopes also surface on association proxies (rbs_rails-generated
+# classes) — declared per proxy as call sites appear.
+class Item
+  class ActiveRecord_Associations_CollectionProxy
+    def with_discarded: () -> untyped
+  end
+end

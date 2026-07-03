@@ -42,6 +42,7 @@ class Item < ApplicationRecord
   # (excludes needs_correction and removed; Domain §7.4).
   scope :searchable, -> { in_box.where(review_state: %w[confirmed auto_confirmed]) }
 
+  #: () -> bool
   def removed?
     presence_state == "removed"
   end
@@ -52,8 +53,13 @@ class Item < ApplicationRecord
 
   # Whether an image generation is currently in flight (a fresh, non-stale claim)
   # — drives the card's generating state on reload, and the generatable guard.
+
+  #: () -> bool
   def image_generating?
-    image_generating_at.present? && image_generating_at > IMAGE_CLAIM_TTL.ago
+    # Bind once: separate attribute reads defeat nil-narrowing. For a timestamp
+    # column, present? ≡ !nil? — the nil? form is what narrows.
+    claimed_at = image_generating_at
+    !claimed_at.nil? && claimed_at > IMAGE_CLAIM_TTL.ago
   end
 
   # Atomically claim this item for image generation (#416): a single UPDATE that
@@ -62,6 +68,8 @@ class Item < ApplicationRecord
   # win (the controller passes it to the job as a token), else nil. Reclaimable
   # after IMAGE_CLAIM_TTL so a crashed job self-heals; taken at the synchronous
   # entry point (the controller) so the in-flight state is observable on render.
+
+  #: () -> untyped
   def claim_image_generation!
     now = Time.current
     rows = self.class.where(id: id, source_media_id: nil)
@@ -74,6 +82,8 @@ class Item < ApplicationRecord
   # before the (paid) vendor call, so a stale-reclaimed duplicate (queue backed up
   # past the TTL → a second click re-claimed) bails instead of double-spending
   # (#416). Second precision is ample: a duplicate only arises ≥ TTL apart.
+
+  #: (untyped claimed_at) -> bool
   def holds_image_claim?(claimed_at)
     image_generating_at.present? && image_generating_at.to_i == claimed_at.to_i
   end

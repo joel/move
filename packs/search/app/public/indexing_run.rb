@@ -18,16 +18,20 @@ class IndexingRun < ApplicationRecord
 
   scope :active, -> { where(status: ACTIVE) }
 
+  #: () -> bool
   def in_progress?
     ACTIVE.include?(status)
   end
 
+  #: () -> Integer
   def finished_items
     completed_count + failed_count
   end
 
   # Whole-number percent for the progress bar. A zero-item run is 100% (there is
   # nothing to embed), so the panel never shows a stuck 0%.
+
+  #: () -> Integer
   def progress_percent
     return 100 if total_count.zero?
 
