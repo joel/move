@@ -23,8 +23,15 @@ class ApplicationRecord
 end
 
 # The 7.0-era activestorage sigs miss the blob-delegation readers that
-# has_one_attached proxies provide (Media uses both).
+# has_one_attached proxies provide (Media uses both), and the ActiveRecord
+# query surface on Attachment (engine models are excluded from rbs_rails
+# generation — env-dependent paths — so the community sig is all Attachment
+# has, and it lacks `.where`).
 module ActiveStorage
+  class Attachment
+    def self.where: (**untyped) -> untyped
+  end
+
   class Attached
     class One
       def content_type: () -> untyped

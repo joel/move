@@ -115,7 +115,7 @@ House rules (`spec/architecture` of the type system, so to speak):
    Config in `config/rbs_rails.rb`. **Freshness is CI-enforced** in the
    `packwerk` job (regenerate + `git diff --exit-code`), the model-signature
    analogue of `RailsSchemaUpToDate`: after a migration touching a model,
-   rerun `bin/rails rbs_rails:generate_rbs_for_models` and commit the diff (models only — the path-helpers output is environment-dependent and is not committed).
+   rerun `bin/rails rbs_rails:generate_rbs_for_models` and commit the diff. Only APP models are generated: rbs_rails derives output paths from source locations, so engine models (ActiveStorage) and path helpers are environment-dependent and excluded — engine constants come from the community sigs + sig/rails_gaps.rbs instead.
 2. **Community gem signatures** — the rbs collection (`rbs_collection.yaml`,
    committed `rbs_collection.lock.yaml`, gitignored `.gem_rbs_collection/`).
    A fresh clone runs `bundle exec rbs collection install` once; CI installs
