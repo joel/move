@@ -6,7 +6,10 @@ module MediaVariants
   # so the gallery/viewers are warm by the time anyone browses. Safe if the Media
   # was since deleted.
   class PrewarmJob < ApplicationJob
-    queue_as :default
+    # CPU-bound libvips variant generation — runs on the dedicated image_ingest
+    # pool (#543) so a burst of captures isn't starved by slow recognition jobs
+    # sharing the general pool.
+    queue_as :image_ingest
 
     def perform(media_id, tenant:)
       Apartment::Tenant.switch(tenant) do
