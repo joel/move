@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.75.0] — 2026-07-04
+
+### Added
+- **Type-checked controllers with typed route helpers (internal — no
+  user-facing change).** Completing the layer-by-layer rollout (v0.72–v0.74),
+  every controller now carries checked type annotations, and route helpers are
+  statically typed — a renamed route becomes a build error at every stale call
+  site instead of a runtime 500. Every non-view layer of the codebase (business
+  actions, models, controllers) is now covered by the type checker (#523).
+
 ## [v0.74.0] — 2026-07-03
 
 ### Added
