@@ -437,6 +437,20 @@ with a stubbed DSN since test boots Sentry-free):
 - **`before_send` must mutate and return the event object** — sentry-ruby 6.x
   silently *discards* the event when the callback returns a hash (the older
   documented `filter.filter(event.to_hash)` pattern kills every event).
+- **Performance tracing needs its own scrub (#531)** — transactions
+  (`traces_sample_rate = 1.0`) carry the *same* request context and
+  breadcrumbs as error events, so the shared scrub runs in
+  `before_send_transaction` too; additionally, traced **db spans use the raw
+  SQL as their description** (Sequel literalizes Rodauth secrets into it), so
+  quoted SQL string literals are redacted from `db.*` span descriptions —
+  query shape stays readable for perf triage.
+- **Profiling (`profiles_sample_rate`) silently no-ops unless `StackProf` is
+  defined at boot** — the `stackprof` gem must be in the Gemfile's *global*
+  group (not `:development`), or production profiles nothing with no warning.
+  Accepted limitation: StackProf is process-global and non-reentrant, so with
+  Solid Queue running inside Puma (`SOLID_QUEUE_IN_PUMA`) concurrent traced
+  work means only the first transaction gets a profile — profiles are
+  best-effort under concurrency; traces are unaffected.
 
 To enable in production:
 

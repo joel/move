@@ -5,6 +5,15 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.79.0] — 2026-07-04
+
+### Added
+- **Sentry performance monitoring (internal — no user-facing change).** Every
+  request is now traced (timings for the request, its database queries and
+  renders) and profiled, building on the v0.77.0 error monitoring. Traced
+  queries get the same secret-scrubbing treatment as error reports: SQL
+  string literals are redacted before anything leaves the app (#531).
+
 ## [v0.78.0] — 2026-07-04
 
 ### Added
