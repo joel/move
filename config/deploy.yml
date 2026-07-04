@@ -52,6 +52,10 @@ env:
     # the Google button/One Tap stay hidden, so the app runs fine without them.
     - GOOGLE_CLIENT_ID
     - GOOGLE_CLIENT_SECRET
+    # Sentry error monitoring (#528). OPTIONAL — when unset, the SDK no-ops
+    # (config/initializers/sentry.rb gates purely on DSN presence), so the app
+    # runs fine without it.
+    - SENTRY_DSN
     # No shared AI key here: both recognition (#185) and embeddings (#232) are
     # per-Move bring-your-own-key — each Move supplies its own encrypted key.
     # OPENAI_API_KEY is no longer an app secret (removed from Doppler too); the

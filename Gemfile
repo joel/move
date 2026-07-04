@@ -193,6 +193,12 @@ gem "prawn", "~> 2.5"
 gem "prawn-table", "~> 0.2"
 gem "rqrcode", "~> 3.0"
 
+# Error monitoring — Sentry (#528). Enabled only when SENTRY_DSN is present
+# (production via Doppler move/prd); the SDK no-ops without a DSN, so dev/test
+# stay silent. sentry-rails auto-instruments controllers + ActiveJob/Solid Queue.
+gem "sentry-rails"
+gem "sentry-ruby"
+
 # Modular boundaries — Packwerk. `packs-rails` is a RUNTIME dependency (not
 # dev-only): it adds `packs/**/app/**` to the autoload + eager_load paths, so the
 # domain code physically living under `packs/` is loaded in every environment

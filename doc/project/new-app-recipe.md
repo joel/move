@@ -386,6 +386,70 @@ To enable it in production:
 > (`spec/requests/google_one_tap_sessions_spec.rb`), and real end-to-end Google
 > verification is done against prod.
 
+## 6d. Sentry error monitoring (optional)
+
+Sentry (`sentry-ruby` + `sentry-rails`) ships wired but **dormant**, behind two
+independent gates in `config/initializers/sentry.rb`:
+
+- **`Sentry.init` only runs when `SENTRY_DSN` is present** — dev/test (no DSN)
+  boot with *no Sentry at all*: no hub, no railtie instrumentation, no `/.*/`
+  notification subscriber, no per-request middleware work. (A `Sentry.init`
+  with a nil DSN would still install all of that and just never send — dead
+  overhead on every dev request and CI spec.)
+- **`enabled_environments = %w[production]`** — an *ambient* prod DSN in a dev
+  shell (a `doppler run` against the prod config, a copied `.env`) must not
+  ship local errors into the production project.
+
+The DSN is **not** committed (public repo — a published DSN invites junk
+events); it flows through Doppler like every other secret, as an *optional*
+one (same pattern as the Google pair — `--no-exit-on-missing-secret` in
+`.kamal/secrets`, not in the Deploy workflow's required-secrets guard).
+
+**PII-scrub gotchas baked into the initializer — keep them when copying**
+(spec: `spec/config/sentry_spec.rb` pins every one; it loads the initializer
+with a stubbed DSN since test boots Sentry-free):
+
+- **`send_default_pii = true` ships raw request context** and sentry-ruby does
+  **not** apply Rails' `filter_parameters` to any of it. In this app that
+  context carries live auth material, so `before_send` scrubs, failing closed:
+  - cookies + the `Authorization` header (MCP Bearer tokens) are **dropped**;
+  - the query string (Rodauth magic-link `key`) is parsed, filtered through
+    `ActiveSupport::ParameterFilter`, and re-encoded — an *unparseable* query
+    string (Rack raises on bad %-encoding) is replaced with `[FILTERED]`, not
+    shipped raw and not allowed to crash the hook (which would drop the event);
+  - form bodies (a Hash) are key-filtered; **JSON bodies arrive as a raw
+    String** (Sentry only parses form data — MCP JSON-RPC bodies would bypass
+    a Hash-only filter) so they are parsed and filtered; any other raw body is
+    replaced with `[FILTERED]`;
+  - **`event.extra[:arguments]` is dropped** — the ActiveJob integration
+    attaches raw job arguments (positional, so no key-based filter can match
+    them), and a failed auth-mailer job carries the live magic-link key;
+  - **http breadcrumbs lose `body` + `query`** — with `send_default_pii` the
+    `http_logger` records every outbound request's raw query string and body
+    (Google OAuth token exchange = `client_secret`, One Tap tokeninfo =
+    `id_token`), and `before_send` is the only place to catch them.
+- **`sql.active_record` breadcrumbs never include the statement text** —
+  Rodauth runs on Sequel, which literalizes values into the SQL (no binds), so
+  a magic-link INSERT would land verbatim in a breadcrumb. The subscription
+  items config drops `:sql`, keeping name/cached for triage. (ActiveRecord's
+  own instrumentation payloads are already Rails-filtered — this is
+  specifically for the Sequel layer.)
+- **`before_send` must mutate and return the event object** — sentry-ruby 6.x
+  silently *discards* the event when the callback returns a hash (the older
+  documented `filter.filter(event.to_hash)` pattern kills every event).
+
+To enable in production:
+
+1. **Sentry** → create a Rails project, copy its DSN.
+2. **Doppler** (`move/prd`) → add `SENTRY_DSN` (synced into GitHub Actions
+   secrets for Kamal). Until set it resolves to empty, which keeps the SDK off.
+3. **Redeploy** (`kamal deploy`, or merge any commit) so the env is baked in —
+   a bare `kamal app start` keeps the old env.
+4. **Verify**: trigger a test event on the prod console —
+   `kamal app exec -i --reuse 'bin/rails runner "Sentry.capture_message(%q(deploy smoke)); Sentry.close"'`
+   — and confirm it appears in the Sentry project (`Sentry.close` flushes the
+   async worker before the process exits).
+
 ## 7. Cutover order (zero-confusion sequence)
 
 1. Buy domain → add Cloudflare zone → registrar nameservers → wait active.

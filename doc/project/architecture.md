@@ -27,6 +27,7 @@ flowchart LR
     KP -->|HTTP| APP["Rails app (Puma)<br/>MoveTenantElevator sets the tenant"]
     APP --> PG[("PostgreSQL 18<br/>Kamal accessory")]
   end
+  APP -.->|"errors, scrubbed<br/>(before_send — #528)"| SEN["Sentry<br/>(SENTRY_DSN, prod only)"]
   classDef closed stroke-dasharray:4 3;
   class ORIGIN closed;
 ```
@@ -425,6 +426,7 @@ admin. New-user email invitations are deferred.
 | Secrets | `.kamal/secrets` + Doppler `<app>/prd` | synced to GitHub Actions |
 | CI | `.github/workflows/ci.yml` | lint + test; `paths-ignore` for docs (not `[skip ci]`) |
 | Deploy CI | `.github/workflows/deploy.yml` | Kamal on push to `main`; `workflow_dispatch` recovery lever |
+| Error monitoring | `config/initializers/sentry.rb` (#528) | Sentry, double-gated: `Sentry.init` only runs when `SENTRY_DSN` is present (optional Doppler secret; dev/test boot Sentry-free) **and** `enabled_environments=%w[production]` (an ambient prod DSN in a dev shell sends nothing). A fail-closed `before_send` scrub keeps auth material out of events and breadcrumbs — see [`new-app-recipe.md`](new-app-recipe.md) §6d and [`security-model.md`](security-model.md) |
 | Skip-marker guard | `.git-hooks/commit_msg/forbid_skip_markers.rb` | rejects `[skip ci]` / `skip-checks: true` |
 | Edge/TLS | Cloudflare Tunnel + `cloudflared` (origin) | `/etc/cloudflared/config.yml` → `http://ORIGIN_IP:80` |
 
