@@ -17,6 +17,12 @@ module Captures
         Current.tenant = tenant
         media = Media.find_by(id: media_id)
         return unless media&.pending?
+        # Zero writes on a read-only Move (#120): if the Move was archived after
+        # capture-start, no-op — don't attach/ready/fail or enqueue recognition.
+        # The row stays pending (harmless; hidden from the gallery by .ready), the
+        # reserved blob is reaped by purge_abandoned_uploads. Mirrors
+        # RecognitionRuns::Process leaving queued work untouched on archive.
+        return unless media.move.writable?
 
         blob = ActiveStorage::Blob.find_by(id: blob_id)
         return mark_failed(media) if blob.nil?

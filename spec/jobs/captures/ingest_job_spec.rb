@@ -55,6 +55,17 @@ RSpec.describe Captures::IngestJob do
       .to change { media.reload.status }.from("pending").to("failed")
   end
 
+  it "no-ops on a Move archived after capture-start — zero writes (#120)" do
+    media = create(:media, :pending, box:, move:)
+    blob = raw_blob
+    move.update!(status: "archived") # archived after the capture was started
+
+    expect { described_class.perform_now(media.id, blob.id, captured_by_id: nil, tenant:) }
+      .not_to(change { media.reload.status }) # still pending; no attach/ready/fail
+    expect(media.image).not_to be_attached
+    expect(media.recognition_runs).to be_empty
+  end
+
   it "is idempotent — a retry once the media has left pending no-ops" do
     media = create(:media, box:, move:) # already ready
     blob = raw_blob
