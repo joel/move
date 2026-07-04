@@ -171,7 +171,33 @@ accessories:
       health-timeout: 3s
       health-retries: 10
 
+  # Scheduled encrypted DB backups: pg_dump → restic → Cloudflare R2 (#536).
+  # Settings in config/kamal-backup.yml (mounted below); runbooks + gotchas in
+  # doc/project/backups.md — in particular: image tag moves in LOCKSTEP with the
+  # Gemfile's kamal-backup pin; changes here need a manual
+  # `kamal accessory reboot backup` (deploys don't touch accessories, `boot`
+  # skips a running container); ALWAYS `kamal-backup validate` first (Kamal
+  # happily boots with empty secrets).
+  backup:
+    image: ghcr.io/crmne/kamal-backup:0.4.0
+    # SSH target = raw origin IP (see servers.web note).
+    host: 65.20.110.89
+    files:
+      - config/kamal-backup.yml:/app/config/kamal-backup.yml:ro
+    env:
+      secret:
+        - POSTGRES_PASSWORD
+        - RESTIC_REPOSITORY
+        - RESTIC_PASSWORD
+        # R2 bucket-scoped S3 token — restic's S3 backend requires these exact names.
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+    volumes:
+      # Check/drill/backup evidence (kamal-backup state) survives reboots.
+      - "move_backup_state:/var/lib/kamal-backup"
+
   # NB: Active Storage uses the SHARED, host-wide `seaweedfs` S3 gateway (run
   # outside Kamal, also serving the sibling apps) via its own `move` bucket — see
   # env STORAGE_ENDPOINT. We deliberately do NOT define a per-app SeaweedFS
-  # accessory here, to avoid a second redundant instance on the box.
+  # accessory here, to avoid a second redundant instance on the box. Media backup
+  # (photos in that store) is likewise out of scope here — tracked in #537.
