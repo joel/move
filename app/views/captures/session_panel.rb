@@ -29,11 +29,26 @@ module Views
       #: () -> void
       def view_template
         div(id: ID, class: "flex flex-col gap-4") do
+          header_row
           @media.any? ? list : empty_state
         end
       end
 
       private
+
+      # Title + live count live INSIDE the replaced target (#545/#546) so both the
+      # capture Turbo response and the ActionCable broadcast refresh the count —
+      # a header outside the target would go stale until a full reload.
+
+      #: () -> untyped
+      def header_row
+        div(class: "flex items-center justify-between px-1") do
+          h3(class: "text-headline-md text-text-warm") { I18n.t("captures.session.title") }
+          span(class: "text-label-caps uppercase text-muted") do
+            I18n.t("captures.session.count", count: @media.size)
+          end
+        end
+      end
 
       #: () -> untyped
       def list

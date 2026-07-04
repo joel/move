@@ -70,6 +70,9 @@ RSpec.describe "Captures" do
 
       expect(response.media_type).to eq("text/vnd.turbo-stream.html")
       expect(response.body).to include(Views::Captures::SessionPanel::ID)
+      # The count lives inside the replaced panel (#546), so the stream refreshes
+      # it — no stale header after upload.
+      expect(response.body).to include(I18n.t("captures.session.count", count: 1))
       expect(Captures::IngestJob).to have_received(:perform_later)
     end
 
