@@ -25,6 +25,8 @@ hand-code a colour, spacing, radius, or type value.**
 
 > The internal **`/style-guide`** route (dev/admin only) renders every primitive in
 > every state, light + dark — the living visual reference and verification surface.
+> For per-component, per-scenario browsing use **Lookbook** at `/lookbook` (dev
+> only, apex host) — see [`doc/project/component-previews.md`](doc/project/component-previews.md).
 
 ---
 

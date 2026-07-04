@@ -36,6 +36,11 @@ This document provides instructions and protocols for AI Agents interacting with
 3. Reproduce **every** state the Design Spec lists (empty, loading, processing, failed, error, dark).
 4. Live-verify with `/product-review` and compare screenshot-to-screenshot against Stitch.
 
+Browse the `Ui::*` kit per-component/per-state in **Lookbook** at `/lookbook` (dev
+only, apex host); a new/changed `Ui::*` component should also gain/update its
+preview in `spec/components/previews/ui/`. See
+[`doc/project/component-previews.md`](doc/project/component-previews.md).
+
 **If a screen you need does not exist in Stitch, STOP — do not invent it.** Either generate it with `mcp__stitch__generate_screen_from_text` (use `designSystem=<project system id>`, dark-first, the brand prompt in the relevant phase file) and record the new `screens/<id>` in `doc/phases/README.md`, or request it from the user/product. Log the gap and remediation in `doc/phases/DESIGN-DISCREPANCIES.md`. As of this writing **all 16 Design-Spec screens have a Stitch design** (the previously-missing A1, E2, E3, and F3 screens were created in the Stitch UI — see `DESIGN-DISCREPANCIES.md`), so no phase is design-blocked.
 
 **Design-led phase plan:** `doc/phases/` re-organises the v0.2 work around screens so each customer-facing surface ships against a real design. `Phase D0` (design foundation) must land before any other UI phase. The domain-led companion plan is `doc/ai/v0.2/prompts/`.

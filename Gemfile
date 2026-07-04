@@ -87,6 +87,12 @@ group :development do
   # Use console on exceptions pages [https://github.com/rails/web-console]
   gem "web-console"
 
+  # Component browser / preview environment for the Phlex Ui::* kit, mounted at
+  # /lookbook in development only (see doc/project/component-previews.md).
+  # `listen` powers Lookbook's live UI reload when preview/component files change.
+  gem "listen"
+  gem "lookbook", ">= 2.3.14"
+
   gem "overcommit", require: false
 
   gem "bundle-audit", require: false

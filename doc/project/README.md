@@ -16,6 +16,7 @@ infrastructure / "how it actually runs and ships" reference.)
 | [`ux-conventions.md`](ux-conventions.md) | Behavioural/interaction conventions (defaults, ordering, state coverage, post-action visibility, memory) — the *feel* counterpart to the Phase D0 *look* system. Applied at plan-time via the `/execution-plan` UX step, enforced via `/code-review`. |
 | [`packwerk-boundaries.md`](packwerk-boundaries.md) | Packwerk domain-boundary enforcement (dependencies/privacy/visibility/architecture): the package + layer model, the public-API convention, the full domain map, how to extract a new pack, CI + overcommit wiring. |
 | [`type-checking.md`](type-checking.md) | RBS + Steep static type checking (actions layer, inline `#:` annotations): the annotation convention, the sig/ shims, what is/isn't caught, CI + overcommit wiring, growth roadmap. |
+| [`component-previews.md`](component-previews.md) | Lookbook component browser (dev-only, `/lookbook` on the apex host): how to run it, how to write `Ui::*` previews, why previews live in `spec/components/previews/`, CSP/auth/tenancy integration notes. |
 | [`diagrams/`](diagrams) | Editable Excalidraw scenes (open at [excalidraw.com](https://excalidraw.com/)). |
 
 ## TL;DR of the production architecture
