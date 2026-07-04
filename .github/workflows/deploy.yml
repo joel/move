@@ -44,6 +44,9 @@ jobs:
       # so they are intentionally NOT in the required-secrets guard below.
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      # Sentry error monitoring (#528). OPTIONAL — when absent the SDK just
+      # stays disabled, so intentionally NOT in the required-secrets guard.
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       # No OPENAI_API_KEY here: embeddings (#232) and recognition (#185) are both
       # per-Move BYO, so the deploy injects no shared AI key (and it is no longer
       # in Doppler). Its only consumer is the Release Bug Scan workflow, which
