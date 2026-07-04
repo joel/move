@@ -618,6 +618,13 @@ GEM
       rexml (~> 3.2, >= 3.2.5)
       rubyzip (>= 1.2.2, < 4.0)
       websocket (~> 1.0)
+    sentry-rails (6.6.2)
+      railties (>= 5.2.0)
+      sentry-ruby (~> 6.6.2)
+    sentry-ruby (6.6.2)
+      bigdecimal
+      concurrent-ruby (~> 1.0, >= 1.0.2)
+      logger
     sequel (5.105.0)
       bigdecimal
     sequel-activerecord_connection (2.0.1)
@@ -809,6 +816,8 @@ DEPENDENCIES
   rubocop-rspec_rails
   ruby-vips
   selenium-webdriver
+  sentry-rails
+  sentry-ruby
   sequel-activerecord_connection
   solid_cable
   solid_cache
