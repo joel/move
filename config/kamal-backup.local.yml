@@ -1,0 +1,10 @@
+# Local-machine overrides for `kamal-backup restore local` / `drill local`.
+#
+# `paths: []` is LOAD-BEARING for this DB-only setup (kamal-backup 0.4.0): the
+# local restore path infers a default file path (`storage`) from the Rails app,
+# but our backups contain no `type:files` snapshots, so a drill would fail on
+# "restored file snapshot is missing storage" after successfully restoring the
+# database. An explicit empty list makes the file-restore leg a no-op.
+# (Restores/drills must also use an explicit snapshot id, not `latest` — see
+# doc/project/backups.md.)
+paths: []

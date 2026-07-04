@@ -422,6 +422,7 @@ admin. New-user email invitations are deferred.
 | Per-env tenancy | `config/environments/*.rb` | `tenant_zone`, `config.hosts` (cookies are host-only — no `cookie_domain`; see §3 #280) |
 | Session handoff | `app/controllers/session_handoffs_controller.rb`, `app/actions/session_handoffs/*`, `app/services/session_handoffs/target_resolver.rb`, `SessionHandoffToken` | single-use apex→subdomain token bridging host-only sessions (#280); minted in the post-auth redirects (`rodauth_main.rb#tenant_handoff_url`, One Tap). `TargetResolver` picks the origin org (subdomain tenant / Google `?org=` param, membership-validated) over the deterministic primary (#346) |
 | Deploy | `config/deploy.yml` | `proxy.ssl: false`, no host, forward_headers; db accessory `postgres:18` at `/var/lib/postgresql` |
+| DB backups | `config/kamal-backup.yml`, `config/deploy.yml` `accessories.backup` (#536) | `backup` accessory (`ghcr.io/crmne/kamal-backup`, pinned) pg_dumps `move_production` daily → encrypted restic repo on Cloudflare R2 (all tenant schemas; cache/queue/cable + media excluded — media gap is #537). Retention 7d/4w/6m, `check_after_backup`, restore drills. Runbooks: [`backups.md`](backups.md) |
 | Boot migration | `bin/docker-entrypoint` | on server start runs `db:prepare && db:migrate`; the `db:migrate` Rake task fires Apartment's `apartment:migrate` so every tenant schema is migrated (§2) |
 | Secrets | `.kamal/secrets` + Doppler `<app>/prd` | synced to GitHub Actions |
 | CI | `.github/workflows/ci.yml` | lint + test; `paths-ignore` for docs (not `[skip ci]`) |

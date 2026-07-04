@@ -87,6 +87,11 @@ group :development do
   # Use console on exceptions pages [https://github.com/rails/web-console]
   gem "web-console"
 
+  # Operator CLI for the encrypted-DB-backups accessory [https://kamal-backup.dev].
+  # PINNED — bump together with the image tag in config/deploy.yml, then reboot
+  # the accessory. See doc/project/backups.md (#536).
+  gem "kamal-backup", "0.4.0", require: false
+
   # Component browser / preview environment for the Phlex Ui::* kit, mounted at
   # /lookbook in development only (see doc/project/component-previews.md).
   # `listen` powers Lookbook's live UI reload when preview/component files change.
