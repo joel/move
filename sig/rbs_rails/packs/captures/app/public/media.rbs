@@ -563,6 +563,46 @@ class ::Media < ::ApplicationRecord
     def original_byte_size_before_type_cast: () -> ::Integer?
 
     def original_byte_size_for_database: () -> ::Integer?
+
+    def status: () -> ::String
+
+    def status=: (::String) -> ::String
+
+    def status?: () -> bool
+
+    def status_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def status_change: () -> [ ::String?, ::String? ]
+
+    def status_will_change!: () -> void
+
+    def status_was: () -> ::String?
+
+    def status_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def status_previous_change: () -> ::Array[::String?]?
+
+    def status_previously_was: () -> ::String?
+
+    def status_before_last_save: () -> ::String?
+
+    def status_change_to_be_saved: () -> ::Array[::String?]?
+
+    def status_in_database: () -> ::String?
+
+    def saved_change_to_status: () -> ::Array[::String?]?
+
+    def saved_change_to_status?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_status?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_status!: () -> void
+
+    def clear_status_change: () -> void
+
+    def status_before_type_cast: () -> ::String
+
+    def status_for_database: () -> ::String
   end
   include ::Media::GeneratedAttributeMethods
   module ::Media::GeneratedAliasAttributeMethods
@@ -656,11 +696,17 @@ class ::Media < ::ApplicationRecord
   include ::Media::GeneratedAssociationMethods
 
   def self.recent_first: () -> ::Media::ActiveRecord_Relation
+  def self.ready: () -> ::Media::ActiveRecord_Relation
+  def self.pending: () -> ::Media::ActiveRecord_Relation
   def self.not_generated: () -> ::Media::ActiveRecord_Relation
   def self.with_attached_image: () -> ::Media::ActiveRecord_Relation
 
   module ::Media::GeneratedRelationMethods
     def recent_first: () -> ::Media::ActiveRecord_Relation
+
+    def ready: () -> ::Media::ActiveRecord_Relation
+
+    def pending: () -> ::Media::ActiveRecord_Relation
 
     def not_generated: () -> ::Media::ActiveRecord_Relation
 

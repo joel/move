@@ -1020,7 +1020,8 @@ CREATE TABLE public.media (
     discarded_by_parent_type character varying,
     discarded_by_parent_id uuid,
     optimized_at timestamp(6) without time zone,
-    original_byte_size bigint
+    original_byte_size bigint,
+    status character varying DEFAULT 'pending'::character varying NOT NULL
 );
 
 
@@ -1757,6 +1758,13 @@ CREATE INDEX index_media_on_box_id ON public.media USING btree (box_id);
 
 
 --
+-- Name: index_media_on_box_id_and_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_media_on_box_id_and_status ON public.media USING btree (box_id, status);
+
+
+--
 -- Name: index_media_on_discard_batch_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2315,6 +2323,7 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260704191306'),
 ('20260630120000'),
 ('20260629140000'),
 ('20260629120000'),

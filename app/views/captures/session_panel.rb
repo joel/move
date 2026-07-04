@@ -94,7 +94,10 @@ module Views
         div(class: "flex items-center gap-3 rounded-xl border border-card-border bg-surface-container p-3") do
           thumb(media)
           div(class: "flex flex-1 flex-col gap-1") do
-            state_badge(run)
+            state_badge(media, run)
+            # An ingest failure (#545) shows its own caption; a recognition
+            # failure keeps the detailed provider-aware one + retry.
+            span(class: "text-body-sm text-muted") { I18n.t("captures.session.ingest_failed") } if media.ingest_failed?
             render Components::Ui::RecognitionErrorCaption.new(run:) if run&.failed?
             retry_button(media) if run&.failed?
           end
@@ -116,8 +119,12 @@ module Views
         end
       end
 
-      #: (untyped run) -> untyped
-      def state_badge(run)
+      #: (untyped media, untyped run) -> untyped
+      def state_badge(media, run)
+        # Ingest state (#545) takes precedence: a pending media is still being
+        # optimised (no image/run yet); a failed one never reached recognition.
+        return render Components::Ui::RecognitionState.new(state: :processing) if media.pending?
+        return render Components::Ui::RecognitionState.new(state: :failed) if media.ingest_failed?
         return span(class: "text-label-caps uppercase text-muted") { I18n.t("ui.states.queued") } if run.nil?
 
         render Components::Ui::RecognitionState.new(state: RUN_TO_STATE.fetch(run.status, :queued))
