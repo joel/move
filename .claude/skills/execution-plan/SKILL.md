@@ -448,6 +448,14 @@ bundle exec steep check --no-daemon --severity-level=error
 > (Step 10b). If a `:js`-covered surface is central to the change, live-verify it
 > instead via `/product-review` (real browser through `agent-browser`).
 
+> **Postgres client pre-flight (host runs only).** Before running specs on a
+> host (not the dev container), verify `psql`/`pg_dump` matching the project's
+> pinned Postgres major are on PATH (`pg_dump --version`) — without them Rails'
+> `maintain_test_schema!` **purges the test DB and aborts on every spec run**
+> (it shells out to load `structure.sql` and can never succeed), a loop that
+> looks like a mysteriously always-stale schema. On macOS: `brew install libpq`
+> and prefix runs with `export PATH="/opt/homebrew/opt/libpq/bin:$PATH"`.
+
 ### Step 7: Commit (Atomic Commits Required)
 
 **NEVER bundle all changes into a single giant commit.** Each commit must be:
@@ -596,7 +604,18 @@ in-repo reference for the visual system (palette/type/spacing/components) that t
 
 ### Step 9: Push and Create PR
 
+> **Freshness check first — another actor may have moved things.** Concurrent
+> sessions/agents work this repo: mid-flight, `main` can gain merges, the
+> remote feature branch can be **rebased under you**, and the next release tag
+> can be taken (all three happened in one #531 run). Before pushing — and again
+> before tagging (Step 13) — run `git fetch origin` and re-check: `origin/main`
+> vs your base (rebase if behind), the remote branch tip vs your local (expect
+> non-fast-forward rejections; reconcile onto the remote's version, don't
+> clobber it), and the existing tag list + CHANGELOG version slots (renumber
+> your entry if the slot was taken).
+
 ```bash
+git fetch origin && git log --oneline HEAD..origin/main | head   # anything new under you?
 git push -u origin <branch-name>
 ```
 
@@ -848,6 +867,13 @@ gh pr merge <PR> --repo <owner>/<repo> --squash
 ### Step 13: Tag `main` & Publish Release (OPTIONAL — after merge)
 
 If your project versions releases, tag/publish a release after the PR is merged to `main` (the agent merges — Step 12). Order: do this **immediately after merge**, then Step 14 (Done). Follow whatever release policy the project's development-workflow doc defines.
+
+> **Re-run the Step 9 freshness check before tagging.** A concurrent
+> session/agent may have released while your PR was in review: `git fetch
+> --tags` and confirm your intended version doesn't already exist and points
+> where you expect (`gh release view <tag>`). If the slot was taken, bump your
+> version AND the CHANGELOG heading (which then needs to have merged that way —
+> catch this at the Step 9 check, not here, whenever possible).
 
 > **Fill out the CHANGELOG *before* you tag.** If the project keeps a curated
 > changelog (e.g. `CHANGELOG.md`, Keep a Changelog format), add the new version's
