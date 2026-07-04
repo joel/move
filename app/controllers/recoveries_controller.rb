@@ -11,6 +11,8 @@ class RecoveriesController < MoveScopedController
   before_action :require_writable_move!, only: %i[retry]
 
   # GET /moves/:move_id/boxes/:box_id/recovery/photo/:media_id
+
+  #: () -> untyped
   def show
     # A resolved photo (it now has an item) is no longer orphaned — send it to that
     # item, not a dead recovery screen.
@@ -27,6 +29,8 @@ class RecoveriesController < MoveScopedController
 
   # GET .../recovery/photo/:media_id/state — polled status fragment (recognition
   # poller) so a re-run's progress updates in place without a manual refresh.
+
+  #: () -> untyped
   def state
     # layout: false — the recognition poller injects this straight into the panel
     # frame; without it each poll would nest the whole AppShell inside the card.
@@ -39,6 +43,8 @@ class RecoveriesController < MoveScopedController
   # POST .../recovery/photo/:media_id/retry — re-run recognition on a failed photo.
   # RecognitionRuns::Retry guards failed-only + writable, so a stale double-submit
   # is a harmless no-op (replayable POST).
+
+  #: () -> untyped
   def retry
     # The page may be stale: the photo could have been resolved (manual add) or
     # conflict-matched since it loaded, with the run still `failed`. Don't re-run
@@ -56,15 +62,19 @@ class RecoveriesController < MoveScopedController
   # A recovered photo's item may live in another box (Items::Move), so the
   # original box's review walk (box-scoped) wouldn't contain it — sending there
   # renders an empty "Photo 1 of 0". Go to the item itself instead.
+
+  #: () -> String
   def recovered_redirect_path
     item = @move.items.find_by(source_media_id: @media.id)
     item ? move_item_path(@move, item) : move_box_path(@move, @box)
   end
 
+  #: () -> untyped
   def latest_run
     @latest_run ||= @media.recognition_runs.order(created_at: :desc).first
   end
 
+  #: () -> untyped
   def set_box
     @box = authorized_scope(@move.boxes).find(params.expect(:box_id))
   rescue ActiveRecord::RecordNotFound
@@ -73,6 +83,8 @@ class RecoveriesController < MoveScopedController
 
   # Media is reached through the already-authorized box (box scoping is the tenant
   # boundary), mirroring ReviewsController#set_media.
+
+  #: () -> untyped
   def set_media
     @media = @box.media.find(params.expect(:media_id))
   rescue ActiveRecord::RecordNotFound
@@ -80,6 +92,8 @@ class RecoveriesController < MoveScopedController
   end
 
   # Archived-Move redirect target (require_writable_move!) — back to the box.
+
+  #: () -> String
   def read_only_redirect_path
     move_box_path(@move, @box)
   end

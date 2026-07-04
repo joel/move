@@ -10,6 +10,8 @@ class SummariesController < MoveScopedController
   before_action { Current.nav_section = :summary }
 
   # GET /moves/:move_id/summary
+
+  #: () -> untyped
   def show
     authorize! @move, to: :show?, with: MovePolicy
 
@@ -24,6 +26,8 @@ class SummariesController < MoveScopedController
   end
 
   # PATCH /moves/:move_id/summary/unit_system
+
+  #: () -> untyped
   def update_unit_system
     authorize! @move, to: :edit_contents?, with: MovePolicy
     return redirect_to move_summary_path(@move), alert: t(".read_only") unless @move.writable?
@@ -46,6 +50,8 @@ class SummariesController < MoveScopedController
   # an editor (admin/contributor) on a writable Move. A viewer or an archived
   # Move sees the resolved unit system as plain text, never a control that would
   # 403 on submit.
+
+  #: () -> bool
   def editable_units?
     @move.writable? && allowed_to?(:edit_contents?, @move, with: MovePolicy)
   end

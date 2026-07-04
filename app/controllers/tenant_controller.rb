@@ -20,6 +20,8 @@ class TenantController < ApplicationController
   private
 
   # Tenancy is non-disclosing: a tenant surface only exists on an org subdomain.
+
+  #: () -> untyped
   def require_tenant!
     head :not_found unless current_tenant
   end
@@ -31,6 +33,8 @@ class TenantController < ApplicationController
   # Non-disclosing 404 to match the tenancy posture (never reveal the org exists).
   # Unauthenticated requests fall through to require_authenticated_user! (the
   # login/unauthorized response) instead of being 404'd here.
+
+  #: () -> untyped
   def require_membership!
     return if current_user.nil?
 
@@ -39,6 +43,8 @@ class TenantController < ApplicationController
 
   # The Organization registry row for the active tenant (a public/excluded model).
   # Drives the Moves-index sample-provisioning state (#432).
+
+  #: () -> untyped
   def current_organization
     return @current_organization if defined?(@current_organization)
 

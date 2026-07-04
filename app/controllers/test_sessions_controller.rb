@@ -7,6 +7,7 @@ class TestSessionsController < ApplicationController
   # Establishes the session itself; the terms gate (#369) doesn't apply here.
   skip_before_action :require_terms_agreement!, raise: false
 
+  #: () -> untyped
   def show
     raise ActionController::RoutingError, "Not Found" unless Rails.env.test?
 
@@ -21,6 +22,7 @@ class TestSessionsController < ApplicationController
 
   private
 
+  #: () -> untyped
   def find_user
     return User.find(params.expect(:user_id)) if params[:user_id].present?
     return User.find_by!(email: params.expect(:email)) if params[:email].present?

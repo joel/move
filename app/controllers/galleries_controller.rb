@@ -16,6 +16,8 @@ class GalleriesController < MoveScopedController
   DEFAULT_SORT = "recent"
 
   # GET /moves/:move_id/gallery?room_id=&sort=
+
+  #: () -> untyped
   def index
     authorize! @move, to: :show?, with: MovePolicy
 
@@ -50,15 +52,19 @@ class GalleriesController < MoveScopedController
   # Only rooms that actually own at least one photo (in a kept box) earn a filter
   # chip — a read-only surface must not offer a zero-result facet (UX rule 3). All
   # SQL: rooms whose id is among the room_ids of kept boxes that have media.
+
+  #: () -> untyped
   def rooms_with_photos
     photographed_box_ids = @move.boxes.where(id: @move.media.select(:box_id)).where.not(room_id: nil)
     @move.rooms.where(id: photographed_box_ids.select(:room_id)).order(:name)
   end
 
+  #: () -> String
   def sort_key
     SORTS.include?(params[:sort]) ? params[:sort] : DEFAULT_SORT
   end
 
+  #: () -> Symbol
   def sort_direction
     sort_key == "oldest" ? :asc : :desc
   end

@@ -40,17 +40,27 @@ class Activity
   end
 end
 
-# ActiveSupport::CurrentAttributes generates a class-level reader per
-# `attribute` — invisible to static analysis, so declared here (untyped, like
-# the runtime accessors).
+# ActiveSupport::CurrentAttributes generates a class-level reader AND writer
+# per `attribute` — invisible to static analysis, so declared here (untyped,
+# like the runtime accessors).
 class Current
   def self.tenant: () -> untyped
 
+  def self.tenant=: (untyped) -> untyped
+
   def self.move: () -> untyped
+
+  def self.move=: (untyped) -> untyped
 
   def self.nav_section: () -> untyped
 
+  def self.nav_section=: (untyped) -> untyped
+
   def self.user: () -> untyped
 
+  def self.user=: (untyped) -> untyped
+
   def self.source: () -> untyped
+
+  def self.source=: (untyped) -> untyped
 end

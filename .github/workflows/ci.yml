@@ -151,8 +151,10 @@ jobs:
         run: |
           # Clean slate so a REMOVED/renamed model's stale committed sig shows
           # up as a deletion in the diff (generation never deletes orphans).
+          # `all` = models + path helpers; both are deterministic under
+          # RAILS_ENV=test (this job's env — regenerate locally the same way).
           rm -rf sig/rbs_rails
-          bin/rails rbs_rails:generate_rbs_for_models
+          bin/rails rbs_rails:all
           # add -N (intent-to-add): a NEW model's generated sig is otherwise
           # untracked and invisible to `git diff` — the gate would pass while
           # the signature is missing from the repo.

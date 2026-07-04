@@ -15,6 +15,8 @@ class BoxesController < MoveScopedController
                 only: %i[new create edit update transition set_fragile seal description_suggestion destroy]
 
   # GET /moves/:move_id/boxes
+
+  #: () -> untyped
   def index
     # Resolve the filter through the Move's own rooms so an unknown or malformed
     # room_id is treated as a cleared filter, never a stray query.
@@ -36,11 +38,15 @@ class BoxesController < MoveScopedController
   end
 
   # GET /moves/:move_id/boxes/:id
+
+  #: () -> untyped
   def show
     render box_show_view
   end
 
   # GET /moves/:move_id/boxes/new
+
+  #: () -> untyped
   def new
     render Views::Boxes::New.new(
       move: @move, box: @move.boxes.new, rooms: @move.rooms.order(:name),
@@ -49,6 +55,8 @@ class BoxesController < MoveScopedController
   end
 
   # GET /moves/:move_id/boxes/:id/edit
+
+  #: () -> untyped
   def edit
     render Views::Boxes::Edit.new(
       move: @move, box: @box, rooms: @move.rooms.order(:name),
@@ -58,6 +66,8 @@ class BoxesController < MoveScopedController
   end
 
   # POST /moves/:move_id/boxes
+
+  #: () -> untyped
   def create
     result = Boxes::Create.new.call(
       move: @move, params: box_params.to_h.symbolize_keys, creator: current_user
@@ -82,6 +92,8 @@ class BoxesController < MoveScopedController
   end
 
   # PATCH /moves/:move_id/boxes/:id
+
+  #: () -> untyped
   def update
     result = Boxes::Update.new.call(
       box: @box, params: box_params.to_h.symbolize_keys, editor: current_user
@@ -105,6 +117,8 @@ class BoxesController < MoveScopedController
   # seal-with-description modal form breaks out to `_top`, so it lands on the HTML
   # redirect below (a full visit, which also dismisses the native <dialog>); every
   # plain (non-modal) transition streams.
+
+  #: () -> untyped
   def transition
     result = Boxes::TransitionStatus.new.call(
       box: @box, to: params[:to], actor: current_user, description: seal_description
@@ -127,6 +141,8 @@ class BoxesController < MoveScopedController
   end
 
   # PATCH /moves/:move_id/boxes/:id/fragile
+
+  #: () -> untyped
   def set_fragile
     result = Boxes::SetFragile.new.call(box: @box, fragile: params[:fragile], actor: current_user)
 
@@ -149,6 +165,8 @@ class BoxesController < MoveScopedController
   # Soft-deletes the box (cascading the discard to its items) and lands back on
   # the boxes home with a toast — the box and its items can be brought back
   # together from the activity feed (Boxes::Restore).
+
+  #: () -> untyped
   def destroy
     case Boxes::Delete.new.call(box: @box, actor: current_user)
     in Dry::Monads::Success(box)
@@ -162,6 +180,8 @@ class BoxesController < MoveScopedController
   # The "describe before sealing" modal frame, with the contents description
   # auto-proposed (AI when configured, deterministic otherwise). Lazy-loaded by
   # the box-detail dialog so the suggestion only runs when the modal opens.
+
+  #: () -> untyped
   def seal
     # Mirror Boxes::TransitionStatus#validate: a roomless box can't be sealed, so
     # don't render the modal or spend AI quota suggesting for a seal that'd fail.
@@ -173,18 +193,23 @@ class BoxesController < MoveScopedController
 
   # GET /moves/:move_id/boxes/:id/description_suggestion
   # JSON { description: "…" } for the edit-form ✨ button (Stimulus fetch).
+
+  #: () -> untyped
   def description_suggestion
     render json: { description: suggest_description }
   end
 
   private
 
+  #: () -> String
   def suggest_description
     Boxes::SuggestDescription.new.call(box: @box).value_or("")
   end
 
   # Only the seal modal posts a description alongside the transition; other
   # transitions (and a stale UI) send none, leaving any existing value untouched.
+
+  #: () -> untyped
   def seal_description
     params.dig(:box, :description) if params[:to].to_s == "sealed"
   end
@@ -197,6 +222,8 @@ class BoxesController < MoveScopedController
   # photo is foreign/absent (not walkable from here) can't be mistaken for done —
   # it keeps the tertiary state even though the walk can't yet resolve it (the
   # photo-less / moved-in correction is itself resolved on C3, #146).
+
+  #: (untyped items) -> Integer
   def unreviewed_count(items)
     items.where(review_state: %w[pending_review needs_correction]).count
   end
@@ -214,6 +241,8 @@ class BoxesController < MoveScopedController
   #  - still queued/processing → transient, stays a plain thumbnail (#162).
   # The per-record equivalent is Media#orphaned? (used by the recovery flow); this
   # is the set-based form for the gallery, with the in-flight/terminal filter added.
+
+  #: () -> untyped
   def recoverable_media_ids
     item_media = @move.items.with_discarded.where.not(source_media_id: nil).select(:source_media_id)
     suggestion_media = RecognitionSuggestion.where(box: @box).select(:media_id)
@@ -234,6 +263,8 @@ class BoxesController < MoveScopedController
   # item moved to another box keeps its source_media_id: a box-scoped count would
   # miss a still-packed sibling living in another box and badge the photo too early
   # (mirrors recoverable_media_ids' move-wide check). Empty before unpacking.
+
+  #: () -> untyped
   def unpacked_media_ids
     return [] unless @box.unpacking? || @box.unpacked?
 
@@ -244,6 +275,7 @@ class BoxesController < MoveScopedController
          .pluck(:source_media_id)
   end
 
+  #: () -> untyped
   def set_box
     @box = authorized_scope(@move.boxes).find(params.expect(:id))
   rescue ActiveRecord::RecordNotFound
@@ -254,6 +286,8 @@ class BoxesController < MoveScopedController
   # by `transition` (which re-streams it so a status change refreshes the header,
   # the inventory and the gallery badges together; a transition to `unpacked`
   # cascades the in-box items to removed).
+
+  #: () -> untyped
   def box_show_view
     scope = authorized_scope(@box.items).in_box
     items = scope.ordered.to_a
@@ -268,9 +302,10 @@ class BoxesController < MoveScopedController
     # it), so eager-loading the whole set would be wasted work Bullet rightly flags.
     foreign = items.select { |i| i.source_media_id && box_media_ids.exclude?(i.source_media_id) }
     if foreign.any?
+      # The community activerecord sig predates the kwargs Preloader API.
       ActiveRecord::Associations::Preloader.new(
-        records: foreign, associations: { source_media: { image_attachment: :blob } }
-      ).call
+        records: foreign, associations: { source_media: { image_attachment: :blob } } # steep:ignore UnexpectedKeywordArgument
+      ).call # steep:ignore NoMethod
     end
     # The box's real-capture photos that produced an item — the review walk's
     # membership. not_generated excludes AI-generated item images (#416): they
@@ -302,11 +337,13 @@ class BoxesController < MoveScopedController
     )
   end
 
+  #: () -> untyped
   def box_detail_stream
     @box.reload
     turbo_stream.replace(Views::Boxes::Show::ID, view_context.render(box_show_view))
   end
 
+  #: (untyped reason) -> untyped
   def transition_error(reason)
     case reason
     when :room_required then t("boxes.transition.room_required")
@@ -318,6 +355,7 @@ class BoxesController < MoveScopedController
   # Archived Moves are read-only — no creating, editing or transitioning boxes.
   # Explicit key (not lazy) since this runs across several actions.
 
+  #: () -> untyped
   def selected_room_id
     params[:room_id].presence
   end
@@ -325,12 +363,16 @@ class BoxesController < MoveScopedController
   # Permitted `?sort=` key for the Boxes list; defaults to "recent" (newest
   # first) so a freshly added box lands at the top (#336). Unknown values fall
   # back to the default rather than raising or reaching `order` directly.
+
+  #: () -> String
   def sort_key
     @sort_key ||= Box::SORTS.key?(params[:sort]) ? params[:sort] : Box::DEFAULT_SORT
   end
 
   # Move-wide progress, independent of any room filter. Item / pending-review
   # aggregates land with Items in D5; they read as zero here.
+
+  #: () -> Hash[Symbol, untyped]
   def move_summary
     boxes = @move.boxes
     {
@@ -343,6 +385,7 @@ class BoxesController < MoveScopedController
     }
   end
 
+  #: () -> untyped
   def box_params
     params.expect(box: %i[number room_name length_cm width_cm height_cm weight_kg description])
   end

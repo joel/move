@@ -13,6 +13,8 @@ class VocabulariesController < MoveScopedController
   before_action :set_record, only: %i[update destroy]
 
   # GET /moves/:move_id/vocabularies/:kind
+
+  #: () -> untyped
   def index
     authorize! @move, to: :index?, with: VocabularyPolicy
     render Views::Vocabularies::Index.new(
@@ -23,6 +25,8 @@ class VocabulariesController < MoveScopedController
 
   # POST /moves/:move_id/vocabularies/:kind — streams the new value into the list
   # (re-sorted + highlighted) with a toast; the add form clears for the next one.
+
+  #: () -> untyped
   def create
     authorize! @move, to: :create?, with: VocabularyPolicy
 
@@ -50,6 +54,8 @@ class VocabulariesController < MoveScopedController
   # PATCH /moves/:move_id/vocabularies/:kind/:id — rename. Success re-renders the
   # whole list (so the row lands at its new sorted position, highlighted); a
   # rejected rename re-renders just that row with the inline edit form re-opened.
+
+  #: () -> untyped
   def update
     authorize! @move, to: :update?, with: VocabularyPolicy
 
@@ -76,6 +82,8 @@ class VocabulariesController < MoveScopedController
 
   # DELETE /moves/:move_id/vocabularies/:kind/:id — streams the row out (no
   # reload); flips to the empty state on the last value.
+
+  #: () -> untyped
   def destroy
     authorize! @move, to: :destroy?, with: VocabularyPolicy
 
@@ -95,18 +103,22 @@ class VocabulariesController < MoveScopedController
 
   private
 
+  #: () -> String
   def index_path
     move_vocabularies_path(@move, @vocabulary.kind)
   end
 
+  #: () -> bool
   def can_edit?
     allowed_to?(:create?, @move, with: VocabularyPolicy)
   end
 
+  #: () -> untyped
   def records
     @vocabulary.records(@move).order(:name).to_a
   end
 
+  #: () -> untyped
   def usage_counts
     @vocabulary.usage_counts(@move)
   end
@@ -115,6 +127,8 @@ class VocabulariesController < MoveScopedController
   # sorted position (records are name-ordered) and the empty↔populated boundary is
   # handled in one place. Always replace this guaranteed-present wrapper rather
   # than appending to a maybe-absent rows container.
+
+  #: (?highlight_id: untyped) -> untyped
   def list_stream(highlight_id: nil)
     turbo_stream.replace(
       Components::Vocabularies::List::ID,
@@ -125,6 +139,7 @@ class VocabulariesController < MoveScopedController
     )
   end
 
+  #: (untyped record, ?edit_record: untyped, ?open: bool) -> untyped
   def row_stream(record, edit_record: nil, open: false)
     turbo_stream.replace(
       Components::Vocabularies::Row.dom_id(record),
@@ -136,6 +151,7 @@ class VocabulariesController < MoveScopedController
     )
   end
 
+  #: (untyped record) -> untyped
   def add_form_stream(record)
     turbo_stream.replace(
       Components::Vocabularies::AddForm::ID,
@@ -147,23 +163,28 @@ class VocabulariesController < MoveScopedController
 
   # Remove the row; when it was the last value, also replace the list so the empty
   # state takes over.
+
+  #: () -> Array[untyped]
   def destroy_streams
     streams = [turbo_stream.remove(Components::Vocabularies::Row.dom_id(@record))]
     streams << list_stream if records.empty?
     streams
   end
 
+  #: () -> void
   def set_vocabulary
     @vocabulary = Vocabulary.find(params.expect(:kind))
     head :not_found unless @vocabulary
   end
 
+  #: () -> void
   def set_record
     @record = @vocabulary.records(@move).find(params.expect(:id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
   end
 
+  #: () -> untyped
   def vocab_params
     params.expect(vocabulary: @vocabulary.permitted_params).to_h.symbolize_keys
   rescue ActionController::ParameterMissing

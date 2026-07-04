@@ -1,10 +1,12 @@
 # Static type checking — RBS + Steep
 
 Move type-checks the **entire actions layer** (`app/actions/**` and every pack's
-`packs/*/app/actions/**` — rollout completed #519) **and the models**
+`packs/*/app/actions/**` — rollout completed #519), **the models**
 (`app/models/**`, packs' `app/public/**` + `app/models/**` — #521, which also
 brought real model types via generated signatures and the community gem
-signatures) with
+signatures), **and the controllers** (`app/controllers/**` — #523, which also
+brought typed route helpers: a renamed route is a NoMethod error at every stale
+call site) with
 [Steep](https://github.com/soutaro/steep) 2.0 reading **inline RBS
 annotations** (`#:` / `@rbs` comments) natively from the Ruby files — the
 [RBS 4 inline syntax](https://github.com/ruby/rbs/blob/master/docs/inline.md),
@@ -29,8 +31,18 @@ Business logic lives in `app/actions` (AGENTS.md §1 rule 2): plain Ruby, one
 `call` per class, already unit-tested in isolation — the highest-value,
 lowest-friction layer to type. Growth is staged like the Packwerk migration:
 pack-by-pack, each addition a `check` line in the Steepfile — completed for
-actions in #519 and extended to the models (with real model types) in #521.
-Controllers and Phlex views are deliberately out of scope for now.
+actions in #519, the models (with real model types) in #521, and the
+controllers (with typed route helpers) in #523. Phlex views/components are the
+one layer deliberately out of scope (DSL-heavy, no RBS story yet).
+
+Controller-layer notes (#523): the four `app/controllers/concerns/` are
+excluded like the model concerns (`included do` bodies + controller API on
+module-self; the inline parser also rejects `@rbs module-self`) — their
+modules and the surface controllers call statically live in `sig/concerns.rbs`.
+The controllers are therefore enumerated as FILES in the Steepfile. ActionPolicy
+(no community RBS) has its controller mixin surface in `sig/rails_gaps.rbs`,
+alongside turbo-rails'/rodauth-rails' helpers, the Rails 8 `rate_limit` macro,
+and `Current`'s attribute writers.
 
 ## Running it
 
@@ -115,7 +127,15 @@ House rules (`spec/architecture` of the type system, so to speak):
    Config in `config/rbs_rails.rb`. **Freshness is CI-enforced** in the
    `packwerk` job (regenerate + `git diff --exit-code`), the model-signature
    analogue of `RailsSchemaUpToDate`: after a migration touching a model,
-   rerun `bin/rails rbs_rails:generate_rbs_for_models` and commit the diff. Only APP models are generated: rbs_rails derives output paths from source locations, so engine models (ActiveStorage) and path helpers are environment-dependent and excluded — engine constants come from the community sigs + sig/rails_gaps.rbs instead.
+   rerun `RAILS_ENV=test bin/rails rbs_rails:all` and commit the diff. Only APP
+   models are generated (rbs_rails derives output paths from source locations,
+   so engine models like ActiveStorage are environment-dependent and excluded —
+   their constants come from the community sigs + `sig/rails_gaps.rbs`). Route
+   helpers (`path_helpers.rbs`) ARE generated and committed, under
+   **`RAILS_ENV=test` discipline** — the route set differs per environment
+   (dev-only `rails_info_*` vs test-only `test_login`), and test is the CI
+   freshness env, so generation is deterministic there; the interface is mixed
+   into `ApplicationController` in `sig/rails_gaps.rbs` (#523).
 2. **Community gem signatures** — the rbs collection (`rbs_collection.yaml`,
    committed `rbs_collection.lock.yaml`, gitignored `.gem_rbs_collection/`).
    A fresh clone runs `bundle exec rbs collection install` once; CI installs
@@ -170,6 +190,13 @@ adoption found in `Moves::SetRecognitionProvider#persist` before a single
 annotation was written).
 
 **Not caught (accepted, structural):**
+
+- **A test-only route helper used in production code** (`test_login_path` —
+  the one route defined under `Rails.env.test?`) type-checks, because the
+  helper signatures are generated in the test env (the deterministic choice).
+  Accepted: misuse would fail loudly in any exercised code path, the helper is
+  unambiguously test-named, and a generation-time strip filter would add more
+  drift risk than it removes. Pre-#523 no route helper was checked at all.
 
 - **Do-notation `yield` unwrapping is `untyped` by construction.**
   `Dry::Monads::Do` re-invokes `call` with an implicit unwrap block —

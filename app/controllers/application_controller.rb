@@ -38,16 +38,21 @@ class ApplicationController < ActionController::Base
   # Expose the signed-in User to in-request rendering (role-aware nav) via
   # Current, mirroring Current.move/tenant. Reset after each request by
   # ActiveSupport::CurrentAttributes.
+
+  #: () -> void
   def set_current_user
     Current.user = current_user
     Current.source = :web
   end
 
+  #: () -> untyped
   def current_user
     rodauth.rails_account
   end
 
   # The active Apartment tenant (Organization slug), or nil on the public apex.
+
+  #: () -> String?
   def current_tenant
     tenant = Apartment::Tenant.current
     tenant unless tenant == Apartment.default_tenant || tenant == "public"
@@ -60,6 +65,8 @@ class ApplicationController < ActionController::Base
   # tenant or when unauthenticated. Indexed `exists?` — no rows loaded into Ruby.
   # Defined here (not on TenantController) so it resolves for the whole controller
   # tree and is a single, stubbable seam.
+
+  #: () -> bool
   def member_of_current_tenant?
     return false if current_user.nil? || current_tenant.nil?
 
@@ -74,6 +81,8 @@ class ApplicationController < ActionController::Base
   # delete fails, the schema is gone while the row lingers — the schema is the
   # signal the elevator actually uses. Unreachable today (a user owns a single
   # org); it guards the multi-solo-org partial-teardown path.
+
+  #: () -> bool
   def current_subdomain_dropped?
     apex_host.present? && current_tenant.present? &&
       !ActiveRecord::Base.connection.schema_exists?(current_tenant)
@@ -85,6 +94,8 @@ class ApplicationController < ActionController::Base
   # but only the apex is registered with Google; excluded labels (www, move)
   # also resolve to the public tenant, so a host check — not just
   # current_tenant.nil? — is what keeps Google off non-canonical hosts.
+
+  #: () -> bool
   def on_apex_host?
     apex_host.present? && request.host == apex_host
   end
@@ -92,6 +103,8 @@ class ApplicationController < ActionController::Base
   # The canonical apex host this app generates links for (move-easy.org in prod,
   # move.move-easy.docker in dev). Single source of truth for on_apex_host?
   # and the session-handoff failure's apex login URL (#280).
+
+  #: () -> String?
   def apex_host
     Rails.application.config.action_mailer.default_url_options&.dig(:host)
   end
@@ -99,10 +112,13 @@ class ApplicationController < ActionController::Base
   # Both Google credentials are required for the OAuth redirect flow (the code
   # exchange needs the secret). Gates whether any Google sign-in affordance —
   # the apex button or the subdomain "route via apex" link — is offered at all.
+
+  #: () -> bool
   def google_credentials_present?
     ENV["GOOGLE_CLIENT_ID"].present? && ENV["GOOGLE_CLIENT_SECRET"].present?
   end
 
+  #: () -> void
   def require_authenticated_user!
     return if current_user
 
@@ -122,6 +138,8 @@ class ApplicationController < ActionController::Base
   # (login/create-account/the apex are reachable logged-out; each controller's own
   # `require_authenticated_user!` handles auth). Acceptance is identity-level, so
   # the gate holds whatever path (email or Google) created the account.
+
+  #: () -> void
   def require_terms_agreement!
     return if current_user.nil?
     # Gate only on org subdomains. The app — and the agreement wall itself
@@ -145,6 +163,8 @@ class ApplicationController < ActionController::Base
 
   # Single source of truth for "has the account accepted the live terms version".
   # Indexed `exists?` — no rows are loaded into Ruby.
+
+  #: () -> bool
   def terms_accepted?
     current_user.terms_acceptances.exists?(terms_version: Terms::CURRENT_VERSION)
   end
@@ -152,6 +172,8 @@ class ApplicationController < ActionController::Base
   # Remember where the user was headed so accepting the terms returns them there
   # (UX: don't lose a deep link behind the wall). Only a safe, tenant-local GET
   # path — never a mutation target or an off-host URL, and never the wall itself.
+
+  #: () -> void
   def remember_terms_return_path
     # Only safe, idempotent navigations (GET/HEAD) — never a POST/PATCH/DELETE
     # target, which we could not legitimately replay as a GET after acceptance.
@@ -168,6 +190,7 @@ class ApplicationController < ActionController::Base
     session[:terms_return_to] = path
   end
 
+  #: () -> bool
   def safe_navigation_request?
     request.get? || request.head?
   end

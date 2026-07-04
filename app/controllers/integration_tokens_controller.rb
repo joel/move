@@ -12,6 +12,8 @@ class IntegrationTokensController < MoveScopedController
   before_action { Current.nav_section = :menu }
 
   # POST /moves/:move_id/integration_tokens
+
+  #: () -> untyped
   def create
     # Minting a token changes persisted state and grants external access, so it
     # is blocked on an archived (read-only) Move — like the other settings
@@ -35,6 +37,8 @@ class IntegrationTokensController < MoveScopedController
   end
 
   # DELETE /moves/:move_id/integration_tokens/:id
+
+  #: () -> untyped
   def destroy
     result = MoveIntegrationTokens::Revoke.new.call(token: token, actor: current_user)
 
@@ -48,14 +52,17 @@ class IntegrationTokensController < MoveScopedController
 
   private
 
+  #: () -> void
   def require_token_admin!
     authorize! @move, to: :manage_integration_tokens?, with: MovePolicy
   end
 
+  #: () -> untyped
   def token
     @token ||= @move.integration_tokens.find(params.expect(:id))
   end
 
+  #: (Symbol key) -> untyped
   def token_param(key)
     params.dig(:integration_token, key)
   end

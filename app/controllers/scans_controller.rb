@@ -9,12 +9,16 @@ class ScansController < MoveScopedController
   before_action { Current.nav_section = :scan }
 
   # GET /moves/:move_id/scan
+
+  #: () -> untyped
   def show
     authorize! @move, to: :show?, with: MovePolicy
     render Views::Scans::Show.new(move: @move)
   end
 
   # GET /moves/:move_id/scan/:token
+
+  #: () -> untyped
   def resolve
     authorize! @move, to: :show?, with: MovePolicy
 

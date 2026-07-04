@@ -19,6 +19,7 @@ class GoogleOneTapSessionsController < ApplicationController
   # client sends the Rails CSRF token in the X-CSRF-Token header (same-origin
   # fetch, so the session cookie rides along), so legitimate One Tap still works.
 
+  #: () -> untyped
   def create
     payload = verify_google_token(params[:credential])
     unless payload
@@ -51,12 +52,15 @@ class GoogleOneTapSessionsController < ApplicationController
   # creates the account (omniauth_create_account?) and lands them on their org
   # subdomain. That bridge only exists when full OAuth creds are configured;
   # otherwise fall back to the self-service signup form.
+
+  #: () -> String
   def signup_redirect
     return rodauth.create_account_path unless google_credentials_present?
 
     "#{rodauth.login_path}?via=google"
   end
 
+  #: (untyped token) -> untyped
   def verify_google_token(token)
     # A credential must be a non-blank string. Rejecting non-strings here also stops a
     # posted object/array from reaching CGI.escape, which raises TypeError (→ 500) (#495).
@@ -77,6 +81,8 @@ class GoogleOneTapSessionsController < ApplicationController
   # The tokeninfo payload is trustworthy only when it is for THIS app (`aud`), issued
   # by Google (`iss` — asserted locally, not just trusted from the round-trip, #495),
   # and the email is verified.
+
+  #: (untyped data) -> bool
   def valid_google_payload?(data)
     data["aud"] == ENV["GOOGLE_CLIENT_ID"] &&
       GOOGLE_ISSUERS.include?(data["iss"]) &&
@@ -87,6 +93,8 @@ class GoogleOneTapSessionsController < ApplicationController
   # model, so Apartment clones it (empty) into each tenant schema, and the
   # tenant search_path is active on org subdomains. Without `public.` this
   # raw SQL would read/write the wrong (empty) tenant copy.
+
+  #: (untyped google_uid) -> untyped
   def find_user_by_identity(google_uid)
     sql = ActiveRecord::Base.sanitize_sql_array(
       [
@@ -99,6 +107,7 @@ class GoogleOneTapSessionsController < ApplicationController
     User.find(row["user_id"]) if row
   end
 
+  #: (untyped email, untyped google_uid) -> untyped
   def find_and_link_user(email, google_uid)
     user = User.find_by(email: email)
     return unless user
@@ -114,6 +123,7 @@ class GoogleOneTapSessionsController < ApplicationController
     user
   end
 
+  #: (untyped user, untyped payload) -> untyped
   def login_and_respond(user, payload)
     open_status = rodauth.account_open_status_value
 
@@ -147,6 +157,7 @@ class GoogleOneTapSessionsController < ApplicationController
     render json: { ok: true, redirect: org_home_redirect }
   end
 
+  #: () -> String
   def org_home_redirect
     org = rodauth.primary_organization
     # Host-only cookies (#280): hand the session to the subdomain via a single-use
@@ -154,6 +165,7 @@ class GoogleOneTapSessionsController < ApplicationController
     org ? rodauth.tenant_handoff_url(org.slug) : "/"
   end
 
+  #: (untyped user, untyped payload) -> untyped
   def backfill_name(user, payload)
     return if user.name.present?
 

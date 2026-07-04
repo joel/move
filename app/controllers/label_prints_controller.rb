@@ -12,12 +12,14 @@ class LabelPrintsController < MoveScopedController
   before_action { Current.nav_section = :menu }
   before_action :authorize_read!
 
+  #: () -> untyped
   def show
     render label_print_form
   end
 
   private
 
+  #: () -> untyped
   def authorize_read!
     authorize! @move, to: :show?, with: MovePolicy
   end

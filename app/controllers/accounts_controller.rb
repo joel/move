@@ -10,11 +10,15 @@ class AccountsController < ApplicationController
   before_action :set_user
 
   # GET /account
+
+  #: () -> untyped
   def show
     render Views::Accounts::Show.new(user: @user)
   end
 
   # PATCH/PUT /account
+
+  #: () -> untyped
   def update
     if @user.update(account_params)
       redirect_to account_path, notice: t(".notice")
@@ -25,6 +29,8 @@ class AccountsController < ApplicationController
   end
 
   # DELETE /account
+
+  #: () -> untyped
   def destroy
     case Accounts::Delete.new.call(user: @user)
     in Dry::Monads::Success(_user_id)
@@ -45,18 +51,22 @@ class AccountsController < ApplicationController
 
   private
 
+  #: () -> untyped
   def set_user
     @user = current_user
   end
 
+  #: () -> String
   def post_deletion_url
     apex_host ? root_url(host: apex_host) : root_path
   end
 
+  #: () -> String
   def failure_redirect_url
     current_subdomain_dropped? ? post_deletion_url : account_path
   end
 
+  #: () -> untyped
   def account_params
     params.expect(user: [:name])
   end

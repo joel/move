@@ -23,11 +23,21 @@ module Dry
     def self.[]: (*Symbol) -> Module
 
     class Result[F, S]
-      # On the base class on purpose: callers unwrap an action's declared
-      # `Result[untyped, untyped]` return (e.g. DemoData::Reveal on
-      # Moves::CardMetrics). Success[V] instantiates it as `-> V`; Failure[V]
-      # (S = bot) as `-> bot`, which is runtime-accurate — it raises UnwrapError.
+      # On the base class on purpose: callers (controllers pattern-matching or
+      # branching, demo_data unwrapping) hold an action's declared
+      # `Result[untyped, untyped]` return. Success/Failure instantiate the
+      # generics runtime-accurately (e.g. Failure's value! is `-> bot`: it
+      # raises UnwrapError).
       def value!: () -> S
+
+      def success?: () -> bool
+
+      def failure?: () -> bool
+
+      def failure: () -> F
+
+      def value_or: [T] (T) -> (S | T)
+                  | [T] () { (F) -> T } -> (S | T)
     end
 
     class Success[S] < Result[bot, S]
@@ -36,7 +46,6 @@ module Dry
     end
 
     class Failure[F] < Result[F, bot]
-      def failure: () -> F
       def success?: () -> false
       def failure?: () -> true
     end

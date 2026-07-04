@@ -68,6 +68,7 @@ Metrics/BlockLength:
     - config/**/*
     - spec/**/*
     - lib/tasks/**/* # rake task definitions are inherently one long block
+    - Steepfile # declarative check-line DSL, one line per checked file/dir
 
 Metrics/ClassLength:
   Exclude:

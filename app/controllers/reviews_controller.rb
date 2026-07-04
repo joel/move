@@ -16,6 +16,8 @@ class ReviewsController < MoveScopedController
   # Enter at the first photo that still has *unreviewed* items (resuming a
   # partially-reviewed box must not land on an already-confirmed photo); fall
   # back to the first photo, then to the box when there's nothing at all.
+
+  #: () -> untyped
   def index
     media = first_unreviewed_media || review_media.first
     return redirect_to(move_box_path(@move, @box), notice: t("reviews.flash.nothing")) unless media
@@ -24,6 +26,8 @@ class ReviewsController < MoveScopedController
   end
 
   # GET /moves/:move_id/boxes/:box_id/review/photo/:media_id
+
+  #: () -> untyped
   def photo
     # "Reviewed when its photo is shown" — only an editor on a writable Move
     # mutates (viewers / archived Moves see a read-only screen). This is a GET-side
@@ -44,6 +48,8 @@ class ReviewsController < MoveScopedController
   # PATCH .../review/photo/:media_id/items/:id/rename — live auto-save (blur).
   # Name-only; 204 on success (the inline editor stays put), 422 on a rejected
   # name so the client can revert instead of showing a phantom save (#147).
+
+  #: () -> untyped
   def rename_item
     # Pass the raw scalar (not params.expect, which 400s on a blank value) so a
     # rejected name flows through Items::Rename to a consistent 422.
@@ -58,6 +64,8 @@ class ReviewsController < MoveScopedController
   # PATCH .../review/photo/:media_id/items/:id/remove — drop a wrong detection.
   # Streams the row out (no reload); flips to the empty state on the last item.
   # No toast — the row vanishing is the feedback, and corrections come in bursts.
+
+  #: () -> untyped
   def remove_item
     # The review walk removes a mis-detected item *during packing* — a distinct use
     # case from destination-side unpacking, so it bypasses MarkRemoved's phase guard.
@@ -71,6 +79,8 @@ class ReviewsController < MoveScopedController
   # POST .../review/photo/:media_id/items — add a missed item to this photo. Streams
   # the new row in (highlighted + scrolled into view) with a confirmation toast
   # (UX rule #1); HTML clients still redirect.
+
+  #: () -> untyped
   def add_item
     result = Items::CreateManual.new.call(
       box: @box, params: { name: params.dig(:item, :name) }, creator: current_user, source_media: @media
@@ -91,6 +101,8 @@ class ReviewsController < MoveScopedController
   # PATCH .../review/photo/:media_id/move — move this photo (and its co-located
   # items) to another box in the same Move (#317). On success the photo now lives
   # in the target box, so redirect there (its review URL under @box would 404).
+
+  #: () -> untyped
   def move_photo
     target = @move.boxes.find_by(id: params[:target_box_id])
 
@@ -111,6 +123,8 @@ class ReviewsController < MoveScopedController
   # a race would make the count > 1 yet the rows container still wouldn't exist
   # here, so Turbo would silently drop an append). The stable list wrapper always
   # exists, so a replace is robust regardless of how the page was first rendered.
+
+  #: (untyped item) -> untyped
   def add_item_success(item)
     items = photo_items(@media).to_a
     respond_with_streams([review_list_stream(items, highlight_id: item.id)],
@@ -119,6 +133,7 @@ class ReviewsController < MoveScopedController
     end
   end
 
+  #: (Array[untyped] items, ?highlight_id: untyped) -> untyped
   def review_list_stream(items, highlight_id: nil)
     turbo_stream.replace(
       Components::Reviews::ItemList::ID,
@@ -128,6 +143,7 @@ class ReviewsController < MoveScopedController
     )
   end
 
+  #: (untyped reason) -> String
   def move_photo_error(reason)
     key = %i[box_missing same_box cross_move move_archived].include?(reason) ? reason : :failed
     t("reviews.flash.move_photo_errors.#{key}")
@@ -135,6 +151,8 @@ class ReviewsController < MoveScopedController
 
   # Boxes (other than this one) the photo can be moved to, numerically ordered — a
   # string `number` would sort lexically ("10" before "9"), the #283 trap.
+
+  #: () -> untyped
   def other_boxes
     authorized_scope(@move.boxes).where.not(id: @box.id).order(Arel.sql("number::bigint"))
   end
@@ -145,6 +163,8 @@ class ReviewsController < MoveScopedController
   # must not drop it from the walk (that would make `next_after` return nil and
   # let the reviewer skip the remaining photos via "Finish"). The per-photo list
   # itself is still in-box only (see `photo_items`).
+
+  #: () -> Array[untyped]
   def review_media
     @review_media ||= begin
       ids = @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
@@ -156,6 +176,8 @@ class ReviewsController < MoveScopedController
 
   # The first photo (in walk order) that still holds an unreviewed item — where
   # the entry should drop the user when resuming a partially-reviewed box.
+
+  #: () -> untyped
   def first_unreviewed_media
     ids = @box.items.in_box.where(review_state: %w[pending_review needs_correction])
               .where.not(source_media_id: nil).distinct.pluck(:source_media_id)
@@ -166,19 +188,24 @@ class ReviewsController < MoveScopedController
 
   # Every in-box item detected in (or hand-added to) this photo, in detection
   # order. Manual review-time additions carry source_media so they join the list.
+
+  #: (untyped media) -> untyped
   def photo_items(media)
     @box.items.in_box.where(source_media_id: media.id).order(:created_at)
   end
 
+  #: (untyped media, Array[untyped] walk) -> Integer
   def position_of(media, walk)
     (walk.index { |m| m.id == media.id } || 0) + 1
   end
 
+  #: (untyped media, Array[untyped] walk) -> untyped
   def next_after(media, walk)
     idx = walk.index { |m| m.id == media.id }
     idx && walk[idx + 1]
   end
 
+  #: () -> untyped
   def set_box
     @box = authorized_scope(@move.boxes).find(params.expect(:box_id))
   rescue ActiveRecord::RecordNotFound
@@ -187,12 +214,15 @@ class ReviewsController < MoveScopedController
 
   # Media / items are reached through the already-authorized box, so box scoping
   # is the tenant boundary (no separate media policy needed).
+
+  #: () -> untyped
   def set_media
     @media = @box.media.find(params.expect(:media_id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
   end
 
+  #: () -> untyped
   def set_item
     @item = @box.items.find(params.expect(:id))
   rescue ActiveRecord::RecordNotFound
@@ -200,6 +230,8 @@ class ReviewsController < MoveScopedController
   end
 
   # Archived-Move redirect target (require_writable_move!) — back to the box.
+
+  #: () -> String
   def read_only_redirect_path
     move_box_path(@move, @box)
   end

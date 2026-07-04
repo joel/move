@@ -11,6 +11,8 @@ class ItemsController < MoveScopedController
                 only: %i[new create update destroy move mark_removed restore generate_image]
 
   # GET /moves/:move_id/items/:id
+
+  #: () -> untyped
   def show
     render Views::Items::Show.new(
       move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
@@ -19,6 +21,8 @@ class ItemsController < MoveScopedController
   end
 
   # GET /moves/:move_id/boxes/:box_id/items/new
+
+  #: () -> untyped
   def new
     return redirect_to move_box_path(@move, @box), alert: t("items.create.box_closed") if pure_add_closed?
 
@@ -30,6 +34,8 @@ class ItemsController < MoveScopedController
   end
 
   # POST /moves/:move_id/boxes/:box_id/items
+
+  #: () -> untyped
   def create
     authorize! @box.items.new(move: @move), to: :create?, with: ItemPolicy
     media = source_media
@@ -59,6 +65,8 @@ class ItemsController < MoveScopedController
   # C3 auto-saves: the editable form submits on every field change as a Turbo
   # Stream and only the inline "Saved ✓" badge is swapped (the form fields keep
   # their DOM state). The HTML branches remain for non-Turbo clients / B-flows.
+
+  #: () -> untyped
   def update
     result = Items::Update.new.call(item: @item, params: item_params, editor: current_user)
 
@@ -104,6 +112,8 @@ class ItemsController < MoveScopedController
   # Packing-phase delete (C3 shows this while the box is still packing): the item
   # was added by mistake. Soft-deletes the item and its now-orphaned source photo;
   # the activity feed offers a restore. Distinct from mark_removed (unpacking).
+
+  #: () -> untyped
   def destroy
     result = Items::Remove.new.call(item: @item, actor: current_user)
 
@@ -118,6 +128,8 @@ class ItemsController < MoveScopedController
   end
 
   # PATCH /moves/:move_id/items/:id/move
+
+  #: () -> untyped
   def move
     target = @move.boxes.find_by(id: params[:target_box_id])
     result = Items::Move.new.call(item: @item, target_box: target, mover: current_user)
@@ -135,6 +147,8 @@ class ItemsController < MoveScopedController
   # The C3 "mark unpacked" path. Items::MarkRemoved enforces the unpacking-phase
   # rule (delete is the tool while packing), so a stale form / direct PATCH on a
   # still-packing item is refused with a friendly alert.
+
+  #: () -> untyped
   def mark_removed
     case Items::MarkRemoved.new.call(item: @item, actor: current_user)
     in Dry::Monads::Success(_)
@@ -151,6 +165,8 @@ class ItemsController < MoveScopedController
   end
 
   # PATCH /moves/:move_id/items/:id/restore
+
+  #: () -> untyped
   def restore
     Items::RestoreToBox.new.call(item: @item, actor: current_user)
     respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".restored")] }
@@ -161,6 +177,8 @@ class ItemsController < MoveScopedController
   # path, then swaps the box-contents card to its current state; the job's
   # broadcast completes it (→ image, or a retryable failed state). Defends the
   # hidden affordance: only a source-less item on an image-ready Move qualifies.
+
+  #: () -> untyped
   def generate_image
     return head :unprocessable_content unless @item.source_media_id.nil? && @move.image_generation_ready?
 
@@ -185,6 +203,8 @@ class ItemsController < MoveScopedController
   # released the claim → the retryable placeholder. ItemCard derives generating
   # from the persisted claim, so the response never overwrites a completed/failed
   # card with a stale spinner (#416 Codex).
+
+  #: () -> Array[untyped]
   def item_card_stream
     @item.reload
     [turbo_stream.replace(
@@ -194,6 +214,8 @@ class ItemsController < MoveScopedController
   end
 
   # Turbo Stream that swaps the inline auto-save badge in the C3 header.
+
+  #: (Symbol state, ?message: String?) -> untyped
   def save_status_stream(state, message: nil)
     turbo_stream.replace(
       Components::Ui::SaveStatus::ID,
@@ -203,6 +225,8 @@ class ItemsController < MoveScopedController
 
   # Turbo Stream that refreshes the item's review-state chip after a save (the
   # edit promotes it to `confirmed`, so the overlaid badge must update in place).
+
+  #: (untyped item) -> untyped
   def state_badge_stream(item)
     turbo_stream.replace(
       Components::ItemStateBadge.dom_id(item),
@@ -210,6 +234,7 @@ class ItemsController < MoveScopedController
     )
   end
 
+  #: () -> String
   def item_path
     move_item_path(@move, @item)
   end
@@ -217,6 +242,8 @@ class ItemsController < MoveScopedController
   # Streams for a presence flip (mark_removed / restore): the overlay badges (the
   # "Removed" chip appears/disappears) and the footer controls (Move hides while
   # removed; the presence button swaps Restore↔Mark-unpacked/Delete). No reload.
+
+  #: () -> Array[untyped]
   def presence_streams
     @item.reload
     [
@@ -233,6 +260,8 @@ class ItemsController < MoveScopedController
   # The Move control renders only the *other* boxes (the current one is excluded),
   # and only while the item is in-box. Query the targets directly so a single-box
   # Move (or a removed item) loads nothing — no eager-loaded :room left unused.
+
+  #: () -> untyped
   def presence_boxes
     return [] if @item.removed?
 
@@ -242,12 +271,15 @@ class ItemsController < MoveScopedController
   # How many *other* in-box items were detected in the same photo — drives the C3
   # "detected with N other items in this photo" line so a single image reads as
   # many items, not one. Zero for manually-added items (no source media).
+
+  #: (untyped item) -> Integer
   def photo_siblings(item)
     return 0 unless item.created_via == "recognition" && item.source_media_id
 
     @move.items.in_box.where(source_media_id: item.source_media_id).where.not(id: item.id).count
   end
 
+  #: () -> untyped
   def set_box
     @box = authorized_scope(@move.boxes).find(params.expect(:box_id))
   rescue ActiveRecord::RecordNotFound
@@ -258,12 +290,16 @@ class ItemsController < MoveScopedController
   # (packing). A recovery add resolves to a settled orphan photo (corrects a
   # captured photo) and stays allowed in any phase; a forged/stale id that doesn't
   # resolve is treated as a pure add. Mirrors Items::CreateManual#ensure_open.
+
+  #: () -> bool
   def pure_add_closed?
     source_media.nil? && !@box.capturable?
   end
 
   # Recovery flow: a manual add launched from an orphaned photo carries the photo
   # id (query param on `new`, hidden field on `create`) so the item attaches to it.
+
+  #: () -> untyped
   def source_media_id
     params.dig(:item, :source_media_id).presence || params[:source_media_id].presence
   end
@@ -276,6 +312,8 @@ class ItemsController < MoveScopedController
   # here — if not, drop the binding (still create the item; the user wants it in the
   # box, just not attributed to that photo). Mirrors Media#orphaned? + the gallery's
   # settled (not-in-flight) check.
+
+  #: () -> untyped
   def source_media
     return @source_media if defined?(@source_media)
 
@@ -286,12 +324,14 @@ class ItemsController < MoveScopedController
       end
   end
 
+  #: () -> untyped
   def set_item
     @item = authorized_scope(@move.items).find(params.expect(:id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
   end
 
+  #: (untyped reason) -> String
   def move_error(reason)
     case reason
     when :removed then t("items.move.removed_item")
@@ -301,10 +341,12 @@ class ItemsController < MoveScopedController
     end
   end
 
+  #: () -> Hash[Symbol, untyped]
   def item_params
     item_attributes.to_h.symbolize_keys
   end
 
+  #: () -> untyped
   def item_attributes
     params.expect(item: [:name])
   end
