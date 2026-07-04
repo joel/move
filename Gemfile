@@ -134,9 +134,6 @@ group :development do
   # For memory profiling
   gem "memory_profiler"
 
-  # For call-stack profiling flamegraphs
-  gem "stackprof"
-
   # For CPU profiling flamegraphs
   gem "flamegraph"
 end
@@ -204,6 +201,10 @@ gem "rqrcode", "~> 3.0"
 # stay silent. sentry-rails auto-instruments controllers + ActiveJob/Solid Queue.
 gem "sentry-rails"
 gem "sentry-ruby"
+# Sentry's profiling backend (#531) — and the local flamegraph tool. Global
+# (not dev-only) because sentry-ruby's profiler silently no-ops unless
+# StackProf is defined at boot, and production profiles traced requests.
+gem "stackprof"
 
 # Modular boundaries — Packwerk. `packs-rails` is a RUNTIME dependency (not
 # dev-only): it adds `packs/**/app/**` to the autoload + eager_load paths, so the

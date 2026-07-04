@@ -146,4 +146,56 @@ RSpec.describe "Sentry request scrubbing" do # rubocop:disable RSpec/DescribeCla
       Sentry.configuration.rails.active_support_logger_subscription_items["sql.active_record"]
     ).not_to include(:sql)
   end
+
+  it "enables tracing and profiling (#531)" do
+    expect(Sentry.configuration.traces_sample_rate).to eq(1.0)
+    expect(Sentry.configuration.profiles_sample_rate).to eq(1.0)
+    expect(defined?(StackProf)).to be_truthy # the profiler silently no-ops without it
+  end
+
+  it "redacts SQL string literals from traced db spans (Sequel literalizes Rodauth secrets)" do
+    transaction = Sentry.start_transaction(name: "spec", op: "http.server")
+    child = transaction.start_child(
+      op: "db.sql.active_record",
+      description: "INSERT INTO account_email_auth_keys (key) VALUES ('magic-link-secret')"
+    )
+    child.finish
+    transaction.finish
+    event = sentry_events.last
+
+    expect(event).to be_a(Sentry::TransactionEvent)
+    span = event.spans.find { |s| s[:op] == "db.sql.active_record" }
+    expect(span[:description]).not_to include("magic-link-secret")
+    expect(span[:description]).to include("INSERT INTO account_email_auth_keys")
+  end
+
+  it "redacts dollar-quoted and escape-string SQL literals too (future hand-written SQL)" do
+    transaction = Sentry.start_transaction(name: "spec", op: "http.server")
+    transaction.start_child(
+      op: "db.sql.active_record",
+      description: "SELECT 1 WHERE a = $$dollar-secret$$ AND b = $tag$tagged-secret$tag$ AND c = E'esc\\'ape-secret'"
+    ).finish
+    transaction.finish
+    span = sentry_events.last.spans.find { |s| s[:op] == "db.sql.active_record" }
+
+    expect(span[:description]).not_to include("dollar-secret")
+    expect(span[:description]).not_to include("tagged-secret")
+    expect(span[:description]).not_to include("ape-secret")
+  end
+
+  it "scrubs the request context on transactions too" do
+    env = Rack::MockRequest.env_for(
+      "https://demo.move-easy.org/auth?key=magic-link-secret",
+      "HTTP_COOKIE" => "_move_session=session-secret", "HTTP_AUTHORIZATION" => "Bearer integration-token"
+    )
+    Sentry.get_current_scope.set_rack_env(env)
+    transaction = Sentry.start_transaction(name: "spec", op: "http.server")
+    transaction.finish
+    event = sentry_events.last
+
+    expect(event).to be_a(Sentry::TransactionEvent)
+    expect(event.request.cookies).to be_nil
+    expect(event.request.headers).not_to have_key("Authorization")
+    expect(event.request.query_string).not_to include("magic-link-secret")
+  end
 end
