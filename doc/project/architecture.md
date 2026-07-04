@@ -427,7 +427,7 @@ admin. New-user email invitations are deferred.
 | Secrets | `.kamal/secrets` + Doppler `<app>/prd` | synced to GitHub Actions |
 | CI | `.github/workflows/ci.yml` | lint + test; `paths-ignore` for docs (not `[skip ci]`) |
 | Deploy CI | `.github/workflows/deploy.yml` | Kamal on push to `main`; `workflow_dispatch` recovery lever |
-| Error monitoring | `config/initializers/sentry.rb` (#528, #531) | Sentry (errors + performance tracing/profiling at 100% sampling), double-gated: `Sentry.init` only runs when `SENTRY_DSN` is present (optional Doppler secret; dev/test boot Sentry-free) **and** `enabled_environments=%w[production]` (an ambient prod DSN in a dev shell sends nothing). A fail-closed scrub in both `before_send` and `before_send_transaction` keeps auth material out of events, breadcrumbs and traced span SQL — see [`new-app-recipe.md`](new-app-recipe.md) §6d and [`security-model.md`](security-model.md) |
+| Error monitoring | `config/initializers/sentry.rb` (#528, #531) | Sentry (errors + performance tracing at 100%, profiling sampled at 10% — #541), double-gated: `Sentry.init` only runs when `SENTRY_DSN` is present (optional Doppler secret; dev/test boot Sentry-free) **and** `enabled_environments=%w[production]` (an ambient prod DSN in a dev shell sends nothing). A fail-closed scrub in both `before_send` and `before_send_transaction` keeps auth material out of events, breadcrumbs and traced span SQL — see [`new-app-recipe.md`](new-app-recipe.md) §6d and [`security-model.md`](security-model.md) |
 | Skip-marker guard | `.git-hooks/commit_msg/forbid_skip_markers.rb` | rejects `[skip ci]` / `skip-checks: true` |
 | Edge/TLS | Cloudflare Tunnel + `cloudflared` (origin) | `/etc/cloudflared/config.yml` → `http://ORIGIN_IP:80` |
 

@@ -447,6 +447,8 @@ with a stubbed DSN since test boots Sentry-free):
 - **Profiling (`profiles_sample_rate`) silently no-ops unless `StackProf` is
   defined at boot** — the `stackprof` gem must be in the Gemfile's *global*
   group (not `:development`), or production profiles nothing with no warning.
+  Sampled at **10%** (#541 — full profiling was pure overhead on a shared box
+  once trace data was flowing; traces stay at 100%).
   Accepted limitation: StackProf is process-global and non-reentrant, so with
   Solid Queue running inside Puma (`SOLID_QUEUE_IN_PUMA`) concurrent traced
   work means only the first transaction gets a profile — profiles are

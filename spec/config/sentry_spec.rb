@@ -147,9 +147,9 @@ RSpec.describe "Sentry request scrubbing" do # rubocop:disable RSpec/DescribeCla
     ).not_to include(:sql)
   end
 
-  it "enables tracing and profiling (#531)" do
+  it "enables tracing and samples profiling (#531, #541)" do
     expect(Sentry.configuration.traces_sample_rate).to eq(1.0)
-    expect(Sentry.configuration.profiles_sample_rate).to eq(1.0)
+    expect(Sentry.configuration.profiles_sample_rate).to eq(0.1)
     expect(defined?(StackProf)).to be_truthy # the profiler silently no-ops without it
   end
 
