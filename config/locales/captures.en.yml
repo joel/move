@@ -20,6 +20,7 @@ en:
         other: "%{count} captures"
       empty: "Captured images for this box will appear here."
       more: "+%{count} more"
+      ingest_failed: "This photo couldn't be processed. Try capturing it again."
       items_found:
         zero: "No items found"
         one: "1 item found"

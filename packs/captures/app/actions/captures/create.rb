@@ -96,6 +96,10 @@ module Captures
     def attach_media(box, captured_via, upload, normalized)
       media = box.media.new(
         move: box.move, media_type: "image", captured_via: captured_via, captured_at: Time.current,
+        # Synchronous path (MCP / AI-generated): the blob is attached in-request,
+        # so the row is `ready` immediately (the async web path uses `pending` +
+        # Captures::IngestJob instead — #545).
+        status: "ready",
         # ImageNormalizer already wrote the optimised master, so stamp it now —
         # the images:optimize backfill (Phase 42) then skips freshly-captured media.
         optimized_at: Time.current

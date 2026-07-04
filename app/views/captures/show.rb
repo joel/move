@@ -98,15 +98,11 @@ module Views
       #: () -> untyped
       def session_region
         aside(class: "flex flex-col gap-4") do
-          div(class: "flex items-center justify-between px-1") do
-            h3(class: "text-headline-md text-text-warm") { I18n.t("captures.session.title") }
-            span(class: "text-label-caps uppercase text-muted") do
-              I18n.t("captures.session.count", count: @media.size)
-            end
-          end
-          # Live recognition state arrives over ActionCable as each run advances —
-          # no polling (#241). The signed stream binds to this tenant-unique Box;
-          # the subscriber replaces the panel by its stable id.
+          # Title + count now live inside SessionPanel (the replaced target) so a
+          # capture/broadcast update refreshes the count (#546). Live recognition
+          # state arrives over ActionCable as each run advances — no polling
+          # (#241). The signed stream binds to this tenant-unique Box; the
+          # subscriber replaces the panel by its stable id.
           turbo_stream_from(@box, :recognition)
           render Views::Captures::SessionPanel.new(
             box: @box, media: @media, items_by_media: @items_by_media

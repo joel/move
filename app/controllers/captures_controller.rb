@@ -23,11 +23,23 @@ class CapturesController < MoveScopedController
 
   #: () -> untyped
   def create
-    result = Captures::Create.new.call(box: @box, file: params[:file], captured_by: current_user)
+    result = Captures::StartIngest.new.call(box: @box, file: params[:file], captured_by: current_user)
 
     case result
     in Dry::Monads::Success(_media)
-      redirect_to move_box_capture_path(@move, @box), notice: t(".captured")
+      # Async ingest (#545): the row + IngestJob exist, so answer immediately —
+      # replace the panel with the pending placeholder tile (Turbo form) rather
+      # than redirecting + re-rendering. The tile fills in over ActionCable as
+      # ingest → recognition advance.
+      respond_to do |format|
+        format.turbo_stream do
+          render turbo_stream: turbo_stream.replace(
+            Views::Captures::SessionPanel::ID,
+            view_context.render(Captures::SessionContent.new(@box).panel)
+          )
+        end
+        format.html { redirect_to move_box_capture_path(@move, @box), notice: t(".captured") }
+      end
     in Dry::Monads::Failure(reason)
       redirect_to move_box_capture_path(@move, @box), alert: capture_error(reason)
     end

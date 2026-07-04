@@ -17,6 +17,16 @@ class Media < ApplicationRecord
   # recognition.
   CAPTURED_VIA = %w[web mcp generated].freeze
 
+  # Ingest lifecycle (#545). The web capture POST creates a `pending` row and
+  # enqueues Captures::IngestJob, which normalizes → attaches → flips to `ready`
+  # (or `failed` if the upload can't be processed). The synchronous paths
+  # (MCP, AI-generated) attach in-request and create the row already `ready`.
+  # A `pending` row has no image yet — the image-presence validation is gated on
+  # `ready` so the row can exist before its blob is attached.
+  STATUSES = %w[pending ready failed].freeze
+  ACTIVE = %w[pending].freeze
+  TERMINAL = (STATUSES - ACTIVE).freeze
+
   # The formats actually *stored* — what every display surface and the vision
   # providers can read. This is a storage backstop: uploads are normalized by
   # ImageNormalizer before attach (HEIC/TIFF/etc. transcoded to JPEG, unsupported
@@ -45,9 +55,21 @@ class Media < ApplicationRecord
   validates :media_type, inclusion: { in: MEDIA_TYPES }
   validates :captured_via, inclusion: { in: CAPTURED_VIA }
   validates :captured_at, presence: true
-  validates :image, presence: true
+  validates :status, inclusion: { in: STATUSES }
+  # A pending row exists before its blob is attached (#545); only a ready media
+  # must carry an image. The format/size backstops below still apply once one is.
+  validates :image, presence: true, if: :ready?
   validate :image_must_be_an_image
   validate :image_within_size_limit
+
+  #: () -> bool
+  def pending? = status == "pending"
+
+  #: () -> bool
+  def ready? = status == "ready"
+
+  #: () -> bool
+  def ingest_failed? = status == "failed"
 
   #: () -> void
   def image_must_be_an_image
@@ -81,6 +103,10 @@ class Media < ApplicationRecord
   end
 
   scope :recent_first, -> { order(captured_at: :desc) }
+  scope :ready, -> { where(status: "ready") }
+  # Rows whose image ingest hasn't settled yet — pending (in flight) or failed.
+  # The reaper (purge_abandoned_uploads) uses `pending` + age to clear orphans.
+  scope :pending, -> { where(status: "pending") }
   # Real captures only — excludes AI-generated images (#416), which never had a
   # recognition run and so must stay out of the per-photo review walk + the
   # "all reviewed" badge.

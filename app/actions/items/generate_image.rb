@@ -77,7 +77,8 @@ module Items
     def build_media(item, result)
       media = item.box.media.new(
         move: item.move, media_type: "image", captured_via: "generated",
-        captured_at: Time.current, optimized_at: Time.current
+        # Attached synchronously below, so the row is `ready` immediately (#545).
+        status: "ready", captured_at: Time.current, optimized_at: Time.current
       )
       media.image.attach(
         io: StringIO.new(result.image_bytes), filename: "generated-#{item.id}.png",

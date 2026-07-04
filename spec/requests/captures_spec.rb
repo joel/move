@@ -60,10 +60,28 @@ RSpec.describe "Captures" do
   end
 
   describe "POST capture" do
-    it "captures an image, runs recognition inline, and lands split items" do
+    it "responds instantly with a pending placeholder tile — ingest is async (#545)" do
+      allow(Captures::IngestJob).to receive(:perform_later) # keep the heavy work off this request
+
+      expect do
+        post move_box_capture_path(move, box), params: { file: upload },
+                                               headers: { "Accept" => "text/vnd.turbo-stream.html" }
+      end.to change(box.media.pending, :count).by(1)
+
+      expect(response.media_type).to eq("text/vnd.turbo-stream.html")
+      expect(response.body).to include(Views::Captures::SessionPanel::ID)
+      # The count lives inside the replaced panel (#546), so the stream refreshes
+      # it — no stale header after upload.
+      expect(response.body).to include(I18n.t("captures.session.count", count: 1))
+      expect(Captures::IngestJob).to have_received(:perform_later)
+    end
+
+    it "captures an image and lands split items once ingest + recognition run" do
+      # Test runs jobs inline, so the async ingest completes within the request:
+      # IngestJob normalizes/attaches → recognition enqueues + runs.
       expect do
         post move_box_capture_path(move, box), params: { file: upload }
-      end.to change(box.media, :count).by(1)
+      end.to change(box.media.ready, :count).by(1)
 
       expect(response).to redirect_to(move_box_capture_path(move, box))
       expect(box.recognition_runs.last.status).to eq("succeeded")
