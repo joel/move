@@ -183,6 +183,26 @@ RSpec.describe "Sentry request scrubbing" do # rubocop:disable RSpec/DescribeCla
     expect(span[:description]).not_to include("ape-secret")
   end
 
+  it "redacts path-embedded capability tokens from the request URL (Active Storage signed ids, scan tokens)" do
+    event = capture_event_for("https://demo.move-easy.org/rails/active_storage/blobs/proxy/eyJfcmFpbHNSIGNED/photo.jpg")
+
+    expect(event.request.url).not_to include("eyJfcmFpbHNSIGNED")
+    expect(event.request.url).to include("/rails/active_storage/[FILTERED]")
+
+    event = capture_event_for("https://demo.move-easy.org/scan/label-token-secret")
+    expect(event.request.url).not_to include("label-token-secret")
+  end
+
+  it "does not trace Active Storage proxy requests at all (signed ids in the path)" do
+    before_count = sentry_events.size
+    transaction = Sentry.start_transaction(
+      name: "/rails/active_storage/blobs/proxy/eyJSIGNED/photo.jpg", op: "http.server", source: :url
+    )
+    transaction&.finish
+
+    expect(sentry_events.size).to eq(before_count)
+  end
+
   it "redacts the outbound query string from traced http.client span data (One Tap id_token)" do
     transaction = Sentry.start_transaction(name: "spec", op: "http.server")
     span = transaction.start_child(op: "http.client", description: "GET https://oauth2.googleapis.com/tokeninfo")

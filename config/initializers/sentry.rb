@@ -51,6 +51,16 @@ if sentry_dsn.present?
     config.traces_sample_rate = 1.0
     config.profiles_sample_rate = 1.0
 
+    # Never trace Active Storage proxy requests: their URLs embed
+    # NON-EXPIRING signed blob/variant ids in the PATH, and a leaked proxy
+    # URL grants blob read access (security-model.md) — plus image-serving
+    # traces are quota noise. The sampler sees the Rack-level transaction
+    # name, which at sampling time is the raw request path.
+    config.traces_sampler = lambda do |sampling_context|
+      path = sampling_context.dig(:transaction_context, :name).to_s
+      path.start_with?("/rails/active_storage") ? 0.0 : 1.0
+    end
+
     # Raw SQL breadcrumbs would carry Sequel-literalized Rodauth secrets; keep
     # the sql.active_record crumbs (name/cached are useful) but never the
     # statement text.
@@ -77,12 +87,24 @@ if sentry_dsn.present?
       "[FILTERED]"
     end
 
+    # Capability tokens that live in the URL PATH, which no parameter filter
+    # can see: Active Storage proxy URLs (non-expiring signed blob/variant
+    # ids — errors on those routes still reach Sentry even though the
+    # sampler skips their traces) and QR scan links (/scan/:token). Redact
+    # the secret path segment wherever a URL surfaces on an event.
+    scrub_url = lambda do |url|
+      url
+        .gsub(%r{/rails/active_storage/\S*}, "/rails/active_storage/[FILTERED]")
+        .gsub(%r{/scan/[^/?#\s]+}, "/scan/[FILTERED]")
+    end
+
     # Shared by before_send (errors) and before_send_transaction (traces) —
     # transactions carry the SAME request context and breadcrumbs as errors.
     scrub_event = lambda do |event|
       if (request = event.request)
         request.cookies = nil
         request.headers&.delete("Authorization")
+        request.url = scrub_url.call(request.url) if request.url.is_a?(String)
         request.data = scrub_body.call(request.data)
         request.query_string = scrub_query.call(request.query_string) if request.query_string.present?
 
@@ -94,6 +116,10 @@ if sentry_dsn.present?
           request.headers["Referer"] = "#{path}?#{scrub_query.call(query)}"
         end
       end
+
+      # The transaction name is normally the parameterized controller#action,
+      # but a request that dies in middleware keeps the Rack-level raw path.
+      event.transaction = scrub_url.call(event.transaction) if event.transaction.is_a?(String)
 
       # The ActiveJob integration attaches raw job arguments to event.extra.
       # They are positional — no key for ParameterFilter to match — and a
