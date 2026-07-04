@@ -2,7 +2,7 @@
     scenario renders inside. Mirrors the app's ChromeHead asset wiring
     (Tailwind build + importmap JS so Stimulus behaviours work) without the
     app chrome. The Lookbook "theme" display option (see
-    config/initializers/lookbook.rb) drives the dark class; the value is
+    config/environments/development.rb) drives the dark class; the value is
     whitelisted so no raw param ever reaches the markup. %>
 <% theme = params.dig(:lookbook, :display, :theme) %>
 <% theme = "dark" unless %w[dark light].include?(theme) %>

@@ -24,7 +24,7 @@ the `dark` class on the preview iframe — dark first, matching the brand defaul
 | Preview classes | `spec/components/previews/ui/*_preview.rb` |
 | Preview iframe layout | `app/views/layouts/lookbook_preview.html.erb` |
 | Engine mount (dev-only) | `config/routes.rb` (`mount Lookbook::Engine, at: "/lookbook"`) |
-| Configuration | `config/initializers/lookbook.rb` |
+| Configuration | `config/environments/development.rb` (the Lookbook block — must live in env config, **not** an initializer: Lookbook registers the preview dir on the autoload paths before `config/initializers/*` load) |
 | Gems | `Gemfile` `:development` group (`lookbook`, `listen`) |
 
 ## Writing a preview
@@ -83,7 +83,7 @@ Plain RuboCop still lints the preview files.
   because the gem/mount exist only in development.
 - **ViewComponent**: a hard transitive dependency of the `lookbook` gem, loaded
   but unused (`using_view_component = false`); its own preview routes are
-  disabled in `config/initializers/lookbook.rb`.
+  disabled in `config/environments/development.rb`.
 - **Tailwind**: `app/assets/tailwind/application.css` has an `@source` for the
   preview dir so preview-only utility classes compile (dev CSS is rebuilt by
   `bin/rails tailwindcss:watch` / `tailwindcss:build`).
