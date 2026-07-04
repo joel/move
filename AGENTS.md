@@ -10,7 +10,7 @@ This document provides instructions and protocols for AI Agents interacting with
 
 - **Ruby version manager:** This project uses **mise**. Prefix Ruby/Rails commands with `mise x --` (e.g. `mise x -- bundle exec rspec`) so the project's Ruby (`.ruby-version`) is used.
 
-- **URLs:** Local development (via `bin/cli`): `https://move.move-easy.docker` (mail at `https://mail.move-easy.docker`). Production: `https://move-easy.org` (apex/login; org subdomains `<slug>.move-easy.org`), behind Cloudflare (Full Strict, Origin CA wildcard cert served by kamal-proxy).
+- **URLs:** Local development (via `bin/cli`): `https://move.move-easy.docker` (mail at `https://mail.move-easy.docker`). Production: `https://move-easy.org` (apex/login; org subdomains `<slug>.move-easy.org`), behind Cloudflare (Full Strict, Origin CA wildcard cert served by kamal-proxy). Component previews (Lookbook): `https://move.move-easy.docker/lookbook` — development only, apex host; there is no production equivalent (the gem and mount don't exist there, so `move-easy.org/lookbook` 404s by construction).
 
 ### Design source of truth (Google Stitch)
 

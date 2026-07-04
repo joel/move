@@ -10,7 +10,10 @@ complementing the hand-rolled `/style_guide` page (which stays the single-page
 
 Development only. Open **`https://move.move-easy.docker/lookbook`** — the apex
 dev host, **not** an org subdomain: the Apartment elevator keeps the apex on the
-`public` schema, while an unknown-tenant subdomain would 404. After changing the
+`public` schema, while an unknown-tenant subdomain would 404. **There is no
+production URL** — the gem lives in the `:development` group and the mount is
+behind `Rails.env.development?`, so `https://move-easy.org/lookbook` 404s by
+construction (verified live at release). After changing the
 Gemfile (first install) the dev container needs `bin/cli app rebuild`; after that,
 Lookbook live-reloads the UI when preview/component files change (the `listen` gem).
 
