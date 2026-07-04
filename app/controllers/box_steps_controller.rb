@@ -23,6 +23,8 @@ class BoxStepsController < MoveScopedController
   MAX_SKIPPED_NUMBERS = 20
 
   # GET /moves/:move_id/box_steps
+
+  #: () -> untyped
   def show
     counts = state_counts
     render Views::BoxSteps::Show.new(
@@ -33,6 +35,8 @@ class BoxStepsController < MoveScopedController
   end
 
   # POST /moves/:move_id/box_steps
+
+  #: () -> untyped
   def create
     result = Boxes::BulkTransition.new.call(move: @move, to: params[:to], actor: current_user)
 
@@ -50,17 +54,23 @@ class BoxStepsController < MoveScopedController
 
   # Where require_writable_move! sends an editor who tried to act on an archived
   # Move — back to the Menu, the surface this page is reached from.
+
+  #: () -> String
   def read_only_redirect_path
     move_menu_path(@move)
   end
 
   # SQL state distribution (AGENTS.md §1 #5): one GROUP BY, never pluck.tally.
+
+  #: () -> untyped
   def state_counts
     @move.boxes.group(:status).count
   end
 
   # "Sealed 10 boxes. 2 skipped (need a room first): 5, 6." — names what moved and
   # what didn't (with box numbers + reason) so a partial seal is self-explanatory.
+
+  #: (untyped summary) -> untyped
   def summary_flash(summary)
     # When nothing moved but boxes were skipped, lead with the skipped sentence
     # alone — the "no boxes were in that state" copy would be wrong (boxes WERE
@@ -73,6 +83,7 @@ class BoxStepsController < MoveScopedController
     "#{moved} #{skipped_sentence(summary.skipped)}"
   end
 
+  #: (untyped skipped) -> untyped
   def skipped_sentence(skipped)
     # Every forward step has exactly one skip reason today (:room_required on a
     # seal); surface it by reason so the copy stays accurate if more are added.
@@ -80,6 +91,7 @@ class BoxStepsController < MoveScopedController
     t(".skipped", count: skipped.size, reason: reason, numbers: skipped_numbers(skipped))
   end
 
+  #: (untyped skipped) -> untyped
   def skipped_numbers(skipped)
     shown = skipped.first(MAX_SKIPPED_NUMBERS).pluck(:number).join(", ")
     remainder = skipped.size - MAX_SKIPPED_NUMBERS

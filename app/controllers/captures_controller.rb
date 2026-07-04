@@ -10,6 +10,8 @@ class CapturesController < MoveScopedController
   before_action :require_capturable!, only: %i[show create]
 
   # GET /moves/:move_id/boxes/:box_id/capture
+
+  #: () -> untyped
   def show
     content = Captures::SessionContent.new(@box)
     render Views::Captures::Show.new(
@@ -18,6 +20,8 @@ class CapturesController < MoveScopedController
   end
 
   # POST /moves/:move_id/boxes/:box_id/capture
+
+  #: () -> untyped
   def create
     result = Captures::Create.new.call(box: @box, file: params[:file], captured_by: current_user)
 
@@ -30,6 +34,8 @@ class CapturesController < MoveScopedController
   end
 
   # POST /moves/:move_id/boxes/:box_id/capture/retry — new run for a failed media.
+
+  #: () -> untyped
   def retry_recognition
     media = @box.media.find(params.expect(:media_id))
     result = RecognitionRuns::Retry.new.call(run: media.recognition_runs.order(created_at: :desc).first)
@@ -43,6 +49,7 @@ class CapturesController < MoveScopedController
 
   private
 
+  #: () -> untyped
   def set_box
     @box = authorized_scope(@move.boxes).find(params.expect(:box_id))
   rescue ActiveRecord::RecordNotFound
@@ -50,12 +57,15 @@ class CapturesController < MoveScopedController
   end
 
   # Capture into a sealed/closed box is blocked until it is unsealed (Domain §5.2).
+
+  #: () -> untyped
   def require_capturable!
     return if @box.capturable?
 
     redirect_to move_box_path(@move, @box), alert: t("captures.sealed")
   end
 
+  #: (untyped reason) -> untyped
   def capture_error(reason)
     case reason
     when :no_file then t("captures.errors.no_file")
@@ -70,6 +80,8 @@ class CapturesController < MoveScopedController
   end
 
   # Archived-Move redirect target (require_writable_move!) — back to the box.
+
+  #: () -> String
   def read_only_redirect_path
     move_box_path(@move, @box)
   end

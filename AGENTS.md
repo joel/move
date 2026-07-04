@@ -151,14 +151,15 @@ These are non-negotiable for all domain work. Do not reinvent these wheels.
    reference: [`doc/project/packwerk-boundaries.md`](doc/project/packwerk-boundaries.md).
 
 7. **Static types → RBS + Steep.** The whole actions layer (`app/actions/**`,
-   `packs/*/app/actions/**`) **and the models** (`app/models/**`, packs'
-   `app/public/**` + `app/models/**`) carry inline RBS annotations (`#:` /
-   `@rbs` comments, read natively by Steep 2.0) checked merge-blocking by the
-   `Types / steep` step in CI's `lint` job and locally by the `Steep`
-   overcommit hook. Model types are real: schema-derived signatures are
-   generated into `sig/rbs_rails/` (regenerate with `bin/rails rbs_rails:generate_rbs_for_models`
-   after schema changes — CI fails on drift) over the community gem sigs
-   (`rbs collection install` once per clone). Every new/changed
+   `packs/*/app/actions/**`), **the models** (`app/models/**`, packs'
+   `app/public/**` + `app/models/**`), **and the controllers**
+   (`app/controllers/**`) carry inline RBS annotations (`#:` / `@rbs` comments,
+   read natively by Steep 2.0) checked merge-blocking by the `Types / steep`
+   step in CI's `lint` job and locally by the `Steep` overcommit hook. Model
+   and route-helper types are real: schema-derived signatures are generated
+   into `sig/rbs_rails/` (regenerate with `RAILS_ENV=test bin/rails
+   rbs_rails:all` after schema/route changes — CI fails on drift) over the
+   community gem sigs (`rbs collection install` once per clone). Every new/changed
    method in the checked scope gets a `#:` annotation (domain objects stay
    `untyped` — models have no signatures yet); hand shims for gem surfaces live
    in `sig/`. Growth is pack-by-pack, mirroring Packwerk. Conventions, gotchas
@@ -210,7 +211,7 @@ Prefix Ruby commands with `mise x --`. Run these and ensure they pass before com
 
 1. **Linting:** `bundle exec rubocop` (autocorrect with `bundle exec rubocop -A`) and `bin/erb_lint --lint-all`.
 
-2. **Types:** `bundle exec steep check --no-daemon --severity-level=error` (scope: the whole actions layer + models; first run per clone needs `bundle exec rbs collection install`; see [`doc/project/type-checking.md`](doc/project/type-checking.md)).
+2. **Types:** `bundle exec steep check --no-daemon --severity-level=error` (scope: the whole actions layer + models + controllers; first run per clone needs `bundle exec rbs collection install`; see [`doc/project/type-checking.md`](doc/project/type-checking.md)).
 
 3. **Security:** `brakeman --exit-on-warn --no-progress` and `bundle-audit check --update`. Reviewed, accepted findings live in `config/brakeman.ignore`.
 

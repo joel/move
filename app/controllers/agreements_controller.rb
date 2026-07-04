@@ -12,6 +12,8 @@ class AgreementsController < TenantController
   layout -> { Views::Layouts::ApplicationLayout }
 
   # GET /agreement
+
+  #: () -> untyped
   def show
     # Already accepted (e.g. landed here via a stale link)? Don't strand them.
     return redirect_to moves_path if terms_accepted?
@@ -20,6 +22,8 @@ class AgreementsController < TenantController
   end
 
   # POST /agreement
+
+  #: () -> untyped
   def accept
     result = Terms::Accept.new.call(
       user: current_user,
@@ -42,6 +46,8 @@ class AgreementsController < TenantController
 
   # The remembered pre-wall destination, re-validated as a safe tenant-local path
   # (guard against a tampered session), else the app home.
+
+  #: () -> String
   def return_path_after_accept
     path = session.delete(:terms_return_to)
     return moves_path if path.blank?

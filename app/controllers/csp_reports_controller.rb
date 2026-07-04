@@ -13,6 +13,8 @@ class CspReportsController < ActionController::API
   MAX_REPORT_BYTES = 8_192
 
   # POST /csp-violation-report  (Content-Type: application/csp-report)
+
+  #: () -> untyped
   def create
     report = parse_report(request.body.read(MAX_REPORT_BYTES).to_s)
     if report
@@ -29,6 +31,8 @@ class CspReportsController < ActionController::API
 
   # The report body is `{"csp-report": {...}}`; return that inner hash, or nil for
   # anything malformed (bad JSON, wrong shape) — never raise on hostile input.
+
+  #: (String raw) -> untyped
   def parse_report(raw)
     parsed = JSON.parse(raw)
     parsed["csp-report"] if parsed.is_a?(Hash) && parsed["csp-report"].is_a?(Hash)
@@ -41,6 +45,8 @@ class CspReportsController < ActionController::API
   # handoff (`/session/handoff?token=…`) — would otherwise persist an auth secret in
   # the logs, bypassing `filter_parameters` (same class as #492). CSP keywords
   # (`inline`/`eval`/`self`) and relative values pass through with any `?…` stripped.
+
+  #: (untyped value) -> untyped
   def redact_url(value)
     return value if value.blank?
 

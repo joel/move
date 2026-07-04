@@ -13,11 +13,15 @@ class LabelPrintRunsController < MoveScopedController
   before_action :set_run, only: %i[show download]
 
   # GET /moves/:move_id/label_print/runs/:id
+
+  #: () -> untyped
   def show
     render Views::LabelPrintRuns::Show.new(move: @move, run: @run)
   end
 
   # POST /moves/:move_id/label_print/runs
+
+  #: () -> untyped
   def create
     result = LabelPrintRuns::Start.new.call(
       move: @move, from: param_int(:from), to: param_int(:to),
@@ -40,6 +44,8 @@ class LabelPrintRunsController < MoveScopedController
   end
 
   # GET /moves/:move_id/label_print/runs/:id/download
+
+  #: () -> untyped
   def download
     return redirect_to move_label_print_run_path(@move, @run) unless @run.ready?
 
@@ -49,10 +55,12 @@ class LabelPrintRunsController < MoveScopedController
 
   private
 
+  #: () -> untyped
   def authorize_read!
     authorize! @move, to: :show?, with: MovePolicy
   end
 
+  #: () -> untyped
   def set_run
     @run = @move.label_print_runs.find(params.expect(:id))
   rescue ActiveRecord::RecordNotFound
@@ -63,10 +71,13 @@ class LabelPrintRunsController < MoveScopedController
   # at 10 copies the real limit is 40 boxes, not 200. The cap policy lives in the
   # action layer (LabelPrintRuns::Start.box_cap); the controller only consumes it.
   # Other reasons ignore the unused :max interpolation.
+
+  #: (untyped reason) -> untyped
   def range_error(reason)
     t("label_print.errors.#{reason}", max: LabelPrintRuns::Start.box_cap(@move.labels_per_box))
   end
 
+  #: (untyped run) -> String
   def filename(run)
     "boxes-#{format("%03d", run.from_number)}-#{format("%03d", run.to_number)}-labels.pdf"
   end

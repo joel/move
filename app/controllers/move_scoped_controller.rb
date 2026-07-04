@@ -14,6 +14,7 @@ class MoveScopedController < TenantController
 
   private
 
+  #: () -> void
   def set_move
     @move = Current.move = authorized_scope(Move.all).find(params.expect(:move_id))
   rescue ActiveRecord::RecordNotFound
@@ -23,6 +24,8 @@ class MoveScopedController < TenantController
   # Authorize that the current user holds an editing role (admin/contributor) on
   # the Move — the authorization decision lives in MovePolicy#edit_contents?, so a
   # viewer is refused with the standard ActionPolicy 403.
+
+  #: () -> void
   def authorize_move_mutation!
     authorize! @move, to: :edit_contents?, with: MovePolicy
   end
@@ -33,6 +36,8 @@ class MoveScopedController < TenantController
   # (BaseAction#ensure_writable → Failure(:move_archived)); this is the controller's
   # presentation of it, in one place instead of copy-pasted per controller. Each
   # subclass declares only its redirect target via read_only_redirect_path.
+
+  #: () -> void
   def require_writable_move!
     authorize_move_mutation!
     return if @move.writable?
@@ -42,6 +47,8 @@ class MoveScopedController < TenantController
 
   # Where require_writable_move! sends a user who tried to mutate an archived
   # Move. Subclasses override; defaults to the Move's Boxes home.
+
+  #: () -> String
   def read_only_redirect_path
     move_boxes_path(@move)
   end
@@ -52,6 +59,8 @@ class MoveScopedController < TenantController
   # viewers and on archived Moves — the UX complement to the server-side 403
   # (the boundary is already enforced; this just stops showing dead controls).
   # Mirrors MoveMembershipAuthorization#editor_of?.
+
+  #: () -> bool
   def editable_move?
     @move.writable? && allowed_to?(:edit_contents?, @move, with: MovePolicy)
   end

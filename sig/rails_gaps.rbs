@@ -10,6 +10,45 @@ module Rails
   def self.event: () -> untyped
 end
 
+# action_policy has no community RBS. The mixin the controllers include; its
+# method surface is declared as checked call sites demand.
+module ActionPolicy
+  module Controller
+    def authorize!: (?untyped record, **untyped) -> untyped
+
+    def allowed_to?: (Symbol rule, ?untyped record, **untyped) -> bool
+
+    def authorized_scope: (untyped scope, **untyped) -> untyped
+  end
+end
+
+# Route helpers (rbs_rails-generated interface, sig/rbs_rails/path_helpers.rbs,
+# regenerated under RAILS_ENV=test so the route set is deterministic) mixed
+# into the controllers so `move_box_path(...)` calls type-check — a renamed
+# route becomes a NoMethod error at the call site. Plus the controller-side
+# helpers the 7.0-era actionpack sigs / no-RBS gems don't declare:
+# turbo-rails' turbo_stream builder, rodauth-rails' rodauth accessor, and the
+# Rails 8 rate_limit macro.
+class ApplicationController
+  include ::_RbsRailsPathHelpers
+
+  def turbo_stream: () -> untyped
+
+  def rodauth: (?Symbol name) -> untyped
+
+  def self.rate_limit: (**untyped) -> void
+
+  # The offline renderer (`ApplicationController.render(view, layout: false)`)
+  # used by the Turbo Stream broadcasting modules; missing from the 7.0 sigs.
+  def self.render: (*untyped, **untyped) -> untyped
+
+  # action_policy's controller-level macro (authorize :user, through: ...).
+  def self.authorize: (*untyped, **untyped) -> void
+
+  # importmap-rails' freshness macro.
+  def self.stale_when_importmap_changes: () -> void
+end
+
 # Gem class-macros used in model class bodies (known singleton types now that
 # model files are checked). Logidze and neighbor have no community RBS;
 # discard_cascade_to is this app's own Discardable concern macro (the concern

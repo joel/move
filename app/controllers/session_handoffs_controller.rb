@@ -14,6 +14,7 @@ class SessionHandoffsController < ApplicationController
   # post-handoff redirect to the org home lands on a gated surface that enforces it.
   skip_before_action :require_terms_agreement!, raise: false
 
+  #: () -> untyped
   def show
     slug = current_tenant
     return render_expired if slug.blank? # handoff is only meaningful on a tenant subdomain
@@ -30,6 +31,7 @@ class SessionHandoffsController < ApplicationController
 
   private
 
+  #: (untyped user) -> untyped
   def establish_session(user)
     # A handoff token is only minted right after a successful apex authentication
     # (Rodauth's own open-status gate has already run), so a non-open status here
@@ -51,6 +53,7 @@ class SessionHandoffsController < ApplicationController
     redirect_to root_path
   end
 
+  #: () -> untyped
   def render_expired
     render Views::SessionHandoffs::Expired.new(login_url: apex_login_url),
            status: :unauthorized
@@ -58,6 +61,8 @@ class SessionHandoffsController < ApplicationController
 
   # Absolute apex login URL: a failed handoff has no subdomain session, and the
   # apex is the canonical home of every auth flow. https to match tenant_home_url.
+
+  #: () -> String
   def apex_login_url
     "https://#{apex_host}#{rodauth.login_path}"
   end

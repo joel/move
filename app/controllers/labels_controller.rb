@@ -8,6 +8,8 @@ class LabelsController < MoveScopedController
   before_action :set_box
 
   # GET /moves/:move_id/boxes/:box_id/label
+
+  #: () -> untyped
   def show
     authorize! @box, to: :label?, with: BoxPolicy
     pdf = BoxLabelPdf.new(
@@ -18,12 +20,14 @@ class LabelsController < MoveScopedController
 
   private
 
+  #: () -> untyped
   def set_box
     @box = authorized_scope(@move.boxes.includes(:room)).find(params.expect(:box_id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
   end
 
+  #: () -> String
   def filename
     "box-#{format("%03d", @box.number.to_i)}-label.pdf"
   end

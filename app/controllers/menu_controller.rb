@@ -10,6 +10,8 @@ class MenuController < MoveScopedController
   before_action { Current.nav_section = :menu }
 
   # GET /moves/:move_id/menu
+
+  #: () -> untyped
   def show
     authorize! @move, to: :show?, with: MovePolicy
 

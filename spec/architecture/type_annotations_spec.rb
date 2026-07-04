@@ -20,12 +20,12 @@ RSpec.describe "Type annotation coverage" do
     [
       "app/actions/**/*.rb", "packs/*/app/actions/**/*.rb",
       "app/models/**/*.rb", "packs/*/app/public/**/*.rb",
-      "packs/*/app/models/**/*.rb"
+      "packs/*/app/models/**/*.rb", "app/controllers/**/*.rb"
     ]
   end
 
   def excluded_from_checking
-    ["packs/utility/app/models/concerns/"]
+    ["packs/utility/app/models/concerns/", "app/controllers/concerns/"]
   end
 
   # A def is annotated when the nearest preceding non-blank line is an inline
@@ -73,7 +73,8 @@ RSpec.describe "Type annotation coverage" do
   # which case every non-excluded .rb file needs its own check line.
   it "every checked-scope directory has its check line(s) in the Steepfile" do
     steepfile = Rails.root.join("Steepfile").read
-    dirs = Rails.root.glob("packs/*/app/{actions,public,models}") + [Rails.root.join("app/models")]
+    dirs = Rails.root.glob("packs/*/app/{actions,public,models}") +
+           [Rails.root.join("app/models"), Rails.root.join("app/controllers")]
 
     missing = dirs.filter_map do |dir|
       rel = dir.relative_path_from(Rails.root).to_s

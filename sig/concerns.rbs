@@ -1,11 +1,31 @@
-# The two model concerns are deliberately UNCHECKED (see the Steepfile — their
-# `included do` DSL bodies are unmodellable), so their modules aren't
-# inline-declared anywhere. These declarations make the models'
-# `include Discardable` / `include Roleable` resolve; the instance/class
-# surface each concern provides is declared only as checked call sites demand
-# (per-model class methods live in sig/discard.rbs / sig/model_singletons.rbs).
+# Concern modules are deliberately UNCHECKED (see the Steepfile — `included do`
+# DSL bodies and controller/AR API called on module-self are unmodellable), so
+# they aren't inline-declared anywhere. These declarations make the includes
+# resolve; each concern's surface is declared only as checked call sites
+# demand (before_action symbol references are dynamic and need nothing).
+
+# ── Model concerns (packs/utility/app/models/concerns) ──
 module Discardable
 end
 
 module Roleable
+end
+
+# ── Controller concerns (app/controllers/concerns) ──
+module MoveSettings
+  def settings_view: (?revealed_token: untyped) -> untyped
+end
+
+module LabelPrintForm
+  def label_print_form: (?error: untyped, ?confirm: untyped) -> untyped
+
+  def param_int: (untyped key) -> Integer?
+end
+
+module McpAuthentication
+  def current_tenant: () -> untyped
+end
+
+module TurboStreamable
+  def respond_with_streams: (untyped streams, redirect: untyped, ?toast: untyped, ?status: Symbol) -> untyped
 end

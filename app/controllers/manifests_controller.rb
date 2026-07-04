@@ -7,6 +7,8 @@ class ManifestsController < MoveScopedController
   before_action :set_box
 
   # GET /moves/:move_id/boxes/:box_id/manifest
+
+  #: () -> untyped
   def show
     authorize! @box, to: :manifest?, with: BoxPolicy
     box, items = Manifests::Generate.new.call(box: @box, actor: current_user).value!.values_at(:box, :items)
@@ -16,12 +18,14 @@ class ManifestsController < MoveScopedController
 
   private
 
+  #: () -> untyped
   def set_box
     @box = authorized_scope(@move.boxes.includes(:room)).find(params.expect(:box_id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
   end
 
+  #: () -> String
   def filename
     "box-#{format("%03d", @box.number.to_i)}-manifest.pdf"
   end

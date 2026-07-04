@@ -40,9 +40,10 @@ PreCommit:
   Steep:
     enabled: true
     required_executable: bundle
-    description: "Type-checking the actions + model layers with Steep"
+    description: "Type-checking the actions, model, and controller layers with Steep"
     include:
       - "app/actions/**/*.rb"
+      - "app/controllers/**/*.rb"
       - "app/models/**/*.rb"
       # All packs on purpose (not just Steepfile-checked ones): an unchecked
       # pack's file triggers a harmless green whole-target run (~6s), and a

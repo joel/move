@@ -2,13 +2,14 @@
 
 # Static type checking — RBS + Steep. See doc/project/type-checking.md.
 #
-# Scope: the actions layer (AGENTS.md §1 rule 2) — packs' actions are staged in
-# later PRs, pack-by-pack, mirroring how Packwerk boundaries were adopted.
+# Scope: the whole actions layer (root + every pack), the models, and the
+# controllers — grown layer-by-layer (#515 → #517 → #519 → #521 → #523),
+# mirroring how Packwerk boundaries were adopted.
 #
 # Annotations are INLINE (`#:` / `@rbs` comments in the .rb files, read natively
-# by Steep 2.0's `inline: true` — no generated .rbs tree to drift). The only
-# committed signatures under sig/ are hand-written shims for gems with no
-# community RBS (dry-monads).
+# by Steep 2.0's `inline: true` — no generated .rbs tree to drift). sig/ holds
+# hand-written shims (gems with no community RBS, community-sig gaps, def-self
+# declarations) and the rbs_rails-generated model + route-helper signatures.
 #
 # ONE target on purpose. Steep 2.0.0's inline mode registers every inline source
 # file globally; a file reachable from two targets (even `ignore`d in one)
@@ -21,6 +22,47 @@
 
 target :actions do
   check "app/actions", inline: true
+  # Controllers (#523): enumerated as FILES to exclude concerns/ — the four
+  # controller concerns have `included do` bodies and instance methods calling
+  # controller API on module-self, both unmodellable (see the packs/utility
+  # note below; the inline parser also rejects `@rbs module-self`). Their
+  # modules + the surface controllers call are declared in sig/concerns.rbs.
+  check "app/controllers/accounts_controller.rb", inline: true
+  check "app/controllers/activities_controller.rb", inline: true
+  check "app/controllers/agreements_controller.rb", inline: true
+  check "app/controllers/application_controller.rb", inline: true
+  check "app/controllers/box_steps_controller.rb", inline: true
+  check "app/controllers/boxes_controller.rb", inline: true
+  check "app/controllers/captures_controller.rb", inline: true
+  check "app/controllers/csp_reports_controller.rb", inline: true
+  check "app/controllers/galleries_controller.rb", inline: true
+  check "app/controllers/google_one_tap_sessions_controller.rb", inline: true
+  check "app/controllers/integration_tokens_controller.rb", inline: true
+  check "app/controllers/items_controller.rb", inline: true
+  check "app/controllers/label_print_runs_controller.rb", inline: true
+  check "app/controllers/label_prints_controller.rb", inline: true
+  check "app/controllers/labels_controller.rb", inline: true
+  check "app/controllers/manifests_controller.rb", inline: true
+  check "app/controllers/mcp_controller.rb", inline: true
+  check "app/controllers/mcp_uploads_controller.rb", inline: true
+  check "app/controllers/members_controller.rb", inline: true
+  check "app/controllers/menu_controller.rb", inline: true
+  check "app/controllers/move_scoped_controller.rb", inline: true
+  check "app/controllers/moves_controller.rb", inline: true
+  check "app/controllers/recoveries_controller.rb", inline: true
+  check "app/controllers/reviews_controller.rb", inline: true
+  check "app/controllers/rodauth_controller.rb", inline: true
+  check "app/controllers/scans_controller.rb", inline: true
+  check "app/controllers/searches_controller.rb", inline: true
+  check "app/controllers/session_handoffs_controller.rb", inline: true
+  check "app/controllers/settings_controller.rb", inline: true
+  check "app/controllers/style_guide_controller.rb", inline: true
+  check "app/controllers/summaries_controller.rb", inline: true
+  check "app/controllers/tenant_controller.rb", inline: true
+  check "app/controllers/test_sessions_controller.rb", inline: true
+  check "app/controllers/unpacking_controller.rb", inline: true
+  check "app/controllers/vocabularies_controller.rb", inline: true
+  check "app/controllers/welcome_controller.rb", inline: true
   # Models (#521): root + every pack's public/private models. Their
   # schema-derived signatures are GENERATED into sig/rbs_rails/ by
   # `bin/rails rbs_rails:all` (freshness-checked in CI); the inline annotations
@@ -67,6 +109,9 @@ target :actions do
   check "packs/vocabularies/app/actions", inline: true
 
   signature "sig"
+
+  # Stdlib signatures the checked scope needs beyond RBS core.
+  library "cgi"
 
   # Diagnostics run on Steep's default preset (configure_code_diagnostics
   # defaults to Ruby.default when omitted); the blocking threshold is the

@@ -8,6 +8,8 @@ class SearchesController < MoveScopedController
   before_action { Current.nav_section = :search }
 
   # GET /moves/:move_id/search?q=...
+
+  #: () -> untyped
   def index
     query = params[:q].to_s
     recent = Searches::RecentSearches.new(session, @move)

@@ -15,12 +15,16 @@ class SettingsController < MoveScopedController
   before_action { Current.nav_section = :menu }
 
   # GET /moves/:move_id/settings
+
+  #: () -> untyped
   def show
     authorize! @move, to: :show?, with: MovePolicy
     render settings_view
   end
 
   # PATCH /moves/:move_id/settings/unit_system
+
+  #: () -> untyped
   def update_unit_system
     # Re-stream the toggle so the selected pill flips in place (the labels select
     # and threshold slider keep their value client-side, so they need no refresh).
@@ -31,6 +35,8 @@ class SettingsController < MoveScopedController
   end
 
   # PATCH /moves/:move_id/settings/auto_confirm_threshold
+
+  #: () -> untyped
   def update_auto_confirm_threshold
     write_setting(Moves::SetAutoConfirmThreshold, threshold: settings_param(:auto_confirm_threshold)) do |result|
       result.success? ? t(".threshold_changed") : t(".threshold_invalid")
@@ -38,6 +44,8 @@ class SettingsController < MoveScopedController
   end
 
   # PATCH /moves/:move_id/settings/labels_per_box
+
+  #: () -> untyped
   def update_labels_per_box
     write_setting(Moves::SetLabelsPerBox, labels_per_box: settings_param(:labels_per_box)) do |result|
       result.success? ? t(".labels_per_box_changed") : t(".labels_per_box_invalid")
@@ -49,6 +57,8 @@ class SettingsController < MoveScopedController
   # Capability panel (#242). Refreshes the AI panels in place (#260) — a key
   # change lights up that vendor's options in BOTH the recognition and search
   # selectors, so all three panels re-render; a redirect is the non-Turbo fallback.
+
+  #: () -> untyped
   def update_provider_key
     return unless ai_write_allowed?
 
@@ -65,6 +75,8 @@ class SettingsController < MoveScopedController
   end
 
   # DELETE /moves/:move_id/settings/provider_key/:provider (admin-only).
+
+  #: () -> untyped
   def remove_provider_key
     return unless ai_write_allowed?
 
@@ -76,6 +88,8 @@ class SettingsController < MoveScopedController
 
   # PATCH /moves/:move_id/settings/recognition_provider (admin-only). Selector +
   # model only; the key is managed via update_provider_key (#242). In place (#260).
+
+  #: () -> untyped
   def update_recognition_provider
     return unless ai_write_allowed?
 
@@ -95,6 +109,8 @@ class SettingsController < MoveScopedController
   # Turbo Stream that replaces only the Semantic Search panel body, so switching the
   # provider updates in place instead of a full-page reload (#247); a plain redirect
   # is the non-Turbo fallback.
+
+  #: () -> untyped
   def update_embedding_provider
     authorize! @move, to: :manage_recognition_keys?, with: MovePolicy
     return redirect_to(move_settings_path(@move), alert: t(".read_only")) unless @move.writable?
@@ -122,6 +138,8 @@ class SettingsController < MoveScopedController
   # Admin gate + archived read-only guard for the in-place AI writes. Returns true
   # to proceed; on a read-only Move redirects with the action-scoped flash and
   # returns false (a redirect is fine even for a Turbo request — Turbo follows it).
+
+  #: () -> bool
   def ai_write_allowed?
     authorize! @move, to: :manage_recognition_keys?, with: MovePolicy
     return true if @move.writable?
@@ -134,6 +152,8 @@ class SettingsController < MoveScopedController
   # AND replace the toast region so success/failure feedback still reaches the user
   # (a blank-key submit must say so, not silently re-render — #260). HTML fallback:
   # redirect to settings with the same flash.
+
+  #: (untyped result) { (untyped) -> untyped } -> untyped
   def respond_ai_update(result)
     flash_key = result.success? ? :notice : :alert
     message = yield(result)
@@ -151,6 +171,8 @@ class SettingsController < MoveScopedController
   # Replace all three AI panels (capability keys + recognition selector + search
   # selector body) — keys and selector availability are interdependent, so always
   # re-render the set from the (reloaded) Move to keep them consistent.
+
+  #: () -> Array[untyped]
   def ai_panels_stream
     @move.reload
     [
@@ -168,6 +190,8 @@ class SettingsController < MoveScopedController
   # re-render a control whose state changed) with an HTML redirect fallback.
   # Secret-bearing writes pass policy: :manage_recognition_keys?. `refresh` is a
   # lazy callable so its render only runs on the Turbo path (#390 pattern).
+
+  #: (untyped action_class, ?policy: Symbol, ?refresh: untyped, **untyped args) { (untyped) -> untyped } -> untyped
   def write_setting(action_class, policy: :edit_settings?, refresh: nil, **args)
     authorize! @move, to: policy, with: MovePolicy
     return redirect_to(move_settings_path(@move), alert: t(".read_only")) unless @move.writable?
@@ -181,6 +205,7 @@ class SettingsController < MoveScopedController
     end
   end
 
+  #: () -> untyped
   def unit_toggle_stream
     turbo_stream.replace(
       Components::Settings::UnitToggle::ID,
@@ -188,6 +213,7 @@ class SettingsController < MoveScopedController
     )
   end
 
+  #: (Symbol key) -> untyped
   def settings_param(key)
     params.dig(:move, key)
   end

@@ -14,6 +14,8 @@ class UnpackingController < MoveScopedController
   before_action :require_active_checklist, only: %i[remove restore]
 
   # GET /moves/:move_id/boxes/:box_id/unpacking
+
+  #: () -> untyped
   def show
     editable = editable_move?
     return render(Views::Unpacking::Celebration.new(move: @move, box: @box, editable:)) if @box.unpacked?
@@ -30,6 +32,8 @@ class UnpackingController < MoveScopedController
   # section. Streams the surgical DOM updates (no reload) — the source row out,
   # the destination section + progress refreshed; HTML clients still redirect.
   # No toast: the checklist is a rapid tap-loop, so a toast per tap would spam.
+
+  #: () -> untyped
   def remove
     Items::MarkRemoved.new.call(item: @item, actor: current_user)
     respond_with_streams(move_item_streams(from: :remaining, to: :unpacked),
@@ -37,6 +41,8 @@ class UnpackingController < MoveScopedController
   end
 
   # PATCH /moves/:move_id/boxes/:box_id/unpacking/items/:item_id/restore
+
+  #: () -> untyped
   def restore
     Items::RestoreToBox.new.call(item: @item, actor: current_user)
     respond_with_streams(move_item_streams(from: :unpacked, to: :remaining),
@@ -45,6 +51,8 @@ class UnpackingController < MoveScopedController
 
   # PATCH /moves/:move_id/boxes/:box_id/unpacking/complete — mark the box unpacked
   # (cascades every remaining in-box item to removed in one transaction).
+
+  #: () -> untyped
   def complete
     result = Boxes::TransitionStatus.new.call(box: @box, to: "unpacked", actor: current_user)
 
@@ -59,6 +67,8 @@ class UnpackingController < MoveScopedController
   # PATCH /moves/:move_id/boxes/:box_id/unpacking/reopen — celebration "Undo".
   # Reopens the box (unpacked -> unpacking); removed items are restored
   # individually on the checklist, never auto-restored here.
+
+  #: () -> untyped
   def reopen
     Boxes::TransitionStatus.new.call(box: @box, to: "unpacking", actor: current_user)
     redirect_to move_box_unpacking_path(@move, @box)
@@ -75,13 +85,15 @@ class UnpackingController < MoveScopedController
   #   4. only when the source section empties, re-render it too (remaining →
   #      all-clear empty state; unpacked → hidden). While it still has rows the
   #      per-row remove in step 1 is enough — the rest of the list is untouched.
+
+  #: (from: Symbol, to: Symbol) -> Array[untyped]
   def move_item_streams(from:, to:)
     editable = editable_move?
     # Only the destination section is re-rendered, so only it needs its rows (with
     # categories) loaded; the source is just counted in SQL (no eager-load of a
     # list we won't render). When the source empties we render it with no rows.
     destination = ordered_items(to)
-    source_count = items_scope(from).count
+    source_count = items_scope(from).count #: Integer
     remaining_count = to == :remaining ? destination.size : source_count
     total = destination.size + source_count
 
@@ -94,15 +106,18 @@ class UnpackingController < MoveScopedController
     streams
   end
 
+  #: (Symbol variant) -> untyped
   def items_scope(variant)
     scope = authorized_scope(@box.items)
     variant == :remaining ? scope.in_box : scope.removed
   end
 
+  #: (Symbol variant) -> Array[untyped]
   def ordered_items(variant)
     items_scope(variant).ordered.to_a
   end
 
+  #: (remaining_count: Integer, total: Integer) -> untyped
   def progress_stream(remaining_count:, total:)
     turbo_stream.replace(
       Components::Unpacking::ProgressCard::ID,
@@ -110,6 +125,7 @@ class UnpackingController < MoveScopedController
     )
   end
 
+  #: (Symbol variant, Array[untyped] items, untyped editable) -> untyped
   def section_stream(variant, items, editable)
     component, id =
       if variant == :remaining
@@ -122,12 +138,14 @@ class UnpackingController < MoveScopedController
     turbo_stream.replace(id, view_context.render(component))
   end
 
+  #: () -> untyped
   def set_box
     @box = authorized_scope(@move.boxes).find(params.expect(:box_id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
   end
 
+  #: () -> untyped
   def set_item
     @item = authorized_scope(@box.items).find(params.expect(:item_id))
   rescue ActiveRecord::RecordNotFound
@@ -137,6 +155,8 @@ class UnpackingController < MoveScopedController
   # The unpacking surface only exists once a box reaches `unpacking`; earlier
   # lifecycle states have no checklist. The celebration is shown once `unpacked`.
   # Bounce back to the box detail for any other state.
+
+  #: () -> untyped
   def ensure_unpacking_surface
     return if @box.unpacking? || @box.unpacked?
 
@@ -147,6 +167,8 @@ class UnpackingController < MoveScopedController
   # (status `unpacking`). On an `unpacked` box the celebration is showing, so
   # toggling an item back in_box would leave an inconsistent "done" box; on
   # earlier states there is no checklist at all. Reopen first to edit items.
+
+  #: () -> untyped
   def require_active_checklist
     return if @box.unpacking?
 
@@ -155,6 +177,8 @@ class UnpackingController < MoveScopedController
 
   # Archived-Move redirect target (require_writable_move!) — back to the
   # (read-only) unpacking checklist rather than the box.
+
+  #: () -> String
   def read_only_redirect_path
     move_box_unpacking_path(@move, @box)
   end

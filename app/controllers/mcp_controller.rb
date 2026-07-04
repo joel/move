@@ -17,9 +17,13 @@ class McpController < ActionController::API
   # gating discovery. Declared after McpAuthentication, so it runs once @token is set
   # (an unauthenticated request 401s earlier and never reaches here). Uses Rails.cache
   # (Solid Cache in prod) so the window is shared across app instances.
-  rate_limit to: 60, within: 1.minute, by: -> { @token&.id }, with: -> { rate_limited! }
+  # steep: the Rails 8 rate_limit macro predates the 7.0-era actionpack sigs,
+  # and its lambdas run instance-context at runtime (class-context to Steep).
+  rate_limit to: 60, within: 1.minute, by: -> { @token&.id }, with: -> { rate_limited! } # steep:ignore NoMethod
 
   # POST /mcp
+
+  #: () -> untyped
   def handle
     Current.tenant = Apartment::Tenant.current
     Current.move = @token.move
@@ -41,6 +45,7 @@ class McpController < ActionController::API
 
   private
 
+  #: () -> untyped
   def rate_limited!
     render json: {
       jsonrpc: "2.0", id: nil,

@@ -9,6 +9,8 @@ class MembersController < MoveScopedController
   before_action :require_member_admin!
 
   # GET /moves/:move_id/members
+
+  #: () -> untyped
   def index
     render Views::Members::Index.new(
       move: @move, memberships: memberships, candidates: candidates, current_user_id: current_user.id
@@ -18,6 +20,8 @@ class MembersController < MoveScopedController
   # POST /moves/:move_id/members — streams the new member into the (re-sorted,
   # highlighted) roster and refreshes the add form (the added user leaves the
   # candidate pool); a toast confirms. A failed add just toasts the reason.
+
+  #: () -> untyped
   def create
     result = MoveMemberships::Add.new.call(
       move: @move, user_id: member_param(:user_id), role: member_param(:role), actor: current_user
@@ -40,6 +44,8 @@ class MembersController < MoveScopedController
   # Success re-renders the roster (re-sorted by role, the changed member
   # highlighted); a last-admin/failed change re-streams just that row so its
   # select reverts to the persisted role, plus an alert toast.
+
+  #: () -> untyped
   def update_role
     result = MoveMemberships::ChangeRole.new.call(
       membership: membership, role: member_param(:role), actor: current_user
@@ -58,6 +64,8 @@ class MembersController < MoveScopedController
 
   # DELETE /moves/:move_id/members/:id — streams the row out and refreshes the add
   # form (the removed user rejoins the candidate pool); a toast confirms.
+
+  #: () -> untyped
   def destroy
     target = membership
     result = MoveMemberships::Remove.new.call(membership: target, actor: current_user)
@@ -76,10 +84,12 @@ class MembersController < MoveScopedController
 
   private
 
+  #: () -> void
   def require_member_admin!
     authorize! @move, to: :manage_members?, with: MovePolicy
   end
 
+  #: () -> untyped
   def membership
     @membership ||= @move.move_memberships.find(params.expect(:id))
   end
@@ -88,20 +98,26 @@ class MembersController < MoveScopedController
   # model — they are passed as explicit arguments to the MoveMemberships actions,
   # which validate the role (against MoveMembership::ROLES) and the user (must be
   # an Organization member) — so no strong-params permit is needed here.
+
+  #: (Symbol key) -> untyped
   def member_param(key)
     params.dig(:member, key)
   end
 
+  #: () -> String
   def index_path
     move_members_path(@move)
   end
 
+  #: () -> untyped
   def memberships
     @move.move_memberships.includes(:user).order(:role, :created_at)
   end
 
   # Organization users not already on this Move — the only valid candidates,
   # since a Move cannot be shared outside its Organization.
+
+  #: () -> untyped
   def candidates
     organization = Organization.find_by(slug: Apartment::Tenant.current)
     return User.none if organization.nil?
@@ -114,6 +130,8 @@ class MembersController < MoveScopedController
   # Replace the whole stable roster — the added/changed member lands at its
   # role-sorted position, highlighted. Always replace this guaranteed-present
   # wrapper rather than appending to it.
+
+  #: (?highlight_id: untyped) -> untyped
   def list_stream(highlight_id: nil)
     turbo_stream.replace(
       Components::Members::List::ID,
@@ -124,6 +142,7 @@ class MembersController < MoveScopedController
     )
   end
 
+  #: (untyped membership) -> untyped
   def row_stream(membership)
     turbo_stream.replace(
       Components::Members::Row.dom_id(membership),
@@ -136,6 +155,8 @@ class MembersController < MoveScopedController
   # Everything that tracks the candidate pool, refreshed together when it changes
   # (a member added leaves it; a member removed rejoins it): the add-member form
   # AND the header Invite CTA both hide when none remain / reappear when one does.
+
+  #: () -> Array[untyped]
   def candidate_pool_streams
     pool = candidates
     [

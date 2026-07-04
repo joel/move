@@ -11,6 +11,8 @@ class ActivitiesController < MoveScopedController
   before_action :require_writable_move!, only: %i[restore revert]
 
   # GET /moves/:move_id/activity
+
+  #: () -> untyped
   def index
     render activity_index_view(before: cursor)
   end
@@ -18,12 +20,16 @@ class ActivitiesController < MoveScopedController
   # POST /moves/:move_id/activity/:id/restore — re-streams the feed from the top
   # (the restore appends a new audit entry there, and the acted-on row's button
   # drops) + a toast; no reload. HTML clients still redirect.
+
+  #: () -> untyped
   def restore
     result = restore_subject(activities_scope.find(params.expect(:id)))
     stream_feed(result, t(".done"), t(".failed"))
   end
 
   # POST /moves/:move_id/activity/:id/revert
+
+  #: () -> untyped
   def revert
     result = revert_subject(activities_scope.find(params.expect(:id)))
     stream_feed(result, t(".done"), t(".failed"))
@@ -31,10 +37,12 @@ class ActivitiesController < MoveScopedController
 
   private
 
+  #: () -> String
   def read_only_redirect_path
     move_activity_path(@move)
   end
 
+  #: () -> untyped
   def activities_scope
     @move.activities
   end
@@ -42,6 +50,8 @@ class ActivitiesController < MoveScopedController
   # Keyset cursor [time, id] for the next (older) page. Both halves come from the
   # last row of the previous page; id disambiguates rows sharing occurred_at
   # (#194). A malformed/partial cursor yields [nil] → the unfiltered first page.
+
+  #: () -> Array[untyped]
   def cursor
     return [nil] if params[:before].blank? || params[:before_id].blank?
 
@@ -50,10 +60,12 @@ class ActivitiesController < MoveScopedController
     [nil]
   end
 
+  #: () -> Symbol
   def source
     Current.source || :web
   end
 
+  #: (untyped activity) -> untyped
   def restore_subject(activity)
     case activity.subject_type
     when "Box"
@@ -65,6 +77,7 @@ class ActivitiesController < MoveScopedController
     end
   end
 
+  #: (untyped activity) -> untyped
   def revert_subject(activity)
     record = revert_target(activity)
     return nil if record.nil? || record.log_version.to_i < 2
@@ -73,6 +86,7 @@ class ActivitiesController < MoveScopedController
     apply_revert(activity.subject_type, record, prior)
   end
 
+  #: (untyped activity) -> untyped
   def revert_target(activity)
     case activity.subject_type
     when "Box" then @move.boxes.find_by(id: activity.subject_id)
@@ -80,6 +94,7 @@ class ActivitiesController < MoveScopedController
     end
   end
 
+  #: (untyped type, untyped record, untyped prior) -> untyped
   def apply_revert(type, record, prior)
     case type
     when "Item"
@@ -95,10 +110,12 @@ class ActivitiesController < MoveScopedController
 
   # The feed view for the given keyset cursor. `index` passes the request cursor;
   # restore/revert pass the top ([nil]) so the new audit entry is visible.
+
+  #: (?before: Array[untyped]) -> untyped
   def activity_index_view(before: [nil])
     activities = @move.activities.high_signal.recent.before(*before).limit(PAGE).to_a
     feed = ActivityFeed.new(activities, current_user_id: current_user.id, editable: editable_move?)
-    last = (activities.last if activities.size == PAGE)
+    last = (activities.last if activities.size == PAGE) #: untyped
     Views::Activities::Index.new(
       move: @move, groups: feed.grouped,
       restorable: feed.restorable_ids, revertable: feed.revertable_ids,
@@ -108,6 +125,8 @@ class ActivitiesController < MoveScopedController
 
   # On success re-stream the feed (from the top) + a toast; on failure a toast
   # only. HTML clients still redirect (the fallback).
+
+  #: (untyped result, untyped ok_message, untyped fail_message) -> untyped
   def stream_feed(result, ok_message, fail_message)
     success = result.respond_to?(:success?) && result.success?
     streams = success ? -> { [feed_stream] } : []
@@ -117,6 +136,7 @@ class ActivitiesController < MoveScopedController
     end
   end
 
+  #: () -> untyped
   def feed_stream
     turbo_stream.replace(
       Views::Activities::Index::ID, view_context.render(activity_index_view(before: [nil]))

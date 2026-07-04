@@ -6,6 +6,8 @@
 # extends TenantController, not MoveScopedController (keeps the default layout).
 class MovesController < TenantController
   # GET /moves
+
+  #: () -> untyped
   def index
     @moves = authorized_scope(Move.all).order(created_at: :desc)
 
@@ -18,12 +20,16 @@ class MovesController < TenantController
   end
 
   # GET /moves/new
+
+  #: () -> untyped
   def new
     @move = Move.new(unit_system: "metric")
     render Views::Moves::New.new(move: @move)
   end
 
   # POST /moves
+
+  #: () -> untyped
   def create
     authorize! Move, to: :create?, with: MovePolicy
     result = Moves::Create.new.call(params: move_params.to_h.symbolize_keys, creator: current_user)
@@ -42,6 +48,8 @@ class MovesController < TenantController
   # the UI (the card surfaces the affordance only when sample?); the action itself
   # is general. Authorize through the same scope the index uses so a non-member or
   # non-admin can't target another Move.
+
+  #: () -> untyped
   def destroy
     move = authorized_scope(Move.all).find(params.expect(:id))
     authorize! move, to: :destroy?, with: MovePolicy
@@ -61,6 +69,7 @@ class MovesController < TenantController
 
   private
 
+  #: () -> untyped
   def move_params
     params.expect(
       move: %i[name planned_on origin_address destination_address unit_system]
