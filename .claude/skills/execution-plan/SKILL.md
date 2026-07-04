@@ -736,6 +736,21 @@ Practical notes:
   if there's no Codex activity ~5 min after a push, post one `@codex review` (spaced,
   not spammed) and keep polling. Don't merge on "green + silent Codex" when the user's
   gate is "Codex clean" — wait for the actual verdict.
+- **Exception: a docs-only delta after a clean verdict needs no fresh verdict.** If
+  Codex returned a clean verdict on commit X and HEAD was since force-pushed with a
+  delta that is **docs-only** (`git diff X HEAD --stat` touches only CI-ignored paths:
+  `doc/**`, `**/*.md`, `.claude/**`), the reviewed code is byte-identical — the prior
+  verdict satisfies the review gate. Nudge once; if Codex stays silent, merge on the
+  objective gate (Step 12) and **record the judgment call in the merge summary**
+  rather than blocking on a re-review that may never come. (Codex often ignores
+  re-review requests on such pushes — it happened on #538.) Two prerequisites:
+  the rewrite must keep a **code-touching commit at HEAD** (the Step 8b docs-only-tip
+  rule still applies — fold trailing docs into the code commit), and the `lint`/`test`
+  contexts must actually be green on the new sha before Step 12. A history-rewriting
+  force-push gets them despite `paths-ignore`: the old tip becomes unreachable, GitHub
+  can't compute the push diff, and CI always runs when the diff is unavailable (#538's
+  rewritten HEAD ran CI green this way). *Appending* a docs-only commit instead is the
+  BLOCKED trap — normal push, computable diff, no contexts.
 - **Codex re-anchors ALREADY-RESOLVED inline comments to the new HEAD** on each
   re-review, so a naive "inline comments where `commit_id == HEAD`" filter resurfaces
   resolved findings as if they were new — every round. Dedupe by comment **`id`** and
