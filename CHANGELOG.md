@@ -5,6 +5,19 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.80.0] — 2026-07-04
+
+### Added
+- **Scheduled encrypted database backups (internal — no user-facing change,
+  but your data is now recoverable).** Production data — every organisation's
+  rooms, boxes, items and recognition results — is backed up daily to an
+  encrypted, deduplicated offsite repository (restic on Cloudflare R2) via a
+  dedicated [kamal-backup](https://kamal-backup.dev) accessory, with
+  retention (7 daily / 4 weekly / 6 monthly), post-backup integrity checks,
+  restore drills and audit evidence. Photos live in separate object storage
+  and are tracked as a follow-up (#537). Runbooks in
+  `doc/project/backups.md` (#536).
+
 ## [v0.79.0] — 2026-07-04
 
 ### Added

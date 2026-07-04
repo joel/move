@@ -464,6 +464,48 @@ To enable in production:
    — and confirm it appears in the Sentry project (`Sentry.close` flushes the
    async worker before the process exits).
 
+## 6e. Encrypted DB backups (kamal-backup → restic → R2)
+
+Full architecture + runbooks: [`backups.md`](backups.md). The reproducible setup
+(#536):
+
+1. **Gemfile** (`group :development`): `gem "kamal-backup", "0.4.0", require: false`
+   — **pinned**; the gem and the accessory image must be the same version (remote
+   commands fail fast on drift), so bump both in one commit + reboot.
+2. `bundle exec kamal-backup init` → edit `config/kamal-backup.yml`: app name,
+   `url: postgres://<user>@<app>-db:5432/<app>_production` +
+   `password: {secret: POSTGRES_PASSWORD}`, `repository: {secret:
+   RESTIC_REPOSITORY}` (keeps the R2 account id out of a public repo),
+   `init_if_missing: true`, `check_after_backup: true`, retention, `schedule: 1d`.
+   DB-only: drop the generated `paths:` (media/object storage is a separate
+   surface).
+3. **`config/deploy.yml`**: `accessories.backup` — image
+   `ghcr.io/crmne/kamal-backup:0.4.0` (version tag has **no `v` prefix**), the
+   config mounted via `files:`, `env.secret` = `POSTGRES_PASSWORD` +
+   `RESTIC_REPOSITORY` + `RESTIC_PASSWORD` + `AWS_ACCESS_KEY_ID` +
+   `AWS_SECRET_ACCESS_KEY`, and a `<app>_backup_state:/var/lib/kamal-backup`
+   volume (evidence survives reboots).
+4. **R2**: bucket `<app>-backups` + a bucket-scoped S3 **Account** API token
+   (Object Read & Write). Optional hardening: IP-lock it to the origin server —
+   neuters exfiltrated copies, but local drills then need ad-hoc tokens and DR
+   needs a dashboard filter edit first. **Doppler**: the
+   4 secrets above (`RESTIC_PASSWORD` = `openssl rand -hex 32`, hex only —
+   Shellwords parsing truncates values with spaces). **Escrow** the restic
+   password + repo URL in the password manager — losing the password loses the
+   backups. Add the 4 to `.kamal/secrets` (required pattern) and to the deploy
+   workflow env + required-secrets guard; verify `gh secret list` shows them
+   **before** merging.
+5. **Rollout** (an app deploy never boots accessories):
+   `bundle exec kamal-backup validate` (the only gate that catches empty secrets —
+   Kamal boots fine with `""`) → `kamal accessory boot backup` → logs →
+   `backup --force` → `list` → `check` → `evidence` → a restore drill
+   (`drill production` into a scratch DB inside the accessory, or `drill local`
+   onto the dev machine — see [`backups.md`](backups.md)).
+   ⚠ `drill local`/`restore production` need `-c config/deploy.yml` (deployment
+   mode) **and an explicit snapshot id — `latest` fails in a DB-only setup**
+   (no `type:files` snapshot exists; commit a `kamal-backup.local.yml` with
+   `paths: []`). Exact commands in [`backups.md`](backups.md).
+
 ## 7. Cutover order (zero-confusion sequence)
 
 1. Buy domain → add Cloudflare zone → registrar nameservers → wait active.
@@ -491,6 +533,9 @@ To enable in production:
 | `missing attribute 'roles_mask'` 500 after DB wipe | stale Puma schema cache | restart the app container |
 | Deploy didn't run after merge | `[skip ci]`/marker in squash message | repo squash setting + commit-msg hook (§5) |
 | `pg_dump: server version mismatch` | client 17 vs server 18 | `postgresql-client-18` (§2) |
+| backup accessory crash-loops with restic auth/repo errors right after boot | Kamal 2.12 swallows secret command-substitution failures — a missing Doppler value boots the container with `""` | `bundle exec kamal-backup validate` before every accessory boot/reboot (§6e) |
+| `kamal-backup` remote commands fail with a version-mismatch error | local gem and accessory image drifted (e.g. a gem-only bump) | pin both to the same version, bump together, `kamal accessory reboot backup` (§6e) |
+| edited `config/kamal-backup.yml` but the accessory ignores it | `accessory boot` skips a running container; app deploys never touch accessories | `kamal accessory reboot backup` re-uploads `files:` + re-pulls the image |
 | dev seed user in prod | `db:seed` ran on fresh prod DB | guard `db/seeds.rb` against `Rails.env.production?` |
 | `PG::ForeignKeyViolation` writing a tenant table whose FK points at empty `public.X` | deploy ran only `db:prepare`; it migrates `public` programmatically and never fires Apartment's `db:migrate` Rake-task enhancement, so existing tenant schemas stay frozen and unqualified writes fall through `search_path` to `public` | entrypoint runs `db:prepare && db:migrate` (the Rake task → `apartment:migrate`); repair existing prod with `kamal app exec --reuse "bin/rails apartment:migrate"` |
 | `type "<tenant>.vector" does not exist` creating/cloning a tenant | the `vector` extension (+ `*_ops` opclasses) live in `public`; Apartment rewrites `public.X`→`<tenant>.X` on clone | add `vector vector_cosine_ops gin_trgm_ops` to `config.pg_excluded_names` (like `citext`) |
@@ -512,4 +557,4 @@ To enable in production:
 
 ---
 
-_Last updated: 2026-06-15, after per-Move BYO recognition keys + first AR encryption setup (#185)._
+_Last updated: 2026-07-04, after encrypted DB backups via kamal-backup → R2 (#536)._
