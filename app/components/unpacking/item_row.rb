@@ -18,10 +18,12 @@ module Components
       ROW_CLASSES = "group flex w-full items-center gap-4 rounded-card border border-card-border " \
                     "bg-card p-4 transition active:scale-[0.98]"
 
+      # @rbs skip
       def self.dom_id(item, variant)
         "unpacking-#{variant}-item-#{item.id}"
       end
 
+      #: (item: untyped, move: untyped, box: untyped, variant: untyped, editable: untyped) -> void
       def initialize(item:, move:, box:, variant:, editable:)
         @item = item
         @move = move
@@ -30,6 +32,7 @@ module Components
         @editable = editable
       end
 
+      #: () -> void
       def view_template
         if @editable
           # The stable id must sit on the <form> button_to generates (the flex
@@ -46,10 +49,13 @@ module Components
 
       private
 
+      #: () -> untyped
       def remaining? = @variant == :remaining
 
+      #: () -> untyped
       def dom_id = self.class.dom_id(@item, @variant)
 
+      #: () -> untyped
       def action_path
         if remaining?
           move_box_unpacking_remove_path(@move, @box, @item)
@@ -58,30 +64,36 @@ module Components
         end
       end
 
+      #: () -> String
       def button_classes
         remaining? ? "#{ROW_CLASSES} hover:bg-surface-container-high" : "#{ROW_CLASSES} hover:opacity-100"
       end
 
+      #: () -> untyped
       def button_attrs
         remaining? ? {} : { aria_label: I18n.t("unpacking.restore", name: @item.name) }
       end
 
+      #: () -> untyped
       def row_body
         remaining? ? empty_circle : filled_circle
         item_text
       end
 
+      #: () -> untyped
       def empty_circle
         div(class: "flex h-8 w-8 shrink-0 items-center justify-center rounded-full " \
                    "border-2 border-muted transition")
       end
 
+      #: () -> untyped
       def filled_circle
         div(class: "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-sage text-page") do
           render Components::Icons::Check.new(css: "h-5 w-5")
         end
       end
 
+      #: () -> untyped
       def item_text
         strike = remaining? ? "" : " line-through"
         div(class: "flex-1 text-left") do

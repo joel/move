@@ -12,6 +12,7 @@ module Views
     class Show < Views::Base
       include Phlex::Rails::Helpers::ButtonTo
 
+      #: (move: untyped, summary: untyped, ?editable: untyped) -> void
       def initialize(move:, summary:, editable: false)
         @move = move
         @summary = summary
@@ -19,6 +20,7 @@ module Views
         @measurements = MoveMeasurements.new(unit_system: move.unit_system)
       end
 
+      #: () -> void
       def view_template
         div(class: "flex flex-col gap-section-gap") do
           header
@@ -34,6 +36,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def header
         render Components::Ui::SectionHeader.new(
           eyebrow: @move.name,
@@ -46,6 +49,8 @@ module Views
 
       # Read-only members (and archived Moves) see which unit system is in
       # effect as a plain chip, never an interactive control that would 403.
+
+      #: () -> untyped
       def current_unit_label
         span(
           class: "inline-flex self-start rounded-full border border-card-border " \
@@ -55,12 +60,15 @@ module Views
 
       # Segmented pill: the active system is an inert label, the other a tiny
       # form that PATCHes Move#unit_system. Hidden entirely on archived Moves.
+
+      #: () -> untyped
       def unit_toggle
         div(class: "inline-flex self-start rounded-full border border-card-border bg-card p-1") do
           Move::UNIT_SYSTEMS.each { |system| unit_toggle_option(system) }
         end
       end
 
+      #: (untyped system) -> untyped
       def unit_toggle_option(system)
         label = I18n.t("summaries.show.#{system}")
         if @move.unit_system == system
@@ -75,12 +83,15 @@ module Views
         end
       end
 
+      #: () -> String
       def toggle_classes
         "rounded-full px-6 py-2 text-sm font-semibold transition"
       end
 
       # Only shown when some box is missing a dimension; "Review" deep-links to
       # Boxes where the dimensions can be filled in.
+
+      #: () -> untyped
       def missing_banner
         div(class: "flex flex-col gap-4 rounded-card border border-secondary/40 bg-secondary/10 " \
                    "p-4 sm:flex-row sm:items-center") do
@@ -101,6 +112,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def metric_cards
         section(
           aria_label: I18n.t("summaries.show.metrics_label"),
@@ -112,6 +124,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def volume_card
         metric_card(
           icon: Components::Icons::Chart,
@@ -122,6 +135,7 @@ module Views
         )
       end
 
+      #: () -> untyped
       def weight_card
         metric_card(
           icon: Components::Icons::Boxes,
@@ -134,6 +148,8 @@ module Views
 
       # The box count is always an exact integer (no unit, no "missing" case), so
       # it gets its own emphasised card rather than the Quantity treatment.
+
+      #: () -> untyped
       def boxes_card
         render Components::Ui::Card.new(padding: "p-6") do
           metric_head(Components::Icons::Boxes, I18n.t("summaries.show.total_boxes"))
@@ -146,6 +162,7 @@ module Views
         end
       end
 
+      #: (icon: untyped, label: untyped, quantity: untyped, caption: untyped, empty: untyped) -> untyped
       def metric_card(icon:, label:, quantity:, caption:, empty:)
         render Components::Ui::Card.new(padding: "p-6") do
           metric_head(icon, label)
@@ -164,6 +181,7 @@ module Views
         end
       end
 
+      #: (untyped icon, untyped label) -> untyped
       def metric_head(icon, label)
         div(class: "flex items-start justify-between") do
           span(
@@ -174,6 +192,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def room_breakdown
         max_volume = @summary.rooms.filter_map(&:volume_cm3).max
         section(aria_label: I18n.t("summaries.show.room_breakdown"), class: "flex flex-col gap-stack-gap") do
@@ -184,6 +203,7 @@ module Views
         end
       end
 
+      #: (untyped room_summary, untyped max_volume) -> untyped
       def room_card(room_summary, max_volume)
         render Components::Ui::Card.new(padding: "p-5") do
           div(class: "flex items-center justify-between gap-3") do
@@ -213,6 +233,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def empty_state
         render Components::Ui::Card.new(padding: "p-10") do
           div(class: "flex flex-col items-center gap-4 text-center") do
@@ -232,15 +253,18 @@ module Views
         end
       end
 
+      #: (untyped room_summary) -> untyped
       def room_name(room_summary)
         room_summary.room ? room_summary.room.name : I18n.t("summaries.show.unassigned")
       end
 
+      #: (untyped room_summary) -> untyped
       def room_volume_label(room_summary)
         quantity = @measurements.volume(room_summary.volume_cm3)
         quantity ? "#{quantity.value} #{quantity.unit}" : I18n.t("summaries.show.unknown_volume")
       end
 
+      #: () -> Integer
       def room_count
         @summary.rooms.count(&:room)
       end

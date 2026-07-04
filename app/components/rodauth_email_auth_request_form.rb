@@ -4,6 +4,7 @@ module Components
   class RodauthEmailAuthRequestForm < Components::Base
     include Phlex::Rails::Helpers::FormWith
 
+    #: () -> void
     def view_template
       div(class: "ha-card p-6 space-y-6") do
         div do

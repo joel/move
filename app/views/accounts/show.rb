@@ -6,10 +6,12 @@ module Views
       include Phlex::Rails::Helpers::LinkTo
       include Phlex::Rails::Helpers::ButtonTo
 
+      #: (user: untyped) -> void
       def initialize(user:)
         @user = user
       end
 
+      #: () -> void
       def view_template
         div(class: "space-y-8") do
           render Components::PageHeader.new(
@@ -35,6 +37,8 @@ module Views
 
       # Passwordless passkey (WebAuthn) management: "Add passkey" until the
       # account has one registered, then "Manage passkeys" to review/remove.
+
+      #: () -> untyped
       def render_security
         section(class: "space-y-4") do
           h2(class: "ha-overline") { "Security" }
@@ -58,6 +62,8 @@ module Views
 
       # Irreversible actions, isolated at the bottom so they're never adjacent to
       # benign controls.
+
+      #: () -> untyped
       def render_danger_zone
         section(class: "space-y-4") do
           h2(class: "ha-overline text-[var(--ha-error)]") { "Danger zone" }
@@ -91,11 +97,13 @@ module Views
         end
       end
 
+      #: () -> untyped
       def passkey_path
         rodauth = view_context.rodauth
         passkey_registered? ? rodauth.webauthn_remove_path : rodauth.webauthn_setup_path
       end
 
+      #: () -> String
       def passkey_label
         passkey_registered? ? "Manage passkeys" : "Add passkey"
       end
@@ -103,6 +111,8 @@ module Views
       # rodauth.webauthn_setup? reads the authenticated Rodauth account; guard on
       # logged_in? so the page never raises when current_user is present without a
       # Rodauth session (e.g. request specs that stub current_user).
+
+      #: () -> bool
       def passkey_registered?
         rodauth = view_context.rodauth
         rodauth.logged_in? && rodauth.webauthn_setup?

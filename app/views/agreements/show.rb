@@ -10,6 +10,7 @@ module Views
     class Show < Views::Base
       include Phlex::Rails::Helpers::FormWith
 
+      #: () -> void
       def view_template
         div(class: "flex min-h-[70vh] items-center justify-center") do
           div(class: "w-full max-w-2xl space-y-8") do
@@ -25,6 +26,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def header_block
         div(class: "text-center") do
           h1(class: "font-headline text-3xl font-bold tracking-tighter") do
@@ -37,6 +39,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def terms_block
         p(class: "text-sm text-[var(--ha-on-surface-variant)]") { plain ::Terms::INTRO }
 
@@ -52,6 +55,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def accept_form
         form_with(
           url: view_context.accept_agreement_path,
@@ -63,6 +67,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def sign_out_block
         p(class: "text-center text-sm text-[var(--ha-on-surface-variant)]") do
           plain "Not ready to accept? "

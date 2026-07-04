@@ -4,6 +4,7 @@ module Components
   class RodauthLoginFormFooter < Components::Base
     include Phlex::Rails::Helpers::LinkTo
 
+    #: () -> void
     def view_template
       return if view_context.rodauth.login_form_footer_links.empty?
 

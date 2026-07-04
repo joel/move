@@ -9,10 +9,12 @@ module Views
     class Expired < Views::Base
       include Phlex::Rails::Helpers::LinkTo
 
+      #: (login_url: untyped) -> void
       def initialize(login_url:)
         @login_url = login_url
       end
 
+      #: () -> void
       def view_template
         div(
           class: "mx-auto max-w-xl rounded-3xl border border-white/10 " \

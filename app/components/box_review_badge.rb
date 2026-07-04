@@ -11,6 +11,7 @@ module Components
     REVIEWED_TINT = "bg-accent-sage/15 text-accent-sage hover:bg-accent-sage/25"
     PENDING_TINT = "bg-tertiary/15 text-tertiary hover:bg-tertiary/25"
 
+    #: (move: untyped, box: untyped, pending_count: untyped) -> void
     def initialize(move:, box:, pending_count:)
       @move = move
       @box = box
@@ -19,6 +20,8 @@ module Components
 
     # Prefetch off: opening a photo marks its items reviewed, so hover must not
     # confirm them prematurely.
+
+    #: () -> void
     def view_template
       reviewed = @pending_count.zero?
       a(href: move_box_review_path(@move, @box), data: { turbo_prefetch: "false" },

@@ -12,11 +12,13 @@ module Components
 
       ID = "add-member"
 
+      #: (move: untyped, candidates: untyped) -> void
       def initialize(move:, candidates:)
         @move = move
         @candidates = candidates.to_a
       end
 
+      #: () -> void
       def view_template
         div(id: ID) do
           card if @candidates.any?
@@ -25,6 +27,7 @@ module Components
 
       private
 
+      #: () -> untyped
       def card
         render Components::Ui::Card.new(padding: "p-6") do
           h3(class: "text-headline-md text-text-warm") { I18n.t("members.add.title") }
@@ -51,10 +54,12 @@ module Components
         end
       end
 
+      #: () -> untyped
       def role_options
         MoveMembership::ROLES.map { |role| [I18n.t("members.roles.#{role}"), role] }
       end
 
+      #: (untyped user) -> untyped
       def candidate_label(user)
         user.name.present? ? "#{user.name} · #{user.email}" : user.email
       end

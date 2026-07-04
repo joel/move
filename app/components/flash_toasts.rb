@@ -18,6 +18,7 @@ module Components
     # stray toast by omission.)
     TOAST_VARIANTS = { "notice" => :success, "alert" => :error, "error" => :error }.freeze
 
+    #: () -> void
     def view_template
       div(id: ID, class: "pointer-events-none fixed right-6 top-20 md:top-6 z-50 " \
                          "flex w-[calc(100vw-3rem)] max-w-sm flex-col gap-3") do

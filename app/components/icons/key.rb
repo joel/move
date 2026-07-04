@@ -4,6 +4,7 @@ module Components
   module Icons
     # A key — the medallion for passkey / security affordances.
     class Key < Components::Icons::Base
+      #: () -> void
       def view_template
         svg(
           class: @css, **@attrs, viewBox: "0 0 24 24", fill: "none",

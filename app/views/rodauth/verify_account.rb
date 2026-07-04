@@ -6,6 +6,7 @@ module Views
       include Phlex::Rails::Helpers::FormWith
       include Phlex::Rails::Helpers::ContentTag
 
+      #: () -> void
       def view_template
         div(class: "space-y-8") do
           div(class: "ha-card p-8") do
@@ -47,6 +48,7 @@ module Views
 
       private
 
+      #: (untyped form) -> untyped
       def render_password_field(form)
         password_error = view_context.rodauth.field_error(view_context.rodauth.password_param)
         aria_attrs = if password_error
@@ -79,6 +81,7 @@ module Views
         end
       end
 
+      #: (untyped form) -> untyped
       def render_password_confirm_field(form)
         password_confirm_error = view_context.rodauth.field_error(
           view_context.rodauth.password_confirm_param

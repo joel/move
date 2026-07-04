@@ -10,6 +10,7 @@ module Components
     class List < Components::Base
       ID = "vocab-list"
 
+      #: (move: untyped, vocabulary: untyped, records: untyped, usage_counts: untyped, can_edit: untyped, ?highlight_id: untyped) -> void
       def initialize(move:, vocabulary:, records:, usage_counts:, can_edit:, highlight_id: nil)
         @move = move
         @vocabulary = vocabulary
@@ -19,6 +20,7 @@ module Components
         @highlight_id = highlight_id
       end
 
+      #: () -> void
       def view_template
         div(id: ID) do
           @records.any? ? rows : empty_state
@@ -27,6 +29,7 @@ module Components
 
       private
 
+      #: () -> untyped
       def rows
         div(class: "flex flex-col gap-stack-gap") do
           @records.each do |record|
@@ -39,6 +42,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def empty_state
         render Components::Ui::EmptyState.new(
           icon: @vocabulary.icon,

@@ -10,6 +10,7 @@ module Components
     #     options: [["Metric", "metric"], ["Imperial", "imperial"]]
     #   )
     class Select < Components::Base
+      #: (name: untyped, label: untyped, ?options: untyped, ?selected: untyped, ?error: untyped, **untyped) -> void
       def initialize(name:, label:, options: [], selected: nil, error: nil, **attrs)
         @name = name
         @label = label
@@ -19,6 +20,7 @@ module Components
         @attrs = attrs
       end
 
+      #: () -> void
       def view_template
         div(class: "flex flex-col gap-2") do
           label(for: field_id, class: "text-label-caps uppercase text-muted") do
@@ -37,12 +39,14 @@ module Components
 
       private
 
+      #: () -> String
       def classes
         edge = @error ? "border border-error" : "border border-card-border focus:border-accent-sage"
         "w-full rounded-card bg-card px-4 py-3 text-text-warm transition " \
           "focus:outline-none focus:ring-2 focus:ring-accent-sage/30 #{edge}"
       end
 
+      #: () -> String
       def field_id
         @field_id ||= "select-#{@name.to_s.parameterize}"
       end

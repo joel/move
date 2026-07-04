@@ -19,6 +19,7 @@ module Views
         "viewer" => Components::Icons::Eye
       }.freeze
 
+      #: (move: untyped, memberships: untyped, candidates: untyped, current_user_id: untyped) -> void
       def initialize(move:, memberships:, candidates:, current_user_id:)
         @move = move
         @memberships = memberships
@@ -26,6 +27,7 @@ module Views
         @current_user_id = current_user_id
       end
 
+      #: () -> void
       def view_template
         div(class: "flex flex-col gap-section-gap") do
           render Components::Members::Header.new(move: @move, candidates: @candidates)
@@ -40,6 +42,8 @@ module Views
       private
 
       # Bento of the three role definitions, with a short explanation of each.
+
+      #: () -> untyped
       def role_definitions
         section(
           aria_label: I18n.t("members.index.roles_label"),
@@ -49,6 +53,7 @@ module Views
         end
       end
 
+      #: (untyped role) -> untyped
       def role_card(role)
         render Components::Ui::Card.new(padding: "p-6") do
           div(class: "flex items-center gap-3") do

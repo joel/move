@@ -28,12 +28,14 @@ module Components
       HERO_CLASS = "#{HERO_LAYOUT} bg-accent-sage text-page".freeze
       HERO_DANGER_CLASS = "#{HERO_LAYOUT} bg-error text-on-error".freeze
 
+      #: (move: untyped, box: untyped, ?editable: untyped) -> void
       def initialize(move:, box:, editable: false)
         @move = move
         @box = box
         @editable = editable
       end
 
+      #: () -> void
       def view_template
         div(id: ID, class: "flex flex-col gap-6") do
           identity
@@ -46,6 +48,8 @@ module Components
       # Plain-text identity on the page background (no card / shadow): chips →
       # number → contents subtitle, with the quick-edit pencil + ⋮ Manage sheet
       # aligned top-right.
+
+      #: () -> untyped
       def identity
         div(class: "flex items-start justify-between gap-3") do
           div(class: "flex flex-col gap-2") do
@@ -59,6 +63,8 @@ module Components
 
       # Quick-edit pencil (editor) + the ⋮ Manage-box sheet (always — it carries the
       # box dimensions and the print actions even for a viewer / archived Move).
+
+      #: () -> untyped
       def header_actions
         div(class: "flex shrink-0 items-center gap-1") do
           edit_link if @editable
@@ -72,6 +78,8 @@ module Components
       # Contents description as a one-line subtitle; when blank, a quiet
       # "add a description" link to the edit form (where the ✨ AI-suggest lives),
       # for an editable Move only.
+
+      #: () -> untyped
       def subtitle
         if @box.description.present?
           p(class: "text-body-md text-on-surface-variant") { @box.description }
@@ -86,6 +94,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def chips
         if @box.room
           span(class: "inline-flex items-center rounded-full bg-accent-sage/15 px-3 py-1 " \
@@ -101,6 +110,7 @@ module Components
         render Components::Ui::Chip.new(label: I18n.t("boxes.fragile_badge"), kind: :tag) if @box.fragile?
       end
 
+      #: () -> untyped
       def edit_link
         a(
           href: edit_move_box_path(@move, @box),
@@ -113,6 +123,8 @@ module Components
       # with a quiet "Add manually" beneath it (Stitch "Approach 1"). A read-only
       # Move shows the quiet read-only note instead (and, where applicable, the
       # unpacking entry — that surface is open to viewers).
+
+      #: () -> untyped
       def hero_zone
         div(class: "flex flex-col items-center gap-2") do
           case hero
@@ -134,6 +146,8 @@ module Components
       # done — its coherent next action is to delete it (an editor); a viewer still
       # gets the read-only checklist view. Backward steps (Unseal / Reopen) and
       # utilities always live in the Manage-box sheet.
+
+      #: () -> untyped
       def hero
         return @hero if defined?(@hero)
 
@@ -146,6 +160,8 @@ module Components
 
       # The hero for an editable, non-destination box: capture while packing, else
       # the forward lifecycle step (sealed → in_transit, in_transit → unpacking).
+
+      #: () -> untyped
       def editable_hero
         return :capture if @box.capturable?
 
@@ -153,6 +169,8 @@ module Components
       end
 
       # The forward lifecycle target promoted to the hero for a holding state.
+
+      #: () -> untyped
       def forward_transition
         case @box.status
         when "sealed" then "in_transit"
@@ -163,10 +181,13 @@ module Components
       # The lifecycle target the hero consumes, so ManageSheet omits it (only the
       # forward-transition hero consumes one; capture/unpack leave Seal/Mark-unpacked
       # in the sheet).
+
+      #: () -> untyped
       def consumed_transition
         forward_transition if hero == :transition
       end
 
+      #: () -> untyped
       def unpack_action
         a(href: move_box_unpacking_path(@move, @box), class: HERO_CLASS) do
           render Components::Icons::Boxes.new(css: "h-6 w-6")
@@ -174,6 +195,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def capture_action
         a(href: move_box_capture_path(@move, @box), class: HERO_CLASS) do
           render Components::Icons::Camera.new(css: "h-6 w-6")
@@ -181,6 +203,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def forward_transition_action
         target = forward_transition
         button_to(
@@ -192,6 +215,8 @@ module Components
       # Terminal action for an unpacked box: the prominent (but danger-styled +
       # confirmed) Delete. Mirrors the sheet's delete; ManageSheet omits its row
       # here so Delete isn't offered twice.
+
+      #: () -> untyped
       def delete_action
         button_to(
           move_box_path(@move, @box),
@@ -204,6 +229,8 @@ module Components
       end
 
       # Quiet secondary action under the hero — the "Subtle Add" half of Approach 1.
+
+      #: () -> untyped
       def add_manually_link
         a(
           href: new_move_box_item_path(@move, @box),
@@ -211,12 +238,14 @@ module Components
         ) { I18n.t("boxes.actions.add_manually") }
       end
 
+      #: () -> untyped
       def read_only_note
         p(class: "text-body-md text-muted text-center") do
           I18n.t(@move.archived? ? "boxes.show.archived" : "boxes.show.view_only")
         end
       end
 
+      #: () -> untyped
       def box_title
         I18n.t("boxes.show.title", number: Kernel.format("%03d", @box.number.to_i))
       end

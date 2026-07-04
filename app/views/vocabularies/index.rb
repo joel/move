@@ -12,6 +12,7 @@ module Views
     # rename form is toggled open client-side (inline-edit), so even opening it
     # no longer navigates.
     class Index < Views::Base
+      #: (move: untyped, vocabulary: untyped, records: untyped, usage_counts: untyped, can_edit: untyped, ?new_record: untyped) -> void
       def initialize(move:, vocabulary:, records:, usage_counts:, can_edit:, new_record: nil)
         @move = move
         @vocabulary = vocabulary
@@ -21,6 +22,7 @@ module Views
         @new_record = new_record
       end
 
+      #: () -> void
       def view_template
         header
         if @can_edit
@@ -36,8 +38,10 @@ module Views
 
       private
 
+      #: () -> untyped
       def kind = @vocabulary.kind
 
+      #: () -> untyped
       def header
         render Components::Ui::SectionHeader.new(
           eyebrow: @move.name,

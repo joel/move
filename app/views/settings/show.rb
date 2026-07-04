@@ -15,6 +15,14 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::Routes
 
+      # @rbs move: untyped
+      # @rbs tokens: untyped
+      # @rbs editable: untyped
+      # @rbs manage_tokens: untyped
+      # @rbs can_create_tokens: untyped
+      # @rbs manage_recognition: untyped
+      # @rbs revealed_token: untyped
+      # @rbs return: void
       def initialize(move:, tokens:, editable:, manage_tokens:, can_create_tokens:,
                      manage_recognition:, revealed_token: nil)
         @move = move
@@ -26,6 +34,7 @@ module Views
         @revealed_token = revealed_token
       end
 
+      #: () -> void
       def view_template
         div(class: "flex flex-col gap-section-gap") do
           render Components::Ui::SectionHeader.new(
@@ -44,6 +53,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def read_only_note
         # Non-editable for two distinct reasons: the Move is archived, or the
         # viewer lacks an editing role. Don't tell a viewer the Move is archived.
@@ -53,6 +63,8 @@ module Views
       end
 
       # --- Appearance: client-only dark-mode switch (theme Stimulus controller) ---
+
+      #: () -> untyped
       def appearance_section
         setting_card(I18n.t("settings.show.appearance.title")) do
           div(class: "flex items-center justify-between gap-4") do
@@ -67,6 +79,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def theme_switch
         button(
           type: "button", role: "switch", aria_checked: "true",
@@ -83,6 +96,8 @@ module Views
       end
 
       # --- Move preferences: measurement units + labels-per-box (editor-gated) ---
+
+      #: () -> untyped
       def preferences_section
         setting_card(I18n.t("settings.show.preferences.title")) do
           setting_row(I18n.t("settings.show.preferences.units")) { unit_toggle }
@@ -96,6 +111,8 @@ module Views
       # How many identical exterior labels print per box (Phase 45). Editors get an
       # auto-submitting select (the existing auto-submit controller — Phlex blocks
       # inline on* handlers); viewers / archived Moves see the resolved number.
+
+      #: () -> untyped
       def labels_per_box_control
         return resolved_value(@move.labels_per_box) unless @editable
 
@@ -115,11 +132,14 @@ module Views
         end
       end
 
+      #: () -> untyped
       def unit_toggle
         render Components::Settings::UnitToggle.new(move: @move, editable: @editable)
       end
 
       # --- AI: shared capability keys (#242), then per-feature selectors ---
+
+      #: () -> untyped
       def recognition_section
         ai_capability_card if @manage_recognition
         panel_card do
@@ -133,12 +153,15 @@ module Views
 
       # Shared keys live in their own titled card; admins only (the panel is the
       # write surface). Keys entered here light up the selectors below.
+
+      #: () -> untyped
       def ai_capability_card
         setting_card(I18n.t("settings.show.ai_capability.title")) do
           render Views::Settings::AiCapabilityPanel.new(move: @move)
         end
       end
 
+      #: () -> untyped
       def threshold_block
         div(class: "flex flex-col gap-3") do
           span(class: "text-headline-md text-text-warm") { I18n.t("settings.show.recognition.threshold") }
@@ -149,6 +172,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def threshold_slider
         form_with(
           url: move_settings_auto_confirm_threshold_path(@move), method: :patch,
@@ -176,6 +200,8 @@ module Views
       end
 
       # --- Assistant & Integrations: MCP tokens (admin-only) ---
+
+      #: () -> untyped
       def assistant_section
         render Views::Settings::AssistantPanel.new(
           move: @move, tokens: @tokens, manage_tokens: @manage_tokens,
@@ -184,6 +210,8 @@ module Views
       end
 
       # --- Account ---
+
+      #: () -> untyped
       def account_section
         sign_out_classes = "rounded-full px-6 py-3 text-body-md font-semibold " \
                            "text-on-surface-variant transition hover:text-error"
@@ -202,6 +230,8 @@ module Views
       end
 
       # --- shared bits ---
+
+      #: (untyped title) ?{ (*untyped) -> untyped } -> untyped
       def setting_card(title, &)
         render Components::Ui::Card.new(padding: "p-6") do
           h2(class: "text-headline-md text-text-warm") { title }
@@ -212,10 +242,12 @@ module Views
       # A card whose contents supply their own header (the feature panels render a
       # title + status chip), so no duplicate h2. Forward the block to render (not
       # Card.new) so the intent is unambiguous.
+      #: () ?{ (*untyped) -> untyped } -> untyped
       def panel_card(&)
         render(Components::Ui::Card.new(padding: "p-6"), &)
       end
 
+      #: (untyped label) ?{ (*untyped) -> untyped } -> untyped
       def setting_row(label, &)
         div(class: "flex items-center justify-between gap-4") do
           span(class: "text-body-lg text-text-warm") { label }
@@ -223,15 +255,18 @@ module Views
         end
       end
 
+      #: (untyped text) -> untyped
       def resolved_value(text)
         span(class: "rounded-full bg-surface-container-high px-4 py-2 text-body-md text-text-warm") { text }
       end
 
+      #: (untyped value) -> String
       def format_threshold(value)
         # Kernel.format, not the bare format() — Phlex shadows `format`.
         Kernel.format("%.2f", value)
       end
 
+      #: (untyped time) -> String
       def time_ago(time)
         "#{view_context.time_ago_in_words(time)} ago"
       end

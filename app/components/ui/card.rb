@@ -8,6 +8,7 @@ module Components
     #   render Components::Ui::Card.new { "Body" }
     #   render Components::Ui::Card.new(micro_bar: ->(c) { c.plain "12/12 packed" })
     class Card < Components::Base
+      #: (?interactive: untyped, ?padding: untyped, ?micro_bar: untyped, **untyped) -> void
       def initialize(interactive: false, padding: "p-5", micro_bar: nil, **attrs)
         @interactive = interactive
         @padding = padding
@@ -15,6 +16,7 @@ module Components
         @attrs = attrs
       end
 
+      #: () ?{ (*untyped) -> untyped } -> untyped
       def view_template(&)
         div(class: classes, **@attrs) do
           div(class: "flex flex-1 flex-col gap-4", &)
@@ -24,12 +26,14 @@ module Components
 
       private
 
+      #: () -> untyped
       def render_micro_bar
         div(class: "mt-auto flex flex-col gap-2 border-t border-card-border pt-4") do
           @micro_bar.call(self)
         end
       end
 
+      #: () -> String
       def classes
         [
           "flex flex-col rounded-card bg-card border border-card-border",

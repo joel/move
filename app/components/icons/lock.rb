@@ -4,6 +4,7 @@ module Components
   module Icons
     # Closed padlock — the "Seal box" lifecycle action (B1 Manage-box sheet).
     class Lock < Components::Icons::Base
+      #: () -> void
       def view_template
         svg(
           class: @css, **@attrs, viewBox: "0 0 24 24", fill: "none",

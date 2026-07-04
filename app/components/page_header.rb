@@ -2,12 +2,14 @@
 
 module Components
   class PageHeader < Components::Base
+    #: (section: untyped, title: untyped, ?subtitle: untyped) -> void
     def initialize(section:, title:, subtitle: nil)
       @section = section
       @title = title
       @subtitle = subtitle
     end
 
+    #: () ?{ (*untyped) -> untyped } -> untyped
     def view_template(&block)
       div(class: "flex flex-col gap-4 sm:flex-row sm:items-end " \
                  "sm:justify-between") do

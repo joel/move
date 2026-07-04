@@ -11,6 +11,16 @@ module Components
                    "placeholder:text-muted transition focus:outline-none " \
                    "focus:ring-2 focus:ring-accent-sage/30"
 
+      # @rbs name: untyped
+      # @rbs label: untyped
+      # @rbs type: untyped
+      # @rbs value: untyped
+      # @rbs placeholder: untyped
+      # @rbs error: untyped
+      # @rbs hint: untyped
+      # @rbs required: untyped
+      # @rbs **: untyped
+      # @rbs return: void
       def initialize(name:, label:, type: "text", value: nil, placeholder: nil,
                      error: nil, hint: nil, required: false, **attrs)
         @name = name
@@ -24,6 +34,7 @@ module Components
         @attrs = attrs
       end
 
+      #: () -> void
       def view_template
         div(class: "flex flex-col gap-2") do
           label(for: field_id, class: "text-label-caps uppercase text-muted") do
@@ -41,23 +52,27 @@ module Components
 
       private
 
+      #: () -> untyped
       def render_hint
         return unless @hint && !@error
 
         p(class: "text-body-md text-on-surface-variant") { @hint }
       end
 
+      #: () -> untyped
       def render_error
         return unless @error
 
         p(class: "text-body-md text-error", role: "alert") { @error }
       end
 
+      #: () -> String
       def input_classes
         edge = @error ? "border border-error" : "border border-card-border focus:border-accent-sage"
         "#{INPUT_BASE} #{edge}"
       end
 
+      #: () -> String
       def field_id
         @field_id ||= "field-#{@name.to_s.parameterize}"
       end

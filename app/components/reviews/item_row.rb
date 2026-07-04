@@ -10,12 +10,15 @@ module Components
     class ItemRow < Components::Base
       include Phlex::Rails::Helpers::ButtonTo
 
+      # @rbs skip
       def self.dom_id(item)
         "review-item-#{item.id}"
       end
 
       # highlight: the row just streamed in from an add — scroll it into view and
       # flash a ring (UX rule #1) via the shared `highlight` Stimulus controller.
+
+      #: (move: untyped, box: untyped, media: untyped, item: untyped, editable: untyped, ?highlight: untyped) -> void
       def initialize(move:, box:, media:, item:, editable:, highlight: false)
         @move = move
         @box = box
@@ -25,6 +28,7 @@ module Components
         @highlight = highlight
       end
 
+      #: () -> void
       def view_template
         div(
           id: self.class.dom_id(@item), data: row_data,
@@ -41,6 +45,7 @@ module Components
 
       private
 
+      #: () -> untyped
       def row_data
         controllers = []
         controllers << "inline-rename" if @editable
@@ -52,6 +57,7 @@ module Components
         data
       end
 
+      #: () -> untyped
       def name_field
         input(
           type: "text", value: @item.name, readonly: !@editable,
@@ -60,6 +66,7 @@ module Components
         )
       end
 
+      #: () -> untyped
       def name_field_data
         return {} unless @editable
 
@@ -67,6 +74,7 @@ module Components
           action: "focus->inline-rename#clearError blur->inline-rename#save keydown.enter->inline-rename#blur" }
       end
 
+      #: () -> untyped
       def confidence_line
         div(class: "flex items-center gap-1.5") do
           if (pct = confidence_percent)
@@ -80,6 +88,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def row_actions
         div(class: "flex shrink-0 items-center gap-1") do
           button(type: "button", data: { action: "inline-rename#focus" }, class: icon_button(:sage)) do
@@ -96,17 +105,20 @@ module Components
         end
       end
 
+      #: (untyped tint) -> untyped
       def icon_button(tint)
         hover = tint == :error ? "hover:text-error hover:bg-error/10" : "hover:text-accent-sage hover:bg-accent-sage/10"
         "flex h-10 w-10 items-center justify-center rounded-full text-muted transition #{hover}"
       end
 
+      #: () -> untyped
       def confidence_percent
         return nil if @item.confidence_score.nil?
 
         (@item.confidence_score * 100).round
       end
 
+      #: () -> untyped
       def rename_path
         move_box_review_rename_item_path(@move, @box, @media, @item)
       end

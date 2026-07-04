@@ -3,11 +3,13 @@
 module Components
   module Icons
     class Google < Phlex::SVG
+      #: (?css: untyped, **untyped) -> void
       def initialize(css: "h-5 w-5", **attrs)
         @css = css
         @attrs = attrs
       end
 
+      #: () -> void
       def view_template
         svg(class: @css, **@attrs, viewBox: "0 0 24 24",
             aria_hidden: "true") do |s|

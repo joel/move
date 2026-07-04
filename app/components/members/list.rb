@@ -9,6 +9,7 @@ module Components
     class List < Components::Base
       ID = "members-list"
 
+      #: (move: untyped, memberships: untyped, current_user_id: untyped, ?highlight_id: untyped) -> void
       def initialize(move:, memberships:, current_user_id:, highlight_id: nil)
         @move = move
         @memberships = memberships
@@ -16,6 +17,7 @@ module Components
         @highlight_id = highlight_id
       end
 
+      #: () -> void
       def view_template
         section(id: ID, aria_label: I18n.t("members.index.current"), class: "flex flex-col gap-stack-gap") do
           h2(class: "text-headline-md text-text-warm") { I18n.t("members.index.current") }

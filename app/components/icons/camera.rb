@@ -3,6 +3,7 @@
 module Components
   module Icons
     class Camera < Components::Icons::Base
+      #: () -> void
       def view_template
         svg(
           class: @css, **@attrs, viewBox: "0 0 24 24", fill: "none",

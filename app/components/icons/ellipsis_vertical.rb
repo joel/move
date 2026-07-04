@@ -4,6 +4,7 @@ module Components
   module Icons
     # Vertical "more actions" kebab (⋮) — the Manage-box sheet trigger (B1).
     class EllipsisVertical < Components::Icons::Base
+      #: () -> void
       def view_template
         svg(
           class: @css, **@attrs, viewBox: "0 0 24 24", fill: "currentColor",

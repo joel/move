@@ -20,12 +20,16 @@ RSpec.describe "Type annotation coverage" do
     [
       "app/actions/**/*.rb", "packs/*/app/actions/**/*.rb",
       "app/models/**/*.rb", "packs/*/app/public/**/*.rb",
-      "packs/*/app/models/**/*.rb", "app/controllers/**/*.rb"
+      "packs/*/app/models/**/*.rb", "app/controllers/**/*.rb",
+      "app/views/**/*.rb", "app/components/**/*.rb"
     ]
   end
 
   def excluded_from_checking
-    ["packs/utility/app/models/concerns/", "app/controllers/concerns/"]
+    [
+      "packs/utility/app/models/concerns/", "app/controllers/concerns/",
+      "app/views/layouts/chrome_head.rb"
+    ]
   end
 
   # A def is annotated when the nearest preceding non-blank line is an inline
@@ -66,30 +70,29 @@ RSpec.describe "Type annotation coverage" do
   end
 
   # The glob above only proves annotations EXIST; this proves Steep actually
-  # CHECKS them — a new pack/model dir whose `check` line is missing from the
-  # Steepfile would otherwise carry annotations that are never type-checked,
-  # green in CI. A directory may alternatively be covered file-by-file (the
-  # packs/utility/app/models case — its concerns/ must stay unchecked), in
-  # which case every non-excluded .rb file needs its own check line.
-  it "every checked-scope directory has its check line(s) in the Steepfile" do
+  # CHECKS them — a file whose path is covered by no `check` line would
+  # otherwise carry annotations that are never type-checked, green in CI.
+  # A file is covered by its own `check` line or one for any ancestor
+  # directory (top scopes check whole dirs; concern-carrying dirs are
+  # enumerated file-by-file or subdir-by-subdir to exclude the concerns).
+  it "every checked-scope file is covered by a Steepfile check line" do
     steepfile = Rails.root.join("Steepfile").read
-    dirs = Rails.root.glob("packs/*/app/{actions,public,models}") +
-           [Rails.root.join("app/models"), Rails.root.join("app/controllers")]
+    checked = steepfile.scan(/check "([^"]+)"/).flatten.to_set
 
-    missing = dirs.filter_map do |dir|
-      rel = dir.relative_path_from(Rails.root).to_s
-      next if steepfile.include?(%(check "#{rel}"))
-
-      files = Rails.root.glob("#{rel}/**/*.rb")
-                   .map { |f| f.relative_path_from(Rails.root).to_s }
-                   .reject { |f| excluded_from_checking.any? { |fragment| f.include?(fragment) } }
-      rel unless files.any? && files.all? { |f| steepfile.include?(%(check "#{f}")) }
+    uncovered = checked_files.reject do |rel|
+      covered = checked.include?(rel)
+      path = rel
+      until covered || path.exclude?("/")
+        path = File.dirname(path)
+        covered = checked.include?(path)
+      end
+      covered
     end
 
-    expect(missing).to be_empty, <<~MSG
-      Checked-scope directories missing from the Steepfile's :actions target
+    expect(uncovered).to be_empty, <<~MSG
+      Checked-scope files covered by no Steepfile `check` line
       (their inline annotations would never be type-checked):
-      #{missing.join("\n")}
+      #{uncovered.join("\n")}
     MSG
   end
 end

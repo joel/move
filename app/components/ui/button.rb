@@ -22,6 +22,7 @@ module Components
         danger: "bg-error text-on-error hover:opacity-90"
       }.freeze
 
+      #: (?label: untyped, ?variant: untyped, ?href: untyped, ?type: untyped, ?full_width: untyped, ?icon: untyped, ?disabled: untyped, **untyped) -> void
       def initialize(
         label: nil, variant: :primary, href: nil, type: "button",
         full_width: false, icon: nil, disabled: false, **attrs
@@ -36,6 +37,7 @@ module Components
         @attrs = attrs
       end
 
+      #: () ?{ (*untyped) -> untyped } -> untyped
       def view_template(&)
         if @href && !@disabled
           a(href: @href, class: classes, **@attrs) { contents(&) }
@@ -48,6 +50,7 @@ module Components
 
       private
 
+      #: () ?{ (*untyped) -> untyped } -> untyped
       def contents(&block)
         render(@icon.new(css: "h-5 w-5")) if @icon
         if block
@@ -57,6 +60,7 @@ module Components
         end
       end
 
+      #: () -> String
       def classes
         variant = VARIANTS.fetch(@variant, VARIANTS[:primary])
         [

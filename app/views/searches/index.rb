@@ -10,6 +10,7 @@ module Views
     class Index < Views::Base
       include Phlex::Rails::Helpers::FormWith
 
+      #: (move: untyped, query: untyped, results: untyped, ?recent_searches: untyped) -> void
       def initialize(move:, query:, results:, recent_searches: [])
         @move = move
         @query = query.to_s
@@ -17,6 +18,7 @@ module Views
         @recent_searches = recent_searches
       end
 
+      #: () -> void
       def view_template
         hero
         if @query.blank?
@@ -30,14 +32,17 @@ module Views
 
       private
 
+      #: () -> bool
       def searched? = @query.present?
 
+      #: () -> untyped
       def hero
         div(class: "mx-auto flex w-full max-w-3xl flex-col items-center #{searched? ? "pt-2" : "pt-10"}") do
           search_form
         end
       end
 
+      #: () -> untyped
       def search_form
         form_with(url: move_search_path(@move), method: :get, class: "w-full") do
           div(class: "flex items-center gap-3 rounded-card border border-card-border bg-card " \
@@ -55,17 +60,22 @@ module Views
 
       # Empty state: once the user has run a successful search, surface their own
       # recent queries in place of the static examples (#338, ux principles 4 & 1).
+
+      #: () -> untyped
       def hints
         @recent_searches.any? ? recent_searches : examples
       end
 
+      #: () -> untyped
       def examples
         div(class: "mx-auto mt-8 flex max-w-3xl flex-col items-center gap-4") do
           hint_label(Components::Icons::Sparkles, I18n.t("searches.hint"))
-          chip_row { I18n.t("searches.examples").each { |example| example_chip(example) } }
+          examples = I18n.t("searches.examples") #: untyped
+          chip_row { examples.each { |example| example_chip(example) } }
         end
       end
 
+      #: () -> untyped
       def recent_searches
         div(class: "mx-auto mt-8 flex max-w-3xl flex-col items-center gap-4") do
           hint_label(Components::Icons::Clock, I18n.t("searches.recent"))
@@ -73,6 +83,7 @@ module Views
         end
       end
 
+      #: (untyped icon, untyped text) -> untyped
       def hint_label(icon, text)
         p(class: "flex items-center gap-2 text-body-md text-muted") do
           render icon.new(css: "h-4 w-4")
@@ -80,10 +91,12 @@ module Views
         end
       end
 
+      #: () ?{ (*untyped) -> untyped } -> untyped
       def chip_row(&)
         div(class: "flex flex-wrap justify-center gap-3", &)
       end
 
+      #: (untyped text) -> untyped
       def example_chip(text)
         a(
           href: move_search_path(@move, q: text),
@@ -92,6 +105,7 @@ module Views
         ) { "“#{text}”" }
       end
 
+      #: () -> untyped
       def results
         div(class: "mt-8 flex flex-col gap-6") do
           h2(class: "border-b border-card-border pb-4 text-headline-lg-mobile md:text-headline-xl text-text-warm") do
@@ -103,6 +117,7 @@ module Views
         end
       end
 
+      #: (untyped result) -> untyped
       def result_card(result)
         a(
           href: move_item_path(@move, result.item),
@@ -117,6 +132,7 @@ module Views
         end
       end
 
+      #: (untyped matched_on) -> untyped
       def match_badge(matched_on)
         render Components::Ui::Chip.new(
           label: I18n.t("searches.match.#{matched_on}"),
@@ -124,6 +140,7 @@ module Views
         )
       end
 
+      #: (untyped result) -> untyped
       def location(result)
         div(class: "mt-auto flex items-center gap-3 rounded-card border border-card-border bg-page p-3") do
           div(class: "flex h-8 w-8 items-center justify-center rounded-lg " \
@@ -138,11 +155,13 @@ module Views
         end
       end
 
+      #: (untyped result) -> String
       def location_label(result)
         box = I18n.t("searches.box", number: result.box_number)
         result.room_name.present? ? "#{box} · #{result.room_name}" : box
       end
 
+      #: () -> untyped
       def no_results
         render Components::Ui::EmptyState.new(
           icon: Components::Icons::Search,

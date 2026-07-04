@@ -14,12 +14,14 @@ module Views
 
       register_element :turbo_frame
 
+      #: (move: untyped, box: untyped, ?suggestion: untyped) -> void
       def initialize(move:, box:, suggestion: "")
         @move = move
         @box = box
         @suggestion = suggestion.to_s
       end
 
+      #: () -> void
       def view_template
         turbo_frame(id: "seal_box") do
           div(class: "flex flex-col gap-stack-gap") do
@@ -32,6 +34,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def heading
         div(class: "flex items-start justify-between gap-3") do
           div do
@@ -48,6 +51,8 @@ module Views
 
       # The describe-and-seal form. data-turbo-frame=_top so the success redirect
       # navigates the whole page instead of trying to swap this frame.
+
+      #: () -> untyped
       def describe_form
         form_with(url: transition_move_box_path(@move, @box), method: :patch, scope: :box,
                   data: { turbo_frame: "_top" }, class: "flex flex-col gap-2") do |form|
@@ -64,6 +69,8 @@ module Views
 
       # Re-requests this frame, forcing a fresh suggestion (overwrites any manual
       # edit — that's the point of "regenerate").
+
+      #: () -> untyped
       def regenerate
         div(class: "flex justify-end") do
           a(
@@ -83,6 +90,8 @@ module Views
 
       # Seal with no description — a separate PATCH that sends no box[description],
       # so the seal proceeds and nothing is written to the column.
+
+      #: () -> untyped
       def seal_without
         button_to(
           I18n.t("boxes.seal.skip"), transition_move_box_path(@move, @box),

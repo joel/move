@@ -9,12 +9,14 @@ module Views
     class Celebration < Views::Base
       include Phlex::Rails::Helpers::ButtonTo
 
+      #: (move: untyped, box: untyped, ?editable: untyped) -> void
       def initialize(move:, box:, editable: false)
         @move = move
         @box = box
         @editable = editable
       end
 
+      #: () -> void
       def view_template
         div(class: "mx-auto flex min-h-[60vh] w-full max-w-md flex-col items-center justify-center gap-section-gap text-center") do
           identity
@@ -26,6 +28,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def identity
         div(class: "flex items-center gap-3") do
           span(class: "text-label-caps uppercase tracking-widest text-muted") { box_label }
@@ -33,6 +36,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def check
         div(class: "relative") do
           div(class: "absolute inset-0 rounded-full bg-accent-sage/20 blur-2xl")
@@ -43,6 +47,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def copy
         div(class: "flex flex-col gap-3") do
           h1(class: "text-headline-xl text-text-warm") { I18n.t("unpacking.done_title") }
@@ -50,6 +55,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def actions
         div(class: "flex w-full flex-col items-center gap-stack-gap") do
           render Components::Ui::Button.new(
@@ -60,6 +66,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def undo_button
         button_to(
           move_box_unpacking_reopen_path(@move, @box),
@@ -69,6 +76,7 @@ module Views
         ) { plain I18n.t("unpacking.undo") }
       end
 
+      #: () -> untyped
       def box_label
         I18n.t("unpacking.box_title", number: Kernel.format("%03d", @box.number.to_i))
       end

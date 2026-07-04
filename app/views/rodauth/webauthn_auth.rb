@@ -6,6 +6,7 @@ module Views
       include Phlex::Rails::Helpers::FormWith
       include Phlex::Rails::Helpers::JavaScriptIncludeTag
 
+      #: () -> void
       def view_template
         cred = view_context.rodauth.webauthn_credential_options_for_get
 

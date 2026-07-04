@@ -63,6 +63,43 @@ target :actions do
   check "app/controllers/unpacking_controller.rb", inline: true
   check "app/controllers/vocabularies_controller.rb", inline: true
   check "app/controllers/welcome_controller.rb", inline: true
+  # Phlex views + components (#525) — the final layer. The tag DSL resolves
+  # via the GENERATED sig/phlex.rbs (introspected from the installed gem).
+  # app/views/layouts is enumerated as FILES: chrome_head.rb is a view MODULE
+  # mixin calling tag methods on module-self (the concern problem — see the
+  # notes below); its surface is declared in sig/concerns.rbs.
+  check "app/components", inline: true
+  check "app/views/accounts", inline: true
+  check "app/views/activities", inline: true
+  check "app/views/agreements", inline: true
+  check "app/views/base.rb", inline: true
+  check "app/views/box_steps", inline: true
+  check "app/views/boxes", inline: true
+  check "app/views/captures", inline: true
+  check "app/views/galleries", inline: true
+  check "app/views/items", inline: true
+  check "app/views/label_print_runs", inline: true
+  check "app/views/label_prints", inline: true
+  check "app/views/layouts/app_shell_layout.rb", inline: true
+  check "app/views/layouts/application_layout.rb", inline: true
+  check "app/views/members", inline: true
+  check "app/views/menu", inline: true
+  check "app/views/moves", inline: true
+  check "app/views/pwa", inline: true
+  check "app/views/recoveries", inline: true
+  check "app/views/reviews", inline: true
+  check "app/views/rodauth", inline: true
+  check "app/views/rodauth_mailer", inline: true
+  check "app/views/scans", inline: true
+  check "app/views/shared", inline: true
+  check "app/views/searches", inline: true
+  check "app/views/session_handoffs", inline: true
+  check "app/views/settings", inline: true
+  check "app/views/style_guide", inline: true
+  check "app/views/summaries", inline: true
+  check "app/views/unpacking", inline: true
+  check "app/views/vocabularies", inline: true
+  check "app/views/welcome", inline: true
   # Models (#521): root + every pack's public/private models. Their
   # schema-derived signatures are GENERATED into sig/rbs_rails/ by
   # `bin/rails rbs_rails:all` (freshness-checked in CI); the inline annotations

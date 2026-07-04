@@ -5,6 +5,7 @@ module Components
     include Phlex::Rails::Helpers::Routes
 
     if Rails.env.development?
+      #: () -> void
       def before_template
         comment { "Begin #{self.class.name}" }
         super

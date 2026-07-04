@@ -21,10 +21,12 @@ module Components
     BUTTON_CLASS = "ha-button ha-button-secondary w-full " \
                    "flex items-center justify-center gap-3"
 
+    #: (?label: untyped) -> void
     def initialize(label: "Sign in with Google")
       @label = label
     end
 
+    #: () -> void
     def view_template
       return unless view_context.google_credentials_present?
 
@@ -33,6 +35,7 @@ module Components
 
     private
 
+    #: () -> untyped
     def apex_button
       button_to(
         view_context.rodauth.omniauth_request_path(:google, **origin_org_param),
@@ -48,12 +51,16 @@ module Components
     # into the OmniAuth request as a query param, so it survives the round-trip to
     # Google and reaches the callback via omniauth.params (#346). Membership is
     # validated server-side before it's honoured, so a stray value is harmless.
+
+    #: () -> untyped
     def origin_org_param
       slug = view_context.params[:org].to_s
       slug.present? ? { org: slug } : {}
     end
 
     # When routed here from a subdomain (?via=google), auto-submit on connect.
+
+    #: () -> untyped
     def form_data
       base = { turbo: "false" }
       return base unless auto_start?
@@ -61,10 +68,12 @@ module Components
       base.merge(controller: "auto-submit", auto_submit_on_connect_value: "true")
     end
 
+    #: () -> untyped
     def auto_start?
       view_context.params[:via].to_s == "google"
     end
 
+    #: () -> untyped
     def subdomain_link
       link_to(apex_google_url, data: { turbo: "false" }, class: BUTTON_CLASS) do
         contents
@@ -74,6 +83,8 @@ module Components
     # Carry the originating org slug to the apex so the post-auth handoff can
     # target THIS subdomain, not the user's primary org (#346). The apex forwards
     # it through OmniAuth; membership is validated before it's honoured.
+
+    #: () -> untyped
     def apex_google_url
       host = Rails.application.config.action_mailer.default_url_options&.dig(:host)
       url = "https://#{host}/login?via=google"
@@ -82,6 +93,7 @@ module Components
       slug.present? ? "#{url}&org=#{CGI.escape(slug)}" : url
     end
 
+    #: () -> untyped
     def contents
       render Components::Icons::Google.new
       span { @label }

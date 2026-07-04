@@ -30,6 +30,7 @@ module Components
         }
       }.freeze
 
+      #: (message: untyped, ?variant: untyped, ?title: untyped, ?timeout: untyped, ?action_href: untyped, ?action_label: untyped, **untyped) -> void
       def initialize(message:, variant: :info, title: nil, timeout: 4500,
                      action_href: nil, action_label: nil, **attrs)
         @config = VARIANTS.fetch(variant.to_sym, VARIANTS[:info])
@@ -41,6 +42,7 @@ module Components
         @attrs = attrs
       end
 
+      #: () -> void
       def view_template
         div(
           data: { controller: "toast", toast_timeout_value: @timeout.to_s },
@@ -68,6 +70,8 @@ module Components
 
       # Optional call-to-action link in the toast body (e.g. "View" the record an
       # action just created). Both pieces are required, else nothing renders.
+
+      #: () -> untyped
       def render_action
         return unless @action_href && @action_label
 
@@ -78,6 +82,7 @@ module Components
         ) { @action_label }
       end
 
+      #: () -> untyped
       def render_dismiss
         button(
           type: "button",

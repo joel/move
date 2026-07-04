@@ -7,6 +7,7 @@ module Components
     #
     #   render Components::Ui::SectionHeader.new(eyebrow: "Move", title: "My Boxes")
     class SectionHeader < Components::Base
+      #: (title: untyped, ?eyebrow: untyped, ?subtitle: untyped, **untyped) -> void
       def initialize(title:, eyebrow: nil, subtitle: nil, **attrs)
         @title = title
         @eyebrow = eyebrow
@@ -14,6 +15,7 @@ module Components
         @attrs = attrs
       end
 
+      #: () ?{ (*untyped) -> untyped } -> untyped
       def view_template(&block)
         div(
           class: "flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between",

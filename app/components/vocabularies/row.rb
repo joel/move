@@ -13,6 +13,7 @@ module Components
     class Row < Components::Base
       include Phlex::Rails::Helpers::ButtonTo
 
+      # @rbs skip
       def self.dom_id(record)
         "vocab-#{record.id}"
       end
@@ -22,6 +23,16 @@ module Components
       # record, but a rejected rename passes the submitted (invalid) record so the
       # form shows what was typed + the error while the display stays persisted —
       # so canceling reveals the persisted name, never the abandoned/invalid one.
+
+      # @rbs move: untyped
+      # @rbs vocabulary: untyped
+      # @rbs record: untyped
+      # @rbs usage_count: untyped
+      # @rbs can_edit: untyped
+      # @rbs open: untyped
+      # @rbs highlight: untyped
+      # @rbs edit_record: untyped
+      # @rbs return: void
       def initialize(move:, vocabulary:, record:, usage_count:, can_edit:,
                      open: false, highlight: false, edit_record: nil)
         @move = move
@@ -34,6 +45,7 @@ module Components
         @edit_record = edit_record || record
       end
 
+      #: () -> void
       def view_template
         div(id: self.class.dom_id(@record), data: row_data,
             class: "rounded-card border border-card-border bg-card p-4") do
@@ -44,8 +56,10 @@ module Components
 
       private
 
+      #: () -> untyped
       def kind = @vocabulary.kind
 
+      #: () -> untyped
       def row_data
         controllers = []
         controllers << "inline-edit" if @can_edit
@@ -60,6 +74,7 @@ module Components
         data
       end
 
+      #: () -> untyped
       def edit_panel
         div(class: "hidden", data: { inline_edit_target: "form" }) do
           render Components::VocabularyForm.new(
@@ -72,6 +87,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def row_body
         div(class: "flex items-center justify-between gap-4") do
           identity
@@ -79,6 +95,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def identity
         div(class: "flex min-w-0 items-center gap-4") do
           medallion
@@ -89,6 +106,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def medallion
         div(class: "flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full " \
                    "#{Components::Ui::Chip::KINDS[@vocabulary.chip_kind]}") do
@@ -96,6 +114,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def meta
         div(class: "flex flex-wrap items-center gap-2") do
           span(class: "text-body-md text-muted") do
@@ -104,6 +123,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def actions
         div(class: "flex flex-shrink-0 items-center gap-1") do
           button(type: "button", data: { action: "inline-edit#edit" }, class: icon_button_class,
@@ -117,18 +137,21 @@ module Components
       # Removing an in-use value warns first (Turbo confirm); an unused value
       # deletes straight away. The confirm goes on the generated <form> (via
       # `form:`), the canonical place Turbo gates submission regardless of version.
+
+      #: () -> untyped
       def remove_button
         opts = {
           method: :delete,
           class: "#{icon_button_class} hover:text-error",
           aria: { label: I18n.t("vocabularies.actions.remove", name: @record.name) }
-        }
+        } #: Hash[Symbol, untyped]
         opts[:form] = { data: { turbo_confirm: I18n.t("vocabularies.#{kind}.remove_confirm", count: @usage_count) } } if @usage_count.positive?
         button_to(move_vocabulary_path(@move, kind, @record), **opts) do
           render Components::Icons::Trash.new(css: "h-5 w-5")
         end
       end
 
+      #: () -> String
       def icon_button_class
         "inline-flex h-10 w-10 items-center justify-center rounded-full text-muted " \
           "transition hover:bg-surface-container-high hover:text-text-warm"

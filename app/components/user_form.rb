@@ -5,10 +5,12 @@ module Components
     include Phlex::Rails::Helpers::FormWith
     include Phlex::Rails::Helpers::Pluralize
 
+    #: (user: untyped) -> void
     def initialize(user:)
       @user = user
     end
 
+    #: () -> void
     def view_template
       form_with(model: @user, class: "space-y-6") do |form|
         render_errors if @user.errors.any?
@@ -33,6 +35,7 @@ module Components
 
     private
 
+    #: () -> untyped
     def render_errors
       div(
         id: "error_explanation",
@@ -49,6 +52,7 @@ module Components
       end
     end
 
+    #: (untyped form) -> untyped
     def render_roles(form)
       div do
         span(class: "text-sm font-medium text-[var(--ha-on-surface-variant)]") { "Roles" }

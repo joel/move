@@ -5,6 +5,7 @@ module Views
     # Living reference for the Move design system. Every primitive is shown in
     # light and dark so the page doubles as the Phase D0 verification surface.
     class Show < Views::Base
+      #: () -> void
       def view_template
         div(class: "flex flex-col gap-section-gap") do
           render Components::Ui::SectionHeader.new(
@@ -28,6 +29,8 @@ module Views
       private
 
       # Render the same content in a light and a dark panel, side by side.
+
+      #: () ?{ (*untyped) -> untyped } -> untyped
       def theme_pair(&)
         div(class: "grid gap-4 sm:grid-cols-2") do
           theme_panel("Light", "light", &)
@@ -35,6 +38,7 @@ module Views
         end
       end
 
+      #: (untyped label, untyped scope) ?{ (*untyped) -> untyped } -> untyped
       def theme_panel(label, scope, &)
         div(class: "#{scope} flex flex-col gap-4 rounded-card border border-card-border bg-page p-6") do
           p(class: "text-label-caps uppercase text-muted") { label }
@@ -42,6 +46,7 @@ module Views
         end
       end
 
+      #: (untyped title) ?{ (*untyped) -> untyped } -> untyped
       def section(title, &)
         div(class: "flex flex-col gap-4") do
           h2(class: "text-headline-md text-text-warm") { title }
@@ -51,6 +56,7 @@ module Views
 
       # Constrain `position: fixed` descendants to a preview box (a transform on
       # the ancestor establishes a containing block for fixed positioning).
+      #: (untyped height) ?{ (*untyped) -> untyped } -> untyped
       def preview_box(height, &)
         div(
           class: "relative #{height} overflow-hidden rounded-card border border-card-border",
@@ -58,6 +64,7 @@ module Views
         )
       end
 
+      #: () -> untyped
       def color_section
         section("Colour") do
           theme_pair do
@@ -79,12 +86,14 @@ module Views
         end
       end
 
+      #: (untyped name, untyped classes) -> untyped
       def swatch(name, classes)
         div(class: "flex h-16 items-end rounded-card p-2 text-label-caps uppercase #{classes}") do
           span { name }
         end
       end
 
+      #: () -> untyped
       def typography_section
         section("Typography — Plus Jakarta Sans") do
           theme_pair do
@@ -100,6 +109,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def buttons_section
         section("Buttons") do
           theme_pair do
@@ -117,6 +127,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def cards_section
         section("Cards") do
           theme_pair do
@@ -138,6 +149,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def chips_section
         section("Chips") do
           theme_pair do
@@ -151,6 +163,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def forms_section
         section("Fields & selects") do
           theme_pair do
@@ -164,6 +177,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def progress_section
         section("Progress") do
           theme_pair do
@@ -174,6 +188,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def recognition_section
         section("Recognition states") do
           theme_pair do
@@ -187,6 +202,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def feedback_section
         section("Toasts & empty states") do
           theme_pair do
@@ -200,6 +216,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def navigation_section
         section("Navigation chrome") do
           p(class: "text-body-md text-on-surface-variant") do

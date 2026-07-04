@@ -11,11 +11,13 @@ module Components
     class SaveStatus < Components::Base
       ID = "item-save-status"
 
+      #: (?state: untyped, ?message: untyped) -> void
       def initialize(state: :idle, message: nil)
         @state = state
         @message = message
       end
 
+      #: () -> void
       def view_template
         case @state
         when :saved then badge(saved: true)
@@ -26,6 +28,7 @@ module Components
 
       private
 
+      #: (saved: bool) -> untyped
       def badge(saved:)
         span(
           id: ID,

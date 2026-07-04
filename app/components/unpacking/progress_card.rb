@@ -8,11 +8,13 @@ module Components
     class ProgressCard < Components::Base
       ID = "unpacking-progress-card"
 
+      #: (remaining_count: untyped, total: untyped) -> void
       def initialize(remaining_count:, total:)
         @remaining_count = remaining_count
         @total = total
       end
 
+      #: () -> void
       def view_template
         # Sticky so the remaining count stays in view while the list scrolls
         # (D10 §6). Sits below the mobile top bar.

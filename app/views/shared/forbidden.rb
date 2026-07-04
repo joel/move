@@ -5,6 +5,7 @@ module Views
     class Forbidden < Views::Base
       include Phlex::Rails::Helpers::LinkTo
 
+      #: () -> void
       def view_template
         div(
           class: "mx-auto max-w-xl rounded-3xl border border-white/10 " \

@@ -29,6 +29,12 @@ class Box
   def self.dimension_presets: (?min_count: Integer, ?limit: Integer) -> untyped
 end
 
+class User
+  # Roleable's class_methods block defines this on including models — the
+  # concern is unchecked (see the Steepfile), so it is declared here.
+  def self.roles_config: () -> untyped
+end
+
 # Vocabulary is a PORO (not ActiveRecord) — its `find` is a custom factory.
 class Vocabulary
   def self.find: (untyped kind) -> untyped

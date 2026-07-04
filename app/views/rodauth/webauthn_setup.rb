@@ -6,6 +6,7 @@ module Views
       include Phlex::Rails::Helpers::FormWith
       include Phlex::Rails::Helpers::JavaScriptIncludeTag
 
+      #: () -> void
       def view_template
         cred = view_context.rodauth.new_webauthn_credential
         suggested = Webauthn::NameSuggester.from_user_agent(view_context.request.user_agent)
@@ -21,6 +22,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def render_hero
         div(class: "ha-card p-8") do
           p(class: "ha-overline") { plain "Security" }
@@ -33,6 +35,7 @@ module Views
         end
       end
 
+      #: (untyped cred, untyped suggested) -> untyped
       def render_setup_form(cred, suggested)
         rodauth = view_context.rodauth
         div(class: "ha-card p-6 space-y-6") do
@@ -64,6 +67,7 @@ module Views
         end
       end
 
+      #: (untyped form, untyped suggested) -> untyped
       def render_name_field(form, suggested)
         div(class: "space-y-2") do
           form.label(

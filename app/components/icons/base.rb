@@ -3,6 +3,7 @@
 module Components
   module Icons
     class Base < Phlex::SVG
+      #: (?css: untyped, **untyped) -> void
       def initialize(css: "h-4 w-4", **attrs)
         @css = css
         @attrs = attrs

@@ -7,12 +7,14 @@ module Components
     #
     #   render Components::Ui::BottomTabBar.new(active: :boxes)
     class BottomTabBar < Components::Base
+      #: (?active: untyped, ?destinations: untyped, **untyped) -> void
       def initialize(active: :boxes, destinations: Components::Ui::NavDestinations.default, **attrs)
         @active = active.to_sym
         @destinations = destinations
         @attrs = attrs
       end
 
+      #: () -> void
       def view_template
         nav(
           class: "lg:hidden fixed bottom-0 left-0 z-50 flex w-full items-center " \
@@ -27,6 +29,7 @@ module Components
 
       private
 
+      #: (untyped dest) -> untyped
       def tab(dest)
         active = dest.key == @active
         a(
@@ -44,6 +47,8 @@ module Components
       end
 
       # Elevated centre action (Scan) — floats above the bar.
+
+      #: (untyped dest) -> untyped
       def elevated_tab(dest)
         a(
           href: dest.href,

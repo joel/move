@@ -10,6 +10,7 @@ module Views
       include Phlex::Rails::Layout
       include ChromeHead
 
+      #: () ?{ (*untyped) -> untyped } -> untyped
       def view_template(&)
         doctype
         html(class: "dark") do

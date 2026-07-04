@@ -4,6 +4,7 @@ module Components
   class RodauthFlash < Components::Base
     include Phlex::Rails::Helpers::Flash
 
+    #: () -> void
     def view_template
       return unless flash[:notice] || flash[:alert]
 

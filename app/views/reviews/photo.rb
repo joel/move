@@ -10,6 +10,16 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::FormWith
 
+      # @rbs move: untyped
+      # @rbs box: untyped
+      # @rbs media: untyped
+      # @rbs items: untyped
+      # @rbs position: untyped
+      # @rbs total: untyped
+      # @rbs next_media: untyped
+      # @rbs editable: untyped
+      # @rbs move_boxes: untyped
+      # @rbs return: void
       def initialize(move:, box:, media:, items:, position:, total:, next_media:, editable: false, move_boxes: [])
         @move = move
         @box = box
@@ -24,6 +34,7 @@ module Views
         @move_boxes = move_boxes
       end
 
+      #: () -> void
       def view_template
         progress_bar
         div(class: "grid grid-cols-1 gap-stack-gap lg:grid-cols-12") do
@@ -34,6 +45,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def progress_bar
         div(class: "flex items-center gap-4") do
           a(href: move_box_path(@move, @box),
@@ -51,6 +63,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def media_panel
         section(class: "lg:col-span-7") do
           div(class: "relative overflow-hidden rounded-card border border-card-border bg-surface-container-high") do
@@ -67,6 +80,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def badge
         div(class: "absolute left-3 top-3 z-10 inline-flex items-center gap-2 rounded-full " \
                    "bg-surface-container-high/80 px-3 py-1 text-label-caps uppercase text-on-surface-variant " \
@@ -76,6 +90,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def items_panel
         section(class: "lg:col-span-5") do
           render Components::Ui::Card.new(padding: "p-6") do
@@ -88,6 +103,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def header
         h2(class: "text-headline-lg text-text-warm") { I18n.t("reviews.photo.title") }
         p(class: "mt-1 text-body-md text-muted") do
@@ -95,6 +111,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def list
         render Components::Reviews::ItemList.new(
           move: @move, box: @box, media: @media, items: @items, editable: @editable
@@ -103,6 +120,8 @@ module Views
 
       # An inline "add a missed item" row: type a name, submit to append it to this
       # photo. Server-side create keeps it robust (no client-only rows to lose).
+
+      #: () -> untyped
       def add_form
         form_with(url: move_box_review_add_item_path(@move, @box, @media), method: :post,
                   data: { controller: "reset-form", action: "turbo:submit-end->reset-form#reset" },
@@ -121,6 +140,8 @@ module Views
 
       # Move the whole photo (and its co-located items) to another box (#317). A box
       # picker + submit; the server validates same-box / cross-move / archived.
+
+      #: () -> untyped
       def move_photo_control
         div(class: "mt-stack-gap border-t border-card-border pt-stack-gap") do
           span(class: "text-label-caps uppercase text-muted") { I18n.t("reviews.photo.move_heading") }
@@ -142,6 +163,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def footer
         div(class: "mt-6") do
           if @next_media
@@ -155,6 +177,8 @@ module Views
       # Turbo prefetch is disabled: opening the next photo marks its items reviewed
       # (a GET-side effect), so hover-prefetching "Next Photo" must not confirm them
       # before the reviewer actually advances.
+
+      #: (untyped key, untyped href) -> untyped
       def advance_link(key, href)
         a(href: href, data: { turbo_prefetch: "false" },
           class: "inline-flex w-full items-center justify-center gap-2 rounded-full bg-accent-sage " \
@@ -165,11 +189,14 @@ module Views
       end
 
       # The add-form's submit button shares the row icon-button styling.
+
+      #: (Symbol tint) -> String
       def icon_button(tint)
         hover = tint == :error ? "hover:text-error hover:bg-error/10" : "hover:text-accent-sage hover:bg-accent-sage/10"
         "flex h-10 w-10 items-center justify-center rounded-full text-muted transition #{hover}"
       end
 
+      #: () -> Integer
       def progress_pct
         return 0 if @total.zero?
 

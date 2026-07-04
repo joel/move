@@ -5,6 +5,7 @@ module Views
     class EmailAuth < Views::Base
       include Phlex::Rails::Helpers::FormWith
 
+      #: () -> void
       def view_template
         div(class: "space-y-8") do
           div(class: "ha-card p-8") do

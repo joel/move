@@ -9,6 +9,7 @@ module Components
   class ItemForm < Components::Base
     include Phlex::Rails::Helpers::FormWith
 
+    #: (models: untyped, item: untyped, ?submit_label: untyped, ?cancel_href: untyped, ?autosave: untyped, ?source_media_id: untyped) -> void
     def initialize(models:, item:, submit_label: nil, cancel_href: nil,
                    autosave: false, source_media_id: nil)
       @models = models
@@ -24,6 +25,7 @@ module Components
       @autosave = autosave
     end
 
+    #: () -> void
     def view_template
       form_with(model: @models, class: "flex flex-col gap-6", **form_attrs) do |form|
         input(type: "hidden", name: "item[source_media_id]", value: @source_media_id) if @source_media_id
@@ -35,12 +37,14 @@ module Components
 
     private
 
+    #: () -> untyped
     def form_attrs
       return {} unless @autosave
 
       { data: { controller: "auto-submit", action: "change->auto-submit#submit" } }
     end
 
+    #: () -> untyped
     def name_field
       render Components::Ui::Field.new(
         name: "item[name]", label: I18n.t("items.form.name"),
@@ -49,6 +53,7 @@ module Components
       )
     end
 
+    #: (untyped form) -> untyped
     def footer(form)
       div(class: "mt-2 flex flex-wrap items-center justify-end gap-3") do
         if @cancel_href
@@ -60,11 +65,13 @@ module Components
       end
     end
 
+    #: () -> String
     def button_classes
       "inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm " \
         "font-bold transition select-none active:scale-[0.98] bg-accent-sage text-page hover:opacity-90"
     end
 
+    #: () -> untyped
     def render_errors
       div(class: "rounded-card bg-[var(--ha-error-container)] px-5 py-4 text-body-md text-error") do
         h2(class: "font-semibold") { I18n.t("items.form.errors", count: @item.errors.count) }

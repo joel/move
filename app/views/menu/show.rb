@@ -12,12 +12,14 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::Routes
 
+      #: (move: untyped, admin: untyped, editor: untyped) -> void
       def initialize(move:, admin:, editor:)
         @move = move
         @admin = admin
         @editor = editor
       end
 
+      #: () -> void
       def view_template
         div(class: "flex flex-col gap-section-gap") do
           render Components::Ui::SectionHeader.new(
@@ -33,13 +35,14 @@ module Views
 
       private
 
+      #: () -> Array[untyped]
       def organize_links
         links = [
           [I18n.t("menu.show.gallery"), Components::Icons::Camera, move_gallery_path(@move)],
           [I18n.t("menu.show.activity"), Components::Icons::Clock, move_activity_path(@move)],
           [I18n.t("menu.show.rooms"), Components::Icons::Boxes,
            move_vocabularies_path(@move, "rooms")]
-        ]
+        ] #: Array[untyped]
         links << [I18n.t("menu.show.members"), Components::Icons::Users, move_members_path(@move)] if @admin
         links << [I18n.t("menu.show.summary"), Components::Icons::Chart, move_summary_path(@move)]
         links << [I18n.t("menu.show.box_steps"), Components::Icons::Bolt, move_box_steps_path(@move)] if @editor
@@ -47,6 +50,7 @@ module Views
         links
       end
 
+      #: () -> Array[untyped]
       def app_links
         [
           [I18n.t("menu.show.settings"), Components::Icons::Settings, move_settings_path(@move)],
@@ -55,6 +59,7 @@ module Views
         ]
       end
 
+      #: (untyped title, untyped links) -> untyped
       def group(title, links)
         section(aria_label: title, class: "flex flex-col gap-stack-gap") do
           h2(class: "text-label-caps uppercase text-muted") { title }
@@ -62,6 +67,7 @@ module Views
         end
       end
 
+      #: (untyped label, untyped icon, untyped href) -> untyped
       def row(label, icon, href)
         a(
           href: href,
@@ -77,6 +83,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def actions
         section(aria_label: I18n.t("menu.show.actions"), class: "flex flex-col gap-3") do
           a(

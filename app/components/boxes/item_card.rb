@@ -15,10 +15,12 @@ module Components
     class ItemCard < Components::Base
       include Phlex::Rails::Helpers::ButtonTo
 
+      # @rbs skip
       def self.dom_id(item)
         "box_item_#{item.id}_card"
       end
 
+      #: (item: untyped, move: untyped, ?image_ready: untyped, ?generating: untyped, ?failed: untyped) -> void
       def initialize(item:, move:, image_ready: false, generating: false, failed: false)
         @item = item
         @move = move
@@ -29,6 +31,7 @@ module Components
         @failed = failed
       end
 
+      #: () -> void
       def view_template
         div(id: self.class.dom_id(@item), class: card_classes) do
           a(href: view_context.move_item_path(@move, @item), class: "flex flex-1 flex-col") do
@@ -44,6 +47,8 @@ module Components
       # Guard on the FK first so a source-less manual item never touches the
       # source_media association (the controller only preloads it for the
       # foreign-source items that have one — #416 Bullet).
+
+      #: () -> untyped
       def image?
         @item.source_media_id.present? && @item.source_media&.image&.attached?
       end
@@ -51,10 +56,13 @@ module Components
       # Role is gated by CSS (.editable-only under the box detail's data-editable),
       # not here — so a shared broadcast can carry the button while only editors
       # see it. We still only render it when generation is actually possible.
+
+      #: () -> untyped
       def show_generate?
         @image_ready && @item.source_media_id.nil? && !@generating
       end
 
+      #: () -> untyped
       def tile
         div(class: tile_classes) do
           if image?
@@ -70,6 +78,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def caption
         div(class: "flex flex-col gap-1 p-2") do
           span(class: "truncate text-body-md font-semibold text-text-warm") { @item.name }
@@ -77,6 +86,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def caption_note
         if @generating
           span(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.contents.generating") }
@@ -91,6 +101,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def needs_attention?
         %w[pending_review needs_correction].include?(@item.review_state)
       end
@@ -98,6 +109,8 @@ module Components
       # A button_to (its own form) — a sibling of the card's link, never nested in
       # the anchor (invalid HTML). Posts to the generate route; Turbo swaps the card
       # to the "generating" state, then the broadcast completes it.
+
+      #: () -> untyped
       def generate_control
         div(class: "editable-only px-2 pb-2") do
           button_to(
@@ -110,11 +123,13 @@ module Components
         end
       end
 
+      #: () -> String
       def card_classes
         "group flex flex-col overflow-hidden rounded-card border border-card-border bg-card " \
           "transition hover:border-accent-sage hover:bg-surface-container-high"
       end
 
+      #: () -> String
       def tile_classes
         "relative flex aspect-square items-center justify-center overflow-hidden " \
           "bg-surface-container-high text-muted"

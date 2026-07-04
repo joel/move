@@ -11,17 +11,20 @@ module Components
     #
     #   render Components::Ui::RecognitionErrorCaption.new(run: run)
     class RecognitionErrorCaption < Components::Base
+      #: (run: untyped, ?css: untyped) -> void
       def initialize(run:, css: "text-body-md text-error")
         @run = run
         @css = css
       end
 
+      #: () -> void
       def view_template
         p(class: @css) { caption_text }
       end
 
       private
 
+      #: () -> untyped
       def caption_text
         body =
           if @run.error_category == :generic

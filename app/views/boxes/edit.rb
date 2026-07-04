@@ -5,6 +5,7 @@ module Views
     # B1 — Edit box (number, room, dimensions, weight). form_with on a persisted
     # box issues a PATCH to the update action. Renders in the AppShellLayout.
     class Edit < Views::Base
+      #: (move: untyped, box: untyped, rooms: untyped, ?dimension_presets: untyped) -> void
       def initialize(move:, box:, rooms:, dimension_presets: [])
         @move = move
         @box = box
@@ -12,6 +13,7 @@ module Views
         @dimension_presets = dimension_presets
       end
 
+      #: () -> void
       def view_template
         a(
           href: move_box_path(@move, @box),

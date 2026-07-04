@@ -7,10 +7,12 @@ module Views
     # deliberately non-disclosing — it never hints the token exists elsewhere —
     # and offers a retry back to the scanner.
     class Unrecognized < Views::Base
+      #: (move: untyped) -> void
       def initialize(move:)
         @move = move
       end
 
+      #: () -> void
       def view_template
         render Components::Ui::Card.new(padding: "p-8", class: "mx-auto w-full max-w-md text-center") do
           div(class: "mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full " \

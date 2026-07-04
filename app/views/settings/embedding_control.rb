@@ -18,12 +18,14 @@ module Views
 
       ID = "ai-embedding-control"
 
+      #: (move: untyped) -> void
       def initialize(move:)
         @move = move
         @run = move.indexing_runs.order(:created_at).last
         @locked = @run&.in_progress? || false
       end
 
+      #: () -> void
       def view_template
         div(id: ID, class: "flex flex-col gap-3") do
           div(class: "flex flex-wrap items-center gap-1 rounded-full border border-card-border bg-card p-1") do
@@ -38,6 +40,7 @@ module Views
 
       private
 
+      #: (untyped provider) -> untyped
       def option(provider)
         label = t("options.#{provider}")
         active = @move.embedding_provider == provider
@@ -53,30 +56,38 @@ module Views
         )
       end
 
+      #: (untyped label) -> untyped
       def active_pill(label)
         span(class: "#{pill} bg-surface-container-high text-text-warm", aria_current: "true") { label }
       end
 
+      #: (untyped label) -> untyped
       def disabled_pill(label)
         span(class: "#{pill} cursor-not-allowed text-muted opacity-60", aria_disabled: "true") { label }
       end
 
       # fake is always selectable; a real provider needs its key stored first.
+
+      #: (untyped provider) -> bool
       def selectable?(provider)
         provider == "fake" || @move.embedding_api_key_for(provider).present?
       end
 
       # Shown when the active provider can't actually run (real, but no key).
+
+      #: () -> untyped
       def needs_key_hint
         return if @move.embedding_provider == "fake" || @move.embedding_provider_ready?
 
         span(class: "text-body-md text-secondary") { t("needs_key") }
       end
 
+      #: () -> String
       def pill
         "rounded-full px-6 py-2 text-sm font-semibold transition"
       end
 
+      #: (untyped key) -> untyped
       def t(key)
         I18n.t("settings.show.recognition.embeddings.#{key}")
       end
