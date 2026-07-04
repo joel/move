@@ -6,7 +6,9 @@
 # `key` and `credential` cover passwordless auth secrets that substring-matching
 # would otherwise miss: Rodauth's email-auth / verify-account magic-link `key`
 # (`"key".include?("_key")` is false) and the Google One Tap `credential` ID token
-# (#492). `key` subsumes `_key`; both kept for clarity.
+# (#492). `key` subsumes `_key`; both kept for clarity. `signed` covers Active
+# Storage `signed_id`s (a leaked signed id grants blob read access — the MCP
+# upload flow passes them as params, #531).
 Rails.application.config.filter_parameters += %i[
-  passw email secret token key credential _key crypt salt certificate otp ssn cvv cvc
+  passw email secret token key credential _key crypt salt certificate otp ssn cvv cvc signed
 ]

@@ -146,4 +146,108 @@ RSpec.describe "Sentry request scrubbing" do # rubocop:disable RSpec/DescribeCla
       Sentry.configuration.rails.active_support_logger_subscription_items["sql.active_record"]
     ).not_to include(:sql)
   end
+
+  it "enables tracing and profiling (#531)" do
+    expect(Sentry.configuration.traces_sample_rate).to eq(1.0)
+    expect(Sentry.configuration.profiles_sample_rate).to eq(1.0)
+    expect(defined?(StackProf)).to be_truthy # the profiler silently no-ops without it
+  end
+
+  it "redacts SQL string literals from traced db spans (Sequel literalizes Rodauth secrets)" do
+    transaction = Sentry.start_transaction(name: "spec", op: "http.server")
+    child = transaction.start_child(
+      op: "db.sql.active_record",
+      description: "INSERT INTO account_email_auth_keys (key) VALUES ('magic-link-secret')"
+    )
+    child.finish
+    transaction.finish
+    event = sentry_events.last
+
+    expect(event).to be_a(Sentry::TransactionEvent)
+    span = event.spans.find { |s| s[:op] == "db.sql.active_record" }
+    expect(span[:description]).not_to include("magic-link-secret")
+    expect(span[:description]).to include("INSERT INTO account_email_auth_keys")
+  end
+
+  it "redacts dollar-quoted and escape-string SQL literals too (future hand-written SQL)" do
+    transaction = Sentry.start_transaction(name: "spec", op: "http.server")
+    transaction.start_child(
+      op: "db.sql.active_record",
+      description: "SELECT 1 WHERE a = $$dollar-secret$$ AND b = $tag$tagged-secret$tag$ AND c = E'esc\\'ape-secret'"
+    ).finish
+    transaction.finish
+    span = sentry_events.last.spans.find { |s| s[:op] == "db.sql.active_record" }
+
+    expect(span[:description]).not_to include("dollar-secret")
+    expect(span[:description]).not_to include("tagged-secret")
+    expect(span[:description]).not_to include("ape-secret")
+  end
+
+  it "redacts path-embedded capability tokens from the request URL (Active Storage signed ids, scan tokens)" do
+    event = capture_event_for("https://demo.move-easy.org/rails/active_storage/blobs/proxy/eyJfcmFpbHNSIGNED/photo.jpg")
+
+    expect(event.request.url).not_to include("eyJfcmFpbHNSIGNED")
+    expect(event.request.url).to include("/rails/active_storage/[FILTERED]")
+
+    event = capture_event_for("https://demo.move-easy.org/scan/label-token-secret")
+    expect(event.request.url).not_to include("label-token-secret")
+  end
+
+  it "does not trace Active Storage proxy requests at all (signed ids in the path)" do
+    before_count = sentry_events.size
+    transaction = Sentry.start_transaction(
+      name: "/rails/active_storage/blobs/proxy/eyJSIGNED/photo.jpg", op: "http.server", source: :url
+    )
+    transaction&.finish
+
+    expect(sentry_events.size).to eq(before_count)
+  end
+
+  it "redacts path-embedded tokens from a query-less Referer" do
+    event = capture_event_for(
+      "https://demo.move-easy.org/boxes",
+      "HTTP_REFERER" => "https://demo.move-easy.org/scan/label-token-secret"
+    )
+
+    expect(event.request.headers["Referer"]).not_to include("label-token-secret")
+  end
+
+  it "scrubs the profile envelope's copied transaction name (raw path when routing never ran)" do
+    transaction = Sentry.start_transaction(name: "/scan/label-token-secret", op: "http.server", source: :url)
+    event = Sentry.get_current_client.event_from_transaction(transaction)
+    event.profile = { transaction: { name: "/scan/label-token-secret" } }
+    scrubbed = Sentry.configuration.before_send_transaction.call(event, {})
+
+    expect(scrubbed.transaction).not_to include("label-token-secret")
+    expect(scrubbed.profile.dig(:transaction, :name)).not_to include("label-token-secret")
+  end
+
+  it "redacts the outbound query string from traced http.client span data (One Tap id_token)" do
+    transaction = Sentry.start_transaction(name: "spec", op: "http.server")
+    span = transaction.start_child(op: "http.client", description: "GET https://oauth2.googleapis.com/tokeninfo")
+    span.set_data("http.query", "id_token=one-tap-token")
+    span.set_data("url", "https://oauth2.googleapis.com/tokeninfo")
+    span.finish
+    transaction.finish
+    sent = sentry_events.last.spans.find { |s| s[:op] == "http.client" }
+
+    expect(sent[:data]["http.query"]).not_to include("one-tap-token")
+    expect(sent[:data]["url"]).to eq("https://oauth2.googleapis.com/tokeninfo")
+  end
+
+  it "scrubs the request context on transactions too" do
+    env = Rack::MockRequest.env_for(
+      "https://demo.move-easy.org/auth?key=magic-link-secret",
+      "HTTP_COOKIE" => "_move_session=session-secret", "HTTP_AUTHORIZATION" => "Bearer integration-token"
+    )
+    Sentry.get_current_scope.set_rack_env(env)
+    transaction = Sentry.start_transaction(name: "spec", op: "http.server")
+    transaction.finish
+    event = sentry_events.last
+
+    expect(event).to be_a(Sentry::TransactionEvent)
+    expect(event.request.cookies).to be_nil
+    expect(event.request.headers).not_to have_key("Authorization")
+    expect(event.request.query_string).not_to include("magic-link-secret")
+  end
 end
