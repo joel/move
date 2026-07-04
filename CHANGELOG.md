@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.77.0] — 2026-07-04
+
+### Added
+- **Sentry error monitoring (internal — no user-facing change).** Production
+  exceptions across web requests and background jobs are now captured in
+  Sentry instead of only living in container logs. The SDK is dormant without
+  a DSN (dev/test send nothing), the DSN flows through Doppler like every
+  other secret, and a scrubbing hook keeps auth material — magic-link keys,
+  session cookies, API tokens — out of the reports (#528).
+
 ## [v0.76.0] — 2026-07-04
 
 ### Added
