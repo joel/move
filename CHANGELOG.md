@@ -5,6 +5,17 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.76.0] — 2026-07-04
+
+### Added
+- **Whole-app type checking (internal — no user-facing change).** The Phlex
+  view and component layer — the last uncovered code — now carries checked type
+  annotations, completing the rollout begun in v0.72.0: every method in every
+  layer of the codebase (business actions, models, controllers, views) is
+  statically type-checked, with the HTML/SVG tag vocabulary generated directly
+  from the view library so a typo'd tag or helper is a build error (#525).
+  Follow-up tracked in #527: tightening domain parameters to real model types.
+
 ## [v0.75.0] — 2026-07-04
 
 ### Added
