@@ -134,9 +134,20 @@ if sentry_dsn.present?
       scrub_event.call(event)
 
       event.spans&.each do |span|
-        next unless span[:op].to_s.start_with?("db.") && span[:description].is_a?(String)
+        if span[:op].to_s.start_with?("db.") && span[:description].is_a?(String)
+          span[:description] = span[:description].gsub(sql_string_literals, "'[FILTERED]'")
+        end
 
-        span[:description] = span[:description].gsub(sql_string_literals, "'[FILTERED]'")
+        # http.client spans record the outbound query string in their data
+        # under send_default_pii (One Tap tokeninfo carries the raw
+        # `id_token`) — same channel the breadcrumb scrub closes, so filter
+        # it here too; the rest of the data hash goes through the parameter
+        # filter for good measure. (The span description is safe: the patch
+        # strips the query from the URL it embeds.)
+        next unless (data = span[:data]).is_a?(Hash)
+
+        data["http.query"] = scrub_query.call(data["http.query"]) if data["http.query"].is_a?(String)
+        span[:data] = param_filter.filter(data)
       end
 
       event

@@ -183,6 +183,19 @@ RSpec.describe "Sentry request scrubbing" do # rubocop:disable RSpec/DescribeCla
     expect(span[:description]).not_to include("ape-secret")
   end
 
+  it "redacts the outbound query string from traced http.client span data (One Tap id_token)" do
+    transaction = Sentry.start_transaction(name: "spec", op: "http.server")
+    span = transaction.start_child(op: "http.client", description: "GET https://oauth2.googleapis.com/tokeninfo")
+    span.set_data("http.query", "id_token=one-tap-token")
+    span.set_data("url", "https://oauth2.googleapis.com/tokeninfo")
+    span.finish
+    transaction.finish
+    sent = sentry_events.last.spans.find { |s| s[:op] == "http.client" }
+
+    expect(sent[:data]["http.query"]).not_to include("one-tap-token")
+    expect(sent[:data]["url"]).to eq("https://oauth2.googleapis.com/tokeninfo")
+  end
+
   it "scrubs the request context on transactions too" do
     env = Rack::MockRequest.env_for(
       "https://demo.move-easy.org/auth?key=magic-link-secret",
