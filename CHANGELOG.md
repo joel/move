@@ -5,6 +5,17 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.78.0] — 2026-07-04
+
+### Added
+- **Lookbook component browser (internal — no user-facing change).** The Phlex
+  `Ui::*` design-system kit is now browsable per-component and per-state in
+  [Lookbook](https://lookbook.build/) at `/lookbook` (development only — the
+  gem and mount don't exist in production): 18 components, 60 scenarios,
+  dark/light toggle, live reload, and the component source alongside each
+  preview. New or changed `Ui::*` components ship with a preview from now on
+  (#530).
+
 ## [v0.77.0] — 2026-07-04
 
 ### Added
