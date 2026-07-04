@@ -3,6 +3,21 @@ default: &default
     - polling_interval: 1
       batch_size: 500
   workers:
+    # Dedicated pool for CPU-bound image ingest (#543) — ImageNormalizer/libvips
+    # transcode + variant prewarm, i.e. the user-visible "thumbnail appears"
+    # path. Isolated from the general pool so a burst of captures isn't starved
+    # by slow, IO-bound vision-API recognition jobs (and vice versa). CPU-bound,
+    # so threads are kept modest to leave headroom on the 4 vCPU box.
+    - queues: image_ingest
+      threads: 2
+      processes: <%= ENV.fetch("INGEST_CONCURRENCY", 1) %>
+      polling_interval: 0.1
+    # Everything else: recognition (slow, IO-bound vision API), embeddings,
+    # Active Storage analysis, label generation, demo provisioning, maintenance.
+    # "*" also covers image_ingest, so ingest can OVERFLOW into this pool for
+    # extra burst capacity — the dedicated pool above guarantees it a floor,
+    # this pool gives it a ceiling. Favouring the thumbnail over recognition is
+    # deliberate (names can appear a beat later; the photo cannot).
     - queues: "*"
       threads: 3
       processes: <%= ENV.fetch("JOB_CONCURRENCY", 1) %>

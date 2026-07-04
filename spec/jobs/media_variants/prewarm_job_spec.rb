@@ -22,4 +22,8 @@ RSpec.describe MediaVariants::PrewarmJob do
   it "is safe when the media was since deleted" do
     expect { described_class.perform_now(SecureRandom.uuid, tenant: tenant) }.not_to raise_error
   end
+
+  it "runs on the dedicated image_ingest pool (#543)" do
+    expect(described_class.new.queue_name).to eq("image_ingest")
+  end
 end
