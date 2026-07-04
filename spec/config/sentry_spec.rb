@@ -203,6 +203,25 @@ RSpec.describe "Sentry request scrubbing" do # rubocop:disable RSpec/DescribeCla
     expect(sentry_events.size).to eq(before_count)
   end
 
+  it "redacts path-embedded tokens from a query-less Referer" do
+    event = capture_event_for(
+      "https://demo.move-easy.org/boxes",
+      "HTTP_REFERER" => "https://demo.move-easy.org/scan/label-token-secret"
+    )
+
+    expect(event.request.headers["Referer"]).not_to include("label-token-secret")
+  end
+
+  it "scrubs the profile envelope's copied transaction name (raw path when routing never ran)" do
+    transaction = Sentry.start_transaction(name: "/scan/label-token-secret", op: "http.server", source: :url)
+    event = Sentry.get_current_client.event_from_transaction(transaction)
+    event.profile = { transaction: { name: "/scan/label-token-secret" } }
+    scrubbed = Sentry.configuration.before_send_transaction.call(event, {})
+
+    expect(scrubbed.transaction).not_to include("label-token-secret")
+    expect(scrubbed.profile.dig(:transaction, :name)).not_to include("label-token-secret")
+  end
+
   it "redacts the outbound query string from traced http.client span data (One Tap id_token)" do
     transaction = Sentry.start_transaction(name: "spec", op: "http.server")
     span = transaction.start_child(op: "http.client", description: "GET https://oauth2.googleapis.com/tokeninfo")

@@ -98,6 +98,16 @@ if sentry_dsn.present?
         .gsub(%r{/scan/[^/?#\s]+}, "/scan/[FILTERED]")
     end
 
+    # A Referer is a full URL: redact path-embedded tokens (/scan/:token, an
+    # Active Storage proxy URL — no query string needed) and filter its query.
+    scrub_referer = lambda do |referer|
+      referer = scrub_url.call(referer)
+      next referer unless referer.include?("?")
+
+      path, query = referer.split("?", 2)
+      "#{path}?#{scrub_query.call(query)}"
+    end
+
     # Shared by before_send (errors) and before_send_transaction (traces) —
     # transactions carry the SAME request context and breadcrumbs as errors.
     scrub_event = lambda do |event|
@@ -110,10 +120,10 @@ if sentry_dsn.present?
 
         # Defense-in-depth: Rodauth redirects the magic-link `key` out of the
         # URL before rendering anything, so today no in-app Referer carries a
-        # secret — but a future URL-borne token shouldn't get a free channel.
-        if (referer = request.headers&.[]("Referer")) && referer.include?("?")
-          path, query = referer.split("?", 2)
-          request.headers["Referer"] = "#{path}?#{scrub_query.call(query)}"
+        # query-borne secret — but a future URL-borne token shouldn't get a
+        # free channel.
+        if (referer = request.headers&.[]("Referer"))
+          request.headers["Referer"] = scrub_referer.call(referer)
         end
       end
 
@@ -158,6 +168,13 @@ if sentry_dsn.present?
 
     config.before_send_transaction = lambda do |event, _hint|
       scrub_event.call(event)
+
+      # The profile envelope copies the transaction name BEFORE this hook
+      # runs, so a raw-path name (request died pre-routing) must be scrubbed
+      # there too, not just on event.transaction.
+      if (profile_txn = event.profile&.dig(:transaction)) && profile_txn[:name].is_a?(String)
+        profile_txn[:name] = scrub_url.call(profile_txn[:name])
+      end
 
       event.spans&.each do |span|
         if span[:op].to_s.start_with?("db.") && span[:description].is_a?(String)
