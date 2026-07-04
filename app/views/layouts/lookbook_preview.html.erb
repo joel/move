@@ -1,0 +1,22 @@
+<%# Lookbook preview layout (#530) — the iframe shell every Ui::* preview
+    scenario renders inside. Mirrors the app's ChromeHead asset wiring
+    (Tailwind build + importmap JS so Stimulus behaviours work) without the
+    app chrome. The Lookbook "theme" display option (see
+    config/initializers/lookbook.rb) drives the dark class; the value is
+    whitelisted so no raw param ever reaches the markup. %>
+<% theme = params.dig(:lookbook, :display, :theme) %>
+<% theme = "dark" unless %w[dark light].include?(theme) %>
+<!DOCTYPE html>
+<html class="<%= theme == "dark" ? "dark" : "" %>">
+  <head>
+    <title>Lookbook preview</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= stylesheet_link_tag :app %>
+    <%= javascript_importmap_tags %>
+  </head>
+  <body class="min-h-screen bg-page text-text-warm antialiased">
+    <div class="p-6">
+      <%= yield %>
+    </div>
+  </body>
+</html>

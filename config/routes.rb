@@ -165,6 +165,13 @@ Rails.application.routes.draw do
 
   # Test-only login shortcut used by system specs (see TestSessionsController).
   get "test/login", to: "test_sessions#show" if Rails.env.test?
+
+  # Lookbook (#530) — component browser / preview environment for the Phlex
+  # Ui::* kit. Development-only: the gem lives in the :development group, so
+  # the constant does not exist elsewhere. Reach it on the apex dev host
+  # (https://move.move-easy.docker/lookbook — the tenant elevator keeps the
+  # apex on the public schema). See doc/project/component-previews.md.
+  mount Lookbook::Engine, at: "/lookbook" if Rails.env.development?
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # CSP violation report sink (#493). The report-only Content-Security-Policy points

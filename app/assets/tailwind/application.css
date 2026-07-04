@@ -24,6 +24,9 @@
 @source "../../views";
 @source "../../components";
 @source "../../../app/javascript";
+/* Lookbook preview scenarios (#530) — wrapper markup may use utilities that
+   no component emits, so the previews are scanned too. */
+@source "../../../spec/components/previews";
 
 /* Class-based dark mode (toggled on <html> by the theme controller). */
 @custom-variant dark (&:where(.dark, .dark *));
