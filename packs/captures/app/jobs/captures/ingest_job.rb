@@ -31,16 +31,20 @@ module Captures
 
     private
 
+    # Orchestrate only: normalize the bytes, hand the domain finalization (attach
+    # → ready → recognition → media.captured event) to Captures::CompleteIngest
+    # so the event stays in the action layer. A domain failure marks the row
+    # failed rather than leaving a stuck placeholder.
     def ingest(media, blob, captured_by_id)
       normalized = ImageNormalizer.call({ io: StringIO.new(blob.download), filename: blob.filename.to_s })
-      media.image.attach(normalized)
-      media.update!(status: "ready", optimized_at: Time.current)
-      blob.purge_later
-      RecognitionRuns::Enqueue.new.call(media: media)
-      Rails.event.notify(
-        "media.captured", media_id: media.id, box_id: media.box_id,
-                          move_id: media.move_id, captured_by_id: captured_by_id
-      )
+      result = Captures::CompleteIngest.new.call(media: media, normalized: normalized, captured_by_id: captured_by_id)
+
+      case result
+      in Dry::Monads::Success(_)
+        blob.purge_later
+      in Dry::Monads::Failure(_)
+        media.update!(status: "failed")
+      end
       broadcast(media.box)
     end
 

@@ -33,6 +33,7 @@ class GalleriesController < MoveScopedController
     # the genuinely oldest photos (the cap takes the first CAP of the chosen order,
     # not always the newest). id breaks captured_at ties for a stable page.
     rows = @move.media
+                .ready # exclude captures still ingesting / failed (#545)
                 .where(box_id: boxes.select(:id))
                 .includes(box: :room, image_attachment: :blob)
                 .order(captured_at: sort_direction, id: sort_direction)

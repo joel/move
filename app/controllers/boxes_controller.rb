@@ -318,7 +318,9 @@ class BoxesController < MoveScopedController
       move: @move, box: @box, items: items,
       # Gallery photos only (not_generated): generated images render via ItemCard.
       # Preload the blob so the grid's :thumb variant proxy URLs don't N+1 the blob.
-      media: @box.media.not_generated.includes(image_attachment: :blob).recent_first,
+      # ready: exclude captures still ingesting / failed (#545) — those show
+      # (with status) only in the capture panel, never as an inert gallery tile.
+      media: @box.media.ready.not_generated.includes(image_attachment: :blob).recent_first,
       editable: editable_move?, pending_count: unreviewed_count(scope),
       # Whether this box has at least one of ITS OWN photos that produced an item —
       # the per-photo review walk's membership (mirrors ReviewsController#review_media,

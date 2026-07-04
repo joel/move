@@ -1021,7 +1021,7 @@ CREATE TABLE public.media (
     discarded_by_parent_id uuid,
     optimized_at timestamp(6) without time zone,
     original_byte_size bigint,
-    status character varying DEFAULT 'pending'::character varying NOT NULL
+    status character varying DEFAULT 'ready'::character varying NOT NULL
 );
 
 
