@@ -39,9 +39,12 @@ if sentry_dsn.present?
 
     # Performance monitoring (#531): trace every request (low-traffic app —
     # lower towards 0.2 if event volume/quota ever becomes a concern) and
-    # profile every traced request (relative to traces_sample_rate; StackProf
-    # must be loaded at boot or the profiler silently no-ops — the stackprof
-    # gem is therefore global in the Gemfile, not dev-only).
+    # profile a SAMPLE of traced requests (#541: 10% — full profiling on a
+    # shared box was pure overhead once error+trace data was flowing; 10% is
+    # plenty for ongoing hot-path visibility). profiles_sample_rate is relative
+    # to traces_sample_rate; StackProf must be loaded at boot or the profiler
+    # silently no-ops — the stackprof gem is therefore global in the Gemfile,
+    # not dev-only.
     #
     # Accepted limitation: StackProf is process-global and non-reentrant, and
     # prod runs Solid Queue inside the Puma process (SOLID_QUEUE_IN_PUMA), so
@@ -49,7 +52,7 @@ if sentry_dsn.present?
     # profile (Sentry logs "running elsewhere" and drops the other). Profiles
     # are best-effort under concurrency; traces are unaffected.
     config.traces_sample_rate = 1.0
-    config.profiles_sample_rate = 1.0
+    config.profiles_sample_rate = 0.1
 
     # Never trace Active Storage proxy requests: their URLs embed
     # NON-EXPIRING signed blob/variant ids in the PATH, and a leaked proxy
