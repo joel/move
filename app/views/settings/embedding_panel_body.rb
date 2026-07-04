@@ -13,11 +13,13 @@ module Views
 
       ID = "ai-search-panel-body"
 
+      #: (move: untyped, manage: untyped) -> void
       def initialize(move:, manage:)
         @move = move
         @manage = manage
       end
 
+      #: () -> void
       def view_template
         div(id: ID, class: "flex flex-col gap-4") do
           div(class: "flex items-start justify-between gap-4") do
@@ -33,6 +35,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def status_chip
         if @move.embedding_provider_ready?
           chip(t("status_active"), "bg-accent-sage/20 text-accent-sage")
@@ -43,16 +46,19 @@ module Views
         end
       end
 
+      #: (untyped text, untyped color) -> untyped
       def chip(text, color)
         span(class: "#{color} rounded-full px-3 py-1 text-label-caps uppercase") { text }
       end
 
+      #: () -> untyped
       def readonly
         span(class: "self-start rounded-full bg-surface-container-high px-4 py-2 text-body-md text-text-warm") do
           t("options.#{@move.embedding_provider}")
         end
       end
 
+      #: (untyped key) -> untyped
       def t(key)
         I18n.t("settings.show.recognition.embeddings.#{key}")
       end

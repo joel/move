@@ -1,0 +1,103 @@
+# Hand-curated Phlex surface (the tag registries live in the GENERATED
+# sig/phlex.rbs): the SGML core methods components call, and the phlex-rails
+# helper-adapter modules they include — each adapter provides its Rails helper
+# as an instance method. Grown as checked call sites demand.
+module Phlex
+  class SGML
+    # Custom-element registration macro + the one element this app registers.
+    def self.register_element: (Symbol, ?untyped tag) -> void
+
+    def turbo_frame: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    # phlex-rails' bridge to the Rails view context (helpers.* / view_context).
+    def view_context: () -> untyped
+
+    def helpers: () -> untyped
+
+    def safe: (untyped) -> untyped
+
+    def doctype: () -> untyped
+
+    # Lifecycle hook Components::Base overrides (calls super).
+    def before_template: () -> void
+
+    def render: (*untyped, **untyped) ?{ () -> untyped } -> untyped
+
+    def plain: (untyped) -> untyped
+
+    def raw: (untyped) -> untyped
+
+    def comment: () ?{ () -> untyped } -> untyped
+
+    def whitespace: () ?{ () -> untyped } -> untyped
+
+    def capture: (*untyped) { () -> untyped } -> String
+
+    def vanish: (*untyped) { () -> untyped } -> nil
+  end
+
+  module Rails
+    module Layout
+    end
+
+    module Helpers
+      module Routes
+        # The same generated route-helper interface the controllers get —
+        # a renamed route is a NoMethod error in components too.
+        include ::_RbsRailsPathHelpers
+      end
+
+      module FormWith
+        def form_with: (*untyped, **untyped) ?{ (untyped) -> untyped } -> untyped
+      end
+
+      module ButtonTo
+        def button_to: (*untyped, **untyped) ?{ () -> untyped } -> untyped
+      end
+
+      module LinkTo
+        def link_to: (*untyped, **untyped) ?{ () -> untyped } -> untyped
+      end
+
+      module TurboStreamFrom
+        def turbo_stream_from: (*untyped, **untyped) -> untyped
+      end
+
+      module Flash
+        def flash: () -> untyped
+      end
+
+      module ContentFor
+        def content_for: (*untyped, **untyped) ?{ () -> untyped } -> untyped
+      end
+
+      module CSRFMetaTags
+        def csrf_meta_tags: () -> untyped
+      end
+
+      module JavaScriptIncludeTag
+        def javascript_include_tag: (*untyped, **untyped) -> untyped
+      end
+
+      module ContentTag
+        def content_tag: (*untyped, **untyped) ?{ () -> untyped } -> untyped
+      end
+
+      module Pluralize
+        def pluralize: (*untyped, **untyped) -> untyped
+      end
+
+      module CSPMetaTag
+        def csp_meta_tag: () -> untyped
+      end
+
+      module StyleSheetLinkTag
+        def stylesheet_link_tag: (*untyped, **untyped) -> untyped
+      end
+
+      module JavaScriptImportmapTags
+        def javascript_importmap_tags: (*untyped, **untyped) -> untyped
+      end
+    end
+  end
+end

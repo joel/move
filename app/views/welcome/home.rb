@@ -5,6 +5,7 @@ module Views
     class Home < Views::Base
       include Phlex::Rails::Helpers::LinkTo
 
+      #: () -> void
       def view_template
         if view_context.current_user
           render_logged_in
@@ -15,6 +16,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def render_logged_in
         div(class: "mx-auto w-full max-w-md space-y-8 text-center") do
           section do
@@ -32,6 +34,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def render_logged_out
         div(class: "mx-auto w-full max-w-md space-y-8") do
           section do
@@ -46,6 +49,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def render_access_card
         div(class: "ha-card p-6 ha-rise") do
           p(class: "ha-overline") { "Get started" }
@@ -64,6 +68,7 @@ module Views
         end
       end
 
+      #: () -> String
       def user_first_name
         user = view_context.current_user
         return "there" unless user
@@ -72,6 +77,7 @@ module Views
         name ? name.split.first : user.email.split("@").first
       end
 
+      #: () -> untyped
       def app_name
         Rails.application.config.x.brand_name
       end

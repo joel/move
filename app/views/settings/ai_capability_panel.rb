@@ -18,10 +18,12 @@ module Views
       # set/remove refreshes the masked status in place (#260), no full reload.
       ID = "ai-capability-panel"
 
+      #: (move: untyped) -> void
       def initialize(move:)
         @move = move
       end
 
+      #: () -> void
       def view_template
         div(id: ID, class: "flex flex-col gap-2") do
           span(class: "text-body-md text-on-surface-variant") { t("subtitle") }
@@ -33,6 +35,7 @@ module Views
 
       private
 
+      #: (untyped provider) -> untyped
       def provider_row(provider)
         div(class: "flex flex-col gap-3 py-4 first:pt-2") do
           div(class: "flex items-center justify-between gap-4") do
@@ -47,6 +50,7 @@ module Views
         end
       end
 
+      #: (untyped provider) -> untyped
       def powers(provider)
         div(class: "flex flex-wrap gap-1.5") do
           @move.provider_powers(provider).each do |feature|
@@ -56,6 +60,7 @@ module Views
         end
       end
 
+      #: (untyped provider) -> untyped
       def status_chip(provider)
         if @move.api_key_for(provider).present?
           span(class: "rounded-full bg-accent-sage/20 px-3 py-1 font-mono text-label-caps text-accent-sage") do
@@ -67,6 +72,7 @@ module Views
         end
       end
 
+      #: (untyped provider) -> untyped
       def key_form(provider)
         form_with(url: move_settings_provider_key_path(@move), method: :patch,
                   class: "flex flex-col gap-2 sm:flex-row sm:items-end") do
@@ -83,6 +89,7 @@ module Views
         end
       end
 
+      #: (untyped provider) -> untyped
       def remove_button(provider)
         button_to(
           t("remove"), move_settings_remove_provider_key_path(@move, provider: provider),
@@ -92,11 +99,14 @@ module Views
       end
 
       # "••••" + last 4 of the stored key. Admin-only surface; never the full key.
+
+      #: (untyped provider) -> String
       def masked_key(provider)
         key = @move.api_key_for(provider)
         key.present? ? "••••#{key[-4..]}" : ""
       end
 
+      #: (untyped key, **untyped) -> untyped
       def t(key, **)
         I18n.t("settings.show.ai_capability.#{key}", **)
       end

@@ -10,12 +10,15 @@ module Components
     class AppLayout < Components::Base
       # Active section + destinations default to the request context (Current),
       # so Move-scoped surfaces light up the right nav item and link Move-aware.
+
+      #: (?active: untyped, **untyped) -> void
       def initialize(active: nil, **attrs)
         @active = (active || Current.nav_section || :boxes).to_sym
         @destinations = Components::Ui::NavDestinations.for_move
         @attrs = attrs
       end
 
+      #: () ?{ (*untyped) -> untyped } -> untyped
       def view_template(&)
         div(class: "flex min-h-screen bg-page text-text-warm", **@attrs) do
           render Components::Ui::Sidebar.new(active: @active, destinations: @destinations)
@@ -32,12 +35,14 @@ module Components
 
       private
 
+      #: () -> untyped
       def mobile_top_bar
         header(
           class: "lg:hidden fixed left-0 top-0 z-40 flex w-full items-center " \
                  "justify-between border-b border-card-border bg-page px-margin-mobile py-4"
         ) do
-          a(href: Rails.application.routes.url_helpers.moves_path,
+          routes = Rails.application.routes.url_helpers #: untyped
+          a(href: routes.moves_path,
             aria_label: I18n.t("ui.nav.brand_home"),
             class: "flex items-center gap-2") do
             span(
@@ -48,7 +53,7 @@ module Components
           end
           div(class: "flex items-center gap-1") do
             render Components::Ui::ThemeToggle.new
-            a(href: Rails.application.routes.url_helpers.account_path,
+            a(href: routes.account_path,
               aria_label: I18n.t("ui.nav.account"),
               class: "flex h-9 w-9 items-center justify-center text-accent-sage " \
                      "transition hover:opacity-80") do

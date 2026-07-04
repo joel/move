@@ -18,11 +18,13 @@ module Views
       # place (#260), no full reload.
       ID = "ai-recognition-panel"
 
+      #: (move: untyped, manage: untyped) -> void
       def initialize(move:, manage:)
         @move = move
         @manage = manage
       end
 
+      #: () -> void
       def view_template
         div(id: ID, class: "flex flex-col gap-4") do
           div(class: "flex items-start justify-between gap-4") do
@@ -38,6 +40,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def status_chip
         if @move.recognition_ready?
           chip(t("status_active"), "bg-accent-sage/20 text-accent-sage")
@@ -46,10 +49,12 @@ module Views
         end
       end
 
+      #: (untyped text, untyped color) -> untyped
       def chip(text, color)
         span(class: "#{color} rounded-full px-3 py-1 text-label-caps uppercase") { text }
       end
 
+      #: () -> untyped
       def selector
         div(class: "flex flex-col gap-3") do
           span(class: "text-label-caps uppercase text-muted") { t("provider_label") }
@@ -61,6 +66,7 @@ module Views
         end
       end
 
+      #: (untyped provider) -> untyped
       def provider_pill(provider)
         label = t("options.#{provider}")
         return active_pill(label) if @move.recognition_provider == provider
@@ -76,10 +82,12 @@ module Views
         )
       end
 
+      #: (untyped label) -> untyped
       def active_pill(label)
         span(class: "#{pill} bg-surface-container-high text-text-warm", aria_current: "true") { label }
       end
 
+      #: (untyped label) -> untyped
       def disabled_pill(label)
         span(
           class: "#{pill} cursor-not-allowed text-muted opacity-60", aria_disabled: "true",
@@ -88,14 +96,18 @@ module Views
       end
 
       # fake is always selectable; a real provider needs its key stored first.
+
+      #: (untyped provider) -> bool
       def selectable?(provider)
         provider == "fake" || @move.recognition_api_key_for(provider).present?
       end
 
+      #: () -> bool
       def real_active?
         Move::REAL_RECOGNITION_PROVIDERS.include?(@move.recognition_provider)
       end
 
+      #: () -> untyped
       def needs_key_hint
         return if selectable?(@move.recognition_provider)
 
@@ -105,6 +117,8 @@ module Views
       # Inline model override for the active real provider (#187). Submits the
       # active provider + the model so the same action records the override; blank
       # or default clears it.
+
+      #: () -> untyped
       def model_form
         provider = @move.recognition_provider
         # Auto-saves on blur (the existing auto-submit controller) — no Save button.
@@ -127,6 +141,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def provider_readonly
         provider = @move.recognition_provider
         div(class: "flex flex-col gap-2") do
@@ -141,14 +156,17 @@ module Views
         end
       end
 
+      #: (untyped provider) -> untyped
       def current_model(provider)
         @move.recognition_model_for(provider).presence || RecognitionProviders.default_model(provider)
       end
 
+      #: () -> String
       def pill
         "rounded-full px-5 py-2 text-sm font-semibold transition"
       end
 
+      #: (untyped key) -> untyped
       def t(key)
         I18n.t("settings.show.recognition.providers.#{key}")
       end

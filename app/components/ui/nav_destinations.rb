@@ -14,8 +14,9 @@ module Components
       # Move-aware destinations: Boxes (D2), Search (D8), Summary (D12), and Menu
       # (D13) link to the active Move when one is in context (Current.move); Scan
       # resolves too. With no Move, all are stubs (D0).
+      # @rbs skip
       def self.for_move(move = Current.move)
-        h = Rails.application.routes.url_helpers
+        h = Rails.application.routes.url_helpers #: untyped
         [
           Destination.new(:boxes, "ui.nav.boxes", Components::Icons::Boxes,
                           move ? h.move_boxes_path(move) : STUB_HREF, false),
@@ -31,6 +32,7 @@ module Components
       end
 
       # Backwards-compatible stateless default (no Move context).
+      # @rbs skip
       def self.default
         for_move(nil)
       end
@@ -40,6 +42,8 @@ module Components
       # A UI affordance read off Current (the server still enforces the boundary):
       # an editing role (admin/contributor) on a writable Move. Hidden for viewers,
       # archived Moves, and when there is no Move in context.
+
+      # @rbs skip
       def self.editor?(move = Current.move)
         return false if move.nil? || Current.user.nil?
 

@@ -6,6 +6,7 @@ module Views
       include Phlex::Rails::Helpers::FormWith
       include Phlex::Rails::Helpers::ContentTag
 
+      #: () -> void
       def view_template
         div(class: "space-y-8") do
           div(class: "ha-card p-8") do
@@ -55,6 +56,7 @@ module Views
 
       private
 
+      #: (untyped form) -> untyped
       def render_login_field(form)
         login_error = view_context.rodauth.field_error(view_context.rodauth.login_param)
         aria_attrs = login_error ? { invalid: true, describedby: "login_error_message" } : {}

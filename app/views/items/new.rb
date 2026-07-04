@@ -5,6 +5,7 @@ module Views
     # B3 — Manual add item. A lightweight form inside the AppShell, scoped to the
     # box the item lands in. Reuses Components::ItemForm.
     class New < Views::Base
+      #: (move: untyped, box: untyped, item: untyped, ?source_media_id: untyped) -> void
       def initialize(move:, box:, item:, source_media_id: nil)
         @move = move
         @box = box
@@ -12,6 +13,7 @@ module Views
         @source_media_id = source_media_id
       end
 
+      #: () -> void
       def view_template
         back_link
         render Components::Ui::SectionHeader.new(
@@ -31,6 +33,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def back_link
         a(
           href: move_box_path(@move, @box),
@@ -41,6 +44,7 @@ module Views
         end
       end
 
+      #: () -> String
       def box_context
         number = Kernel.format("%03d", @box.number.to_i)
         room = @box.room&.name

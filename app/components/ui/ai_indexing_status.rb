@@ -12,10 +12,12 @@ module Components
     class AiIndexingStatus < Components::Base
       ID = "ai-indexing-status"
 
+      #: (run: untyped) -> void
       def initialize(run:)
         @run = run
       end
 
+      #: () -> void
       def view_template
         div(id: ID, class: "flex flex-col gap-2") do
           if @run&.in_progress?
@@ -28,6 +30,7 @@ module Components
 
       private
 
+      #: () -> untyped
       def progress
         render Components::Ui::ProgressBar.new(
           value: @run.finished_items, max: @run.total_count, label: t("progress_label")
@@ -38,6 +41,7 @@ module Components
         span(class: "text-body-sm text-muted") { t("locked_note") }
       end
 
+      #: () -> untyped
       def up_to_date
         span(class: "inline-flex items-center gap-1.5 text-label-caps uppercase text-accent-sage") do
           render Components::Icons::Check.new(css: "h-4 w-4")
@@ -45,6 +49,7 @@ module Components
         end
       end
 
+      #: (untyped key, **untyped) -> untyped
       def t(key, **)
         I18n.t("settings.show.recognition.embeddings.indexing.#{key}", **)
       end

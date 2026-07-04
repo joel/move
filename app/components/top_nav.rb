@@ -6,6 +6,7 @@ module Components
   class TopNav < Components::Base
     include Phlex::Rails::Helpers::LinkTo
 
+    #: () -> void
     def view_template
       header(class: "sticky top-0 z-40 border-b border-[var(--ha-border)]/40 " \
                     "bg-[var(--ha-surface)]/80 backdrop-blur") do
@@ -22,6 +23,7 @@ module Components
 
     private
 
+    #: () -> untyped
     def render_brand
       link_to(view_context.root_path, class: "flex items-center gap-2") do
         span(class: "flex h-8 w-8 items-center justify-center rounded-xl " \
@@ -34,10 +36,12 @@ module Components
       end
     end
 
+    #: () -> untyped
     def render_theme_toggle
       render Components::Ui::ThemeToggle.new
     end
 
+    #: () -> untyped
     def render_auth_actions
       if current_user
         link_to(view_context.account_path,
@@ -53,10 +57,12 @@ module Components
       end
     end
 
+    #: () -> untyped
     def current_user
       view_context.current_user
     end
 
+    #: () -> untyped
     def app_name
       Rails.application.config.x.brand_name
     end

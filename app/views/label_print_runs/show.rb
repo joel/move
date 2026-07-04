@@ -10,11 +10,13 @@ module Views
       include Phlex::Rails::Helpers::Routes
       include Phlex::Rails::Helpers::TurboStreamFrom
 
+      #: (move: untyped, run: untyped) -> void
       def initialize(move:, run:)
         @move = move
         @run = run
       end
 
+      #: () -> void
       def view_template
         div(class: "flex flex-col gap-section-gap") do
           turbo_stream_from(@run, :progress)

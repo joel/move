@@ -6,6 +6,7 @@ module Views
       include Phlex::Rails::Layout
       include ChromeHead
 
+      #: () ?{ (*untyped) -> untyped } -> untyped
       def view_template(&)
         doctype
         html(class: "dark") do
@@ -24,6 +25,7 @@ module Views
 
       private
 
+      #: () ?{ (*untyped) -> untyped } -> untyped
       def render_main(&)
         main(class: "relative") do
           render_background_decorations
@@ -33,6 +35,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def render_background_decorations
         div(class: "pointer-events-none fixed inset-0 -z-10") do
           div(class: "absolute -right-48 -top-48 h-[500px] w-[500px] " \

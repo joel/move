@@ -7,11 +7,13 @@ module Views
     # "Open box" CTA leads to the box detail, where authorized members see the
     # full inventory. Status is shown, never changed by the scan.
     class Resolved < Views::Base
+      #: (move: untyped, box: untyped) -> void
       def initialize(move:, box:)
         @move = move
         @box = box
       end
 
+      #: () -> void
       def view_template
         render Components::Ui::Card.new(padding: "p-6", class: "mx-auto w-full max-w-md") do
           identity
@@ -22,6 +24,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def identity
         div(class: "flex items-start justify-between gap-3") do
           div(class: "flex flex-col gap-2") do
@@ -35,6 +38,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def tiles
         div(class: "mt-6 grid grid-cols-2 gap-3") do
           tile(I18n.t("scans.resolved.items"), @box.item_count.to_s)
@@ -42,6 +46,7 @@ module Views
         end
       end
 
+      #: (untyped label, untyped value) -> untyped
       def tile(label, value)
         div(class: "rounded-card border border-card-border bg-surface-container-high p-4") do
           p(class: "text-headline-md text-text-warm") { value }
@@ -49,6 +54,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def open_button
         div(class: "mt-6") do
           render Components::Ui::Button.new(
@@ -58,6 +64,7 @@ module Views
         end
       end
 
+      #: () -> String
       def box_title
         "Box ##{Kernel.format("%03d", @box.number.to_i)}"
       end

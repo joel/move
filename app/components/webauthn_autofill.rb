@@ -4,6 +4,7 @@ module Components
   class WebauthnAutofill < Components::Base
     include Phlex::Rails::Helpers::JavaScriptIncludeTag
 
+    #: () -> void
     def view_template
       return unless show?
 
@@ -58,6 +59,7 @@ module Components
 
     private
 
+    #: () -> untyped
     def show?
       view_context.rodauth.respond_to?(:webauthn_autofill?) &&
         view_context.rodauth.webauthn_autofill? &&

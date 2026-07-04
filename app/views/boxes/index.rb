@@ -8,6 +8,16 @@ module Views
     class Index < Views::Base
       include Phlex::Rails::Helpers::FormWith
 
+      # @rbs move: untyped
+      # @rbs boxes: untyped
+      # @rbs rooms: untyped
+      # @rbs summary: untyped
+      # @rbs sort_key: untyped
+      # @rbs selected_room_id: untyped
+      # @rbs item_counts: untyped
+      # @rbs editable: untyped
+      # @rbs highlight_box_id: untyped
+      # @rbs return: void
       def initialize(move:, boxes:, rooms:, summary:, sort_key: Box::DEFAULT_SORT,
                      selected_room_id: nil, item_counts: {}, editable: false,
                      highlight_box_id: nil)
@@ -22,6 +32,7 @@ module Views
         @highlight_box_id = highlight_box_id
       end
 
+      #: () -> void
       def view_template
         @boxes.load # one query, reused by the any?/each calls below
         header
@@ -32,6 +43,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def header
         render Components::Ui::SectionHeader.new(
           eyebrow: I18n.t("moves.status.#{@move.status}", default: @move.status.titleize),
@@ -42,6 +54,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def add_button
         render Components::Ui::Button.new(
           label: I18n.t("boxes.index.add"),
@@ -52,6 +65,8 @@ module Views
 
       # Move-wide progress: packed ratio + pending-review and missing-dimensions
       # counts (Domain §4 progress indicator). Item counts arrive in D5.
+
+      #: () -> untyped
       def progress_summary
         render Components::Ui::Card.new do
           div(class: "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between") do
@@ -69,6 +84,7 @@ module Views
         end
       end
 
+      #: (untyped value, untyped label) -> untyped
       def stat(value, label)
         div(class: "flex flex-col") do
           span(class: "text-headline-md text-text-warm") { value.to_s }
@@ -81,6 +97,8 @@ module Views
       # whenever the Move has rooms — even on an empty filtered result, so the user
       # can always switch rooms; the sort control only when there are boxes to sort.
       # `ml-auto` right-aligns the sort without a spacer element.
+
+      #: () -> untyped
       def controls
         return unless @rooms.any? || @boxes.any?
 
@@ -90,6 +108,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def filters
         div(class: "flex gap-3 overflow-x-auto pb-1") do
           chip_link(I18n.t("boxes.filters.all"), boxes_path_with(room_id: nil), @selected_room_id.nil?)
@@ -101,6 +120,8 @@ module Views
 
       # Filter links keep the active non-default sort so switching rooms doesn't
       # reset it — the mirror of the sort control carrying room_id (#336 review).
+
+      #: (room_id: untyped) -> String
       def boxes_path_with(room_id:)
         query = { room_id: room_id, sort: (@sort_key unless @sort_key == Box::DEFAULT_SORT) }
         move_boxes_path(@move, query.compact)
@@ -109,6 +130,8 @@ module Views
       # Auto-submitting GET select (Phlex blocks inline on* handlers, so the
       # submit is driven by the `auto-submit` Stimulus controller — same pattern as
       # Settings labels-per-box). Carries the active room filter through.
+
+      #: () -> untyped
       def sort_control
         form_with(url: move_boxes_path(@move), method: :get,
                   data: { controller: "auto-submit" }) do
@@ -133,6 +156,7 @@ module Views
         end
       end
 
+      #: (untyped label, untyped href, untyped selected) -> untyped
       def chip_link(label, href, selected)
         a(href: href, class: "flex-shrink-0") do
           render Components::Ui::Chip.new(label: label, kind: :room, selected: selected)
@@ -143,6 +167,8 @@ module Views
       # would only ever appear alongside existing boxes — redundant with the green
       # "+ Add box" button in the header. Dropped (#260); the empty state (no boxes)
       # keeps its own Add CTA.
+
+      #: () -> untyped
       def grid
         div(class: "grid grid-cols-1 gap-stack-gap sm:grid-cols-2 lg:grid-cols-3") do
           @boxes.each do |box|
@@ -154,6 +180,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def empty_state
         if @selected_room_id
           render Components::Ui::EmptyState.new(

@@ -2,6 +2,7 @@
 
 module Components
   class GoogleOneTap < Components::Base
+    #: () -> void
     def view_template
       return unless show?
 
@@ -26,6 +27,8 @@ module Components
     # subdomain (or a non-canonical public host like www/move) One Tap would fail
     # with an origin error. The component renders in the global layout, so it must
     # guard the host itself (ApplicationController#on_apex_host?).
+
+    #: () -> untyped
     def show?
       ENV["GOOGLE_CLIENT_ID"].present? &&
         view_context.on_apex_host? &&

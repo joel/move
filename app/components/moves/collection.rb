@@ -22,6 +22,8 @@ module Components
       # or DemoData::Reveal for the broadcast path). REQUIRED, and each card's
       # entry is fetched strictly, so a render site that forgets it fails loudly
       # instead of silently regressing to the old placeholder zeros.
+
+      #: (moves: untyped, organization: untyped, metrics: untyped, ?user: untyped) -> void
       def initialize(moves:, organization:, metrics:, user: nil)
         @moves = moves
         @organization = organization
@@ -29,6 +31,7 @@ module Components
         @user = user
       end
 
+      #: () -> void
       def view_template
         div(id: ID, class: "flex flex-col gap-4") do
           if provisioning?
@@ -50,6 +53,7 @@ module Components
 
       private
 
+      #: () -> untyped
       def status
         @organization&.demo_data_status
       end
@@ -57,14 +61,18 @@ module Components
       # Only treat the account as "provisioning"/"failed" while it has no Moves yet —
       # once anything exists the list wins, so a user who created their own Move (or
       # whose sample landed) never sees the onboarding states.
+
+      #: () -> untyped
       def provisioning?
         status == "provisioning" && @moves.none?
       end
 
+      #: () -> untyped
       def failed?
         status == "failed" && @moves.none?
       end
 
+      #: () -> untyped
       def list
         section(class: "flex flex-col gap-4") do
           @moves.each do |move|
@@ -73,6 +81,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def preparing_card
         div(
           class: "flex flex-col gap-4 rounded-card border border-card-border bg-card p-5 " \
@@ -86,6 +95,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def failed_card
         render Components::Ui::EmptyState.new(
           title: I18n.t("moves.sample.failed_title"),
@@ -98,6 +108,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def empty_state
         render Components::Ui::EmptyState.new(
           title: I18n.t("moves.empty.title"),

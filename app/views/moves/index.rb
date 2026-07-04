@@ -4,6 +4,7 @@ module Views
   module Moves
     # A1 — Select Move (list view) / empty state.
     class Index < Views::Base
+      #: (moves: untyped, metrics: untyped, ?organization: untyped, ?user: untyped) -> void
       def initialize(moves:, metrics:, organization: nil, user: nil)
         @moves = moves
         @metrics = metrics
@@ -11,6 +12,7 @@ module Views
         @user = user
       end
 
+      #: () -> void
       def view_template
         div(class: "mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8") do
           header
@@ -22,6 +24,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def header
         div(class: "flex flex-col gap-4 md:flex-row md:items-end md:justify-between") do
           div do

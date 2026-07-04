@@ -9,10 +9,12 @@ module Components
     class StateBadges < Components::Base
       ID = "item-state-badges"
 
+      #: (item: untyped) -> void
       def initialize(item:)
         @item = item
       end
 
+      #: () -> void
       def view_template
         div(id: ID, class: "absolute left-3 top-3 z-10 flex flex-wrap gap-2") do
           render Components::ItemStateBadge.new(item: @item)

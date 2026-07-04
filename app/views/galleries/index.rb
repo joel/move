@@ -10,6 +10,7 @@ module Views
 
       SORTS = %w[recent oldest].freeze
 
+      #: (move: untyped, media: untyped, rooms: untyped, sort_key: untyped, ?selected_room_id: untyped, ?over_cap: untyped) -> void
       def initialize(move:, media:, rooms:, sort_key:, selected_room_id: nil, over_cap: false)
         @move = move
         @media = media
@@ -19,6 +20,7 @@ module Views
         @over_cap = over_cap
       end
 
+      #: () -> void
       def view_template
         div(class: "flex flex-col gap-section-gap") do
           header
@@ -30,6 +32,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def header
         render Components::Ui::SectionHeader.new(
           eyebrow: @move.name,
@@ -38,6 +41,7 @@ module Views
         )
       end
 
+      #: () -> untyped
       def cap_notice
         p(class: "text-body-md text-on-surface-variant") do
           I18n.t("galleries.index.capped.#{@sort_key}", count: GalleriesController::CAP)
@@ -46,6 +50,8 @@ module Views
 
       # Room filter (left) + sort (right), both GET-param driven so they survive
       # each other and stay bookmarkable — mirrors Views::Boxes::Index.
+
+      #: () -> untyped
       def controls
         return unless @rooms.any? || @media.any?
 
@@ -55,6 +61,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def filters
         div(class: "flex gap-3 overflow-x-auto pb-1") do
           chip_link(I18n.t("galleries.index.filters.all"), gallery_path_with(room_id: nil), @selected_room_id.nil?)
@@ -64,6 +71,7 @@ module Views
         end
       end
 
+      #: (untyped label, untyped href, bool selected) -> untyped
       def chip_link(label, href, selected)
         a(href: href, class: "flex-shrink-0") do
           render Components::Ui::Chip.new(label: label, kind: :room, selected: selected)
@@ -72,11 +80,14 @@ module Views
 
       # Keep the active non-default sort when switching rooms (mirror of the sort
       # control carrying room_id), so neither control resets the other.
+
+      #: (room_id: untyped) -> untyped
       def gallery_path_with(room_id:)
         query = { room_id: room_id, sort: (@sort_key unless @sort_key == "recent") }
         move_gallery_path(@move, query.compact)
       end
 
+      #: () -> untyped
       def sort_control
         form_with(url: move_gallery_path(@move), method: :get, data: { controller: "auto-submit" }) do
           input(type: "hidden", name: "room_id", value: @selected_room_id) if @selected_room_id
@@ -98,10 +109,12 @@ module Views
         end
       end
 
+      #: () -> untyped
       def grid
         render Components::Gallery::Grid.new(move: @move, media: @media)
       end
 
+      #: () -> untyped
       def empty_state
         if @selected_room_id
           render Components::Ui::EmptyState.new(

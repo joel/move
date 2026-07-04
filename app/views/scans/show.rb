@@ -7,10 +7,12 @@ module Views
     # for when the camera is unavailable. On a hit the controller navigates to the
     # Move-scoped resolve route. Renders in the Move app shell.
     class Show < Views::Base
+      #: (move: untyped) -> void
       def initialize(move:)
         @move = move
       end
 
+      #: () -> void
       def view_template
         div(
           class: "flex flex-col items-center gap-6",
@@ -25,6 +27,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def viewfinder
         div(class: "relative aspect-[3/4] w-full max-w-sm overflow-hidden rounded-card " \
                    "border border-card-border bg-black") do
@@ -37,6 +40,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def overlay
         div(class: "pointer-events-none absolute inset-0 flex flex-col items-center " \
                    "justify-center gap-6") do
@@ -48,6 +52,8 @@ module Views
       end
 
       # Camera-independent fallback: type the box code printed on the label.
+
+      #: () -> untyped
       def manual_entry
         form(
           data: { action: "qr-scanner#submitManual" },
@@ -67,6 +73,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def fallback
         div(
           data: { qr_scanner_target: "fallback" },

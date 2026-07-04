@@ -9,6 +9,7 @@ module Views
 
       HIGHLIGHT_CLASSES = "ring-2 ring-[var(--ha-primary)]"
 
+      #: () -> void
       def view_template
         div(class: "space-y-8") do
           render_hero
@@ -26,12 +27,15 @@ module Views
       # The credential this session authenticated with (or just registered);
       # nil on an email-link session. The only reliable "current device" signal —
       # localStorage can't tell which of several browser-created keys is current.
+
+      #: () -> untyped
       def current_device_id
         return @current_device_id if defined?(@current_device_id)
 
         @current_device_id = view_context.rodauth.authenticated_webauthn_id
       end
 
+      #: () -> untyped
       def render_hero
         div(class: "ha-card p-8") do
           p(class: "ha-overline") { plain "Security" }
@@ -44,6 +48,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def render_add_another_card
         div(class: "ha-card p-6") do
           h2(class: "text-lg font-semibold") { plain "Add another passkey" }
@@ -60,6 +65,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def render_remove_form
         div(class: "ha-card p-6 space-y-6") do
           form_with(
@@ -91,6 +97,7 @@ module Views
         end
       end
 
+      #: (untyped form, untyped row, ?checked: bool, ?current: bool) -> untyped
       def render_passkey_row(form, row, checked: false, current: false)
         label(
           for: "webauthn-remove-#{row[:id]}",
@@ -123,6 +130,8 @@ module Views
       end
 
       # Shown only on the credential this session authenticated with.
+
+      #: () -> untyped
       def render_this_device_badge
         span(
           class: "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 " \
@@ -131,6 +140,7 @@ module Views
         ) { plain "This device" }
       end
 
+      #: () -> untyped
       def render_remove_error
         return unless remove_error
 
@@ -140,12 +150,14 @@ module Views
         ) { remove_error }
       end
 
+      #: () -> Hash[Symbol, untyped]
       def radio_aria_attrs
         return {} unless remove_error
 
         { invalid: true, describedby: "webauthn_remove_error_message" }
       end
 
+      #: () -> untyped
       def remove_error
         return @remove_error if defined?(@remove_error)
 
@@ -154,6 +166,7 @@ module Views
         )
       end
 
+      #: () -> Array[Hash[Symbol, untyped]]
       def passkey_rows
         rodauth = view_context.rodauth
         fmt = rodauth.strftime_format

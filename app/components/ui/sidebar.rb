@@ -8,12 +8,14 @@ module Components
     #
     #   render Components::Ui::Sidebar.new(active: :boxes)
     class Sidebar < Components::Base
+      #: (?active: untyped, ?destinations: untyped, **untyped) -> void
       def initialize(active: :boxes, destinations: Components::Ui::NavDestinations.default, **attrs)
         @active = active.to_sym
         @destinations = destinations
         @attrs = attrs
       end
 
+      #: () -> void
       def view_template
         nav(
           class: "hidden lg:flex fixed left-0 top-0 z-40 h-full w-[280px] flex-col " \
@@ -42,8 +44,10 @@ module Components
 
       private
 
+      #: () -> untyped
       def render_brand
-        a(href: Rails.application.routes.url_helpers.moves_path,
+        routes = Rails.application.routes.url_helpers #: untyped
+        a(href: routes.moves_path,
           aria_label: I18n.t("ui.nav.brand_home"),
           class: "mb-8 flex items-center gap-4 rounded-card px-2 py-1 " \
                  "transition hover:bg-card") do
@@ -58,6 +62,7 @@ module Components
         end
       end
 
+      #: (untyped dest) -> untyped
       def item(dest)
         active = dest.key == @active
         a(

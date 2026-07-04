@@ -1,0 +1,375 @@
+# Phlex tag-DSL surface — 100% GENERATED from the installed gem's element
+# registries (Phlex::HTML::StandardElements/VoidElements +
+# Phlex::SVG::StandardElements), because phlex ships no RBS and
+# gem_rbs_collection has none. Regenerate after a phlex bump with the runner
+# snippet in doc/project/type-checking.md — it REWRITES this whole file; the
+# hand-curated Phlex surface lives in sig/phlex_rails.rbs instead.
+#
+# Every tag shares the same permissive shape on purpose: attributes are a
+# free-form kwargs hash, content is a block (splat-args — Phlex yields a
+# builder to blocks that ask for one, e.g. `svg do |s|`) — per-attribute
+# typing is not the goal, resolving the DSL as known methods is.
+
+module Phlex
+  class HTML < SGML
+    def a: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def abbr: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def address: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def area: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def article: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def aside: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def audio: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def b: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def base: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def bdi: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def bdo: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def blockquote: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def body: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def br: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def button: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def canvas: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def caption: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def cite: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def code: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def col: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def colgroup: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def data: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def datalist: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def dd: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def del: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def details: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def dfn: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def dialog: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def div: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def dl: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def dt: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def em: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def embed: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def fencedframe: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def fieldset: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def figcaption: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def figure: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def footer: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def form: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def h1: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def h2: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def h3: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def h4: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def h5: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def h6: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def head: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def header: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def hgroup: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def hr: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def html: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def i: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def iframe: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def img: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def input: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def ins: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def kbd: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def label: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def legend: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def li: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def link: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def main: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def map: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def mark: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def menu: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def meta: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def meter: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def nav: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def noscript: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def object: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def ol: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def optgroup: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def option: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def output: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def p: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def picture: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def pre: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def progress: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def q: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def rp: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def rt: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def ruby: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def s: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def samp: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def script: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def search: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def section: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def select: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def selectedcontent: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def slot: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def small: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def source: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def span: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def strong: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def style: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def sub: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def summary: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def sup: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def svg: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def table: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def tbody: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def td: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def template: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def textarea: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def tfoot: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def th: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def thead: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def time: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def title: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def tr: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def track: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def u: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def ul: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def var: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def video: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def wbr: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+  end
+
+  class SVG < SGML
+    def a: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def animate: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def animateMotion: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def animateTransform: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def circle: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def clipPath: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def defs: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def desc: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def discard: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def ellipse: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feBlend: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feColorMatrix: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feComponentTransfer: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feComposite: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feConvolveMatrix: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feDiffuseLighting: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feDisplacementMap: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feDistantLight: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feDropShadow: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feFlood: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feFuncA: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feFuncB: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feFuncG: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feFuncR: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feGaussianBlur: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feImage: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feMerge: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feMergeNode: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feMorphology: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feOffset: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def fePointLight: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feSpecularLighting: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feSpotLight: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feTile: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def feTurbulence: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def filter: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def foreignObject: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def g: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def image: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def line: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def linearGradient: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def marker: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def mask: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def metadata: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def mpath: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def path: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def pattern: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def polygon: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def polyline: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def radialGradient: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def rect: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def script: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def set: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def stop: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def style: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def svg: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def switch: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def symbol: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def text: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def textPath: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def title: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def tspan: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def use: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+
+    def view: (*untyped, **untyped) ?{ (*untyped) -> untyped } -> untyped
+  end
+end

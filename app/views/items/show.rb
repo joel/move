@@ -6,6 +6,7 @@ module Views
     # never cropped) on the left; the edit form plus Move and Remove/Restore
     # controls on the right. Review and presence are shown as independent axes.
     class Show < Views::Base
+      #: (move: untyped, item: untyped, boxes: untyped, ?editable: untyped, ?photo_siblings: untyped) -> void
       def initialize(move:, item:, boxes:, editable: false, photo_siblings: 0)
         @move = move
         @item = item
@@ -16,6 +17,7 @@ module Views
         @photo_siblings = photo_siblings
       end
 
+      #: () -> void
       def view_template
         back_link
         header
@@ -27,6 +29,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def back_link
         href = move_box_path(@move, @item.box)
         label = I18n.t("items.show.back")
@@ -39,6 +42,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def header
         render Components::Ui::SectionHeader.new(
           eyebrow: box_context(@item.box), title: I18n.t("items.show.title")
@@ -50,6 +54,8 @@ module Views
       end
 
       # --- Left: source media ------------------------------------------------
+
+      #: () -> untyped
       def media_panel
         section(class: "lg:col-span-5") do
           div(class: "relative overflow-hidden rounded-card border border-card-border bg-surface-container-high") do
@@ -63,6 +69,8 @@ module Views
 
       # "Detected with N other items in this photo" — only when this item came from
       # a photo that yielded more than one in-box item.
+
+      #: () -> untyped
       def sibling_note
         return unless @photo_siblings.positive?
 
@@ -71,6 +79,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def media_image
         if @item.source_media&.image&.attached?
           img(
@@ -84,10 +93,12 @@ module Views
         end
       end
 
+      #: () -> untyped
       def state_badges
         render Components::Items::StateBadges.new(item: @item)
       end
 
+      #: () -> untyped
       def box_caption
         div(class: "absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3") do
           span(class: "text-label-caps uppercase text-white") { box_context(@item.box) }
@@ -95,6 +106,8 @@ module Views
       end
 
       # --- Right: edit + move + remove --------------------------------------
+
+      #: () -> untyped
       def edit_panel
         section(class: "lg:col-span-7") do
           render Components::Ui::Card.new(padding: "p-6") do
@@ -103,6 +116,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def editable_body
         render Components::ItemForm.new(models: [@move, @item], item: @item, autosave: true)
         render Components::Items::PresenceControls.new(
@@ -112,6 +126,8 @@ module Views
 
       # Read-only detail for viewers / archived Moves: the item name, rendered as
       # labelled text instead of an input.
+
+      #: () -> untyped
       def read_only_body
         div(class: "flex flex-col gap-5") do
           detail_row(I18n.t("items.form.name"), @item.name)
@@ -121,6 +137,7 @@ module Views
         end
       end
 
+      #: (untyped label, untyped value) -> untyped
       def detail_row(label, value)
         div(class: "flex flex-col gap-1") do
           span(class: "text-label-caps uppercase text-muted") { label }
@@ -128,6 +145,7 @@ module Views
         end
       end
 
+      #: (untyped box) -> String
       def box_context(box)
         number = Kernel.format("%03d", box.number.to_i)
         room = box.room&.name

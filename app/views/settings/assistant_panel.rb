@@ -12,6 +12,7 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::Routes
 
+      #: (move: untyped, tokens: untyped, manage_tokens: untyped, ?can_create: untyped, ?revealed_token: untyped) -> void
       def initialize(move:, tokens:, manage_tokens:, can_create: true, revealed_token: nil)
         @move = move
         @tokens = tokens
@@ -20,6 +21,7 @@ module Views
         @revealed_token = revealed_token
       end
 
+      #: () -> void
       def view_template
         section(id: "assistant", aria_label: I18n.t("integration_tokens.panel.title")) do
           render Components::Ui::Card.new(padding: "p-6") do
@@ -40,6 +42,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def create_token_form
         # turbo: false — create renders the settings page inline (200) to reveal
         # the raw token once. Turbo Drive ignores a non-redirect 200 on form
@@ -63,6 +66,8 @@ module Views
       end
 
       # The one-and-only display of the raw token, with a copy button.
+
+      #: () -> untyped
       def revealed_token_block
         div(
           class: "flex flex-col gap-3 rounded-card border border-accent-sage/40 bg-surface-container-high p-4",
@@ -85,6 +90,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def token_list
         active = @tokens.reject(&:revoked?)
         if active.empty?
@@ -94,6 +100,7 @@ module Views
         end
       end
 
+      #: (untyped token) -> untyped
       def token_row(token)
         article(
           class: "flex items-center justify-between gap-4 rounded-card border border-card-border bg-card p-4"
@@ -106,6 +113,7 @@ module Views
         end
       end
 
+      #: (untyped token) -> untyped
       def revoke_button(token)
         confirm = I18n.t("integration_tokens.token.revoke_confirm", name: token.name)
         classes = "rounded-full px-4 py-2 text-body-md font-semibold text-on-surface-variant " \
@@ -116,6 +124,7 @@ module Views
         ) { I18n.t("integration_tokens.token.revoke") }
       end
 
+      #: (untyped token) -> String
       def token_meta(token)
         creator = token.created_by&.name.presence || token.created_by&.email.to_s.split("@").first
         used = if token.last_used_at
@@ -126,6 +135,7 @@ module Views
         "#{I18n.t("integration_tokens.token.created_by", name: creator)} · #{used}"
       end
 
+      #: (untyped time) -> String
       def time_ago(time)
         "#{view_context.time_ago_in_words(time)} ago"
       end

@@ -10,6 +10,7 @@ module Components
     class RemainingSection < Components::Base
       ID = "unpacking-remaining-section"
 
+      #: (remaining: untyped, move: untyped, box: untyped, editable: untyped) -> void
       def initialize(remaining:, move:, box:, editable:)
         @remaining = remaining
         @move = move
@@ -17,6 +18,7 @@ module Components
         @editable = editable
       end
 
+      #: () -> void
       def view_template
         section(id: ID, class: "flex flex-col gap-stack-gap") do
           h2(class: "text-headline-md text-text-warm") { I18n.t("unpacking.remaining_title") }

@@ -19,12 +19,14 @@ module Views
         "succeeded" => :succeeded, "partially_succeeded" => :succeeded, "failed" => :failed
       }.freeze
 
+      #: (box: untyped, media: untyped, ?items_by_media: untyped) -> void
       def initialize(box:, media:, items_by_media: {})
         @box = box
         @media = media
         @items_by_media = items_by_media
       end
 
+      #: () -> void
       def view_template
         div(id: ID, class: "flex flex-col gap-4") do
           @media.any? ? list : empty_state
@@ -33,12 +35,15 @@ module Views
 
       private
 
+      #: () -> untyped
       def list
         @media.each { |media| rows(media) }
       end
 
       # A succeeded photo becomes one card with its recognised names as chips;
       # otherwise a single status row (queued / recognising / failed).
+
+      #: (untyped media) -> untyped
       def rows(media)
         run = media.recognition_runs.max_by(&:created_at)
         items = @items_by_media[media.id]
@@ -49,6 +54,7 @@ module Views
         end
       end
 
+      #: (untyped run) -> bool
       def succeeded?(run)
         run && %w[succeeded partially_succeeded].include?(run.status)
       end
@@ -57,6 +63,8 @@ module Views
       # the per-photo detail (C2) where a wrong name can be fixed — no separate
       # per-item rows. turbo_prefetch off: ReviewsController#photo marks the photo
       # reviewed on GET, so a hover prefetch would silently clear pending_review.
+
+      #: (untyped media, untyped items) -> untyped
       def photo_card(media, items)
         a(
           href: view_context.move_box_review_photo_path(@box.move, @box, media_id: media.id),
@@ -74,12 +82,14 @@ module Views
         end
       end
 
+      #: (untyped label) -> untyped
       def name_chip(label)
         span(class: "inline-flex max-w-full items-center truncate rounded-full " \
                     "bg-surface-container-high px-2.5 py-1 text-label-caps uppercase " \
                     "text-on-surface-variant") { label }
       end
 
+      #: (untyped media, untyped run) -> untyped
       def status_row(media, run)
         div(class: "flex items-center gap-3 rounded-xl border border-card-border bg-surface-container p-3") do
           thumb(media)
@@ -91,6 +101,7 @@ module Views
         end
       end
 
+      #: (untyped media) -> untyped
       def thumb(media)
         div(class: "flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden " \
                    "rounded-lg bg-surface-container-high text-muted") do
@@ -105,12 +116,14 @@ module Views
         end
       end
 
+      #: (untyped run) -> untyped
       def state_badge(run)
         return span(class: "text-label-caps uppercase text-muted") { I18n.t("ui.states.queued") } if run.nil?
 
         render Components::Ui::RecognitionState.new(state: RUN_TO_STATE.fetch(run.status, :queued))
       end
 
+      #: (untyped media) -> untyped
       def retry_button(media)
         button_to(
           I18n.t("ui.buttons.retry"),
@@ -120,6 +133,7 @@ module Views
         )
       end
 
+      #: () -> untyped
       def empty_state
         p(class: "text-body-md text-muted") { I18n.t("captures.session.empty") }
       end

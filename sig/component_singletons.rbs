@@ -1,0 +1,49 @@
+# Hand-written `def self.` methods on Phlex components — inline RBS can't
+# declare `def self.` yet, so each def carries `# @rbs skip` in the component
+# and its type lives here (the sig/model_singletons.rbs pattern). Fold back
+# into inline annotations once rbs/steep ship inline singleton support.
+module Components
+  class ItemStateBadge
+    def self.dom_id: (untyped item) -> String
+  end
+
+  module Boxes
+    class ItemCard
+      def self.dom_id: (untyped item) -> String
+    end
+  end
+
+  module Reviews
+    class ItemRow
+      def self.dom_id: (untyped item) -> String
+    end
+  end
+
+  module Members
+    class Row
+      def self.dom_id: (untyped membership) -> String
+    end
+  end
+
+  module Vocabularies
+    class Row
+      def self.dom_id: (untyped record) -> String
+    end
+  end
+
+  module Unpacking
+    class ItemRow
+      def self.dom_id: (untyped item, untyped variant) -> String
+    end
+  end
+
+  module Ui
+    module NavDestinations
+      def self.for_move: (?untyped move) -> untyped
+
+      def self.default: () -> untyped
+
+      def self.editor?: (?untyped move) -> bool
+    end
+  end
+end

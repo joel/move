@@ -14,6 +14,7 @@ module Components
         category: "bg-surface-container-high text-on-surface-variant"
       }.freeze
 
+      #: (label: untyped, ?kind: untyped, ?selected: untyped, **untyped) -> void
       def initialize(label:, kind: :category, selected: false, **attrs)
         @label = label
         @kind = kind
@@ -21,12 +22,14 @@ module Components
         @attrs = attrs
       end
 
+      #: () -> void
       def view_template
         span(class: classes, **@attrs) { @label }
       end
 
       private
 
+      #: () -> String
       def classes
         tint = @selected ? "bg-accent-sage text-page" : KINDS.fetch(@kind, KINDS[:category])
         [

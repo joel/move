@@ -6,11 +6,13 @@ module Views
     # box is shown read-only: identity + item count, no edit/unpack actions. A
     # ghost link still opens the box detail (which itself renders read-only).
     class Archived < Views::Base
+      #: (move: untyped, box: untyped) -> void
       def initialize(move:, box:)
         @move = move
         @box = box
       end
 
+      #: () -> void
       def view_template
         render Components::Ui::Card.new(padding: "p-6", class: "mx-auto w-full max-w-md") do
           p(class: "text-label-caps uppercase text-muted") { I18n.t("scans.archived.eyebrow") }
@@ -32,6 +34,7 @@ module Views
 
       private
 
+      #: () -> String
       def box_title
         "Box ##{Kernel.format("%03d", @box.number.to_i)}"
       end

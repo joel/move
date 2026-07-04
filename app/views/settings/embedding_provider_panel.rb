@@ -10,11 +10,13 @@ module Views
     class EmbeddingProviderPanel < Views::Base
       include Phlex::Rails::Helpers::TurboStreamFrom
 
+      #: (move: untyped, manage: untyped) -> void
       def initialize(move:, manage:)
         @move = move
         @manage = manage
       end
 
+      #: () -> void
       def view_template
         div(class: "flex flex-col gap-4") do
           # Subscribe to this Move's indexing stream so re-embedding progress (and

@@ -3,6 +3,7 @@
 module Views
   module Rodauth
     class Login < Views::Base
+      #: () -> void
       def view_template
         div(class: "flex min-h-[70vh] items-center justify-center") do
           div(class: "w-full max-w-md space-y-8") do
@@ -15,6 +16,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def render_brand_header
         div(class: "text-center") do
           div(class: "mx-auto flex h-16 w-16 items-center " \
@@ -33,6 +35,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def render_login_panel
         div(class: "ha-glass rounded-[2rem] p-8 " \
                    "shadow-[var(--ha-card-shadow)]") do
@@ -57,11 +60,13 @@ module Views
         end
       end
 
+      #: () -> untyped
       def render_google_section
         render_social_divider
         render Components::GoogleAuthButton.new
       end
 
+      #: () -> untyped
       def render_social_divider
         div(class: "relative my-6") do
           div(class: "absolute inset-0 flex items-center") do
@@ -77,6 +82,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def app_name
         Rails.application.class.module_parent_name
       end

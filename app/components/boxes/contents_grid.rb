@@ -16,6 +16,14 @@ module Components
     class ContentsGrid < Components::Base
       CHIP_CAP = 4 # name chips shown per photo card before collapsing to "+N more"
 
+      # @rbs move: untyped
+      # @rbs box: untyped
+      # @rbs media: untyped
+      # @rbs items: untyped
+      # @rbs reviewable_media_ids: untyped
+      # @rbs recoverable_media_ids: untyped
+      # @rbs unpacked_media_ids: untyped
+      # @rbs return: void
       def initialize(move:, box:, media:, items:, reviewable_media_ids: [],
                      recoverable_media_ids: [], unpacked_media_ids: [])
         @move = move
@@ -35,6 +43,7 @@ module Components
         @standalone_items = items.reject { |i| i.source_media_id && box_media_ids.include?(i.source_media_id) }
       end
 
+      #: () -> void
       def view_template
         section(class: "flex flex-col gap-stack-gap") do
           header
@@ -44,10 +53,12 @@ module Components
 
       private
 
+      #: () -> untyped
       def any_cards?
         @media.any? || @standalone_items.any?
       end
 
+      #: () -> untyped
       def header
         div(class: "flex items-center justify-between px-2") do
           h3(class: "text-headline-md text-text-warm") { I18n.t("boxes.contents.title") }
@@ -57,10 +68,12 @@ module Components
         end
       end
 
+      #: () -> untyped
       def item_count
         @items.size
       end
 
+      #: () -> untyped
       def grid
         div(class: "grid grid-cols-2 gap-3 sm:grid-cols-3") do
           @media.each { |media| photo_card(media) }
@@ -75,6 +88,8 @@ module Components
 
       # A photo card. Tappable only when it has somewhere to go (review/recovery);
       # a still-processing or settled-empty photo is a plain, inert tile.
+
+      #: (untyped media) -> untyped
       def photo_card(media)
         href = photo_href(media)
         attrs = href ? { href: href, **prefetch_for(media) } : {}
@@ -88,6 +103,8 @@ module Components
       # The names recognised in this photo, as wrapping chips (capped). A photo with
       # no in-box items (processing, or its items moved/unpacked away) shows just the
       # image + any badge — no speculative caption.
+
+      #: (untyped items) -> untyped
       def names_caption(items)
         return unless items.any?
 
@@ -97,11 +114,13 @@ module Components
         end
       end
 
+      #: (untyped label) -> untyped
       def name_chip(label)
         span(class: "inline-flex max-w-full items-center truncate rounded-full bg-surface-container-high " \
                     "px-2.5 py-1 text-label-caps uppercase text-on-surface-variant") { label }
       end
 
+      #: (untyped media) -> untyped
       def tile(media)
         div(class: tile_classes) do
           image(media)
@@ -110,6 +129,7 @@ module Components
         end
       end
 
+      #: (untyped media) -> untyped
       def image(media)
         if media.image.attached?
           img(
@@ -121,6 +141,7 @@ module Components
         end
       end
 
+      #: (untyped media) -> untyped
       def unpacked_badge(media)
         return unless @unpacked_media_ids.include?(media.id)
 
@@ -131,6 +152,7 @@ module Components
         end
       end
 
+      #: (untyped media) -> untyped
       def recovery_badge(media)
         return unless @recoverable_media_ids.include?(media.id)
 
@@ -140,6 +162,7 @@ module Components
         end
       end
 
+      #: (untyped media) -> untyped
       def photo_href(media)
         if @reviewable_media_ids.include?(media.id)
           move_box_review_photo_path(@move, @box, media_id: media.id)
@@ -150,20 +173,25 @@ module Components
 
       # ReviewsController#photo marks the photo's items reviewed on GET, so a hover
       # prefetch would silently clear pending_review — opt the review link out.
+
+      #: (untyped media) -> untyped
       def prefetch_for(media)
         @reviewable_media_ids.include?(media.id) ? { data: { turbo_prefetch: "false" } } : {}
       end
 
+      #: (interactive: untyped) -> String
       def card_classes(interactive:)
         base = "group flex flex-col overflow-hidden rounded-card border border-card-border bg-card"
         interactive ? "#{base} transition hover:border-accent-sage hover:bg-surface-container-high" : base
       end
 
+      #: () -> String
       def tile_classes
         "relative flex aspect-square items-center justify-center overflow-hidden " \
           "bg-surface-container-high text-muted"
       end
 
+      #: () -> untyped
       def empty
         render Components::Ui::EmptyState.new(
           icon: Components::Icons::Camera,

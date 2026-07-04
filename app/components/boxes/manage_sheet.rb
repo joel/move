@@ -22,6 +22,7 @@ module Components
                    "text-left text-body-md font-semibold text-error transition " \
                    "hover:bg-error/10 active:scale-[0.98]"
 
+      #: (move: untyped, box: untyped, ?editable: untyped, ?consumed: untyped, ?omit_delete: untyped) -> void
       def initialize(move:, box:, editable: false, consumed: nil, omit_delete: false)
         @move = move
         @box = box
@@ -32,6 +33,7 @@ module Components
         @omit_delete = omit_delete
       end
 
+      #: () -> void
       def view_template
         div(data: { controller: "modal" }) do
           trigger
@@ -44,6 +46,7 @@ module Components
 
       private
 
+      #: () -> untyped
       def trigger
         button(
           type: "button", data: { action: "modal#open" },
@@ -53,6 +56,7 @@ module Components
         ) { render Components::Icons::EllipsisVertical.new(css: "h-5 w-5") }
       end
 
+      #: () -> untyped
       def sheet_body
         div(class: "w-12 h-1.5 rounded-full bg-outline-variant/60 mx-auto mb-4")
         h3(class: "text-headline-md text-text-warm mb-4") do
@@ -70,6 +74,8 @@ module Components
 
       # Read-only dimensions + weight — demoted off the slim box header (#401), they
       # surface here (and on the Edit form, where they're set).
+
+      #: () -> untyped
       def details_block
         measurements = BoxMeasurements.new(@box, unit_system: @move.unit_system)
         div(class: "mb-4 flex items-center justify-between rounded-lg bg-surface-container-high px-4 py-3") do
@@ -85,6 +91,7 @@ module Components
         end
       end
 
+      #: (untyped volume) -> untyped
       def volume_line(volume)
         return unless volume
 
@@ -93,6 +100,8 @@ module Components
 
       # The lifecycle transitions still available from here, minus the one the
       # header already shows as the hero (so a forward step isn't offered twice).
+
+      #: () -> untyped
       def lifecycle_rows
         (@box.available_transitions - [@consumed]).each do |target|
           if target == "sealed" && seal_needs_description?
@@ -105,6 +114,7 @@ module Components
         end
       end
 
+      #: (untyped target) -> untyped
       def transition_row(target)
         button_to(
           transition_move_box_path(@move, @box),
@@ -117,6 +127,8 @@ module Components
 
       # Manual fragile toggle (Phase A) — idempotent set of the opposite state, so a
       # stale sheet can't double-flip. A fragile box prints FRAGILE on its label.
+
+      #: () -> untyped
       def fragile_row
         button_to(
           fragile_move_box_path(@move, @box),
@@ -127,6 +139,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def print_rows
         link_row(I18n.t("boxes.actions.print_label"), Components::Icons::Printer,
                  move_box_label_path(@move, @box))
@@ -134,11 +147,13 @@ module Components
                  move_box_manifest_path(@move, @box))
       end
 
+      #: () -> untyped
       def edit_row
         link_row(I18n.t("boxes.actions.edit"), Components::Icons::Pencil,
                  edit_move_box_path(@move, @box), turbo: true)
       end
 
+      #: () -> untyped
       def delete_section
         div(class: "mt-1 border-t border-card-border pt-2") do
           button_to(
@@ -154,6 +169,8 @@ module Components
 
       # A link row. Print targets open the inline PDF in a new tab; Edit is a
       # same-tab navigation (Turbo-driven).
+
+      #: (untyped label, untyped icon, untyped href, ?turbo: untyped) -> untyped
       def link_row(label, icon, href, turbo: false)
         attrs = turbo ? {} : { target: "_blank", rel: "noopener" }
         a(href: href, class: ROW, **attrs) do
@@ -162,10 +179,12 @@ module Components
         end
       end
 
+      #: () -> untyped
       def seal_needs_description?
         @box.room_id.present? && @box.description.blank? && @box.item_count.positive?
       end
 
+      #: (untyped target) -> untyped
       def transition_label(target)
         case target
         when "sealed" then I18n.t("boxes.actions.seal")
@@ -176,6 +195,7 @@ module Components
         end
       end
 
+      #: (untyped target) -> untyped
       def transition_icon(target)
         case target
         when "sealed" then Components::Icons::Lock

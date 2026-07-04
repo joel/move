@@ -12,6 +12,18 @@ module Components
     #   cancel button — used when the edit form is toggled open client-side.
     # form_data / field_data: extra data attributes for the <form> and the name
     #   input (reset-form wiring on the add form; the inline-edit input target).
+
+    # @rbs vocabulary: untyped
+    # @rbs record: untyped
+    # @rbs url: untyped
+    # @rbs method: untyped
+    # @rbs submit_label: untyped
+    # @rbs cancel_href: untyped
+    # @rbs cancel_action: untyped
+    # @rbs compact: untyped
+    # @rbs form_data: untyped
+    # @rbs field_data: untyped
+    # @rbs return: void
     def initialize(vocabulary:, record:, url:, method:, submit_label:,
                    cancel_href: nil, cancel_action: nil, compact: false, form_data: {}, field_data: {})
       @vocabulary = vocabulary
@@ -26,6 +38,7 @@ module Components
       @field_data = field_data
     end
 
+    #: () -> void
     def view_template
       form_with(url: @url, method: @method, scope: :vocabulary, data: @form_data,
                 class: "flex flex-col gap-4 sm:flex-row sm:items-end") do |form|
@@ -42,6 +55,7 @@ module Components
 
     private
 
+    #: (untyped form) -> untyped
     def actions(form)
       div(class: "flex gap-3") do
         form.submit @submit_label, class: "ha-button ha-button-primary whitespace-nowrap"
@@ -49,6 +63,7 @@ module Components
       end
     end
 
+    #: () -> untyped
     def cancel_control
       if @cancel_action
         button(type: "button", data: { action: @cancel_action },

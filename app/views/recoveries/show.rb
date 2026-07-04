@@ -8,6 +8,7 @@ module Views
     # card is the live status region (Recoveries::State) wrapped in the recognition
     # poller so a re-run's progress updates in place. Renders in AppShellLayout.
     class Show < Views::Base
+      #: (move: untyped, box: untyped, media: untyped, run: untyped, ?editable: untyped) -> void
       def initialize(move:, box:, media:, run:, editable: false)
         @move = move
         @box = box
@@ -16,6 +17,7 @@ module Views
         @editable = editable
       end
 
+      #: () -> void
       def view_template
         back_link
         div(class: "grid grid-cols-1 gap-stack-gap lg:grid-cols-12") do
@@ -26,6 +28,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def back_link
         a(
           href: move_box_path(@move, @box),
@@ -36,6 +39,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def media_panel
         section(class: "mt-stack-gap lg:col-span-7") do
           div(class: "relative overflow-hidden rounded-card border border-card-border bg-surface-container-high") do
@@ -52,6 +56,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def badge
         div(class: "absolute left-3 top-3 z-10 inline-flex items-center gap-2 rounded-full " \
                    "bg-surface-container-high/80 px-3 py-1 text-label-caps uppercase text-on-surface-variant " \
@@ -61,6 +66,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def panel
         section(class: "mt-stack-gap lg:col-span-5") do
           div(

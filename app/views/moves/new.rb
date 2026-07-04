@@ -6,10 +6,12 @@ module Views
     class New < Views::Base
       include Phlex::Rails::Helpers::LinkTo
 
+      #: (move: untyped) -> void
       def initialize(move:)
         @move = move
       end
 
+      #: () -> void
       def view_template
         div(class: "mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8") do
           header
@@ -23,6 +25,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def header
         div do
           h1(class: "text-headline-lg text-text-warm") { I18n.t("moves.new.title") }

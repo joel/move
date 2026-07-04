@@ -8,6 +8,7 @@ module Components
     #   render Components::Ui::EmptyState.new(icon: Components::Icons::Boxes,
     #                                         title: "No boxes yet")
     class EmptyState < Components::Base
+      #: (?icon: untyped, ?title: untyped, ?description: untyped, **untyped) -> void
       def initialize(icon: Components::Icons::Boxes, title: nil, description: nil, **attrs)
         @icon = icon
         @title = title || I18n.t("ui.empty.title")
@@ -15,6 +16,7 @@ module Components
         @attrs = attrs
       end
 
+      #: () ?{ (*untyped) -> untyped } -> untyped
       def view_template(&block)
         div(
           class: "flex flex-col items-center gap-4 rounded-card border " \

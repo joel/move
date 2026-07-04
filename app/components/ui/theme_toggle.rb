@@ -6,10 +6,12 @@ module Components
     # <body> in both page layouts, so it works wherever it is rendered (root
     # TopNav and the Move app shell alike). Sun shows in dark mode, Moon in light.
     class ThemeToggle < Components::Base
+      #: (?css: untyped) -> void
       def initialize(css: nil)
         @css = css || default_css
       end
 
+      #: () -> void
       def view_template
         button(
           type: "button",
@@ -28,6 +30,7 @@ module Components
 
       private
 
+      #: () -> String
       def default_css
         "flex h-9 w-9 items-center justify-center rounded-full " \
           "text-[var(--ha-muted)] transition hover:bg-[var(--ha-surface-high)] " \

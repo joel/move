@@ -10,10 +10,12 @@ module Components
       include Phlex::Rails::Helpers::FormWith
       include Phlex::Rails::Helpers::ButtonTo
 
+      # @rbs skip
       def self.dom_id(membership)
         "member-#{membership.id}"
       end
 
+      #: (move: untyped, membership: untyped, current_user_id: untyped, ?highlight: untyped) -> void
       def initialize(move:, membership:, current_user_id:, highlight: false)
         @move = move
         @membership = membership
@@ -21,6 +23,7 @@ module Components
         @highlight = highlight
       end
 
+      #: () -> void
       def view_template
         article(
           id: self.class.dom_id(@membership), data: row_data,
@@ -41,10 +44,12 @@ module Components
 
       private
 
+      #: () -> untyped
       def row_data
         @highlight ? { controller: "highlight" } : {}
       end
 
+      #: () -> untyped
       def identity
         user = @membership.user
         div(class: "flex flex-1 items-center gap-4") do
@@ -63,6 +68,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def you_badge
         span(
           class: "rounded-full bg-surface-container-high px-2 py-0.5 " \
@@ -72,6 +78,8 @@ module Components
 
       # The current admin's own role is locked here to avoid self-lockout; the
       # last-admin guard in the actions is the server-side backstop.
+
+      #: () -> untyped
       def locked_role
         div(
           class: "flex items-center gap-2 rounded-full bg-surface-container-high " \
@@ -79,6 +87,7 @@ module Components
         ) { I18n.t("members.roles.#{@membership.role}") }
       end
 
+      #: () -> untyped
       def role_form
         form_with(
           url: update_role_move_member_path(@move, @membership),
@@ -107,6 +116,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def remove_button
         button_to(
           move_member_path(@move, @membership),
@@ -118,14 +128,17 @@ module Components
         ) { render Components::Icons::Trash.new(css: "h-5 w-5") }
       end
 
+      #: () -> untyped
       def own?
         @membership.user_id == @current_user_id
       end
 
+      #: (untyped user) -> untyped
       def member_name(user)
         user.name.presence || user.email.to_s.split("@").first
       end
 
+      #: (untyped user) -> untyped
       def initials(user)
         source = user.name.presence || user.email.to_s
         letters = source.scan(/[[:alnum:]]+/).first(2).pluck(0).join

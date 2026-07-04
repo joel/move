@@ -29,3 +29,16 @@ end
 module TurboStreamable
   def respond_with_streams: (untyped streams, redirect: untyped, ?toast: untyped, ?status: Symbol) -> untyped
 end
+
+# ── View concerns (app/views/layouts) ──
+module Views
+  module Layouts
+    module ChromeHead
+      def render_head: () -> untyped
+
+      def render_theme_boot_script: () -> untyped
+
+      def app_name: () -> String
+    end
+  end
+end

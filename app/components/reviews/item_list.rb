@@ -12,6 +12,8 @@ module Components
 
       # highlight_id: when the list is re-rendered after adding the first item to a
       # previously-empty photo, flag that one row so it scrolls into view + rings.
+
+      #: (move: untyped, box: untyped, media: untyped, items: untyped, editable: untyped, ?highlight_id: untyped) -> void
       def initialize(move:, box:, media:, items:, editable:, highlight_id: nil)
         @move = move
         @box = box
@@ -21,6 +23,7 @@ module Components
         @highlight_id = highlight_id
       end
 
+      #: () -> void
       def view_template
         div(id: ID) do
           if @items.empty?
@@ -40,6 +43,7 @@ module Components
 
       private
 
+      #: () -> untyped
       def empty_state
         render Components::Ui::EmptyState.new(
           icon: Components::Icons::Camera,

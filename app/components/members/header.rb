@@ -9,11 +9,13 @@ module Components
     class Header < Components::Base
       ID = "members-header"
 
+      #: (move: untyped, candidates: untyped) -> void
       def initialize(move:, candidates:)
         @move = move
         @candidates = candidates.to_a
       end
 
+      #: () -> void
       def view_template
         div(id: ID) do
           render Components::Ui::SectionHeader.new(

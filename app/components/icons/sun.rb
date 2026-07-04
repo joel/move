@@ -3,6 +3,7 @@
 module Components
   module Icons
     class Sun < Components::Icons::Base
+      #: () -> void
       def view_template
         svg(class: @css, **@attrs, viewBox: "0 0 20 20", fill: "none", aria_hidden: "true") do |s|
           s.path(

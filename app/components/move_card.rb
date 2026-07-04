@@ -16,12 +16,14 @@ module Components
       "archived" => "bg-surface-container-high text-muted"
     }.freeze
 
+    #: (move: untyped, metrics: untyped, ?user: untyped) -> void
     def initialize(move:, metrics:, user: nil)
       @move = move
       @metrics = metrics
       @user = user
     end
 
+    #: () -> void
     def view_template
       # button_to renders a <form>, which is invalid inside an <a> — so the card
       # link and the "Remove sample" control are siblings in a wrapper.
@@ -49,10 +51,13 @@ module Components
 
     # Only an admin of the Move can delete it (MovePolicy#destroy?), so don't render
     # a destructive affordance that a viewer/contributor would only get a 403 from.
+
+    #: () -> untyped
     def removable?
       @move.sample? && @move.membership_for(@user)&.admin?
     end
 
+    #: () -> untyped
     def sample_badge
       span(class: "inline-flex items-center rounded-full bg-secondary/20 px-2.5 py-0.5 " \
                   "text-label-caps uppercase text-secondary") do
@@ -60,6 +65,7 @@ module Components
       end
     end
 
+    #: () -> untyped
     def remove_sample_control
       div(class: "flex justify-end") do
         button_to(
@@ -71,37 +77,44 @@ module Components
       end
     end
 
+    #: () -> String
     def card_classes
       base = "flex flex-col gap-4 rounded-card border border-card-border bg-card p-5 " \
              "transition hover:-translate-y-0.5 hover:bg-surface-container-high"
       @move.archived? ? "#{base} opacity-60" : base
     end
 
+    #: () -> String
     def status_classes
       tint = STATUS_TINT.fetch(@move.status, STATUS_TINT["planned"])
       "inline-flex items-center rounded-full px-2.5 py-0.5 text-label-caps uppercase #{tint}"
     end
 
+    #: () -> untyped
     def status_label
       I18n.t("moves.status.#{@move.status}", default: @move.status.titleize)
     end
 
+    #: () -> untyped
     def archived_lock
       span(class: "text-muted", title: I18n.t("moves.read_only")) { "🔒" }
     end
 
+    #: () -> untyped
     def progress_bar
       div(class: "h-2 w-full overflow-hidden rounded-full bg-surface-container-high") do
         div(class: "h-full rounded-full bg-accent-sage", style: "width: #{packed_percent}%")
       end
     end
 
+    #: () -> untyped
     def packed_percent
       return 0 if @metrics.total.zero?
 
       (@metrics.packed * 100.0 / @metrics.total).round
     end
 
+    #: () -> untyped
     def metrics
       div(class: "flex items-center justify-between text-body-md text-on-surface-variant") do
         span(class: "text-text-warm") do

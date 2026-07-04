@@ -14,10 +14,12 @@ module Components
 
       ID = "label-print-status"
 
+      #: (run: untyped) -> void
       def initialize(run:)
         @run = run
       end
 
+      #: () -> void
       def view_template
         div(id: ID, class: "flex flex-col gap-3") do
           if @run.in_progress?
@@ -32,6 +34,7 @@ module Components
 
       private
 
+      #: () -> untyped
       def progress
         render Components::Ui::ProgressBar.new(
           value: @run.completed_count, max: @run.total_count, label: t("progress_label")
@@ -41,6 +44,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def ready
         span(class: "inline-flex items-center gap-1.5 text-label-caps uppercase text-accent-sage") do
           render Components::Icons::Check.new(css: "h-4 w-4")
@@ -56,6 +60,7 @@ module Components
         )
       end
 
+      #: () -> untyped
       def failed
         span(class: "text-body-md text-secondary") { t("failed_title") }
         render Components::Ui::Button.new(
@@ -63,6 +68,7 @@ module Components
         )
       end
 
+      #: (untyped key, **untyped) -> untyped
       def t(key, **)
         I18n.t("label_print.status.#{key}", **)
       end

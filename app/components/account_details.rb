@@ -6,10 +6,12 @@ module Components
     include Phlex::Rails::Helpers::FormWith
     include Phlex::Rails::Helpers::Pluralize
 
+    #: (user: untyped) -> void
     def initialize(user:)
       @user = user
     end
 
+    #: () -> void
     def view_template
       div(
         class: "ha-card p-8",
@@ -34,6 +36,7 @@ module Components
 
     private
 
+    #: () -> untyped
     def render_name_display
       div(
         class: "flex items-center gap-2",
@@ -53,6 +56,7 @@ module Components
       end
     end
 
+    #: () -> untyped
     def render_name_form
       div(class: "hidden", data: { inline_edit_target: "form" }) do
         form_with(model: @user, url: view_context.account_path, class: "space-y-3") do |form|
@@ -75,6 +79,7 @@ module Components
       end
     end
 
+    #: () -> untyped
     def render_errors
       div(
         id: "error_explanation",
@@ -86,6 +91,7 @@ module Components
       end
     end
 
+    #: () -> untyped
     def render_avatar
       div(class: "flex h-20 w-20 flex-shrink-0 items-center " \
                  "justify-center rounded-full " \
@@ -96,6 +102,7 @@ module Components
       end
     end
 
+    #: () -> untyped
     def render_role_chip
       div(class: "mt-3") do
         span(class: "inline-flex rounded-full px-3 py-1 " \
@@ -107,6 +114,7 @@ module Components
       end
     end
 
+    #: () -> untyped
     def user_initials
       name = @user.name.presence
       if name
@@ -116,6 +124,7 @@ module Components
       end
     end
 
+    #: () -> untyped
     def role_label
       if @user.role?(:admin) then "Admin"
       elsif @user.role?(:contributor) then "Contributor"

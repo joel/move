@@ -10,6 +10,7 @@ module Components
     class UnpackedSection < Components::Base
       ID = "unpacking-unpacked-section"
 
+      #: (unpacked: untyped, move: untyped, box: untyped, editable: untyped) -> void
       def initialize(unpacked:, move:, box:, editable:)
         @unpacked = unpacked
         @move = move
@@ -17,6 +18,7 @@ module Components
         @editable = editable
       end
 
+      #: () -> void
       def view_template
         classes = ["flex flex-col gap-stack-gap", ("hidden" if @unpacked.empty?)].compact.join(" ")
         section(id: ID, class: classes) do

@@ -2,10 +2,12 @@
 
 module Components
   class NoticeBanner < Components::Base
+    #: (message: untyped) -> void
     def initialize(message:)
       @message = message
     end
 
+    #: () -> void
     def view_template
       p(
         id: "notice",

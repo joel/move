@@ -9,6 +9,7 @@ module Views
       include Phlex::Rails::Helpers::FormWith
       include Phlex::Rails::Helpers::TurboStreamFrom
 
+      #: (move: untyped, box: untyped, media: untyped, ?items_by_media: untyped) -> void
       def initialize(move:, box:, media:, items_by_media: {})
         @move = move
         @box = box
@@ -16,6 +17,7 @@ module Views
         @items_by_media = items_by_media
       end
 
+      #: () -> void
       def view_template
         header
         demo_banner
@@ -31,6 +33,8 @@ module Views
       # default), detections are canned sample data, not real recognition. Warn
       # the user so a fabricated result is never mistaken for a real one. Reuses
       # the attention-state tokens the recognition status chip already uses.
+
+      #: () -> untyped
       def demo_banner
         return unless @move.recognition_provider == "fake"
 
@@ -44,6 +48,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def header
         div(class: "flex flex-wrap items-center justify-between gap-4") do
           div(class: "flex items-center gap-3") do
@@ -66,6 +71,8 @@ module Views
       # camera (accept+capture) on mobile or the file picker on desktop. Selecting
       # a photo fires `change`, which the form-level auto-submit controller turns
       # into a submit — recognition starts immediately, with no shutter button.
+
+      #: () -> untyped
       def capture_area
         render Components::Ui::Card.new(padding: "p-6", class: "lg:col-span-2") do
           form_with(url: move_box_capture_path(@move, @box), method: :post,
@@ -88,6 +95,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def session_region
         aside(class: "flex flex-col gap-4") do
           div(class: "flex items-center justify-between px-1") do
@@ -113,10 +121,12 @@ module Views
         end
       end
 
+      #: () -> untyped
       def title
         I18n.t("captures.title", number: Kernel.format("%03d", @box.number.to_i), room: room_label)
       end
 
+      #: () -> String
       def room_label
         @box.room&.name.presence || I18n.t("boxes.card.no_room")
       end

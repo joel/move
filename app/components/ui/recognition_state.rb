@@ -41,6 +41,7 @@ module Components
         }
       }.freeze
 
+      #: (state: untyped, ?retry_href: untyped, **untyped) -> void
       def initialize(state:, retry_href: nil, **attrs)
         @state = state.to_sym
         @config = STATES.fetch(@state) do
@@ -50,6 +51,7 @@ module Components
         @attrs = attrs
       end
 
+      #: () -> void
       def view_template
         span(class: badge_classes, **@attrs) do
           render @config[:icon].new(css: "h-4 w-4")
@@ -60,6 +62,7 @@ module Components
 
       private
 
+      #: () -> untyped
       def render_retry
         a(
           href: @retry_href,
@@ -68,6 +71,7 @@ module Components
         ) { I18n.t("ui.buttons.retry") }
       end
 
+      #: () -> String
       def badge_classes
         [
           "inline-flex items-center gap-1.5 rounded-full px-3 py-1",

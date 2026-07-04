@@ -4,6 +4,7 @@ module Views
   module Boxes
     # A2 — Add box. Renders inside the AppLayout sidebar shell.
     class New < Views::Base
+      #: (move: untyped, box: untyped, rooms: untyped, ?dimension_presets: untyped) -> void
       def initialize(move:, box:, rooms:, dimension_presets: [])
         @move = move
         @box = box
@@ -11,6 +12,7 @@ module Views
         @dimension_presets = dimension_presets
       end
 
+      #: () -> void
       def view_template
         a(href: move_boxes_path(@move), class: "text-label-caps uppercase text-muted hover:text-text-warm") do
           I18n.t("boxes.new.back")

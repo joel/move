@@ -9,11 +9,13 @@ module Components
     # "view box" href as data-*; the controller swaps them in on open and cycles
     # prev/next over the rendered set. Read-only — no mutating affordances.
     class Grid < Components::Base
+      #: (move: untyped, media: untyped) -> void
       def initialize(move:, media:)
         @move = move
         @media = media
       end
 
+      #: () -> void
       def view_template
         div(data: { controller: "lightbox" }) do
           grid
@@ -23,12 +25,14 @@ module Components
 
       private
 
+      #: () -> untyped
       def grid
         div(class: "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4") do
           @media.each { |media| tile(media) }
         end
       end
 
+      #: (untyped media) -> untyped
       def tile(media)
         button(
           type: "button",
@@ -46,6 +50,7 @@ module Components
         end
       end
 
+      #: () -> String
       def image_tile_classes
         "relative flex aspect-square items-center justify-center overflow-hidden " \
           "bg-surface-container-high text-muted"
@@ -53,12 +58,15 @@ module Components
 
       # The photo's location, shown beneath the image so the box/room is legible
       # while browsing across boxes (not only on hover/tap).
+
+      #: (untyped media) -> untyped
       def caption_strip(media)
         span(class: "block truncate px-3 py-2 text-label-caps uppercase text-on-surface-variant") do
           caption(media)
         end
       end
 
+      #: (untyped media) -> untyped
       def image(media)
         if media.image.attached?
           img(
@@ -70,6 +78,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def generated_badge
         span(class: "absolute left-1.5 top-1.5 z-10 inline-flex items-center gap-1 rounded-full " \
                     "bg-page/80 px-2 py-0.5 text-label-caps uppercase text-text-warm backdrop-blur") do
@@ -78,6 +87,7 @@ module Components
         end
       end
 
+      #: (untyped media) -> untyped
       def tile_data(media)
         {
           lightbox_target: "tile",
@@ -88,18 +98,22 @@ module Components
         }
       end
 
+      #: (untyped media) -> untyped
       def detail_src(media)
         return unless media.image.attached?
 
         view_context.rails_storage_proxy_path(media.image.variant(:detail))
       end
 
+      #: (untyped media) -> untyped
       def generated?(media)
         media.captured_via == "generated"
       end
 
       # "Box 3 · Kitchen" — the photo's location, used as the tile aria-label and
       # the lightbox caption. Box and room are eager-loaded by the controller.
+
+      #: (untyped media) -> untyped
       def caption(media)
         parts = [I18n.t("galleries.index.box_label", number: media.box.number)]
         parts << media.box.room.name if media.box.room
@@ -109,6 +123,8 @@ module Components
       # The single shared viewer. Hidden until a tile opens it. The inner wrapper is
       # the backdrop (click-to-close); the image and controls are children, so a
       # click on them does not close.
+
+      #: () -> untyped
       def lightbox
         dialog(
           class: "ha-lightbox",
@@ -129,6 +145,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def top_bar
         div(class: "absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 p-4") do
           span(
@@ -147,6 +164,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def close_button
         button(
           type: "button", aria_label: I18n.t("galleries.index.lightbox.close"),
@@ -156,6 +174,7 @@ module Components
         ) { render Components::Icons::Close.new(css: "h-5 w-5") }
       end
 
+      #: (untyped direction, untyped side, untyped rotate) -> untyped
       def nav_button(direction, side, rotate)
         button(
           type: "button", aria_label: I18n.t("galleries.index.lightbox.#{direction}"),

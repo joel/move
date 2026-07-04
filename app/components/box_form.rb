@@ -8,6 +8,7 @@ module Components
     include Phlex::Rails::Helpers::FormWith
     include Phlex::Rails::Helpers::Pluralize
 
+    #: (move: untyped, box: untyped, rooms: untyped, ?submit_label: untyped, ?dimension_presets: untyped) -> void
     def initialize(move:, box:, rooms:, submit_label: nil, dimension_presets: [])
       @move = move
       @box = box
@@ -16,6 +17,7 @@ module Components
       @dimension_presets = dimension_presets
     end
 
+    #: () -> void
     def view_template
       # Stimulus host so a "reuse dimensions" chip can fill the L/W/H inputs.
       form_with(model: [@move, @box], class: "flex flex-col gap-5",
@@ -37,6 +39,7 @@ module Components
 
     private
 
+    #: (untyped form) -> untyped
     def room_field(form)
       div(class: "flex flex-col gap-2") do
         form.label :room_name, label_text(I18n.t("boxes.form.room"), optional: true),
@@ -52,6 +55,8 @@ module Components
     # A horizontally-scrollable row of "reuse dimensions" chips — only shown when
     # this Move already has boxes with complete dimensions. Tapping a chip fills
     # the L/W/H inputs (weight is left alone; it varies per box).
+
+    #: () -> untyped
     def reuse_dimensions
       return if @dimension_presets.blank?
 
@@ -63,6 +68,7 @@ module Components
       end
     end
 
+    #: (untyped preset) -> untyped
     def dimension_chip(preset)
       button(
         type: "button", class: "ha-dim-chip", "aria-pressed": preset_selected?(preset).to_s,
@@ -79,6 +85,8 @@ module Components
     end
 
     # "40 × 30 × 25 cm" — trailing zeros trimmed so 40.00 reads as 40.
+
+    #: (untyped preset) -> untyped
     def dimension_label(preset)
       I18n.t(
         "boxes.form.dimension_format",
@@ -88,16 +96,20 @@ module Components
       )
     end
 
+    #: (untyped value) -> untyped
     def format_dim(value)
       number = value.to_d
       number.frac.zero? ? number.to_i.to_s : number.to_s("F")
     end
 
     # Pre-press the chip matching the box's current dimensions (edit form).
+
+    #: (untyped preset) -> untyped
     def preset_selected?(preset)
       Box::DIMENSIONS.all? { |dim| @box[dim].present? && @box[dim] == preset[dim] }
     end
 
+    #: (untyped form) -> untyped
     def dimensions(form)
       div(class: "grid grid-cols-2 gap-4 sm:grid-cols-4") do
         number_field(form, :length_cm, I18n.t("boxes.form.length_cm"), target: "length")
@@ -110,6 +122,8 @@ module Components
     # Optional contents description. A ✨ "Suggest with AI" button (wired to the
     # ai-suggest Stimulus controller) appears only once the box exists and holds
     # items — there's nothing to summarise on a brand-new, empty box.
+
+    #: (untyped form) -> untyped
     def description_field(form)
       attrs = suggestable? ? { controller: "ai-suggest", ai_suggest_url_value: suggest_url } : {}
       div(class: "flex flex-col gap-2", data: attrs) do
@@ -124,6 +138,7 @@ module Components
       end
     end
 
+    #: () -> untyped
     def suggest_button
       button(
         type: "button",
@@ -139,14 +154,17 @@ module Components
       end
     end
 
+    #: () -> untyped
     def suggestable?
       @box.persisted? && @box.item_count.positive?
     end
 
+    #: () -> untyped
     def suggest_url
       description_suggestion_move_box_path(@move, @box)
     end
 
+    #: (untyped form, untyped name, untyped text, ?optional: untyped, ?placeholder: untyped) -> untyped
     def field(form, name, text, optional: false, placeholder: nil)
       div(class: "flex flex-col gap-2") do
         form.label name, label_text(text, optional: optional), class: "text-label-caps uppercase text-muted"
@@ -154,6 +172,7 @@ module Components
       end
     end
 
+    #: (untyped form, untyped name, untyped text, ?target: untyped) -> untyped
     def number_field(form, name, text, target: nil)
       div(class: "flex flex-col gap-2") do
         form.label name, text, class: "text-label-caps uppercase text-muted"
@@ -162,10 +181,12 @@ module Components
       end
     end
 
+    #: (untyped text, ?optional: untyped) -> untyped
     def label_text(text, optional: false)
       optional ? "#{text} · #{I18n.t("boxes.form.optional")}" : text
     end
 
+    #: () -> untyped
     def render_errors
       div(class: "rounded-card bg-[var(--ha-error-container)] px-5 py-4 text-body-md text-error") do
         h2(class: "font-semibold") { plain I18n.t("boxes.form.errors", count: @box.errors.count) }

@@ -13,6 +13,8 @@ module Components
     # `trigger_class` / `trigger_icon` let a caller (the Manage-box sheet) render
     # the seal trigger as a left-aligned sheet row instead of the default sage
     # pill; the lazy describe-before-sealing dialog is identical either way.
+
+    #: (move: untyped, box: untyped, ?trigger_class: untyped, ?trigger_icon: untyped) -> void
     def initialize(move:, box:, trigger_class: nil, trigger_icon: nil)
       @move = move
       @box = box
@@ -20,6 +22,7 @@ module Components
       @trigger_icon = trigger_icon
     end
 
+    #: () -> void
     def view_template
       div(data: { controller: "modal" }) do
         button(type: "button", data: { action: "modal#open" }, class: @trigger_class) do
@@ -41,6 +44,7 @@ module Components
 
     private
 
+    #: () -> String
     def default_trigger_class
       "inline-flex w-full items-center justify-center rounded-full bg-accent-sage " \
         "px-6 py-3 text-sm font-bold text-page transition hover:opacity-90 active:scale-[0.98]"

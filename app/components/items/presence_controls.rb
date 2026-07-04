@@ -13,6 +13,7 @@ module Components
 
       ID = "item-presence-controls"
 
+      #: (move: untyped, item: untyped, boxes: untyped, editable: untyped) -> void
       def initialize(move:, item:, boxes:, editable:)
         @move = move
         @item = item
@@ -20,6 +21,7 @@ module Components
         @editable = editable
       end
 
+      #: () -> void
       def view_template
         div(id: ID, class: "mt-2 flex flex-wrap items-center gap-3 border-t border-card-border pt-5") do
           if @editable
@@ -31,6 +33,7 @@ module Components
 
       private
 
+      #: () -> untyped
       def move_control
         # A removed item must be restored before it can be moved — hide Move while
         # removed (the footer shows Restore instead).
@@ -57,6 +60,8 @@ module Components
       # removing means "physically taken out" (presence → removed, reversible);
       # while *packing*, the item was added by mistake — Delete it. A sealed /
       # in-transit box is closed: no removal control — unseal it to edit contents.
+
+      #: () -> untyped
       def presence_control
         if @item.removed?
           restore_to_box_control
@@ -67,6 +72,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def restore_to_box_control
         button_to(
           I18n.t("items.show.restore"), restore_move_item_path(@move, @item),
@@ -74,6 +80,7 @@ module Components
         )
       end
 
+      #: () -> untyped
       def mark_unpacked_control
         button_to(
           I18n.t("items.show.mark_unpacked"), mark_removed_move_item_path(@move, @item),
@@ -82,6 +89,7 @@ module Components
         )
       end
 
+      #: () -> untyped
       def delete_control
         button_to(
           I18n.t("items.show.delete"), move_item_path(@move, @item),
@@ -90,17 +98,21 @@ module Components
         )
       end
 
+      #: () -> untyped
       def ghost_button
         "inline-flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm " \
           "font-bold text-text-warm transition hover:bg-surface-container-high active:scale-[0.98]"
       end
 
       # Destructive action — filled error red (mirrors Ui::Button :danger variant).
+
+      #: () -> untyped
       def danger_button
         "inline-flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm " \
           "font-bold bg-error text-on-error transition hover:opacity-90 active:scale-[0.98]"
       end
 
+      #: (untyped box) -> untyped
       def box_context(box)
         number = Kernel.format("%03d", box.number.to_i)
         room = box.room&.name

@@ -9,12 +9,14 @@ module Components
     class AddForm < Components::Base
       ID = "vocab-add"
 
+      #: (move: untyped, vocabulary: untyped, record: untyped) -> void
       def initialize(move:, vocabulary:, record:)
         @move = move
         @vocabulary = vocabulary
         @record = record
       end
 
+      #: () -> void
       def view_template
         render Components::Ui::Card.new(id: ID) do
           h3(class: "text-label-caps uppercase text-muted") do

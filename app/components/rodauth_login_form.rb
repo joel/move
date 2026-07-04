@@ -5,6 +5,7 @@ module Components
     include Phlex::Rails::Helpers::FormWith
     include Phlex::Rails::Helpers::ContentTag
 
+    #: () -> void
     def view_template
       form_with(
         url: view_context.rodauth.login_path,
@@ -31,6 +32,7 @@ module Components
 
     private
 
+    #: (untyped form) -> untyped
     def render_readonly_login_field(form)
       div do
         form.label(
@@ -48,6 +50,7 @@ module Components
       end
     end
 
+    #: (untyped form) -> untyped
     def render_login_field(form)
       login_error = view_context.rodauth.field_error(view_context.rodauth.login_param)
 
@@ -79,6 +82,7 @@ module Components
       end
     end
 
+    #: (untyped form) -> untyped
     def render_password_field(form)
       password_error = view_context.rodauth.field_error(view_context.rodauth.password_param)
 

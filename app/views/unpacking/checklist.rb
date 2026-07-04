@@ -14,6 +14,7 @@ module Views
     class Checklist < Views::Base
       include Phlex::Rails::Helpers::ButtonTo
 
+      #: (move: untyped, box: untyped, remaining: untyped, unpacked: untyped, ?editable: untyped) -> void
       def initialize(move:, box:, remaining:, unpacked:, editable: false)
         @move = move
         @box = box
@@ -22,6 +23,7 @@ module Views
         @editable = editable
       end
 
+      #: () -> void
       def view_template
         div(class: "mx-auto flex w-full max-w-2xl flex-col gap-section-gap") do
           back_link
@@ -41,10 +43,14 @@ module Views
 
       # Mutating affordances show only for an editor on a writable Move — viewers
       # (and archived Moves) see the checklist read-only. The server still 403s.
+
+      #: () -> bool
       def editable? = @editable
 
+      #: () -> Integer
       def total = @remaining.size + @unpacked.size
 
+      #: () -> untyped
       def back_link
         a(
           href: move_box_path(@move, @box),
@@ -55,6 +61,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def header
         div(class: "flex flex-col gap-3") do
           div(class: "flex flex-wrap gap-2") { chips }
@@ -62,6 +69,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def chips
         render Components::Ui::Chip.new(label: @box.room.name, kind: :room) if @box.room
         render Components::Ui::Chip.new(label: I18n.t("unpacking.read_only"), kind: :tag) unless editable?
@@ -70,6 +78,8 @@ module Views
       # The "Mark box unpacked" action — cascades every remaining in-box item to
       # removed. In-flow (not a second fixed bar) so it coexists with the shell's
       # mobile bottom tab bar.
+
+      #: () -> untyped
       def complete_cta
         button_to(
           move_box_unpacking_complete_path(@move, @box),
@@ -83,6 +93,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def box_title
         I18n.t("unpacking.box_title", number: Kernel.format("%03d", @box.number.to_i))
       end

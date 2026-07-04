@@ -18,6 +18,17 @@ module Views
       # must refresh together with the header, not just the action set.
       ID = "box-detail"
 
+      # @rbs move: untyped
+      # @rbs box: untyped
+      # @rbs items: untyped
+      # @rbs media: untyped
+      # @rbs editable: untyped
+      # @rbs pending_count: untyped
+      # @rbs reviewable: untyped
+      # @rbs reviewable_media_ids: untyped
+      # @rbs recoverable_media_ids: untyped
+      # @rbs unpacked_media_ids: untyped
+      # @rbs return: void
       def initialize(move:, box:, items: [], media: [], editable: false, pending_count: 0,
                      reviewable: false, reviewable_media_ids: [], recoverable_media_ids: [],
                      unpacked_media_ids: [])
@@ -39,6 +50,7 @@ module Views
         @recoverable_media_ids = recoverable_media_ids
       end
 
+      #: () -> void
       def view_template
         # data-editable gates editor-only controls inside this surface via CSS
         # (.editable-only), so a shared Turbo Stream card swap can carry the
@@ -57,6 +69,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def back_link
         a(
           href: move_boxes_path(@move),
@@ -70,6 +83,8 @@ module Views
       # The unified photo-card grid (D1): one card per photo (image + its item-name
       # chips) plus a placeholder card per photo-less manual item — replacing the
       # old split of a separate gallery + items list.
+
+      #: () -> untyped
       def detail_stack
         render Components::Boxes::ContentsGrid.new(
           move: @move, box: @box, media: @media, items: @items,
@@ -79,6 +94,8 @@ module Views
       end
 
       # Review CTA above the grid (#260) — permanent once the box has a walkable photo.
+
+      #: () -> untyped
       def review_banner
         div(class: "px-2") do
           render Components::BoxReviewBadge.new(move: @move, box: @box, pending_count: @pending_count)

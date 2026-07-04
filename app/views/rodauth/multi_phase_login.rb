@@ -5,6 +5,7 @@ module Views
     class MultiPhaseLogin < Views::Base
       include Phlex::Rails::Helpers::LinkTo
 
+      #: () -> void
       def view_template
         login_value = view_context.params[
           view_context.rodauth.login_param
@@ -21,6 +22,7 @@ module Views
 
       private
 
+      #: (untyped login_value) -> untyped
       def render_header(login_value)
         div(class: "ha-card p-8") do
           p(class: "ha-overline") { "Access" }
@@ -38,6 +40,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def render_auth_methods
         div(class: "grid gap-4 md:grid-cols-2") do
           raw safe(
@@ -47,12 +50,14 @@ module Views
         end
       end
 
+      #: () -> untyped
       def render_google_option
         div(class: "ha-card p-6") do
           render Components::GoogleAuthButton.new
         end
       end
 
+      #: () -> untyped
       def render_footer
         div(
           class: "ha-card p-6 flex flex-col gap-3 sm:flex-row " \

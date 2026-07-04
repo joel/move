@@ -16,6 +16,7 @@ module Views
       # write — the acted-on row's button also drops — with no reload.
       ID = "activity-feed"
 
+      #: (move: untyped, groups: untyped, restorable: untyped, revertable: untyped, ?next_before: untyped, ?next_before_id: untyped) -> void
       def initialize(move:, groups:, restorable:, revertable:, next_before: nil, next_before_id: nil)
         @move = move
         @groups = groups
@@ -25,6 +26,7 @@ module Views
         @next_before_id = next_before_id
       end
 
+      #: () -> void
       def view_template
         div(id: ID, class: "flex flex-col gap-section-gap") do
           render Components::Ui::SectionHeader.new(
@@ -37,6 +39,7 @@ module Views
 
       private
 
+      #: () -> untyped
       def empty_state
         render Components::Ui::EmptyState.new(
           icon: Components::Icons::Clock,
@@ -51,6 +54,7 @@ module Views
         end
       end
 
+      #: () -> untyped
       def feed
         div(class: "flex flex-col gap-section-gap") do
           @groups.each { |date, presenters| day_group(date, presenters) }
@@ -58,6 +62,7 @@ module Views
         end
       end
 
+      #: (untyped date, untyped presenters) -> untyped
       def day_group(date, presenters)
         section(class: "relative flex flex-col gap-5") do
           # Faint connector line behind the avatars.
@@ -67,6 +72,7 @@ module Views
         end
       end
 
+      #: (untyped presenter) -> untyped
       def row(presenter)
         div(class: "relative flex items-start gap-4") do
           avatar(presenter)
@@ -80,6 +86,7 @@ module Views
         end
       end
 
+      #: (untyped presenter) -> untyped
       def avatar(presenter)
         tint = if presenter.accent?
                  "bg-secondary-container text-on-secondary-container"
@@ -92,6 +99,7 @@ module Views
         ) { presenter.initials }
       end
 
+      #: (untyped presenter) -> untyped
       def summary(presenter)
         tone = presenter.accent? ? "text-secondary" : "text-on-surface"
         p(class: "text-body-md #{tone}") do
@@ -101,6 +109,7 @@ module Views
         end
       end
 
+      #: (untyped presenter) -> untyped
       def meta(presenter)
         div(class: "flex items-center gap-2") do
           span(class: "text-xs text-on-surface-variant") do
@@ -113,6 +122,7 @@ module Views
         end
       end
 
+      #: (untyped presenter) -> untyped
       def trailing(presenter)
         id = presenter.activity.id
         if @restorable.include?(id)
@@ -122,6 +132,7 @@ module Views
         end
       end
 
+      #: (untyped id) -> untyped
       def restore_button(id)
         button_to(
           I18n.t("activities.restore.action"), move_activity_restore_path(@move, id),
@@ -131,6 +142,7 @@ module Views
         )
       end
 
+      #: (untyped id) -> untyped
       def revert_button(id)
         button_to(
           I18n.t("activities.revert.action"), move_activity_revert_path(@move, id),
@@ -140,6 +152,7 @@ module Views
         )
       end
 
+      #: () -> untyped
       def load_older
         div(class: "flex justify-center pt-2") do
           a(
@@ -151,6 +164,7 @@ module Views
         end
       end
 
+      #: (untyped date) -> untyped
       def day_label(date)
         today = Date.current
         return I18n.t("activities.day.today") if date == today

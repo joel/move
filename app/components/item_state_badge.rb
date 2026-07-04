@@ -8,14 +8,17 @@ module Components
   # tertiary (`:tag`); every vouched / needs-correction state is sage (`:room`),
   # mirroring the box list's item_chip_kind.
   class ItemStateBadge < Components::Base
+    # @rbs skip
     def self.dom_id(item)
       "item_#{item.id}_state_badge"
     end
 
+    #: (item: untyped) -> void
     def initialize(item:)
       @item = item
     end
 
+    #: () -> void
     def view_template
       span(id: self.class.dom_id(@item)) do
         render Components::Ui::Chip.new(
@@ -26,6 +29,7 @@ module Components
 
     private
 
+    #: () -> untyped
     def chip_kind
       @item.review_state == "pending_review" ? :tag : :room
     end

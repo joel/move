@@ -4,6 +4,7 @@ module Components
   module Icons
     # Two horizontal arrows pointing opposite ways — the "switch move" action.
     class Swap < Components::Icons::Base
+      #: () -> void
       def view_template
         svg(
           class: @css, **@attrs, viewBox: "0 0 24 24", fill: "none",

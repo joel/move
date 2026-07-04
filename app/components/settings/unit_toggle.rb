@@ -12,11 +12,13 @@ module Components
 
       ID = "settings-unit-toggle"
 
+      #: (move: untyped, editable: untyped) -> void
       def initialize(move:, editable:)
         @move = move
         @editable = editable
       end
 
+      #: () -> void
       def view_template
         div(id: ID) do
           if @editable
@@ -33,6 +35,7 @@ module Components
 
       private
 
+      #: (untyped system) -> untyped
       def unit_option(system)
         label = I18n.t("settings.show.preferences.#{system}")
         if @move.unit_system == system
@@ -46,6 +49,7 @@ module Components
         end
       end
 
+      #: () -> untyped
       def toggle_pill
         "rounded-full px-6 py-2 text-sm font-semibold transition"
       end

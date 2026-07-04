@@ -12,6 +12,15 @@ module Views
       include Phlex::Rails::Helpers::Routes
       include Phlex::Rails::Helpers::FormWith
 
+      # @rbs move: untyped
+      # @rbs min_number: untyped
+      # @rbs max_number: untyped
+      # @rbs box_count: untyped
+      # @rbs from: untyped
+      # @rbs to: untyped
+      # @rbs error: untyped
+      # @rbs confirm: untyped
+      # @rbs return: void
       def initialize(move:, min_number:, max_number:, box_count:, from: nil, to: nil, error: nil, confirm: nil)
         @move = move
         @min_number = min_number
@@ -23,6 +32,7 @@ module Views
         @confirm = confirm
       end
 
+      #: () -> void
       def view_template
         div(class: "flex flex-col gap-section-gap") do
           render Components::Ui::SectionHeader.new(
@@ -45,6 +55,8 @@ module Views
       # Large-batch confirmation (#314): the range is valid but would print a lot of
       # labels, so ask before burning thermal paper. "Print anyway" re-POSTs the same
       # range with confirmed=true; "Back" returns to the range picker.
+
+      #: () -> untyped
       def confirm_card
         div(class: "ha-card p-6 flex flex-col gap-stack-gap") do
           p(class: "text-body-md font-semibold text-secondary") do
@@ -72,12 +84,14 @@ module Views
         end
       end
 
+      #: () -> untyped
       def empty_state
         div(class: "ha-card p-8 text-center") do
           p(class: "text-body-md text-muted") { I18n.t("label_print.empty_state") }
         end
       end
 
+      #: () -> untyped
       def form_card
         div(class: "ha-card p-6 flex flex-col gap-stack-gap") do
           p(class: "text-body-md text-muted") do
@@ -103,6 +117,7 @@ module Views
         end
       end
 
+      #: (untyped name, untyped label, untyped value) -> untyped
       def number_field(name, label, value)
         render Components::Ui::Field.new(
           name: name, label: label, type: "number", value: value,
@@ -110,6 +125,7 @@ module Views
         )
       end
 
+      #: () -> untyped
       def render_error
         return unless @error
 
