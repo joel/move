@@ -22,8 +22,12 @@ module Captures
         return mark_failed(media) if blob.nil?
 
         ingest(media, blob, captured_by_id)
+        # FileNotFoundError: the blob row exists but its backing object is gone
+        # (mirrors the synchronous Captures::Create rescue) — fail the tile, don't
+        # leave it stuck pending.
       rescue ImageNormalizer::UnsupportedFormat, ImageNormalizer::ImageTooLarge,
-             ActiveRecord::RecordInvalid, ActiveStorage::IntegrityError => e
+             ActiveRecord::RecordInvalid, ActiveStorage::IntegrityError,
+             ActiveStorage::FileNotFoundError => e
         Rails.logger.warn("[captures:ingest_job] media #{media_id} failed: #{e.class}: #{e.message}")
         mark_failed(media) if media
       end

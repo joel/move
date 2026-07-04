@@ -45,6 +45,16 @@ RSpec.describe Captures::IngestJob do
       .to change { media.reload.status }.from("pending").to("failed")
   end
 
+  it "marks the media failed when the blob's backing object is missing (not stuck pending)" do
+    media = create(:media, :pending, box:, move:)
+    blob = raw_blob
+    allow(ActiveStorage::Blob).to receive(:find_by).and_return(blob)
+    allow(blob).to receive(:download).and_raise(ActiveStorage::FileNotFoundError)
+
+    expect { described_class.perform_now(media.id, blob.id, captured_by_id: nil, tenant:) }
+      .to change { media.reload.status }.from("pending").to("failed")
+  end
+
   it "is idempotent — a retry once the media has left pending no-ops" do
     media = create(:media, box:, move:) # already ready
     blob = raw_blob

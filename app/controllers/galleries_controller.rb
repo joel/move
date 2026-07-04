@@ -56,7 +56,10 @@ class GalleriesController < MoveScopedController
 
   #: () -> untyped
   def rooms_with_photos
-    photographed_box_ids = @move.boxes.where(id: @move.media.select(:box_id)).where.not(room_id: nil)
+    # ready only (#545): the grid excludes pending/failed captures, so a room
+    # whose only media is still ingesting must not be offered as a facet that
+    # then renders an empty grid (zero-result facet — ux-conventions.md).
+    photographed_box_ids = @move.boxes.where(id: @move.media.ready.select(:box_id)).where.not(room_id: nil)
     @move.rooms.where(id: photographed_box_ids.select(:room_id)).order(:name)
   end
 
