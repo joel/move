@@ -75,8 +75,12 @@ module Views
       #: () -> untyped
       def capture_area
         render Components::Ui::Card.new(padding: "p-6", class: "lg:col-span-2") do
+          # capture-upload (#547): downscales the photo to <=2048px JPEG in the
+          # browser before submitting, so a small file goes over the wire (the
+          # server still normalizes it as the authority). Falls back to the
+          # original on any error, so capture never breaks.
           form_with(url: move_box_capture_path(@move, @box), method: :post,
-                    data: { controller: "auto-submit", action: "change->auto-submit#submit" }) do |form|
+                    data: { controller: "capture-upload", action: "change->capture-upload#submit" }) do |form|
             label(
               class: "flex h-56 w-full cursor-pointer flex-col items-center justify-center gap-3 " \
                      "rounded-card border border-dashed border-card-border bg-surface-container-high " \
@@ -89,7 +93,8 @@ module Views
               span(class: "text-headline-md text-text-warm") { I18n.t("captures.tap_to_capture") }
               span(class: "text-body-md text-muted") { I18n.t("captures.capture_hint") }
               form.file_field :file, accept: "image/*", capture: "environment",
-                                     required: true, class: "sr-only"
+                                     required: true, class: "sr-only",
+                                     data: { "capture-upload-target": "file" }
             end
           end
         end
