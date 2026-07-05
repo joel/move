@@ -12,6 +12,16 @@ import { Controller } from "@hotwired/stimulus"
 // anything goes wrong (an undecodable HEIC, a missing browser API, an already-
 // small image) we simply upload the original and let the server handle it;
 // capture must never break because the optimization failed.
+// A 2x1 JPEG tagged EXIF Orientation=6: decodes to 1x2 (height > width) ONLY on
+// browsers that honor `imageOrientation: "from-image"` (Chrome 79+, Safari 16+).
+// We use it to feature-detect that support before downscaling — see below.
+const ORIENTATION_PROBE =
+  "/9j/4QAiRXhpZgAATU0AKgAAAAgAAQESAAMAAAABAAYAAAAAAAD/2wCEAAEBAQEBAQEBAQEBAQEBAQ" +
+  "EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB" +
+  "AQEBAQEBAQH/wAARCAABAAIDAREAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAAAv/EABQQAQAAAA" +
+  "AAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/a" +
+  "AAwDAQACEQMRAD8AfwD/2Q=="
+
 export default class extends Controller {
   static targets = ["file"]
   static values = { maxEdge: { type: Number, default: 2048 }, quality: { type: Number, default: 0.85 } }
@@ -42,9 +52,13 @@ export default class extends Controller {
   // Returns a downscaled JPEG File, or null to signal "upload the original as-is".
   async downscale(file) {
     if (typeof createImageBitmap !== "function") return null
+    // Only proceed where the browser applies EXIF orientation on decode. Canvas
+    // strips EXIF, so on a browser that ignores imageOrientation (iOS Safari
+    // <16, older Chromium) we'd re-encode a portrait phone photo sideways with
+    // no EXIF left for the server to autorotate from — so there we skip and
+    // upload the original (correct, just not optimized).
+    if (!(await this.orientationSupported())) return null
 
-    // imageOrientation: bake the EXIF rotation into the pixels. Canvas discards
-    // EXIF, so without this a portrait phone photo would upload sideways.
     const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" })
     const longEdge = Math.max(bitmap.width, bitmap.height)
     const scale = Math.min(1, this.maxEdgeValue / longEdge)
@@ -78,6 +92,26 @@ export default class extends Controller {
 
     const name = `${(file.name || "capture").replace(/\.[^.]+$/, "")}.jpg`
     return new File([blob], name, { type: "image/jpeg" })
+  }
+
+  // Memoized feature-detect: does createImageBitmap honor imageOrientation?
+  // Decodes the orientation-6 probe; it comes back taller-than-wide iff honored.
+  // Any failure resolves false (skip the optimization, upload the original).
+  orientationSupported() {
+    this._orientationSupported ||= (async () => {
+      try {
+        const bytes = Uint8Array.from(atob(ORIENTATION_PROBE), (c) => c.charCodeAt(0))
+        const probe = await createImageBitmap(new Blob([bytes], { type: "image/jpeg" }), {
+          imageOrientation: "from-image"
+        })
+        const honored = probe.height > probe.width
+        probe.close?.()
+        return honored
+      } catch {
+        return false
+      }
+    })()
+    return this._orientationSupported
   }
 
   // Swap the input's selected file for the downscaled one. Assigning input.files
