@@ -1021,7 +1021,8 @@ CREATE TABLE public.media (
     discarded_by_parent_id uuid,
     optimized_at timestamp(6) without time zone,
     original_byte_size bigint,
-    status character varying DEFAULT 'ready'::character varying NOT NULL
+    status character varying DEFAULT 'ready'::character varying NOT NULL,
+    image_unavailable boolean DEFAULT false NOT NULL
 );
 
 
@@ -2323,6 +2324,7 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260705170000'),
 ('20260704191306'),
 ('20260630120000'),
 ('20260629140000'),

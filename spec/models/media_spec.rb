@@ -87,4 +87,20 @@ RSpec.describe Media do
         .to include(resize_to_limit: [1600, 1600])
     end
   end
+
+  describe "#image_displayable? (#563)" do
+    it "is true for a ready media with a readable master" do
+      expect(create(:media)).to be_image_displayable
+    end
+
+    it "is false when the master is flagged unavailable" do
+      media = create(:media, image_unavailable: true)
+      expect(media).not_to be_image_displayable
+      expect(media).to be_image_unavailable
+    end
+
+    it "is false for a pending media with no image yet" do
+      expect(build(:media, :pending)).not_to be_image_displayable
+    end
+  end
 end

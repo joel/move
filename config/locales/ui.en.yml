@@ -38,5 +38,9 @@ en:
     empty:
       title: "Nothing here yet"
       description: "When there is something to show, it will appear here."
+    media:
+      # Shown in place of a thumbnail whose original photo can no longer be read
+      # from storage (#563). The item data it produced is unaffected.
+      unavailable: "Photo unavailable"
     progress:
       label: "Progress"

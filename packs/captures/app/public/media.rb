@@ -71,6 +71,15 @@ class Media < ApplicationRecord
   #: () -> bool
   def ingest_failed? = status == "failed"
 
+  # Whether a display surface can actually render this photo: an attached master
+  # that is still readable. `image_unavailable` is set (#563) when the master blob
+  # became unrecoverable (the #560 corruption); rendering a variant off it would
+  # 500 and retry regeneration on every view, so surfaces fall back to a
+  # placeholder instead. `image_unavailable?` is provided by the boolean column.
+
+  #: () -> bool
+  def image_displayable? = image.attached? && !image_unavailable?
+
   #: () -> void
   def image_must_be_an_image
     return unless image.attached?

@@ -81,15 +81,28 @@ module Views
 
       #: () -> untyped
       def media_image
-        if @item.source_media&.image&.attached?
+        if @item.source_media&.image_displayable?
           img(
             src: view_context.rails_storage_proxy_path(@item.source_media.image.variant(:detail)),
             class: "aspect-square w-full object-cover", alt: "", loading: "lazy"
           )
+        elsif @item.source_media&.image_unavailable?
+          unavailable_placeholder
         else
           div(class: "flex aspect-square w-full items-center justify-center text-muted") do
             render Components::Icons::Camera.new(css: "h-10 w-10")
           end
+        end
+      end
+
+      # Master blob unrecoverable (#563) — the item data is intact, only the photo
+      # is gone.
+
+      #: () -> untyped
+      def unavailable_placeholder
+        div(class: "flex aspect-square w-full flex-col items-center justify-center gap-2 text-muted") do
+          render Components::Icons::ImageOff.new(css: "h-10 w-10")
+          span(class: "text-body-md") { I18n.t("ui.media.unavailable") }
         end
       end
 
