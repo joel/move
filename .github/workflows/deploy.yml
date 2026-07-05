@@ -109,3 +109,10 @@ jobs:
 
       - name: Deploy
         run: bin/kamal deploy
+
+# Sentry release finalization lives in its OWN workflow
+# (.github/workflows/sentry-release.yml, workflow_run on Deploy): it must not
+# run inside this workflow's `deploy-production` concurrency group, where it
+# would hold the deploy lock and delay a queued (possibly urgent) deploy, and
+# the third-party release action must never run in a job whose env carries
+# the production secret set.
