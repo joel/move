@@ -109,3 +109,27 @@ jobs:
 
       - name: Deploy
         run: bin/kamal deploy
+
+      # Tell Sentry this release exists, which commits it contains, and that it
+      # reached production. Events are ALREADY tagged with release=<git SHA> —
+      # Kamal injects KAMAL_VERSION into the container and sentry-ruby's
+      # ReleaseDetector picks it up (no app code) — so this step only creates/
+      # finalizes the release object and records a production deploy, which is
+      # what unlocks regressed-issue detection (`is:regressed`) and suspect
+      # commits for the self-healing pipeline (doc/project/self-healing.md).
+      #
+      # continue-on-error: a Sentry hiccup (or the SENTRY_RELEASE_TOKEN /
+      # SENTRY_ORG_SLUG / SENTRY_PROJECT_SLUG secrets+vars not yet being
+      # provisioned) must never fail a deploy that already completed.
+      - name: Finalize Sentry release
+        if: success()
+        continue-on-error: true
+        uses: getsentry/action-release@v3
+        with:
+          environment: production
+          release: ${{ github.sha }}
+          inject: false # Ruby app — no JS sourcemaps to upload or inject
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_RELEASE_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG_SLUG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT_SLUG }}
