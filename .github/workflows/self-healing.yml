@@ -321,7 +321,7 @@ jobs:
       # The agent gets file tools + spec-running + local git only: no push
       # credential (persist-credentials: false above), no gh, no network.
       - name: Generate the fix (claude-code-action)
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@558b1d6cab4085c7753fe402c10bef0fbb92ac7a # v1
         with:
           anthropic_api_key: ${{ secrets.AUTOFIX_ANTHROPIC_API_KEY }}
           prompt: |
@@ -360,7 +360,7 @@ jobs:
       - name: Mint GitHub App token
         id: app-token
         if: steps.validate.outputs.result == 'ok'
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: ${{ secrets.AUTOFIX_APP_ID }}
           private-key: ${{ secrets.AUTOFIX_APP_PRIVATE_KEY }}
@@ -611,7 +611,7 @@ jobs:
       - name: Mint GitHub App token
         id: app-token
         if: steps.pick.outputs.pr != ''
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: ${{ secrets.AUTOFIX_APP_ID }}
           private-key: ${{ secrets.AUTOFIX_APP_PRIVATE_KEY }}
