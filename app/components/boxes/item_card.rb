@@ -50,7 +50,15 @@ module Components
 
       #: () -> untyped
       def image?
-        @item.source_media_id.present? && @item.source_media&.image&.attached?
+        @item.source_media_id.present? && @item.source_media&.image_displayable?
+      end
+
+      # The source photo existed but its master is now unrecoverable (#563) —
+      # render the "unavailable" glyph rather than a broken thumbnail.
+
+      #: () -> untyped
+      def image_unavailable?
+        @item.source_media_id.present? && @item.source_media&.image_unavailable?
       end
 
       # Role is gated by CSS (.editable-only under the box detail's data-editable),
@@ -72,6 +80,8 @@ module Components
             )
           elsif @generating
             div(class: "h-7 w-7 animate-spin rounded-full border-2 border-accent-sage border-t-transparent")
+          elsif image_unavailable?
+            render Components::Icons::ImageOff.new(css: "h-7 w-7")
           else
             render Components::Icons::Boxes.new(css: "h-7 w-7")
           end

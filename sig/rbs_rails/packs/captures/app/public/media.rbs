@@ -603,6 +603,46 @@ class ::Media < ::ApplicationRecord
     def status_before_type_cast: () -> ::String
 
     def status_for_database: () -> ::String
+
+    def image_unavailable: () -> bool
+
+    def image_unavailable=: (bool) -> bool
+
+    def image_unavailable?: () -> bool
+
+    def image_unavailable_changed?: (?from: bool?, ?to: bool?) -> bool
+
+    def image_unavailable_change: () -> [ bool?, bool? ]
+
+    def image_unavailable_will_change!: () -> void
+
+    def image_unavailable_was: () -> bool?
+
+    def image_unavailable_previously_changed?: (?from: bool?, ?to: bool?) -> bool
+
+    def image_unavailable_previous_change: () -> ::Array[bool?]?
+
+    def image_unavailable_previously_was: () -> bool?
+
+    def image_unavailable_before_last_save: () -> bool?
+
+    def image_unavailable_change_to_be_saved: () -> ::Array[bool?]?
+
+    def image_unavailable_in_database: () -> bool?
+
+    def saved_change_to_image_unavailable: () -> ::Array[bool?]?
+
+    def saved_change_to_image_unavailable?: (?from: bool?, ?to: bool?) -> bool
+
+    def will_save_change_to_image_unavailable?: (?from: bool?, ?to: bool?) -> bool
+
+    def restore_image_unavailable!: () -> void
+
+    def clear_image_unavailable_change: () -> void
+
+    def image_unavailable_before_type_cast: () -> bool
+
+    def image_unavailable_for_database: () -> bool
   end
   include ::Media::GeneratedAttributeMethods
   module ::Media::GeneratedAliasAttributeMethods

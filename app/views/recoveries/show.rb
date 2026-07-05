@@ -44,9 +44,14 @@ module Views
         section(class: "mt-stack-gap lg:col-span-7") do
           div(class: "relative overflow-hidden rounded-card border border-card-border bg-surface-container-high") do
             badge
-            if @media.image.attached?
+            if @media.image_displayable?
               img(src: view_context.rails_storage_proxy_path(@media.image.variant(:detail)),
                   class: "aspect-square w-full object-cover lg:aspect-auto lg:h-full", alt: "", loading: "lazy")
+            elsif @media.image_unavailable?
+              div(class: "flex aspect-square w-full flex-col items-center justify-center gap-2 text-muted") do
+                render Components::Icons::ImageOff.new(css: "h-10 w-10")
+                span(class: "text-body-md") { I18n.t("ui.media.unavailable") }
+              end
             else
               div(class: "flex aspect-square w-full items-center justify-center text-muted") do
                 render Components::Icons::Camera.new(css: "h-10 w-10")

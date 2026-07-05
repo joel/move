@@ -131,11 +131,13 @@ module Components
 
       #: (untyped media) -> untyped
       def image(media)
-        if media.image.attached?
+        if media.image_displayable?
           img(
             src: view_context.rails_storage_proxy_path(media.image.variant(:thumb)), alt: "", loading: "lazy",
             class: "h-full w-full object-cover transition group-hover:scale-105"
           )
+        elsif media.image_unavailable?
+          render Components::Icons::ImageOff.new(css: "h-7 w-7")
         else
           render Components::Icons::Camera.new(css: "h-7 w-7")
         end

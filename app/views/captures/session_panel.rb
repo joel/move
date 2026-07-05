@@ -123,11 +123,13 @@ module Views
       def thumb(media)
         div(class: "flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden " \
                    "rounded-lg bg-surface-container-high text-muted") do
-          if media.image.attached?
+          if media.image_displayable?
             img(
               src: view_context.rails_storage_proxy_path(media.image.variant(:thumb)),
               class: "h-full w-full object-cover", alt: "", loading: "lazy"
             )
+          elsif media.image_unavailable?
+            render Components::Icons::ImageOff.new(css: "h-6 w-6")
           else
             render Components::Icons::Camera.new(css: "h-6 w-6")
           end
