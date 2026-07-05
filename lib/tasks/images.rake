@@ -114,4 +114,42 @@ namespace :images do
 
     puts "[images:repair] total: #{grand_repaired} repaired, #{grand_total} variants ensured present"
   end
+
+  desc "Flag media whose master blob is unreadable so surfaces show a placeholder (#563)"
+  task flag_unavailable: :environment do
+    # Derives the corrupt set at RUNTIME rather than hardcoding ids: reads a few
+    # bytes of each ready master and flags the ones storage can't return (the #560
+    # corruption). Env-safe — a no-op where storage is healthy (dev/CI/test), so it
+    # is the deploy-time companion to the image_unavailable migration. Idempotent;
+    # only ever sets the flag (a genuinely readable master is never re-hidden).
+    require "timeout"
+    grand = 0
+    Organization.pluck(:slug).each do |slug|
+      Apartment::Tenant.switch(slug) do
+        flagged = 0
+        Media.ready.where(image_unavailable: false).with_attached_image.find_each do |media|
+          blob = media.image.blob
+          readable = begin
+            Timeout.timeout(5) { blob.service.download_chunk(blob.key, 0..64) }
+            true
+          rescue StandardError # rubocop:disable Move/BroadRescue -- any read error (corrupt/missing/timeout) means "can't display"
+            false
+          end
+          next if readable
+
+          # rubocop:disable Rails/SkipsModelValidations -- deliberate: flip one flag
+          # across many rows; re-running image validations here is needless overhead.
+          media.update_column(:image_unavailable, true)
+          # rubocop:enable Rails/SkipsModelValidations
+          flagged += 1
+        end
+        grand += flagged
+        line = "[images:flag_unavailable] #{slug}: #{flagged} flagged unavailable"
+        Rails.logger.info(line)
+        puts line
+      end
+    end
+
+    puts "[images:flag_unavailable] total: #{grand} media flagged unavailable"
+  end
 end
