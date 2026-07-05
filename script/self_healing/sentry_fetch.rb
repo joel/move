@@ -23,6 +23,13 @@ module SelfHealing
     # transactions. Anything else — spaces, quotes, braces, newlines — is not
     # an identifier and gets dropped.
     SAFE_IDENTIFIER = %r{\A[\w:#./-]+\z}
+    # Timestamps are NOT identifiers (SAFE_IDENTIFIER has no `+`, so an
+    # offset-form time would become "[UNSAFE]" and poison downstream epoch
+    # comparisons). Sentry emits Zulu form today; accept a numeric offset too.
+    # Anything else becomes a sentinel that `date -d` refuses, so the verify
+    # stage fails CLOSED (treats the fix as not held) instead of comparing
+    # garbage.
+    ISO8601_TIMESTAMP = /\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})\z/
     MAX_IDENTIFIER_LENGTH = 200
     MAX_FRAMES = 20
     MIN_EVENTS_24H = 3
@@ -88,8 +95,8 @@ module SelfHealing
         count: issue["count"].to_i,
         user_count: issue["userCount"].to_i,
         events_24h: (issue.dig("stats", "24h") || []).sum { |_timestamp, count| count.to_i },
-        first_seen: sanitize_identifier(issue["firstSeen"]),
-        last_seen: sanitize_identifier(issue["lastSeen"]),
+        first_seen: sanitize_timestamp(issue["firstSeen"]),
+        last_seen: sanitize_timestamp(issue["lastSeen"]),
         permalink: sanitize_permalink(issue["permalink"])
       }
     end
@@ -120,6 +127,13 @@ module SelfHealing
                 line: (frame["lineNo"] || frame["lineno"]).to_i
               }
             end
+    end
+
+    #: (untyped value) -> String?
+    def self.sanitize_timestamp(value)
+      return nil unless value.is_a?(String) && !value.empty?
+
+      value.match?(ISO8601_TIMESTAMP) ? value : "[INVALID-TIMESTAMP]"
     end
 
     #: (untyped value) -> String?

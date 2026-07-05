@@ -71,6 +71,12 @@ RSpec.describe SelfHealing::Score do
       expect(verdict[:score]).to be >= described_class::THRESHOLD
       expect(verdict[:verdict]).to eq("needs-human")
     end
+
+    it "echoes the tuning constants so the audit-trail comment can never go stale" do
+      verdict = verdict_for
+      expect(verdict[:thresholds]).to eq(score: 85, agent_confidence: 70)
+      expect(verdict[:weights]).to eq(agent: 0.45, size: 0.25, spec_quality: 0.20, locality: 0.10)
+    end
   end
 
   describe "the size component" do
@@ -156,6 +162,29 @@ RSpec.describe SelfHealing::Score do
       end
       expect(verdict_for("pr_body" => "quotes [skip deploy]")[:gate_failures].join).to include("skip marker")
       expect(verdict_for("commit_messages" => ["ok", "b [ci skip]"])[:gate_failures].join).to include("skip marker")
+    end
+
+    it "gates the hyphenated marker forms and the skip-checks trailer the hook also rejects" do
+      ["[skip-ci]", "[ci-skip]", "[no-ci]", "[skip-actions]", "[actions-skip]", "[skip-deploy]"].each do |marker|
+        expect(verdict_for("pr_title" => "Fix #{marker}")[:gate_failures].join).to include("skip marker")
+      end
+      expect(verdict_for("pr_body" => "Done.\n\nskip-checks: true")[:gate_failures].join).to include("skip marker")
+      expect(verdict_for("commit_messages" => ["ok", "b\n\nskip-checks:  TRUE"])[:gate_failures].join)
+        .to include("skip marker")
+    end
+
+    it "gates an added FIX-ME token (the local hook cannot cover bot commits)" do
+      token = "FIXME"
+      diff = spec_diff + <<~DIFF
+        diff --git a/app/actions/boxes/create.rb b/app/actions/boxes/create.rb
+        --- a/app/actions/boxes/create.rb
+        +++ b/app/actions/boxes/create.rb
+        @@ -1,1 +1,2 @@
+        +  # #{token}: revisit after the incident
+      DIFF
+      verdict = verdict_for("diff" => diff)
+      expect(verdict[:gate_failures].join).to include("fixme")
+      expect(verdict[:gate_failures].join).to include("app/actions/boxes/create.rb")
     end
 
     it "gates a missing or malformed assessment" do

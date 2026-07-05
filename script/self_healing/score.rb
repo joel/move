@@ -25,12 +25,23 @@ module SelfHealing
     # it then falls linearly to 0 at the blast-radius max_non_spec_lines cap.
     FULL_MARKS_LINES = 20
 
-    # Replicates the local-only ForbidSkipMarkers overcommit hook: a squash
-    # merge quoting `[skip deploy]` silently skips the deploy, and the GitHub
-    # platform-level `[skip ci]` family suppresses ALL workflows (AGENTS.md §4)
-    # — so a marker anywhere in what could reach the squash commit message is
-    # a hard gate, not a style nit.
-    SKIP_MARKERS = /\[\s*(?:skip\s+(?:ci|actions|deploy)|(?:ci|actions|no[- ]?ci)\s+skip|no\s+ci)\s*\]/i
+    # Replicates the local-only ForbidSkipMarkers overcommit hook as a
+    # SUPERSET: space *and hyphen* separators with optional padding, plus the
+    # GitHub-honoured `skip-checks: true` trailer. A squash merge quoting
+    # `[skip deploy]` silently skips the deploy, and the GitHub platform-level
+    # `[skip ci]` family (hyphenated forms included) suppresses ALL workflows
+    # (AGENTS.md §4) — so a marker anywhere in what could reach the squash
+    # commit message is a hard gate, not a style nit. Keep in sync with
+    # .git-hooks/commit_msg/forbid_skip_markers.rb.
+    SKIP_MARKERS = Regexp.union(
+      /\[\s*(?:skip[\s-]+(?:ci|actions|deploy)|(?:ci|actions)[\s-]+skip|no[\s-]+ci)\s*\]/i,
+      /skip-checks:\s*true/i
+    )
+
+    # The local FixMe overcommit hook blocks this token at commit time, but a
+    # bot commit is made in CI where hooks never run and no cop covers it.
+    # (Built without the literal so the hook doesn't trip on this file.)
+    FIXME_TOKEN = /\bFIXME\b/
 
     #: (input: Hash[String, untyped], blast_radius: BlastRadius) -> void
     def initialize(input:, blast_radius:)
@@ -47,7 +58,11 @@ module SelfHealing
         verdict: verdict_label(failures, score),
         score: score,
         components: failures.empty? ? components : nil,
-        gate_failures: failures
+        gate_failures: failures,
+        # Echo the tuning constants so the PR audit-trail comment renders the
+        # numbers that actually judged this PR, never a stale copy.
+        thresholds: { score: THRESHOLD, agent_confidence: MIN_AGENT_CONFIDENCE },
+        weights: WEIGHTS
       }
     end
 
@@ -58,6 +73,7 @@ module SelfHealing
         size_failure,
         spec_evidence_failure,
         skip_marker_failure,
+        fixme_failure,
         assessment_failure
       ].compact
     end
@@ -138,6 +154,14 @@ module SelfHealing
     end
 
     #: () -> String?
+    def fixme_failure
+      offending = paths.select { |path| @diff_stats.added_lines(path).any? { |line| line.match?(FIXME_TOKEN) } }
+      return if offending.empty?
+
+      "fixme: added FIXME token in #{offending.join(", ")}"
+    end
+
+    #: () -> String?
     def assessment_failure
       assessment = @input["assessment"]
       return "assessment: missing" unless assessment.is_a?(Hash)
@@ -185,15 +209,15 @@ module SelfHealing
 end
 
 if $PROGRAM_NAME == __FILE__
-  input_path = ARGV.find { |arg| !arg.start_with?("--") }
-  config_index = ARGV.index("--config")
-  config_path = config_index ? ARGV.fetch(config_index + 1) : SelfHealing::BlastRadius::DEFAULT_CONFIG_PATH
-
-  abort "usage: score.rb INPUT_JSON [--config blast_radius.yml]" unless input_path
+  input_path = ARGV[0]
+  abort "usage: score.rb INPUT_JSON" unless input_path
 
   score = SelfHealing::Score.new(
     input: JSON.parse(File.read(input_path)),
-    blast_radius: SelfHealing::BlastRadius.load(config_path)
+    # Always the config from the checked-out (main) tree. Deliberately NO
+    # override flag: a caller must never be able to point the judge at a
+    # PR-controlled blast-radius config.
+    blast_radius: SelfHealing::BlastRadius.load(SelfHealing::BlastRadius::DEFAULT_CONFIG_PATH)
   )
   puts JSON.pretty_generate(score.verdict)
 end

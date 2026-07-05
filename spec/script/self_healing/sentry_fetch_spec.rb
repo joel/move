@@ -147,6 +147,22 @@ RSpec.describe SelfHealing::SentryFetch do
     end
   end
 
+  describe ".sanitize_timestamp" do
+    it "passes Zulu, fractional, and numeric-offset ISO-8601 forms" do
+      expect(described_class.sanitize_timestamp("2026-07-04T10:00:00Z")).to eq("2026-07-04T10:00:00Z")
+      expect(described_class.sanitize_timestamp("2026-07-04T10:00:00.121Z")).to eq("2026-07-04T10:00:00.121Z")
+      expect(described_class.sanitize_timestamp("2026-07-04T10:00:00+00:00")).to eq("2026-07-04T10:00:00+00:00")
+    end
+
+    it "replaces anything else with a sentinel that epoch conversion refuses (fail closed)" do
+      expect(described_class.sanitize_timestamp("not a time")).to eq("[INVALID-TIMESTAMP]")
+      expect(described_class.sanitize_timestamp("2026-07-04 10:00:00")).to eq("[INVALID-TIMESTAMP]")
+      expect(described_class.sanitize_timestamp("$(date)")).to eq("[INVALID-TIMESTAMP]")
+      expect(described_class.sanitize_timestamp(nil)).to be_nil
+      expect(described_class.sanitize_timestamp(42)).to be_nil
+    end
+  end
+
   describe ".sanitize_permalink" do
     it "keeps Sentry-hosted https links" do
       expect(described_class.sanitize_permalink("https://sentry.io/issues/1/")).to eq("https://sentry.io/issues/1/")
