@@ -19,14 +19,23 @@ export default class extends Controller {
   // change -> capture-upload#submit
   async submit() {
     const input = this.fileTarget
-    if (!input.files || input.files.length === 0) return
+    const selected = input.files && input.files[0]
+    if (!selected) return
 
+    let downscaled = null
     try {
-      const downscaled = await this.downscale(input.files[0])
-      if (downscaled) this.replaceFile(input, downscaled)
+      downscaled = await this.downscale(selected)
     } catch {
       // Fall through and upload the original — the server normalizes it anyway.
     }
+
+    // The user may have retaken/re-picked while we were resizing (a slow phone
+    // can resolve the old resize after a newer selection). That later change
+    // event owns the newer file — bail so we neither upload a stale photo nor
+    // submit twice.
+    if (input.files[0] !== selected) return
+
+    if (downscaled) this.replaceFile(input, downscaled)
     this.element.requestSubmit()
   }
 
