@@ -434,14 +434,19 @@ jobs:
             --label "autofix,sentry:${SHORT_ID}")
           echo "::notice::Opened ${url}"
 
+      # !cancelled(): an `if` without a status function gets an implicit
+      # success(), which would SKIP this report when the agent step itself
+      # times out or crashes — leaving the issue autofix:attempted (excluded
+      # from future cycles) with no trace. An empty validate result means
+      # exactly that agent-step failure.
       - name: Report a failed attempt on the issue
-        if: steps.validate.outputs.result != 'ok'
+        if: ${{ !cancelled() && steps.validate.outputs.result != 'ok' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           gh issue comment "${{ matrix.issue.number }}" --repo "$GITHUB_REPOSITORY" --body \
-            "🤖 Automated fix attempt did not produce a PR (\`${{ steps.validate.outputs.result }}\`). A human should triage this one — remove the \`autofix:attempted\` label to allow a retry. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            "🤖 Automated fix attempt did not produce a PR (\`${{ steps.validate.outputs.result || 'agent-step-failed' }}\`). A human should triage this one — remove the \`autofix:attempted\` label to allow a retry. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
   # Deterministic scoring of every open autofix PR, from MAIN (a PR can never
   # rewrite its own judge). Idempotent per cycle: labels + a single upserted
