@@ -489,8 +489,8 @@ jobs:
               echo "_Scored from \`main\` by \`script/self_healing/score.rb\` (run ${GITHUB_RUN_ID}). Labels are re-derived every cycle._"
             } > /tmp/score_comment.md
 
-            existing=$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr/comments" --paginate \
-              --jq '[.[] | select(.body | startswith("<!-- autofix:score -->"))][0].id // empty')
+            existing=$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr/comments" --paginate | \
+              jq -s -r '[add[] | select(.body | startswith("<!-- autofix:score -->"))][0].id // empty')
             if [ -n "$existing" ]; then
               gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" \
                 -F body=@/tmp/score_comment.md > /dev/null
@@ -498,3 +498,165 @@ jobs:
               gh pr comment "$pr" --repo "$GITHUB_REPOSITORY" --body-file /tmp/score_comment.md
             fi
           done
+
+  # THE AUTONOMY SWITCH. At most ONE merge per cycle, of the OLDEST
+  # auto-eligible PR, and only when every gate agrees:
+  #   autonomy variable -> merge budget -> last deploy not red -> required
+  #   checks green on HEAD -> independent (Codex) review verdict clean ->
+  #   branch up to date. Every uncertain state fails CLOSED to the human path
+  #   or waits for the next cycle. Requires SELF_HEALING_AUTONOMY_ENABLED —
+  #   set it only after the canary drill in doc/project/self-healing.md.
+  steward:
+    runs-on: ubuntu-latest
+    needs: [gate, score]
+    if: ${{ !cancelled() && needs.gate.outputs.proceed == 'true' && vars.SELF_HEALING_AUTONOMY_ENABLED == 'true' }}
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Checkout main (steward code + Sentry reducer)
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      # The App identity performs update-branch and the merge so the resulting
+      # pushes trigger CI and the production deploy (GITHUB_TOKEN events are
+      # suppressed — the dependabot silent-deploy bug this pipeline must not
+      # reintroduce).
+      - name: Mint GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.AUTOFIX_APP_ID }}
+          private-key: ${{ secrets.AUTOFIX_APP_PRIVATE_KEY }}
+
+      - name: Evaluate gates and merge at most one PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          SENTRY_AUTOFIX_TOKEN: ${{ secrets.SENTRY_AUTOFIX_TOKEN }}
+          SENTRY_ORG_SLUG: ${{ vars.SENTRY_ORG_SLUG }}
+          MERGE_BUDGET_24H: "3"
+          CODEX_WAIT_MINUTES: "90"
+          STALE_HOURS: "48"
+        run: |
+          set -euo pipefail
+          audit() { echo "::notice::steward: $*"; }
+          demote() { # demote <pr> <reason> — force the human path and stop
+            gh pr edit "$1" --repo "$GITHUB_REPOSITORY" \
+              --add-label "autofix:needs-human" --remove-label "autofix:auto-eligible"
+            gh pr comment "$1" --repo "$GITHUB_REPOSITORY" --body \
+              "🤖 Steward demoted this PR to \`autofix:needs-human\`: $2 (run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+            audit "PR #$1 demoted: $2"
+          }
+
+          # --- Gate: merge budget -------------------------------------------
+          merged_24h=$(gh pr list --repo "$GITHUB_REPOSITORY" --label autofix \
+            --state merged --limit 50 --json mergedAt \
+            --jq '[.[] | select(.mergedAt != null) | select((now - (.mergedAt | fromdateiso8601)) < 86400)] | length')
+          if [ "$merged_24h" -ge "$MERGE_BUDGET_24H" ]; then
+            audit "budget exhausted: $merged_24h automated merges in 24h (max $MERGE_BUDGET_24H)"; exit 0
+          fi
+
+          # --- Gate: last production deploy not red -------------------------
+          deploy=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml \
+            --branch main --limit 1 --json status,conclusion --jq '.[0] // empty')
+          if [ -n "$deploy" ]; then
+            status=$(jq -r '.status' <<< "$deploy"); conclusion=$(jq -r '.conclusion' <<< "$deploy")
+            if [ "$status" != "completed" ]; then audit "a deploy is in flight — waiting"; exit 0; fi
+            if [ "$conclusion" != "success" ] && [ "$conclusion" != "skipped" ]; then
+              audit "last deploy concluded '$conclusion' — not merging onto a broken pipeline"; exit 0
+            fi
+          fi
+
+          # --- Pick the oldest auto-eligible PR -----------------------------
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --label autofix:auto-eligible \
+            --state open --json number,createdAt --jq 'sort_by(.createdAt) | .[0].number // empty')
+          if [ -z "$pr" ]; then audit "no auto-eligible PRs"; exit 0; fi
+          view=$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" \
+            --json number,createdAt,mergeStateStatus,commits,labels)
+          audit "considering PR #$pr"
+
+          # --- Gate: staleness ----------------------------------------------
+          created=$(jq -r '.createdAt' <<< "$view")
+          age_hours=$(( ($(date +%s) - $(date -d "$created" +%s)) / 3600 ))
+          if [ "$age_hours" -gt "$STALE_HOURS" ]; then
+            demote "$pr" "open for ${age_hours}h (> ${STALE_HOURS}h) without merging — too stale to auto-merge"; exit 0
+          fi
+
+          # --- Gate: required checks green on HEAD --------------------------
+          checks=$(gh pr checks "$pr" --repo "$GITHUB_REPOSITORY" --json name,bucket 2>/dev/null || echo '[]')
+          for required in lint test packwerk; do
+            bucket=$(jq -r --arg n "$required" '[.[] | select(.name == $n)][0].bucket // "missing"' <<< "$checks")
+            case "$bucket" in
+              pass) ;;
+              fail) demote "$pr" "required check \`$required\` failed"; exit 0 ;;
+              *) audit "required check '$required' is '$bucket' — waiting"; exit 0 ;;
+            esac
+          done
+
+          # --- Gate: independent review verdict (dual-channel) --------------
+          # Findings arrive as a formal review + inline comments; a CLEAN
+          # round is an issue comment "Codex Review: Didn't find any major
+          # issues" with no commit_id — recency judged against the last
+          # commit. No verdict within CODEX_WAIT_MINUTES => FAIL CLOSED.
+          head_time=$(jq -r '.commits[-1].committedDate' <<< "$view")
+          # (--paginate emits one array per page; -s + add flattens them.)
+          findings=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr/reviews" --paginate | \
+            jq -s --arg t "$head_time" '[add[] | select(.user.login == "chatgpt-codex-connector[bot]")
+                       | select(.state != "APPROVED" and .state != "DISMISSED")
+                       | select(.submitted_at > $t)] | length')
+          clean=$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr/comments" --paginate | \
+            jq -s --arg t "$head_time" '[add[] | select(.user.login == "chatgpt-codex-connector[bot]")
+                       | select(.created_at > $t)
+                       | select(.body | test("^Codex Review: Didn.t find any major issues"))] | length')
+          if [ "$findings" -gt 0 ]; then
+            demote "$pr" "the independent review left findings — a human must triage them"; exit 0
+          fi
+          if [ "$clean" -eq 0 ]; then
+            waited_minutes=$(( ($(date +%s) - $(date -d "$head_time" +%s)) / 60 ))
+            if [ "$waited_minutes" -gt "$CODEX_WAIT_MINUTES" ]; then
+              demote "$pr" "no independent review verdict after ${waited_minutes}m (> ${CODEX_WAIT_MINUTES}m) — failing closed"
+            else
+              audit "no review verdict yet (${waited_minutes}m) — waiting"
+            fi
+            exit 0
+          fi
+
+          # --- Gate: branch up to date --------------------------------------
+          # GitHub auto-merge never updates a behind branch, so the steward
+          # does it explicitly (App token => the update push retriggers CI)
+          # and finishes next cycle.
+          merge_state=$(jq -r '.mergeStateStatus' <<< "$view")
+          if [ "$merge_state" = "BEHIND" ]; then
+            audit "PR #$pr is behind main — updating branch and waiting for CI"
+            GH_TOKEN="$APP_TOKEN" gh api -X PUT \
+              "repos/$GITHUB_REPOSITORY/pulls/$pr/update-branch" > /dev/null
+            exit 0
+          fi
+          if [ "$merge_state" = "DIRTY" ]; then
+            demote "$pr" "merge conflicts with main"; exit 0
+          fi
+
+          # --- Merge (direct, at decision time — no enable-vs-merge race) ---
+          audit "all gates green — merging PR #$pr"
+          GH_TOKEN="$APP_TOKEN" gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --squash
+
+          # --- Post-merge bookkeeping (best effort, never fails the merge) --
+          short_id=$(jq -r '[.labels[].name | select(startswith("sentry:"))][0] // "" | ltrimstr("sentry:")' <<< "$view")
+          if [ -n "$short_id" ]; then
+            issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --label "sentry:${short_id}" \
+              --state all --json number,body --jq '.[0] // empty')
+            sentry_issue_id=$(jq -r '.body' <<< "$issue" | grep -oP '\| Sentry issue ID \| \K[0-9]+' || true)
+            if [ -n "$sentry_issue_id" ]; then
+              ruby script/self_healing/sentry_fetch.rb update-status \
+                --org "$SENTRY_ORG_SLUG" --issue-id "$sentry_issue_id" \
+                --status resolvedInNextRelease \
+                || echo "::warning::Sentry status update failed for ${short_id} (issue ${sentry_issue_id})"
+            fi
+          fi
+          gh pr comment "$pr" --repo "$GITHUB_REPOSITORY" --body \
+            "🤖 Auto-merged by the steward: score \`autofix:auto-eligible\`, required checks green, independent review clean, deploy pipeline healthy, budget ${merged_24h}/${MERGE_BUDGET_24H} used in 24h. The push to main triggers the production deploy; post-deploy verification watches the Sentry issue. (run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"

@@ -127,10 +127,44 @@ token is minted by a deterministic workflow step after the agent finishes.
 4. `score` re-scores **every** open autofix PR from `main` each cycle:
    hard gates + weighted score → labels + a transparent breakdown comment.
 
-Until the steward exists (and its canary passes), nothing merges — scored PRs
-wait for a human, which doubles as the scorer's calibration window: compare
-`autofix:auto-eligible` labels against what review actually found before
-enabling autonomy.
+Until autonomy is enabled (`SELF_HEALING_AUTONOMY_ENABLED` after the canary
+drill), nothing merges — scored PRs wait for a human, which doubles as the
+scorer's calibration window: compare `autofix:auto-eligible` labels against
+what review actually found before enabling autonomy.
+
+## Steward (the autonomy switch)
+
+One merge per cycle, of the **oldest** `autofix:auto-eligible` PR, only when
+every gate agrees — evaluated in order, every uncertain state failing closed
+(demote to `autofix:needs-human`) or waiting for the next cycle:
+
+1. **Autonomy variable** — the job doesn't run without
+   `SELF_HEALING_AUTONOMY_ENABLED == 'true'` (on top of the kill switch and
+   circuit breaker).
+2. **Merge budget** — ≤ 3 automated merges per 24 h.
+3. **Deploy pipeline healthy** — the last `Deploy` run on main completed and
+   didn't fail; an in-flight deploy means wait.
+4. **Staleness** — a PR open > 48 h is demoted (something kept it unmerged;
+   a human should look).
+5. **Required checks green on HEAD** — `lint`, `test`, `packwerk` all pass;
+   failure demotes, pending waits.
+6. **Independent review verdict (dual-channel, recency-anchored)** — findings
+   are a formal `chatgpt-codex-connector[bot]` review after the last commit
+   (demote: a human triages findings, always — they override any score); a
+   clean round is an issue comment starting "Codex Review: Didn't find any
+   major issues" after the last commit. **No verdict within 90 minutes of the
+   last commit ⇒ fail closed** (demote). If the canary drill shows Codex
+   ignores bot PRs entirely, the designed fallback is a second-model review
+   job (`openai/codex-action`, read-only, machine-readable
+   `AUTOFIX_REVIEW_STATUS:` first line — the security-audit house pattern)
+   feeding this same gate.
+7. **Branch up to date** — `BEHIND` triggers `update-branch` with the **App
+   token** (so the update push retriggers CI) and waits; `DIRTY` demotes.
+8. **Merge** — direct `gh pr merge --squash` with the App token at decision
+   time (no enable-auto-merge race, and the App identity is what makes the
+   merge push trigger CI-on-main + the production deploy). Post-merge: the
+   Sentry issue is set to `resolvedInNextRelease` and an audit-trail comment
+   records every gate's state.
 
 ## Manual setup checklist
 
