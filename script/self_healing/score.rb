@@ -147,6 +147,10 @@ module SelfHealing
 
     #: () -> String?
     def spec_evidence_failure
+      # A spec-only diff fixes nothing (and would falsely mark the Sentry
+      # issue resolved) — an error fix must change production code, and its
+      # spec evidence must accompany a production change, not replace it.
+      return "spec evidence: no production change (spec-only diff)" if non_spec_paths.empty?
       return "spec evidence: no spec file changed" if paths.none? { |path| DiffStats.spec_path?(path) }
       return "spec evidence: no added example (it/specify/scenario)" if @diff_stats.added_spec_examples.zero?
       # An example with no expectation is not regression evidence — without

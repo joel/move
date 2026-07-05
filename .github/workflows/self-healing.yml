@@ -555,12 +555,25 @@ jobs:
             jq . /tmp/verdict.json
             verdict=$(jq -r '.verdict' /tmp/verdict.json)
 
+            # Label application is asymmetric on purpose: promotion may fail
+            # open (the PR just stays needs-human), but a DEMOTION that fails
+            # to strip autofix:auto-eligible would leave the steward a stale
+            # green light — that failure must kill the run loudly.
             if [ "$verdict" = "auto-eligible" ]; then
               gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" \
                 --add-label "autofix:auto-eligible" --remove-label "autofix:needs-human" || true
             else
               gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" \
-                --add-label "autofix:needs-human" --remove-label "autofix:auto-eligible" || true
+                --add-label "autofix:needs-human" || true
+              has_eligible=$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" \
+                --json labels --jq '[.labels[].name] | index("autofix:auto-eligible") != null')
+              if [ "$has_eligible" = "true" ]; then
+                if ! gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" \
+                     --remove-label "autofix:auto-eligible"; then
+                  echo "::error::Failed to demote PR #$pr — autofix:auto-eligible is STALE; failing closed."
+                  exit 1
+                fi
+              fi
             fi
 
             {
@@ -660,7 +673,12 @@ jobs:
           fi
 
           # --- Pick the oldest auto-eligible PR -----------------------------
-          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --label autofix:auto-eligible \
+          # BOTH labels required: the scorer only ever evaluates `autofix`
+          # PRs, so `autofix:auto-eligible` alone (manually applied, or left
+          # behind by a label mishap) must never make a PR stewardable —
+          # nothing without the pipeline's own provenance gets auto-merged.
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" \
+            --label autofix --label autofix:auto-eligible \
             --state open --json number,createdAt --jq 'sort_by(.createdAt) | .[0].number // empty')
           if [ -z "$pr" ]; then audit "no auto-eligible PRs"; exit 0; fi
           echo "pr=$pr" >> "$GITHUB_OUTPUT"

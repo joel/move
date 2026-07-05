@@ -179,6 +179,15 @@ RSpec.describe SelfHealing::Score do
       expect(verdict[:gate_failures].join).to include("fail closed")
     end
 
+    it "gates a spec-only diff — an error fix must change production code" do
+      verdict = verdict_for(
+        "files" => [{ "path" => "spec/actions/boxes/create_spec.rb", "additions" => 8, "deletions" => 0 }]
+      )
+      expect(verdict[:verdict]).to eq("needs-human")
+      expect(verdict[:score]).to be_nil
+      expect(verdict[:gate_failures].join).to include("spec-only")
+    end
+
     it "gates a PR without a spec change" do
       verdict = verdict_for(
         "files" => [{ "path" => "app/actions/boxes/create.rb", "additions" => 3, "deletions" => 2 }],
