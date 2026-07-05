@@ -49,6 +49,13 @@ export default class extends Controller {
   // "upload the original as-is".
   async downscale(file) {
     if (typeof createImageBitmap !== "function") return null
+    // JPEG only. It's the one format whose orientation we can read and apply
+    // reliably (EXIF, below). HEIC/HEIF (iPhone default), PNG, WebP etc. upload
+    // as-is — the server's ImageNormalizer transcodes + autorotates them; a
+    // client re-encode there would risk a sideways image (HEIC has orientation
+    // we can't read here) with EXIF stripped. Optimizing HEIC in-browser is a
+    // Phase 3b follow-up (needs real-device verification).
+    if (file.type !== "image/jpeg") return null
 
     const orientation = await this.readOrientation(file)
     // `none`: we handle EXIF orientation ourselves below, so decode raw pixels
@@ -114,9 +121,10 @@ export default class extends Controller {
       let offset = 2
       while (offset + 4 <= view.byteLength) {
         const marker = view.getUint16(offset)
-        if (marker === 0xffe1) {
-          // APP1 — expect "Exif\0\0" then a TIFF header.
-          if (view.getUint32(offset + 4) !== 0x45786966) return 1
+        // The Exif APP1 — but a JPEG may carry an earlier non-Exif APP1 (e.g.
+        // XMP), so only parse the one whose payload starts with "Exif"; any
+        // other segment is skipped by its length so scanning continues.
+        if (marker === 0xffe1 && view.getUint32(offset + 4) === 0x45786966) {
           const tiff = offset + 10
           const little = view.getUint16(tiff) === 0x4949 // "II" little-endian, else "MM" big
           const ifd = tiff + view.getUint32(tiff + 4, little)
@@ -131,7 +139,7 @@ export default class extends Controller {
           return 1
         }
         if ((marker & 0xff00) !== 0xff00) return 1 // not a valid marker — give up
-        offset += 2 + view.getUint16(offset + 2) // skip this segment
+        offset += 2 + view.getUint16(offset + 2) // skip this segment (incl. non-Exif APP1)
       }
       return 1
     } catch {
