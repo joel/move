@@ -382,6 +382,7 @@ jobs:
           private-key: ${{ secrets.AUTOFIX_APP_PRIVATE_KEY }}
 
       - name: Push the fix branch and open the PR (App identity)
+        id: publish
         if: steps.validate.outputs.result == 'ok'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -435,18 +436,28 @@ jobs:
           echo "::notice::Opened ${url}"
 
       # !cancelled(): an `if` without a status function gets an implicit
-      # success(), which would SKIP this report when the agent step itself
-      # times out or crashes — leaving the issue autofix:attempted (excluded
-      # from future cycles) with no trace. An empty validate result means
-      # exactly that agent-step failure.
+      # success(), which would SKIP this report exactly on the opaque
+      # failures — the agent step timing out/crashing (validate skipped,
+      # result empty) or the publication path (token mint, push, pr create)
+      # failing after a green validation. Every such outcome must leave an
+      # explanatory comment, or the issue stays autofix:attempted (excluded
+      # from future cycles) with no trace outside the Actions log.
       - name: Report a failed attempt on the issue
-        if: ${{ !cancelled() && steps.validate.outputs.result != 'ok' }}
+        if: >-
+          ${{ !cancelled() &&
+              (steps.validate.outputs.result != 'ok' ||
+               steps.app-token.outcome == 'failure' ||
+               steps.publish.outcome == 'failure') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REASON: >-
+            ${{ steps.validate.outputs.result != 'ok'
+                && (steps.validate.outputs.result || 'agent-step-failed')
+                || 'publish-failed' }}
         run: |
           set -euo pipefail
           gh issue comment "${{ matrix.issue.number }}" --repo "$GITHUB_REPOSITORY" --body \
-            "🤖 Automated fix attempt did not produce a PR (\`${{ steps.validate.outputs.result || 'agent-step-failed' }}\`). A human should triage this one — remove the \`autofix:attempted\` label to allow a retry. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            "🤖 Automated fix attempt did not produce a PR (\`${REASON}\`). A human should triage this one — remove the \`autofix:attempted\` label to allow a retry. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
   # Deterministic scoring of every open autofix PR, from MAIN (a PR can never
   # rewrite its own judge). Idempotent per cycle: labels + a single upserted
@@ -670,7 +681,7 @@ jobs:
           pr="$PR_NUMBER"
           merged_24h="$MERGED_24H"
           view=$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" \
-            --json number,createdAt,mergeStateStatus,statusCheckRollup,commits,labels)
+            --json number,createdAt,mergeStateStatus,statusCheckRollup,commits,labels,headRefOid)
           audit "considering PR #$pr"
 
           # --- Gate: staleness ----------------------------------------------
@@ -743,8 +754,13 @@ jobs:
           esac
 
           # --- Merge (direct, at decision time — no enable-vs-merge race) ---
-          audit "all gates green — merging PR #$pr"
-          GH_TOKEN="$APP_TOKEN" gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --squash
+          # --match-head-commit pins the merge to the EXACT head every gate
+          # above judged: a push to the branch between snapshot and merge
+          # makes GitHub reject the merge (retried next cycle, re-gated).
+          head_oid=$(jq -r '.headRefOid' <<< "$view")
+          audit "all gates green — merging PR #$pr at ${head_oid}"
+          GH_TOKEN="$APP_TOKEN" gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --squash \
+            --match-head-commit "$head_oid"
 
           # --- Post-merge bookkeeping (best effort, never fails the merge) --
           short_id=$(jq -r '[.labels[].name | select(startswith("sentry:"))][0] // "" | ltrimstr("sentry:")' <<< "$view")
