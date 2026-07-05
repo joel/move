@@ -51,7 +51,14 @@ export default class extends Controller {
     const canvas = document.createElement("canvas")
     canvas.width = width
     canvas.height = height
-    canvas.getContext("2d").drawImage(bitmap, 0, 0, width, height)
+    const context = canvas.getContext("2d")
+    // JPEG has no alpha; a transparent PNG/WebP would otherwise composite onto
+    // canvas' transparent-black default. Flatten onto WHITE to match the server's
+    // ImageNormalizer (jpegsave flatten) so a cutout/screenshot looks identical
+    // whether it took this path or the original-upload fallback.
+    context.fillStyle = "#ffffff"
+    context.fillRect(0, 0, width, height)
+    context.drawImage(bitmap, 0, 0, width, height)
     bitmap.close?.()
 
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", this.qualityValue))
