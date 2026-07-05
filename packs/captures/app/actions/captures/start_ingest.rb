@@ -22,7 +22,7 @@ module Captures
       return Failure(:unsupported_image) unless image_bytes?(file)
 
       blob = yield store_raw(file)
-      media = yield create_pending(box)
+      media = yield create_pending(box, blob.byte_size)
       IngestJob.perform_later(media.id, blob.id, captured_by_id: captured_by&.id, tenant: Apartment::Tenant.current)
       Success(media)
     end
@@ -68,11 +68,17 @@ module Captures
       Failure(:invalid_upload)
     end
 
-    #: (untyped box) -> Dry::Monads::Result[untyped, untyped]
-    def create_pending(box)
+    #: (untyped box, Integer raw_byte_size) -> Dry::Monads::Result[untyped, untyped]
+    def create_pending(box, raw_byte_size)
       media = box.media.create!(
         move: box.move, media_type: "image", captured_via: "web",
-        captured_at: Time.current, status: "pending"
+        captured_at: Time.current, status: "pending",
+        # The raw upload as the client sent it (downscaled by capture-upload, or
+        # the original on a fallback) — recorded before IngestJob normalizes it,
+        # so the client-side downscale is measurable (#556). IngestJob stamps
+        # optimized_at, keeping the images:optimize backfill off freshly-captured
+        # media regardless.
+        original_byte_size: raw_byte_size
       )
       Success(media)
     rescue ActiveRecord::RecordInvalid => e
