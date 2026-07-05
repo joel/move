@@ -22,7 +22,11 @@ import { Controller } from "@hotwired/stimulus"
 // original, so capture can never break because the optimization failed.
 export default class extends Controller {
   static targets = ["file"]
-  static values = { maxEdge: { type: Number, default: 2048 }, quality: { type: Number, default: 0.85 } }
+  static values = {
+    maxEdge: { type: Number, default: 2048 },
+    quality: { type: Number, default: 0.85 },
+    timeout: { type: Number, default: 2500 }
+  }
 
   // change -> capture-upload#submit
   async submit() {
@@ -32,7 +36,15 @@ export default class extends Controller {
 
     let downscaled = null
     try {
-      downscaled = await this.downscale(selected)
+      // The optimization must NEVER block the upload. Some browsers (observed:
+      // iOS decoding HEIC) can leave createImageBitmap pending forever; without
+      // a bound, submit() would never reach requestSubmit() and the capture
+      // would silently never send (#558). Race the resize against a timeout and,
+      // whether it hangs OR throws, fall back to uploading the original.
+      downscaled = await Promise.race([
+        this.downscale(selected),
+        new Promise((resolve) => setTimeout(() => resolve(null), this.timeoutValue))
+      ])
     } catch {
       // Fall through and upload the original — the server normalizes it anyway.
     }
