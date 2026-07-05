@@ -6,20 +6,25 @@ import { Controller } from "@hotwired/stimulus"
 // latency is the phone pushing a 3–8 MB full-resolution photo over the (often
 // cellular) network. Resizing to a <=2048px JPEG here cuts that upload ~10x.
 //
-// Orientation is handled by the BROWSER, not by us: we decode with
-// `imageOrientation: "from-image"`, which returns the already-display-oriented
-// bitmap (verified in Chrome across all EXIF orientations), then just resize it —
-// no manual EXIF parse or canvas rotation (that path was un-testable and produced
-// repeated sideways-image bugs in #548). Browsers that don't honor `from-image`
-// (iOS Safari <16, older Chromium) are detected up front and skipped, so a
-// portrait photo is never re-encoded sideways there — it uploads as-is and the
-// server autorotates it (ImageNormalizer#autorot). Because the browser decodes +
-// orients, this covers JPEG, HEIC/HEIF (iPhone default, on Safari), PNG and WebP
-// alike; a format the browser can't decode throws and falls back to the original.
+// Two decode paths, picked by a runtime feature-detect:
+//
+//   1. from-image (Chrome/Chromium, Safari 16+ desktop): `createImageBitmap` with
+//      `imageOrientation:"from-image"` returns the already-display-oriented bitmap,
+//      so we just resize it — no manual orientation. Verified in Chrome across all
+//      EXIF orientations.
+//   2. RAW + re-tag (iOS WebKit, where from-image is IGNORED — #549): decode the
+//      raw pixels, resize WITHOUT rotating, and re-attach the file's original EXIF
+//      orientation so the server autorotate + display apply it exactly as they do
+//      for the untouched original. Correct by construction: a smaller image
+//      carrying the same orientation metadata. A dimension self-check (decoded
+//      dims vs the JPEG's stored SOF dims) confirms we actually got raw pixels
+//      before re-tagging, so a browser that unexpectedly orients can't double-
+//      apply and upload sideways. Scoped to JPEG and orientations {1,6,8} — the
+//      cases the self-check can verify; everything else uploads the original.
 //
 // Pure speed optimization: the server's ImageNormalizer stays the authority
-// (re-sniff, EXIF/GPS strip, size cap, transcode). Any failure uploads the
-// original, so capture can never break because the optimization failed.
+// (re-sniff, EXIF/GPS strip, size cap, transcode). Any failure — or a hang, via
+// submit()'s timeout — uploads the original, so capture can never break.
 export default class extends Controller {
   static targets = ["file"]
   static values = {
@@ -59,17 +64,49 @@ export default class extends Controller {
     this.element.requestSubmit()
   }
 
-  // Returns a downscaled, correctly-oriented JPEG File, or null → "upload the
-  // original as-is".
+  // Returns a downscaled JPEG File, or null → "upload the original as-is".
   async downscale(file) {
     if (typeof createImageBitmap !== "function") return null
-    if (!(await this.orientationSupported())) return null
 
-    // from-image: the browser applies EXIF orientation on decode, so `bitmap` is
-    // already in display orientation and we just resize it. Throws for a format
-    // the browser can't decode (e.g. HEIC on Chrome) → caught by submit()'s
-    // try/catch → original upload.
-    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" })
+    if (await this.orientationSupported()) {
+      // Browser orients on decode — resize the display-ready bitmap. Covers JPEG,
+      // HEIC/HEIF (Safari), PNG, WebP; an undecodable format throws → original.
+      const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" })
+      return this.resizeToJpeg(bitmap, file, null)
+    }
+
+    // WebKit fallback: the browser won't orient, so re-tag the raw pixels.
+    return this.downscaleRawJpeg(file)
+  }
+
+  // iOS WebKit path: decode raw pixels, resize, re-attach EXIF orientation.
+  async downscaleRawJpeg(file) {
+    // EXIF read + re-tag are JPEG-specific; HEIC/others upload as-is (the server
+    // transcodes + autorotates them).
+    if (file.type !== "image/jpeg") return null
+
+    const orientation = await this.readOrientation(file)
+    // Only the orientations the dimension self-check below can verify: 1 (upright,
+    // no rotation) and the two 90° rotations (6/8, dims swap). Mirrored/180
+    // orientations aren't dim-distinguishable, so they upload the original.
+    if (![1, 6, 8].includes(orientation)) return null
+
+    const raw = await this.readRawDimensions(file)
+    if (!raw) return null
+
+    const bitmap = await createImageBitmap(file)
+    // Did the browser already orient? A 90° rotation swaps the dimensions, so if
+    // the decoded bitmap still matches the file's stored (raw) dims we truly got
+    // raw pixels and must re-tag; if it's swapped, the browser oriented it and
+    // re-tagging would double-apply — so don't.
+    const gotRaw = bitmap.width === raw.width && bitmap.height === raw.height
+    return this.resizeToJpeg(bitmap, file, gotRaw ? orientation : null)
+  }
+
+  // Resize a decoded bitmap to <=maxEdge and encode JPEG. `reinjectOrientation`
+  // (when not 1/null) splices the EXIF Orientation back in so downstream rotates
+  // the resized raw pixels. Consumes (closes) the bitmap. Null if not worth it.
+  async resizeToJpeg(bitmap, file, reinjectOrientation) {
     const scale = Math.min(1, this.maxEdgeValue / Math.max(bitmap.width, bitmap.height))
     if (scale === 1) {
       bitmap.close?.() // already within the target — upload the original
@@ -90,18 +127,21 @@ export default class extends Controller {
     bitmap.close?.()
 
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", this.qualityValue))
+    if (!blob) return null
+
+    let bytes = new Uint8Array(await blob.arrayBuffer())
+    if (reinjectOrientation && reinjectOrientation !== 1) bytes = this.tagOrientation(bytes, reinjectOrientation)
     // Never make it worse: a re-encode can occasionally grow a small image.
-    if (!blob || blob.size >= file.size) return null
+    if (bytes.byteLength >= file.size) return null
 
     const name = `${(file.name || "capture").replace(/\.[^.]+$/, "")}.jpg`
-    return new File([blob], name, { type: "image/jpeg" })
+    return new File([bytes], name, { type: "image/jpeg" })
   }
 
   // Memoized: does this browser honor `imageOrientation: "from-image"` (Chrome
-  // 79+, Safari 16+)? Where it doesn't, decoding then re-encoding would strip
-  // EXIF and upload rotated photos sideways — so we skip the optimization there.
-  // The probe is built at RUNTIME (no embedded binary to get malformed): a 2x1
-  // JPEG tagged EXIF orientation 6 decodes to 1x2 (height > width) iff honored.
+  // 79+, Safari 16+ desktop)? iOS WebKit ignores it (→ the raw path above). The
+  // probe is built at RUNTIME (no embedded binary to get malformed): a 2x1 JPEG
+  // tagged EXIF orientation 6 decodes to 1x2 (height > width) iff honored.
   orientationSupported() {
     this._orientationSupported ||= (async () => {
       try {
@@ -126,6 +166,64 @@ export default class extends Controller {
     canvas.getContext("2d").fillRect(0, 0, 2, 1)
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 1))
     return new Uint8Array(await blob.arrayBuffer())
+  }
+
+  // Read the EXIF Orientation tag (1–8) from a JPEG's APP1 segment, or 1 if it's
+  // absent/unreadable. Only the first APP1 (where Exif lives) is inspected.
+  async readOrientation(file) {
+    try {
+      const view = new DataView(await file.slice(0, 131072).arrayBuffer())
+      if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) return 1 // not a JPEG (SOI)
+
+      let offset = 2
+      while (offset + 4 <= view.byteLength) {
+        const marker = view.getUint16(offset)
+        if (marker === 0xffe1 && view.getUint32(offset + 4) === 0x45786966) { // "Exif"
+          const tiff = offset + 10
+          const little = view.getUint16(tiff) === 0x4949 // "II" little-endian, else "MM" big
+          const ifd = tiff + view.getUint32(tiff + 4, little)
+          const entries = view.getUint16(ifd, little)
+          for (let i = 0; i < entries; i++) {
+            const entry = ifd + 2 + i * 12
+            if (view.getUint16(entry, little) === 0x0112) {
+              const value = view.getUint16(entry + 8, little)
+              return value >= 1 && value <= 8 ? value : 1
+            }
+          }
+          return 1
+        }
+        if ((marker & 0xff00) !== 0xff00) return 1 // not a valid marker — give up
+        offset += 2 + view.getUint16(offset + 2) // skip this segment
+      }
+      return 1
+    } catch {
+      return 1
+    }
+  }
+
+  // Read the raw (as-stored, pre-orientation) pixel dimensions from a JPEG's
+  // Start-Of-Frame marker, or null if unreadable. Used to detect whether the
+  // decoder already applied EXIF orientation (a 90° rotation swaps these).
+  async readRawDimensions(file) {
+    try {
+      const view = new DataView(await file.slice(0, 131072).arrayBuffer())
+      if (view.getUint16(0) !== 0xffd8) return null // not a JPEG (SOI)
+
+      let offset = 2
+      while (offset + 9 < view.byteLength) {
+        if (view.getUint8(offset) !== 0xff) return null
+        const marker = view.getUint8(offset + 1)
+        // SOF0..SOF15 carry frame dimensions, except the non-SOF markers that
+        // share the 0xC_ range: DHT (C4), JPG (C8), DAC (CC).
+        if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+          return { height: view.getUint16(offset + 5), width: view.getUint16(offset + 7) }
+        }
+        offset += 2 + view.getUint16(offset + 2) // skip this segment by its length
+      }
+      return null
+    } catch {
+      return null
+    }
   }
 
   // Splice an EXIF APP1 (big-endian TIFF, one Orientation entry) in after the SOI.
