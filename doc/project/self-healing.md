@@ -99,6 +99,50 @@ token is minted by a deterministic workflow step after the agent finishes.
   attacker-influenceable → prompt-injection and PII channels). See
   `security-model.md`.
 
+## Post-deploy verification (the breaker's trigger)
+
+Each cycle, for every autofix PR merged in the last 24 h whose deploy has
+completed: if the Sentry issue's `last_seen` is **after** the deploy's
+completion time, the fix did not hold — the verify stage reopens the GitHub
+issue and opens a `self-healing-halt` issue, halting every stage until a human
+closes it. Timestamps, not release tags, are the signal: a merge SHA can be
+superseded before its deploy runs, so "events after the deploy that shipped
+the fix completed" is the reliable check. Residual window: one cron cycle
+(~30 min) between a bad deploy and the breaker tripping.
+
+## Runbooks
+
+**Pause the pipeline** (planned work, noisy period): set the repo variable
+`SELF_HEALING_ENABLED` to anything but `true`. Autonomy alone can be paused by
+unsetting `SELF_HEALING_AUTONOMY_ENABLED` (issues and scored PRs keep flowing,
+nothing merges).
+
+**Triage a halt** (`self-healing-halt` issue open — the pipeline is stopped):
+
+1. Read the halt issue: it names the autofix PR, the tracked error issue, the
+   deploy completion time, and the post-deploy `last_seen`.
+2. Check the Sentry issue — same failure mode, or a new one at the same
+   location? (The GitHub issue's frames are the pre-fix snapshot to compare
+   against.)
+3. If the fix is wrong: **revert forward** — `git revert <squash SHA>` on a
+   branch, PR, merge (the merge push deploys the revert). Never rewrite main.
+4. If the fix is right but incomplete: fix forward on a new branch (a human
+   one — the Sentry issue's GitHub issue stays open and `autofix:attempted`,
+   so the pipeline won't touch it again).
+5. Close the halt issue to resume the pipeline.
+
+**Emergency rollback** (prod is broken now, can't wait for a revert deploy):
+`mise x -- kamal rollback <previous version>` from a local checkout — with the
+caveat that **the schema never rolls back** (the entrypoint runs
+`db:prepare && db:migrate` on boot), which is exactly why migrations are
+deny-listed for autofix PRs: an autofix rollback is always schema-safe.
+
+**Deploy didn't fire after a merge** (skip marker slipped through, workflow
+hiccup): `unset GITHUB_TOKEN && gh workflow run Deploy --ref main`.
+
+**Retry a failed fix attempt**: remove the issue's `autofix:attempted` label —
+the next cycle picks it up again (the fix branch is force-pushed).
+
 ## Label state machine
 
 | Label | Lives on | Meaning |

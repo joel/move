@@ -44,6 +44,12 @@ module SelfHealing
             .map { |issue| self.class.reduce_issue(issue) }
     end
 
+    # One issue's current state (post-deploy verification reads last_seen).
+    #: (String issue_id) -> Hash[Symbol, untyped]
+    def issue(issue_id)
+      self.class.reduce_issue(get("/organizations/#{@org}/issues/#{issue_id}/"))
+    end
+
     #: (String issue_id) -> Hash[Symbol, untyped]
     def latest_event(issue_id)
       event = get("/organizations/#{@org}/issues/#{issue_id}/events/latest/")
@@ -172,7 +178,7 @@ if $PROGRAM_NAME == __FILE__
 
   options = { query: "is:unresolved level:error" }
   parser = OptionParser.new do |opts|
-    opts.banner = "usage: sentry_fetch.rb {list|event|update-status} [options]"
+    opts.banner = "usage: sentry_fetch.rb {list|issue|event|update-status} [options]"
     opts.on("--org ORG") { |value| options[:org] = value }
     opts.on("--project PROJECT") { |value| options[:project] = value }
     opts.on("--issue-id ID") { |value| options[:issue_id] = value }
@@ -188,6 +194,8 @@ if $PROGRAM_NAME == __FILE__
   case mode
   when "list"
     puts JSON.pretty_generate(client.candidate_issues(query: options.fetch(:query)))
+  when "issue"
+    puts JSON.pretty_generate(client.issue(options.fetch(:issue_id)))
   when "event"
     puts JSON.pretty_generate(client.latest_event(options.fetch(:issue_id)))
   when "update-status"

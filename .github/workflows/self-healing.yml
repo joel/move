@@ -660,3 +660,107 @@ jobs:
           fi
           gh pr comment "$pr" --repo "$GITHUB_REPOSITORY" --body \
             "🤖 Auto-merged by the steward: score \`autofix:auto-eligible\`, required checks green, independent review clean, deploy pipeline healthy, budget ${merged_24h}/${MERGE_BUDGET_24H} used in 24h. The push to main triggers the production deploy; post-deploy verification watches the Sentry issue. (run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+
+  # THE CIRCUIT BREAKER'S TRIGGER. For every autofix PR merged in the last
+  # 24h whose production deploy has completed: if the Sentry issue records
+  # events AFTER the deploy finished, the fix didn't fix it — reopen the
+  # GitHub issue and open a `self-healing-halt` issue, which stops every
+  # stage (the gate job) until a human closes it. Timestamps, not release
+  # tags: a merge SHA can be superseded before its deploy, so "events after
+  # the deploy that shipped the fix completed" is the reliable signal.
+  verify:
+    runs-on: ubuntu-latest
+    needs: gate
+    if: needs.gate.outputs.proceed == 'true'
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      actions: read
+    steps:
+      - name: Checkout main (Sentry reducer)
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verify recently deployed autofixes against Sentry
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SENTRY_AUTOFIX_TOKEN: ${{ secrets.SENTRY_AUTOFIX_TOKEN }}
+          SENTRY_ORG_SLUG: ${{ vars.SENTRY_ORG_SLUG }}
+        run: |
+          set -euo pipefail
+
+          merged=$(gh pr list --repo "$GITHUB_REPOSITORY" --label autofix \
+            --state merged --limit 20 --json number,mergedAt,labels \
+            --jq '[.[] | select(.mergedAt != null)
+                       | select((now - (.mergedAt | fromdateiso8601)) < 86400)
+                       | {number, mergedAt,
+                          short_id: ([.labels[].name | select(startswith("sentry:"))][0] // "" | ltrimstr("sentry:"))}
+                       | select(.short_id != "")]')
+          echo "Autofix PRs merged in the last 24h: $(jq length <<< "$merged")"
+
+          deploys=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml \
+            --branch main --status completed --limit 20 --json conclusion,createdAt,updatedAt)
+
+          while IFS= read -r item; do
+            pr_number=$(jq -r '.number' <<< "$item")
+            merged_at=$(jq -r '.mergedAt' <<< "$item")
+            short_id=$(jq -r '.short_id' <<< "$item")
+
+            # The first successful deploy that STARTED after the merge is the
+            # one that shipped this fix; its completion time is the watermark.
+            deploy_done=$(jq -r --arg m "$merged_at" \
+              '[.[] | select(.conclusion == "success") | select(.createdAt > $m)]
+               | sort_by(.createdAt) | .[0].updatedAt // empty' <<< "$deploys")
+            if [ -z "$deploy_done" ]; then
+              echo "PR #$pr_number (${short_id}): no completed deploy after merge yet — checking next cycle."
+              continue
+            fi
+
+            issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --label "sentry:${short_id}" \
+              --state all --json number,body,state --jq '.[0] // empty')
+            [ -n "$issue" ] || continue
+            gh_issue=$(jq -r '.number' <<< "$issue")
+            sentry_issue_id=$(jq -r '.body' <<< "$issue" | grep -oP '\| Sentry issue ID \| \K[0-9]+' || true)
+            [ -n "$sentry_issue_id" ] || continue
+
+            last_seen=$(ruby script/self_healing/sentry_fetch.rb issue \
+              --org "$SENTRY_ORG_SLUG" --issue-id "$sentry_issue_id" | jq -r '.last_seen // empty')
+            if [ -z "$last_seen" ] || [[ ! "$last_seen" > "$deploy_done" ]]; then
+              echo "PR #$pr_number (${short_id}): clean — no events after deploy completion ($deploy_done)."
+              continue
+            fi
+
+            echo "::error::PR #$pr_number (${short_id}): Sentry recorded events at ${last_seen}, AFTER the deploy completed at ${deploy_done} — the fix did not hold."
+
+            if [ "$(jq -r '.state' <<< "$issue")" = "CLOSED" ]; then
+              gh issue reopen "$gh_issue" --repo "$GITHUB_REPOSITORY"
+            fi
+            gh issue comment "$gh_issue" --repo "$GITHUB_REPOSITORY" --body \
+              "🤖 Post-deploy verification FAILED: Sentry recorded new events (last seen \`${last_seen}\`) after the deploy that shipped PR #${pr_number} completed (\`${deploy_done}\`). The automated fix did not hold. (run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+
+            # One halt is enough — the gate stops every stage while it is open.
+            open_halts=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+              --label self-healing-halt --state open --json number --jq 'length')
+            if [ "$open_halts" -eq 0 ]; then
+              gh label create "self-healing-halt" --repo "$GITHUB_REPOSITORY" \
+                --color B60205 --description "Circuit breaker: self-healing is halted while this is open" --force
+              gh issue create --repo "$GITHUB_REPOSITORY" \
+                --title "[Self-Healing HALT] Post-deploy verification failed for ${short_id}" \
+                --label "self-healing-halt" \
+                --body "$(printf '%s\n' \
+                  "The self-healing circuit breaker tripped: **every pipeline stage is paused** while this issue is open." \
+                  "" \
+                  "| | |" \
+                  "|---|---|" \
+                  "| Autofix PR | #${pr_number} |" \
+                  "| Tracked error | #${gh_issue} (\`${short_id}\`) |" \
+                  "| Deploy completed | \`${deploy_done}\` |" \
+                  "| Events seen after deploy | last seen \`${last_seen}\` |" \
+                  "" \
+                  "**Runbook** (doc/project/self-healing.md § Runbooks): triage the regression, revert the PR if needed (\`git revert\` + merge, which redeploys), then close this issue to resume the pipeline." \
+                  "" \
+                  "_Opened automatically by the verify stage. (run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})_")"
+            fi
+          done < <(jq -c '.[]' <<< "$merged")
