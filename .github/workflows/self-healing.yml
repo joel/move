@@ -1,0 +1,186 @@
+name: Self-Healing
+
+run-name: Self-Healing - ${{ github.event_name }}
+
+# Loop A of the self-healing pipeline (doc/project/self-healing.md):
+# Sentry error issues -> public-safe GitHub issues -> agent fix PRs ->
+# deterministic scoring -> confidence-gated auto-merge -> the existing
+# deploy-on-merge -> post-deploy verification. Stages land incrementally;
+# this workflow currently implements TRIAGE only (observe-only: it opens
+# issues, nothing merges).
+#
+# Safety engine:
+# - Kill switch: repo variable SELF_HEALING_ENABLED must be exactly 'true'.
+# - Circuit breaker: any OPEN issue labelled `self-healing-halt` stops every
+#   stage (opened automatically by post-deploy verification, closed manually
+#   after triage).
+# - Public-repo doctrine: everything written to issues/PRs/logs is
+#   non-sensitive BY CONSTRUCTION — Sentry data only enters via the whitelist
+#   reducer script/self_healing/sentry_fetch.rb (exception messages,
+#   breadcrumbs, request/user context never pass). See
+#   doc/project/security-model.md.
+#
+# Never triggered by pull_request/fork events — schedule + manual dispatch
+# only, so untrusted PR code can never run in this workflow's context.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List candidates without creating issues"
+        type: boolean
+        default: false
+
+# Jobs opt in to the narrowest permissions they need.
+permissions: {}
+
+# One pipeline cycle at a time; never interrupt an in-flight cycle (a steward
+# mid-merge must not be cancelled).
+concurrency:
+  group: self-healing
+  cancel-in-progress: false
+
+jobs:
+  # Every stage hangs off this gate: kill switch, circuit breaker, and
+  # never-on-forks. Downstream jobs require `needs.gate.outputs.proceed`.
+  gate:
+    runs-on: ubuntu-latest
+    if: github.repository == 'joel/move' && vars.SELF_HEALING_ENABLED == 'true'
+    permissions:
+      issues: read
+    outputs:
+      proceed: ${{ steps.breaker.outputs.proceed }}
+    steps:
+      - name: Circuit breaker — halt on an open self-healing-halt issue
+        id: breaker
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          halts=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label self-healing-halt --state open --json number --jq 'length')
+          if [ "$halts" -gt 0 ]; then
+            echo "::warning::Self-healing halted: $halts open self-healing-halt issue(s). Close them to resume."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Poll Sentry for unresolved production errors over the activity thresholds
+  # and open a fixed-format, public-safe GitHub issue per new candidate.
+  triage:
+    runs-on: ubuntu-latest
+    needs: gate
+    if: needs.gate.outputs.proceed == 'true'
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # The reducer is stdlib-only, so the runner's default Ruby suffices —
+      # no bundler-cache, no gem install, and the Sentry token is scoped to
+      # exactly this step.
+      - name: Fetch candidate issues from Sentry (whitelist-reduced)
+        env:
+          SENTRY_AUTOFIX_TOKEN: ${{ secrets.SENTRY_AUTOFIX_TOKEN }}
+          SENTRY_ORG_SLUG: ${{ vars.SENTRY_ORG_SLUG }}
+          SENTRY_PROJECT_SLUG: ${{ vars.SENTRY_PROJECT_SLUG }}
+        run: |
+          set -euo pipefail
+          ruby script/self_healing/sentry_fetch.rb list \
+            --org "$SENTRY_ORG_SLUG" --project "$SENTRY_PROJECT_SLUG" \
+            --query "is:unresolved level:error" > /tmp/candidates.json
+          echo "Candidates over threshold: $(jq length /tmp/candidates.json)"
+
+      - name: Open public-safe issues for new candidates
+        if: inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SENTRY_AUTOFIX_TOKEN: ${{ secrets.SENTRY_AUTOFIX_TOKEN }}
+          SENTRY_ORG_SLUG: ${{ vars.SENTRY_ORG_SLUG }}
+          MAX_NEW_ISSUES_PER_CYCLE: "2"
+          MAX_OPEN_AUTOFIX_PRS: "3"
+        run: |
+          set -euo pipefail
+
+          open_prs=$(gh pr list --repo "$GITHUB_REPOSITORY" \
+            --label autofix --state open --json number --jq 'length')
+          if [ "$open_prs" -ge "$MAX_OPEN_AUTOFIX_PRS" ]; then
+            echo "::notice::Skipping: $open_prs open autofix PRs (cap $MAX_OPEN_AUTOFIX_PRS)."
+            exit 0
+          fi
+
+          created=0
+          while IFS= read -r candidate; do
+            [ "$created" -ge "$MAX_NEW_ISSUES_PER_CYCLE" ] && break
+
+            short_id=$(jq -r '.short_id' <<< "$candidate")
+            issue_id=$(jq -r '.issue_id' <<< "$candidate")
+            [ -n "$short_id" ] && [ "$short_id" != "null" ] || continue
+
+            # Dedupe across ALL issue states: one GitHub issue per Sentry
+            # issue, ever — a closed issue means it was fixed or triaged
+            # away; recurrence after a fix is the post-deploy verifier's
+            # job to surface, not a fresh triage ticket.
+            existing=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+              --label "sentry:${short_id}" --state all --json number --jq 'length')
+            if [ "$existing" -gt 0 ]; then
+              echo "Skipping ${short_id}: already tracked."
+              continue
+            fi
+
+            # Frames for the report come from the latest event, also
+            # whitelist-reduced.
+            ruby script/self_healing/sentry_fetch.rb event \
+              --org "$SENTRY_ORG_SLUG" --issue-id "$issue_id" > /tmp/event.json
+
+            title="[AutoFix] $(jq -r '.exception_type // "Error"' <<< "$candidate") in $(jq -r '.culprit // "unknown"' <<< "$candidate") (${short_id})"
+
+            {
+              echo "### Automated error report — ${short_id}"
+              echo
+              echo "| | |"
+              echo "|---|---|"
+              jq -r '"| Exception | `\(.exception_type // "?")` |",
+                     "| Location (culprit) | `\(.culprit // "?")` |",
+                     "| Level / substatus | \(.level // "?") / \(.substatus // "-") |",
+                     "| Events (24h / total) | \(.events_24h) / \(.count) |",
+                     "| Users affected | \(.user_count) |",
+                     "| First seen | \(.first_seen // "?") |",
+                     "| Last seen | \(.last_seen // "?") |"' <<< "$candidate"
+              permalink=$(jq -r '.permalink // empty' <<< "$candidate")
+              [ -n "$permalink" ] && echo "| Sentry | $permalink |"
+              echo
+              echo "<details><summary>In-app stack frames (latest event, innermost last)</summary>"
+              echo
+              echo '```'
+              jq -r '.frames[] | "\(.filename):\(.line) in \(.function)"' /tmp/event.json
+              echo '```'
+              echo
+              echo "</details>"
+              echo
+              echo "---"
+              echo "_Opened automatically by the self-healing pipeline (\`self-healing.yml\` triage)._"
+              echo "_All fields are whitelist-reduced (\`script/self_healing/sentry_fetch.rb\`): exception messages and breadcrumbs never appear here — open the Sentry link for full detail._"
+            } > /tmp/issue_body.md
+
+            gh label create "sentry:${short_id}" --repo "$GITHUB_REPOSITORY" \
+              --color BFD4F2 --description "Tracks Sentry issue ${short_id}" --force
+            url=$(gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$title" --body-file /tmp/issue_body.md \
+              --label "autofix,bug,sentry:${short_id}")
+            echo "::notice::Opened ${url} for ${short_id}"
+            created=$((created + 1))
+          done < <(jq -c '.[]' /tmp/candidates.json)
+
+          echo "Created ${created} issue(s) this cycle."
+
+      - name: Dry run — list candidates only
+        if: inputs.dry_run == true
+        run: jq . /tmp/candidates.json
