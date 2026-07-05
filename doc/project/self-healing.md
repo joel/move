@@ -43,25 +43,31 @@ merge commit; the release page shows commits and a production deploy.
 
 ## Pipeline overview
 
-```
-Sentry (prod errors, PII-scrubbed at ingest — config/initializers/sentry.rb)
-  │ cron */30 poll (self-healing.yml `triage`)
-  ▼
-triage: kill switch + circuit breaker + dedupe + caps → public-safe GitHub issue
-  ▼
-fix:    whitelist-scrubbed event context → claude-code-action (failing spec →
-        minimal fix) → assessment.json → App-token push → PR "Closes #N"
-  ▼
-score:  deterministic scorer FROM MAIN (script/self_healing/score.rb)
-        → autofix:auto-eligible | autofix:needs-human + breakdown comment
-  ▼
-steward (later cycles): budget → deploy green → checks green → Codex verdict
-        → update-branch if behind → direct squash merge → Sentry resolved
-  ▼
-deploy.yml (existing push-to-main deploy) → production
-  ▼
-verify: new events on the Sentry issue after the deploy completed?
-        ⇒ reopen the GitHub issue + open a `self-healing-halt` issue (breaker)
+```mermaid
+flowchart TD
+    SENTRY["Sentry — prod errors,<br/>PII-scrubbed at ingest<br/>(config/initializers/sentry.rb)"]
+    TRIAGE["triage (cron */30)<br/>kill switch · circuit breaker ·<br/>dedupe · caps"]
+    ISSUE["Public-safe GitHub issue<br/>(whitelist-reduced fields only)"]
+    FIX["fix<br/>claude-code-action: failing spec →<br/>minimal fix → assessment.json<br/>(no push credential)"]
+    PR["PR via App token<br/>'Closes #N' — App identity<br/>makes CI run"]
+    SCORE["score (FROM MAIN)<br/>script/self_healing/score.rb<br/>hard gates + weighted score"]
+    STEWARD["steward (later cycles)<br/>budget → deploy green → no failing<br/>check → Codex verdict → mergeState<br/>CLEAN → direct squash merge"]
+    DEPLOY["deploy.yml<br/>(existing push-to-main deploy)"]
+    VERIFY["verify<br/>new Sentry events after<br/>deploy completed?"]
+    HALT["self-healing-halt issue<br/>(circuit breaker — every<br/>stage no-ops while open)"]
+
+    SENTRY -->|poll, whitelist-reduced| TRIAGE
+    TRIAGE --> ISSUE
+    ISSUE --> FIX
+    FIX --> PR
+    PR --> SCORE
+    SCORE -->|autofix:auto-eligible| STEWARD
+    SCORE -->|autofix:needs-human| HUMAN["Human review path"]
+    STEWARD -->|squash merge| DEPLOY
+    DEPLOY --> VERIFY
+    VERIFY -->|clean| DONE["Sentry: resolvedInNextRelease"]
+    VERIFY -->|fix did not hold| HALT
+    HALT -.->|blocks| TRIAGE
 ```
 
 Separation of duties: **Claude** (claude-code-action) writes the fix; **Codex**
@@ -98,6 +104,19 @@ token is minted by a deterministic workflow step after the agent finishes.
   breadcrumb values never reach the agent prompt or any public sink (they are
   attacker-influenceable → prompt-injection and PII channels). See
   `security-model.md`.
+
+**Accepted risk — no pre-merge live verification on the bot path.** Human PRs
+run the mandatory live `/product-review` (AGENTS.md §5) before pushing; the
+pipeline structurally cannot (no `bin/cli` container stack or real browser in
+CI, and `rack_test` system specs execute no JavaScript). Mitigations, layered:
+the browser-only failure classes this repo has been bitten by live behind
+deny-listed paths (`app/javascript/**`, `app/assets/**` — untestable under
+`rack_test`); the blast radius caps what an autofix may touch at all; Codex
+independently reviews every PR pre-merge; and post-deploy verification plus
+the circuit breaker bound the damage window to about one cron cycle. A
+regression class that slips all four layers is the residual risk accepted in
+exchange for autonomy — revisit if a real incident shows the layers are not
+enough.
 
 ## Post-deploy verification (the breaker's trigger)
 
@@ -190,20 +209,29 @@ every gate agrees — evaluated in order, every uncertain state failing closed
    didn't fail; an in-flight deploy means wait.
 4. **Staleness** — a PR open > 48 h is demoted (something kept it unmerged;
    a human should look).
-5. **Required checks green on HEAD** — `lint`, `test`, `packwerk` all pass;
-   failure demotes, pending waits.
+5. **No failing check on HEAD** — any `statusCheckRollup` conclusion of
+   FAILURE/ERROR/TIMED_OUT/CANCELLED demotes (checked by name via the rollup,
+   never `gh pr checks` buckets, which flap mid-run). Whether every
+   *required* context is green is deliberately NOT re-derived from a
+   hard-coded list — GitHub's own `mergeStateStatus` (gate 7) answers that
+   from live branch protection, so a renamed or newly-required check can
+   never be silently bypassed.
 6. **Independent review verdict (dual-channel, recency-anchored)** — findings
    are a formal `chatgpt-codex-connector[bot]` review after the last commit
    (demote: a human triages findings, always — they override any score); a
-   clean round is an issue comment starting "Codex Review: Didn't find any
-   major issues" after the last commit. **No verdict within 90 minutes of the
-   last commit ⇒ fail closed** (demote). If the canary drill shows Codex
-   ignores bot PRs entirely, the designed fallback is a second-model review
-   job (`openai/codex-action`, read-only, machine-readable
+   clean round is an issue comment containing "Didn't find any major issues"
+   after the last commit (matched loosely — the exact wording is
+   canary-verified). **No verdict within 90 minutes of the last commit ⇒
+   fail closed** (demote). If the canary drill shows Codex ignores bot PRs
+   entirely, the designed fallback is a second-model review job
+   (`openai/codex-action`, read-only, machine-readable
    `AUTOFIX_REVIEW_STATUS:` first line — the security-audit house pattern)
    feeding this same gate.
-7. **Branch up to date** — `BEHIND` triggers `update-branch` with the **App
-   token** (so the update push retriggers CI) and waits; `DIRTY` demotes.
+7. **GitHub's merge verdict (live branch protection)** — `mergeStateStatus`
+   must be `CLEAN` (every required context green AND up to date). `BEHIND`
+   triggers `update-branch` with the **App token** (so the update push
+   retriggers CI) and waits; `DIRTY` demotes; anything else waits (bounded by
+   the staleness gate).
 8. **Merge** — direct `gh pr merge --squash` with the App token at decision
    time (no enable-auto-merge race, and the App identity is what makes the
    merge push trigger CI-on-main + the production deploy). Post-merge: the
@@ -243,9 +271,10 @@ One-time provisioning, in order:
 4. **Anthropic** → Actions secret `AUTOFIX_ANTHROPIC_API_KEY`, with a spend
    cap configured in the Anthropic console (API key, not subscription OAuth —
    unattended CI billing must be capped and attributable).
-5. Repo variable `SELF_HEALING_ENABLED=true`; labels `autofix`,
-   `autofix:auto-eligible`, `autofix:needs-human`, `self-healing-halt`
-   (`sentry:<shortId>` labels are created lazily by triage).
+5. Repo variable `SELF_HEALING_ENABLED=true`. No label setup needed — the
+   pipeline creates/refreshes every label it uses (`autofix`, `sentry:*`,
+   `autofix:attempted`, `autofix:auto-eligible`, `autofix:needs-human`,
+   `self-healing-halt`) idempotently at its own use sites.
 6. Verify release tagging (§ Release tracking above).
 7. **Canary drill — gates autonomy.** Using the App identity: open a trivial
    PR → confirm (a) the branch push triggers CI, (b) whether Codex reviews a

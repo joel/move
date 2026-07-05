@@ -37,7 +37,7 @@ cause, say so in the assessment with low confidence — do not guess.
   `packs/*/app/**` (except the auth/tenancy packs), `spec/**`, `packs/*/spec/**`,
   and hand-written `sig/**`. Everything else — migrations, `config/**`, `db/**`,
   `.github/**`, `script/**`, `bin/**`, `lib/**`, `Gemfile*`, `app/misc/**`,
-  `app/policies/**`, `app/javascript/**`, `app/assets/**`, and the
+  `app/policies/**`, `app/mcp/**`, `app/javascript/**`, `app/assets/**`, and the
   `organizations`/`accounts`/`session_handoffs`/`move_integration_tokens`/`move_memberships`
   packs — is off-limits. If the root cause lives there, stop, write the
   assessment with `"fixable": false`, and explain.
