@@ -27,6 +27,9 @@ RSpec.describe Captures::StartIngest do
     expect(media).to be_pending
     expect(media.image).not_to be_attached
     expect(media.captured_via).to eq("web")
+    # Records the raw upload size (#556) so the client-side downscale is
+    # measurable — the stored blob is exactly what the client sent.
+    expect(media.original_byte_size).to eq(Rails.root.join("spec/fixtures/files/sample_image.png").size)
     expect(Captures::IngestJob).to have_received(:perform_later)
       .with(media.id, anything, hash_including(captured_by_id: user.id, tenant: Apartment::Tenant.current))
   end
