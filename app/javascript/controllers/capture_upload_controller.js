@@ -9,19 +9,15 @@ import { Controller } from "@hotwired/stimulus"
 //
 // This is a pure speed optimization — the server's ImageNormalizer stays the
 // authority (re-sniffs the bytes, strips EXIF/GPS, caps size, transcodes). So if
-// anything goes wrong (an undecodable HEIC, a missing browser API, an already-
-// small image) we simply upload the original and let the server handle it;
-// capture must never break because the optimization failed.
-// A 2x1 JPEG tagged EXIF Orientation=6: decodes to 1x2 (height > width) ONLY on
-// browsers that honor `imageOrientation: "from-image"` (Chrome 79+, Safari 16+).
-// We use it to feature-detect that support before downscaling — see below.
-const ORIENTATION_PROBE =
-  "/9j/4QAiRXhpZgAATU0AKgAAAAgAAQESAAMAAAABAAYAAAAAAAD/2wCEAAEBAQEBAQEBAQEBAQEBAQ" +
-  "EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB" +
-  "AQEBAQEBAQH/wAARCAABAAIDAREAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAAAv/EABQQAQAAAA" +
-  "AAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/a" +
-  "AAwDAQACEQMRAD8AfwD/2Q=="
-
+// anything goes wrong (an undecodable HEIC, a missing API, an already-small
+// image) we upload the original and let the server handle it; capture must never
+// break because the optimization failed.
+//
+// EXIF orientation is applied EXPLICITLY (read from the file, baked into the
+// canvas transform) rather than relying on createImageBitmap's `imageOrientation`
+// option — that option is unsupported on iOS Safari <16 / older Chromium, where
+// it would silently produce sideways uploads (canvas strips EXIF, so the server
+// can't autorotate afterwards). Doing it ourselves is correct on every browser.
 export default class extends Controller {
   static targets = ["file"]
   static values = { maxEdge: { type: Number, default: 2048 }, quality: { type: Number, default: 0.85 } }
@@ -49,69 +45,98 @@ export default class extends Controller {
     this.element.requestSubmit()
   }
 
-  // Returns a downscaled JPEG File, or null to signal "upload the original as-is".
+  // Returns a downscaled, correctly-oriented JPEG File, or null to signal
+  // "upload the original as-is".
   async downscale(file) {
     if (typeof createImageBitmap !== "function") return null
-    // Only proceed where the browser applies EXIF orientation on decode. Canvas
-    // strips EXIF, so on a browser that ignores imageOrientation (iOS Safari
-    // <16, older Chromium) we'd re-encode a portrait phone photo sideways with
-    // no EXIF left for the server to autorotate from — so there we skip and
-    // upload the original (correct, just not optimized).
-    if (!(await this.orientationSupported())) return null
 
-    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" })
-    const longEdge = Math.max(bitmap.width, bitmap.height)
-    const scale = Math.min(1, this.maxEdgeValue / longEdge)
+    const orientation = await this.readOrientation(file)
+    // `none`: we handle EXIF orientation ourselves below, so decode raw pixels
+    // consistently across browsers (never double-apply).
+    const bitmap = await createImageBitmap(file, { imageOrientation: "none" })
+    const swap = orientation >= 5 && orientation <= 8 // 90°/270° → displayed dims are swapped
+    const displayWidth = swap ? bitmap.height : bitmap.width
+    const displayHeight = swap ? bitmap.width : bitmap.height
 
-    // Already small and already JPEG — no point re-encoding; upload the original.
-    if (scale === 1 && file.type === "image/jpeg") {
+    const scale = Math.min(1, this.maxEdgeValue / Math.max(displayWidth, displayHeight))
+    // Nothing to gain: already small AND already upright JPEG — upload the original.
+    if (scale === 1 && orientation <= 1 && file.type === "image/jpeg") {
       bitmap.close?.()
       return null
     }
 
-    const width = Math.round(bitmap.width * scale)
-    const height = Math.round(bitmap.height * scale)
+    const outWidth = Math.round(displayWidth * scale)
+    const outHeight = Math.round(displayHeight * scale)
     const canvas = document.createElement("canvas")
-    canvas.width = width
-    canvas.height = height
+    canvas.width = outWidth
+    canvas.height = outHeight
     const context = canvas.getContext("2d")
-    // JPEG has no alpha; a transparent PNG/WebP would otherwise composite onto
-    // canvas' transparent-black default. Flatten onto WHITE to match the server's
-    // ImageNormalizer (jpegsave flatten) so a cutout/screenshot looks identical
-    // whether it took this path or the original-upload fallback.
+    // Flatten transparency onto WHITE to match the server's ImageNormalizer
+    // (JPEG has no alpha; the canvas default is transparent-black).
     context.fillStyle = "#ffffff"
-    context.fillRect(0, 0, width, height)
-    context.drawImage(bitmap, 0, 0, width, height)
+    context.fillRect(0, 0, outWidth, outHeight)
+    this.applyOrientation(context, orientation, outWidth, outHeight)
+    // After the orientation transform the drawing space is in the pre-swap
+    // (raw) axis, so draw scaled to the raw-oriented dimensions.
+    context.drawImage(bitmap, 0, 0, swap ? outHeight : outWidth, swap ? outWidth : outHeight)
     bitmap.close?.()
 
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", this.qualityValue))
     // Never make it worse: a small flat PNG/WebP can re-encode to a LARGER JPEG.
-    // If the result isn't actually smaller, upload the original (the whole point
-    // is a smaller upload — the server normalizes either way).
     if (!blob || blob.size >= file.size) return null
 
     const name = `${(file.name || "capture").replace(/\.[^.]+$/, "")}.jpg`
     return new File([blob], name, { type: "image/jpeg" })
   }
 
-  // Memoized feature-detect: does createImageBitmap honor imageOrientation?
-  // Decodes the orientation-6 probe; it comes back taller-than-wide iff honored.
-  // Any failure resolves false (skip the optimization, upload the original).
-  orientationSupported() {
-    this._orientationSupported ||= (async () => {
-      try {
-        const bytes = Uint8Array.from(atob(ORIENTATION_PROBE), (c) => c.charCodeAt(0))
-        const probe = await createImageBitmap(new Blob([bytes], { type: "image/jpeg" }), {
-          imageOrientation: "from-image"
-        })
-        const honored = probe.height > probe.width
-        probe.close?.()
-        return honored
-      } catch {
-        return false
+  // Canonical EXIF-orientation → canvas transform (w, h are the OUTPUT dims).
+  applyOrientation(context, orientation, width, height) {
+    switch (orientation) {
+      case 2: context.transform(-1, 0, 0, 1, width, 0); break // flip-x
+      case 3: context.transform(-1, 0, 0, -1, width, height); break // 180°
+      case 4: context.transform(1, 0, 0, -1, 0, height); break // flip-y
+      case 5: context.transform(0, 1, 1, 0, 0, 0); break // transpose
+      case 6: context.transform(0, 1, -1, 0, height, 0); break // 90° CW
+      case 7: context.transform(0, -1, -1, 0, height, width); break // transverse
+      case 8: context.transform(0, -1, 1, 0, 0, width); break // 270° CW
+      default: break // 1 (or unknown): no transform
+    }
+  }
+
+  // Read the EXIF Orientation tag (1–8) from a JPEG's APP1 segment, or 1 if it's
+  // absent/unreadable (a non-JPEG, a screenshot, a stripped image). Reading only
+  // the first 128 KB is enough — EXIF lives in the first APP1 marker.
+  async readOrientation(file) {
+    try {
+      const view = new DataView(await file.slice(0, 131072).arrayBuffer())
+      if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) return 1 // not a JPEG (SOI)
+
+      let offset = 2
+      while (offset + 4 <= view.byteLength) {
+        const marker = view.getUint16(offset)
+        if (marker === 0xffe1) {
+          // APP1 — expect "Exif\0\0" then a TIFF header.
+          if (view.getUint32(offset + 4) !== 0x45786966) return 1
+          const tiff = offset + 10
+          const little = view.getUint16(tiff) === 0x4949 // "II" little-endian, else "MM" big
+          const ifd = tiff + view.getUint32(tiff + 4, little)
+          const entries = view.getUint16(ifd, little)
+          for (let i = 0; i < entries; i++) {
+            const entry = ifd + 2 + i * 12
+            if (view.getUint16(entry, little) === 0x0112) {
+              const value = view.getUint16(entry + 8, little)
+              return value >= 1 && value <= 8 ? value : 1
+            }
+          }
+          return 1
+        }
+        if ((marker & 0xff00) !== 0xff00) return 1 // not a valid marker — give up
+        offset += 2 + view.getUint16(offset + 2) // skip this segment
       }
-    })()
-    return this._orientationSupported
+      return 1
+    } catch {
+      return 1
+    }
   }
 
   // Swap the input's selected file for the downscaled one. Assigning input.files
