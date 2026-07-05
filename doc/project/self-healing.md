@@ -167,7 +167,7 @@ the next cycle picks it up again (the fix branch is force-pushed).
 | Label | Lives on | Meaning |
 |---|---|---|
 | `autofix` | issue + PR | Created/managed by the pipeline. |
-| `sentry:<shortId>` | issue + PR | Binds them to one Sentry issue; the all-states dedupe key. |
+| `sentry:<shortId>` | issue + PR | Binds them to one Sentry issue; the all-states dedupe key. Exception: a CLOSED ticket whose Sentry issue turns `regressed` is REOPENED by triage (the verifier only watches 24 h) — visibility is automatic, a fresh fix attempt still needs a human to remove `autofix:attempted`. |
 | `autofix:attempted` | issue | A fix attempt ran (set BEFORE the agent runs — the retry-loop guard). Remove it to consciously allow a retry. |
 | `autofix:auto-eligible` / `autofix:needs-human` | PR | The scorer's verdict, re-derived every cycle with an upserted breakdown comment. |
 | `self-healing-halt` | issue | Circuit breaker: while one is open, every stage no-ops. Close after triage to resume. |

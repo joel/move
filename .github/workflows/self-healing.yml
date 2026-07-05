@@ -130,14 +130,34 @@ jobs:
             issue_id=$(jq -r '.issue_id' <<< "$candidate")
             [ -n "$short_id" ] && [ "$short_id" != "null" ] || continue
 
-            # Dedupe across ALL issue states: one GitHub issue per Sentry
-            # issue, ever — a closed issue means it was fixed or triaged
-            # away; recurrence after a fix is the post-deploy verifier's
-            # job to surface, not a fresh triage ticket.
+            # Dedupe across ALL issue states — one GitHub issue per Sentry
+            # issue — with ONE exception: a CLOSED ticket whose Sentry issue
+            # is marked `regressed` gets REOPENED. The post-deploy verifier
+            # only watches 24h, so without this a recurrence after that
+            # window would be invisible forever. A closed ticket that is NOT
+            # regressed stays closed (fixed-and-quiet, or a human triaged it
+            # away in GitHub while leaving Sentry unresolved). Reopening only
+            # restores visibility — a fresh fix attempt still requires a
+            # human to remove `autofix:attempted` (no unbounded fix loops).
             existing=$(gh issue list --repo "$GITHUB_REPOSITORY" \
-              --label "sentry:${short_id}" --state all --json number --jq 'length')
-            if [ "$existing" -gt 0 ]; then
-              echo "Skipping ${short_id}: already tracked."
+              --label "sentry:${short_id}" --state all --json number,state \
+              --jq 'sort_by(.number) | last // empty')
+            if [ -n "$existing" ]; then
+              number=$(jq -r '.number' <<< "$existing")
+              state=$(jq -r '.state' <<< "$existing")
+              substatus=$(jq -r '.substatus // ""' <<< "$candidate")
+              if [ "$state" = "OPEN" ]; then
+                echo "Skipping ${short_id}: already tracked (#${number})."
+                continue
+              fi
+              if [ "$substatus" != "regressed" ]; then
+                echo "Skipping ${short_id}: #${number} closed and not regressed."
+                continue
+              fi
+              gh issue reopen "$number" --repo "$GITHUB_REPOSITORY"
+              gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body \
+                "🤖 Sentry marked \`${short_id}\` REGRESSED after this issue was closed (events 24h: $(jq -r '.events_24h' <<< "$candidate"), total: $(jq -r '.count' <<< "$candidate")). Reopened for triage — remove the \`autofix:attempted\` label to allow a fresh automated attempt. $(jq -r '.permalink // ""' <<< "$candidate")"
+              echo "::notice::Reopened #${number} for regressed ${short_id}."
               continue
             fi
 
