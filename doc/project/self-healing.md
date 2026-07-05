@@ -99,6 +99,39 @@ token is minted by a deterministic workflow step after the agent finishes.
   attacker-influenceable → prompt-injection and PII channels). See
   `security-model.md`.
 
+## Label state machine
+
+| Label | Lives on | Meaning |
+|---|---|---|
+| `autofix` | issue + PR | Created/managed by the pipeline. |
+| `sentry:<shortId>` | issue + PR | Binds them to one Sentry issue; the all-states dedupe key. |
+| `autofix:attempted` | issue | A fix attempt ran (set BEFORE the agent runs — the retry-loop guard). Remove it to consciously allow a retry. |
+| `autofix:auto-eligible` / `autofix:needs-human` | PR | The scorer's verdict, re-derived every cycle with an upserted breakdown comment. |
+| `self-healing-halt` | issue | Circuit breaker: while one is open, every stage no-ops. Close after triage to resume. |
+
+## Fix attempt lifecycle
+
+1. `select` picks up to 2 open, unattempted `autofix` issues.
+2. `fix` (per issue, matrix): labels the issue `autofix:attempted` first, checks
+   out `main` with **no persisted credentials**, boots the CI Postgres service,
+   stages whitelist-reduced context (`tmp/autofix/issue.md`, `event.json`), and
+   runs `claude-code-action` with `.github/autofix/fix-prompt.md` — strict TDD
+   (failing regression spec first), house conventions, path/size constraints,
+   an honesty-calibrated `assessment.json`, and **no push/gh/network tools**
+   (`--max-turns 40`, 30-minute timeout).
+3. Deterministic post-steps validate (commits exist, assessment well-formed,
+   `fixable: true`) and only then mint the App token, push
+   `fix/sentry-<shortid>`, and open the PR (`Closes #<issue>`, assessment
+   embedded in an HTML comment for the scorer). A failed attempt is reported on
+   the issue instead — nothing is pushed.
+4. `score` re-scores **every** open autofix PR from `main` each cycle:
+   hard gates + weighted score → labels + a transparent breakdown comment.
+
+Until the steward exists (and its canary passes), nothing merges — scored PRs
+wait for a human, which doubles as the scorer's calibration window: compare
+`autofix:auto-eligible` labels against what review actually found before
+enabling autonomy.
+
 ## Manual setup checklist
 
 One-time provisioning, in order:

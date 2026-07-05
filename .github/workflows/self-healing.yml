@@ -153,7 +153,8 @@ jobs:
                      "| Events (24h / total) | \(.events_24h) / \(.count) |",
                      "| Users affected | \(.user_count) |",
                      "| First seen | \(.first_seen // "?") |",
-                     "| Last seen | \(.last_seen // "?") |"' <<< "$candidate"
+                     "| Last seen | \(.last_seen // "?") |",
+                     "| Sentry issue ID | \(.issue_id) |"' <<< "$candidate"
               permalink=$(jq -r '.permalink // empty' <<< "$candidate")
               [ -n "$permalink" ] && echo "| Sentry | $permalink |"
               echo
@@ -184,3 +185,316 @@ jobs:
       - name: Dry run — list candidates only
         if: inputs.dry_run == true
         run: jq . /tmp/candidates.json
+
+  # Pick the open autofix issues that have not had a fix attempt yet (the
+  # `autofix:attempted` label marks an attempt BEFORE the agent runs, so a
+  # crashed attempt can never retry-loop every 30 minutes — a human removes
+  # the label to consciously retry).
+  select:
+    runs-on: ubuntu-latest
+    needs: [gate, triage]
+    if: needs.gate.outputs.proceed == 'true' && inputs.dry_run != true
+    permissions:
+      issues: read
+    outputs:
+      issues: ${{ steps.pick.outputs.issues }}
+      count: ${{ steps.pick.outputs.count }}
+    steps:
+      - name: Pick unattempted autofix issues
+        id: pick
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MAX_ATTEMPTS_PER_CYCLE: "2"
+        run: |
+          set -euo pipefail
+          issues=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label autofix --state open --json number,title,labels \
+            --jq '[.[]
+                   | select([.labels[].name] | index("autofix:attempted") | not)
+                   | {number, title, short_id: ([.labels[].name | select(startswith("sentry:"))][0] // "" | ltrimstr("sentry:"))}
+                   | select(.short_id != "")]
+                  | .[0:'"$MAX_ATTEMPTS_PER_CYCLE"']')
+          echo "issues=$(jq -c . <<< "$issues")" >> "$GITHUB_OUTPUT"
+          echo "count=$(jq length <<< "$issues")" >> "$GITHUB_OUTPUT"
+          jq . <<< "$issues"
+
+  # One fix attempt per selected issue. The agent diagnoses, writes a failing
+  # regression spec, fixes, self-assesses — with NO push credential and no
+  # network tools. A deterministic step then publishes the branch + PR with a
+  # GitHub App token (the App identity is what makes CI run on the PR).
+  fix:
+    runs-on: ubuntu-latest
+    needs: [gate, select]
+    if: needs.gate.outputs.proceed == 'true' && needs.select.outputs.count != '0'
+    permissions:
+      contents: read
+      issues: write
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        issue: ${{ fromJSON(needs.select.outputs.issues) }}
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      RAILS_ENV: test
+      RAILS_LOG_LEVEL: error
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      DB_HOST: localhost
+      DB_PORT: 5432
+    steps:
+      - name: Mark the attempt (retry-loop guard)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh label create "autofix:attempted" --repo "$GITHUB_REPOSITORY" \
+            --color D4C5F9 --description "An automated fix attempt ran for this issue" --force
+          gh issue edit "${{ matrix.issue.number }}" --repo "$GITHUB_REPOSITORY" \
+            --add-label "autofix:attempted"
+
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      # Mirrors the CI test job: the agent must be able to RUN the failing
+      # regression spec (TDD evidence), and image-adjacent specs need libvips.
+      - name: Install libvips + HEIF decoders
+        run: |
+          sudo apt-get update
+          decoders="libheif1 libheif-plugin-libde265 libheif-plugin-dav1d"
+          sudo apt-get install -y --no-install-recommends libvips42t64 $decoders \
+            || sudo apt-get install -y --no-install-recommends libvips42 $decoders
+
+      - name: Prepare test database
+        run: bin/rails db:create db:schema:load
+
+      - name: Stage whitelist-reduced context for the agent
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SENTRY_AUTOFIX_TOKEN: ${{ secrets.SENTRY_AUTOFIX_TOKEN }}
+          SENTRY_ORG_SLUG: ${{ vars.SENTRY_ORG_SLUG }}
+        run: |
+          set -euo pipefail
+          mkdir -p tmp/autofix
+          gh issue view "${{ matrix.issue.number }}" --repo "$GITHUB_REPOSITORY" \
+            --json title,body --jq '"# " + .title + "\n\n" + .body' > tmp/autofix/issue.md
+          sentry_issue_id=$(grep -oP '\| Sentry issue ID \| \K[0-9]+' tmp/autofix/issue.md || true)
+          if [ -n "$sentry_issue_id" ]; then
+            ruby script/self_healing/sentry_fetch.rb event \
+              --org "$SENTRY_ORG_SLUG" --issue-id "$sentry_issue_id" > tmp/autofix/event.json
+          else
+            echo '{}' > tmp/autofix/event.json
+          fi
+
+      # The agent gets file tools + spec-running + local git only: no push
+      # credential (persist-credentials: false above), no gh, no network.
+      - name: Generate the fix (claude-code-action)
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.AUTOFIX_ANTHROPIC_API_KEY }}
+          prompt: |
+            Read .github/autofix/fix-prompt.md and follow it exactly. Your
+            task: produce a candidate fix for GitHub issue
+            #${{ matrix.issue.number }} ("${{ matrix.issue.title }}").
+            Context files: tmp/autofix/issue.md and tmp/autofix/event.json.
+            Finish with local commits and tmp/autofix/assessment.json.
+          claude_args: |
+            --max-turns 40
+            --allowedTools "Edit,Write,Read,Grep,Glob,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(bundle exec rspec:*)"
+        timeout-minutes: 30
+
+      # Everything below is deterministic: validate the agent's output, then
+      # publish with the App identity. Fail closed: no assessment or no
+      # commits -> no PR, surfaced on the issue.
+      - name: Validate the attempt
+        id: validate
+        run: |
+          set -euo pipefail
+          commits=$(git rev-list --count origin/main..HEAD)
+          if [ "$commits" -eq 0 ]; then
+            echo "result=no-commits" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! jq -e '.confidence' tmp/autofix/assessment.json > /dev/null 2>&1; then
+            echo "result=no-assessment" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$(jq -r '.fixable' tmp/autofix/assessment.json)" = "false" ]; then
+            echo "result=not-fixable" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "result=ok" >> "$GITHUB_OUTPUT"
+
+      - name: Mint GitHub App token
+        id: app-token
+        if: steps.validate.outputs.result == 'ok'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.AUTOFIX_APP_ID }}
+          private-key: ${{ secrets.AUTOFIX_APP_PRIVATE_KEY }}
+
+      - name: Push the fix branch and open the PR (App identity)
+        if: steps.validate.outputs.result == 'ok'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          ISSUE_NUMBER: ${{ matrix.issue.number }}
+          SHORT_ID: ${{ matrix.issue.short_id }}
+        run: |
+          set -euo pipefail
+          branch="fix/sentry-$(tr '[:upper:]' '[:lower:]' <<< "$SHORT_ID")"
+          # --force: a branch can only pre-exist here when a human removed
+          # `autofix:attempted` to consciously retry — the fresh attempt wins.
+          git push --force \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "HEAD:refs/heads/${branch}"
+
+          {
+            echo "Closes #${ISSUE_NUMBER}"
+            echo
+            echo "## Automated fix attempt for ${SHORT_ID}"
+            echo
+            echo "**Diagnosis (agent, self-reported):** $(jq -r '.diagnosis' tmp/autofix/assessment.json)"
+            echo
+            echo "**Agent confidence:** $(jq -r '.confidence' tmp/autofix/assessment.json)/100 · **Regression spec:** \`$(jq -r '.spec_file // "?"' tmp/autofix/assessment.json)\` (failed before fix: $(jq -r '.spec_failed_before_fix // "?"' tmp/autofix/assessment.json))"
+            echo
+            notes=$(jq -r '.notes // empty' tmp/autofix/assessment.json)
+            [ -n "$notes" ] && { echo "**Reviewer notes:** ${notes}"; echo; }
+            echo "<!-- autofix:assessment"
+            jq -c . tmp/autofix/assessment.json
+            echo "-->"
+            echo
+            echo "---"
+            echo "🤖 Opened automatically by the self-healing pipeline (\`self-healing.yml\`). A deterministic scorer labels this PR \`autofix:auto-eligible\` or \`autofix:needs-human\`; nothing merges without green checks and a clean independent review. See \`doc/project/self-healing.md\`."
+          } > /tmp/pr_body.md
+
+          url=$(gh pr create --repo "$GITHUB_REPOSITORY" \
+            --base main --head "$branch" \
+            --title "[AutoFix] ${{ matrix.issue.title }}" \
+            --body-file /tmp/pr_body.md \
+            --label "autofix,sentry:${SHORT_ID}")
+          echo "::notice::Opened ${url}"
+
+      - name: Report a failed attempt on the issue
+        if: steps.validate.outputs.result != 'ok'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh issue comment "${{ matrix.issue.number }}" --repo "$GITHUB_REPOSITORY" --body \
+            "🤖 Automated fix attempt did not produce a PR (\`${{ steps.validate.outputs.result }}\`). A human should triage this one — remove the \`autofix:attempted\` label to allow a retry. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+  # Deterministic scoring of every open autofix PR, from MAIN (a PR can never
+  # rewrite its own judge). Idempotent per cycle: labels + a single upserted
+  # breakdown comment.
+  score:
+    runs-on: ubuntu-latest
+    needs: [gate, fix]
+    if: ${{ !cancelled() && needs.gate.outputs.proceed == 'true' }}
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout main (the judge)
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Score open autofix PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh label create "autofix:auto-eligible" --repo "$GITHUB_REPOSITORY" \
+            --color 0E8A16 --description "Deterministic scorer: eligible for automated merge" --force
+          gh label create "autofix:needs-human" --repo "$GITHUB_REPOSITORY" \
+            --color D93F0B --description "Deterministic scorer: requires human review" --force
+
+          for pr in $(gh pr list --repo "$GITHUB_REPOSITORY" --label autofix --state open --json number --jq '.[].number'); do
+            echo "--- scoring PR #$pr"
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$pr/files" --paginate \
+              --jq '[.[] | {path: .filename, additions: .additions, deletions: .deletions}]' | jq -s 'add' > /tmp/files.json
+            gh pr diff "$pr" --repo "$GITHUB_REPOSITORY" > /tmp/pr.diff
+            gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json title,body,commits > /tmp/pr.json
+            jq -r '.body' /tmp/pr.json | sed -n '/<!-- autofix:assessment/,/^-->/p' | sed '1d;$d' > /tmp/assessment.json
+            jq -e . /tmp/assessment.json > /dev/null 2>&1 || echo 'null' > /tmp/assessment.json
+
+            jq -n \
+              --slurpfile files /tmp/files.json \
+              --rawfile diff /tmp/pr.diff \
+              --slurpfile pr /tmp/pr.json \
+              --slurpfile assessment /tmp/assessment.json \
+              '{
+                files: $files[0],
+                diff: $diff,
+                pr_title: $pr[0].title,
+                pr_body: $pr[0].body,
+                commit_messages: [$pr[0].commits[] | (.messageHeadline + "\n" + .messageBody)],
+                assessment: $assessment[0]
+              }' > /tmp/score_input.json
+
+            ruby script/self_healing/score.rb /tmp/score_input.json > /tmp/verdict.json
+            jq . /tmp/verdict.json
+            verdict=$(jq -r '.verdict' /tmp/verdict.json)
+
+            if [ "$verdict" = "auto-eligible" ]; then
+              gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" \
+                --add-label "autofix:auto-eligible" --remove-label "autofix:needs-human" || true
+            else
+              gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" \
+                --add-label "autofix:needs-human" --remove-label "autofix:auto-eligible" || true
+            fi
+
+            {
+              echo "<!-- autofix:score -->"
+              echo "## 🤖 Deterministic score: \`$verdict\`"
+              echo
+              if [ "$(jq -r '.score' /tmp/verdict.json)" != "null" ]; then
+                echo "**Score: $(jq -r '.score' /tmp/verdict.json)** (auto-eligible ≥ 85 with agent confidence ≥ 70)"
+                echo
+                echo "| Component | Value | Weight |"
+                echo "|---|---|---|"
+                jq -r '.components | "| Agent confidence | \(.agent) | 0.45 |",
+                                     "| Size | \(.size) | 0.25 |",
+                                     "| Spec quality | \(.spec_quality) | 0.20 |",
+                                     "| Locality | \(.locality) | 0.10 |"' /tmp/verdict.json
+              fi
+              failures=$(jq -r '.gate_failures[]' /tmp/verdict.json)
+              if [ -n "$failures" ]; then
+                echo "**Hard-gate failures:**"
+                jq -r '.gate_failures[] | "- " + .' /tmp/verdict.json
+              fi
+              echo
+              echo "_Scored from \`main\` by \`script/self_healing/score.rb\` (run ${GITHUB_RUN_ID}). Labels are re-derived every cycle._"
+            } > /tmp/score_comment.md
+
+            existing=$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr/comments" --paginate \
+              --jq '[.[] | select(.body | startswith("<!-- autofix:score -->"))][0].id // empty')
+            if [ -n "$existing" ]; then
+              gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" \
+                -F body=@/tmp/score_comment.md > /dev/null
+            else
+              gh pr comment "$pr" --repo "$GITHUB_REPOSITORY" --body-file /tmp/score_comment.md
+            fi
+          done
