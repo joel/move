@@ -4,8 +4,10 @@ require "rails_helper"
 
 # JS-driven coverage for the #162 flows that the rack_test specs can't exercise:
 # capture has no shutter button and Item Detail has no Save button — both rely on
-# `change->auto-submit#submit` firing in a real browser, Turbo submitting, and
-# (for the item) the save-status Turbo Stream rendering. Without this, a Stimulus
+# a `change`-driven Stimulus submit firing in a real browser (capture:
+# `capture-upload#submit`, which also downscales the photo, #547; item:
+# `auto-submit#submit`), Turbo submitting, and (for the item) the save-status
+# Turbo Stream rendering. Without this, a Stimulus
 # / importmap / Turbo regression would leave users unable to capture or save with
 # the rack_test suite still green (Release Bug Scan, #164).
 #
@@ -57,7 +59,8 @@ RSpec.describe "Capture & auto-save (JS)", :js do
     # Inline recognition (Fake provider) lands a photo-first card: the recognised
     # names show as chips inside ONE card linking to the per-photo detail (D3).
     # Asserting on the rendered card (not a cross-thread DB read) proves the full
-    # JS path: file select → auto-submit → recognition.
+    # JS path: file select → capture-upload (downscale) → submit → ingest →
+    # recognition.
     #
     # Match with a CSS href-attribute selector, NOT `have_link(text, href:)`:
     # Capybara's link href filter runs `node[:href].match?(regex)` and raises
