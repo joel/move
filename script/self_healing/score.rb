@@ -74,7 +74,8 @@ module SelfHealing
         spec_evidence_failure,
         skip_marker_failure,
         fixme_failure,
-        assessment_failure
+        assessment_failure,
+        tdd_evidence_failure
       ].compact
     end
 
@@ -110,6 +111,13 @@ module SelfHealing
     #: () -> Array[String]
     def paths = files.map { |file| file.fetch("path") }
 
+    # Blast radius judges BOTH sides of a rename: a file moved out of a denied
+    # path (e.g. script/** -> app/models/foo.rb) exposes the denied source only
+    # via previous_path, and removing a denied file is as much a control-plane
+    # change as editing it.
+    #: () -> Array[String]
+    def blast_paths = paths + files.filter_map { |file| file["previous_path"] }
+
     #: () -> Array[String]
     def non_spec_paths = paths.reject { |path| DiffStats.spec_path?(path) }
 
@@ -121,7 +129,7 @@ module SelfHealing
 
     #: () -> String?
     def blast_radius_failure
-      violations = @blast_radius.violations(paths)
+      violations = @blast_radius.violations(blast_paths)
       return if violations.empty?
 
       details = violations.map { |violation| "#{violation[:path]} (#{violation[:reason]})" }
@@ -169,6 +177,22 @@ module SelfHealing
       confidence = assessment["confidence"]
       return "assessment: confidence must be an integer 0..100" unless confidence.is_a?(Integer) && (0..100).cover?(confidence)
       return "assessment: diagnosis missing" unless assessment["diagnosis"].is_a?(String) && !assessment["diagnosis"].strip.empty?
+
+      nil
+    end
+
+    # TDD evidence is a hard requirement for autonomy, not workflow-side
+    # courtesy: a guessed fix with a token spec line must never reach the
+    # steward. The agent must claim, in the assessment it signs, that the
+    # regression spec existed AND failed before the fix.
+    #: () -> String?
+    def tdd_evidence_failure
+      assessment = @input["assessment"]
+      return unless assessment.is_a?(Hash) # absence is assessment_failure's gate
+
+      return "assessment: fixable is not true" unless assessment["fixable"] == true
+      return "assessment: spec_file missing" unless assessment["spec_file"].is_a?(String) && !assessment["spec_file"].strip.empty?
+      return "assessment: spec_failed_before_fix is not true" unless assessment["spec_failed_before_fix"] == true
 
       nil
     end

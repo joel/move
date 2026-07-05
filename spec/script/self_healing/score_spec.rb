@@ -25,6 +25,18 @@ RSpec.describe SelfHealing::Score do
     DIFF
   end
 
+  # A fully valid assessment — the TDD-evidence keys are hard-gated, so every
+  # example that expects a score must carry them.
+  def assessment(confidence: 90)
+    {
+      "confidence" => confidence,
+      "diagnosis" => "lexical MAX on a text column",
+      "fixable" => true,
+      "spec_file" => "spec/actions/boxes/create_spec.rb",
+      "spec_failed_before_fix" => true
+    }
+  end
+
   def input_for(overrides = {})
     {
       "files" => [
@@ -35,7 +47,7 @@ RSpec.describe SelfHealing::Score do
       "commit_messages" => ["Fix box numbering beyond ten (#600)"],
       "pr_title" => "Fix box numbering beyond ten",
       "pr_body" => "Closes #600",
-      "assessment" => { "confidence" => 90, "diagnosis" => "lexical MAX on a text column" }
+      "assessment" => assessment
     }.merge(overrides)
   end
 
@@ -52,20 +64,20 @@ RSpec.describe SelfHealing::Score do
     end
 
     it "is auto-eligible exactly at the 85 threshold" do
-      verdict = verdict_for("assessment" => { "confidence" => 80, "diagnosis" => "d" })
+      verdict = verdict_for("assessment" => assessment(confidence: 80))
       expect(verdict[:score]).to eq(85.0)
       expect(verdict[:verdict]).to eq("auto-eligible")
     end
 
     it "needs a human just under the threshold" do
-      verdict = verdict_for("assessment" => { "confidence" => 79, "diagnosis" => "d" })
+      verdict = verdict_for("assessment" => assessment(confidence: 79))
       expect(verdict[:score]).to eq(84.6)
       expect(verdict[:verdict]).to eq("needs-human")
     end
 
     it "needs a human when agent confidence is under 70 even with a high score" do
       verdict = verdict_for(
-        "assessment" => { "confidence" => 69, "diagnosis" => "d" },
+        "assessment" => assessment(confidence: 69),
         "diff" => spec_diff(examples: 4, expectations: 4)
       )
       expect(verdict[:score]).to be >= described_class::THRESHOLD
@@ -131,6 +143,31 @@ RSpec.describe SelfHealing::Score do
       expect(verdict[:verdict]).to eq("needs-human")
       expect(verdict[:score]).to be_nil
       expect(verdict[:gate_failures].join).to include("db/migrate")
+    end
+
+    it "gates a rename OUT of a denied path — both sides are judged" do
+      verdict = verdict_for(
+        "files" => [
+          { "path" => "app/models/foo.rb", "previous_path" => "script/self_healing/score.rb",
+            "additions" => 1, "deletions" => 0 },
+          { "path" => "spec/actions/boxes/create_spec.rb", "additions" => 8, "deletions" => 0 }
+        ]
+      )
+      expect(verdict[:verdict]).to eq("needs-human")
+      expect(verdict[:gate_failures].join).to include("script/self_healing/score.rb")
+    end
+
+    it "gates an assessment without TDD evidence (fixable/spec_file/spec_failed_before_fix)" do
+      expect(verdict_for("assessment" => assessment.merge("fixable" => false))[:gate_failures].join)
+        .to include("fixable")
+      expect(verdict_for("assessment" => assessment.except("fixable"))[:gate_failures].join)
+        .to include("fixable")
+      expect(verdict_for("assessment" => assessment.merge("spec_file" => " "))[:gate_failures].join)
+        .to include("spec_file")
+      expect(verdict_for("assessment" => assessment.merge("spec_failed_before_fix" => false))[:gate_failures].join)
+        .to include("spec_failed_before_fix")
+      expect(verdict_for("assessment" => assessment.except("spec_failed_before_fix"))[:gate_failures].join)
+        .to include("spec_failed_before_fix")
     end
 
     it "gates a path outside the allow list (fail closed)" do

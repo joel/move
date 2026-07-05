@@ -472,8 +472,11 @@ jobs:
 
           for pr in $(gh pr list --repo "$GITHUB_REPOSITORY" --label autofix --state open --json number --jq '.[].number'); do
             echo "--- scoring PR #$pr"
+            # previous_path: a rename exposes the denied SOURCE only via
+            # previous_filename — the scorer blast-radius checks both sides
+            # (a rename out of script/** must never look like app-only).
             gh api "repos/$GITHUB_REPOSITORY/pulls/$pr/files" --paginate \
-              --jq '[.[] | {path: .filename, additions: .additions, deletions: .deletions}]' | jq -s 'add' > /tmp/files.json
+              --jq '[.[] | {path: .filename, previous_path: .previous_filename, additions: .additions, deletions: .deletions}]' | jq -s 'add' > /tmp/files.json
             gh pr diff "$pr" --repo "$GITHUB_REPOSITORY" > /tmp/pr.diff
             gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json title,body,commits > /tmp/pr.json
             jq -r '.body' /tmp/pr.json | sed -n '/<!-- autofix:assessment/,/^-->/p' | sed '1d;$d' > /tmp/assessment.json
