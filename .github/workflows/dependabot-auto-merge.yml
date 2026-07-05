@@ -14,9 +14,12 @@ jobs:
     # Only run for PRs opened by dependabot
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
+      # SHA-pinned: this workflow holds the App private key, and a
+      # `pull_request` run executes the merge-ref workflow — floating tags on
+      # the actions it runs are a supply-chain channel into that key.
       - name: Dependabot metadata
         id: metadata
-        uses: dependabot/fetch-metadata@v3
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
@@ -36,17 +39,29 @@ jobs:
       # (in addition to Actions secrets, where the self-healing pipeline reads
       # them). A missing secret fails this job loudly; auto-merge is then
       # simply not enabled (fail closed).
+      # github-actions-ecosystem PRs are EXCLUDED from the privileged path
+      # (Codex P1, #554): such a PR edits `.github/workflows/*.yml` pins, and
+      # the pull_request run executes the PR-modified workflow — so the very
+      # action versions being bumped would run in a job holding the App key
+      # before any review. Those (rare) bumps wait for a human merge instead.
+      # (`startsWith` rather than an exact match: the metadata action has
+      # reported both `github-actions` and `github_actions` across versions;
+      # no other ecosystem starts with `github`.)
       - name: Mint GitHub App token
         id: app-token
-        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
-        uses: actions/create-github-app-token@v2
+        if: >-
+          steps.metadata.outputs.update-type != 'version-update:semver-major' &&
+          !startsWith(steps.metadata.outputs.package-ecosystem, 'github')
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: ${{ secrets.AUTOFIX_APP_ID }}
           private-key: ${{ secrets.AUTOFIX_APP_PRIVATE_KEY }}
 
       - name: Enable auto-merge for Dependabot PRs
         # Only merge patch/minor updates to stay safe
-        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        if: >-
+          steps.metadata.outputs.update-type != 'version-update:semver-major' &&
+          !startsWith(steps.metadata.outputs.package-ecosystem, 'github')
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
