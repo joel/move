@@ -13,11 +13,13 @@ import { Controller } from "@hotwired/stimulus"
 // image) we upload the original and let the server handle it; capture must never
 // break because the optimization failed.
 //
-// EXIF orientation is applied EXPLICITLY (read from the file, baked into the
-// canvas transform) rather than relying on createImageBitmap's `imageOrientation`
-// option — that option is unsupported on iOS Safari <16 / older Chromium, where
-// it would silently produce sideways uploads (canvas strips EXIF, so the server
-// can't autorotate afterwards). Doing it ourselves is correct on every browser.
+// Scope is deliberately narrow so it's correct on every browser WITHOUT relying
+// on canvas rotation (which can't be verified in CI) or on createImageBitmap's
+// `imageOrientation` (unsupported on iOS Safari <16 / older Chromium): only an
+// UPRIGHT (EXIF orientation 1, read from the file) JPEG is resized, which needs
+// no rotation. Rotated JPEGs, HEIC/HEIF (iPhone default), PNG and WebP upload
+// as-is — the server transcodes + autorotates them. Optimizing those cases is a
+// Phase 3b follow-up that needs real-device verification.
 export default class extends Controller {
   static targets = ["file"]
   static values = { maxEdge: { type: Number, default: 2048 }, quality: { type: Number, default: 0.85 } }
@@ -57,57 +59,35 @@ export default class extends Controller {
     // Phase 3b follow-up (needs real-device verification).
     if (file.type !== "image/jpeg") return null
 
-    const orientation = await this.readOrientation(file)
-    // `none`: we handle EXIF orientation ourselves below, so decode raw pixels
-    // consistently across browsers (never double-apply).
-    const bitmap = await createImageBitmap(file, { imageOrientation: "none" })
-    const swap = orientation >= 5 && orientation <= 8 // 90°/270° → displayed dims are swapped
-    const displayWidth = swap ? bitmap.height : bitmap.width
-    const displayHeight = swap ? bitmap.width : bitmap.height
+    // Only UPRIGHT (orientation 1, or absent) JPEGs are resized here. A rotated
+    // JPEG would need a canvas rotation transform, which can't be verified in
+    // this repo (no browser/device in CI for canvas output); rather than risk a
+    // sideways/cropped upload we send the original and let the server autorotate
+    // (ImageNormalizer#autorot). Correctly resizing rotated + HEIC captures is a
+    // Phase 3b follow-up with real-device verification.
+    if ((await this.readOrientation(file)) !== 1) return null
 
-    const scale = Math.min(1, this.maxEdgeValue / Math.max(displayWidth, displayHeight))
-    // Nothing to gain: already small AND already upright JPEG — upload the original.
-    if (scale === 1 && orientation <= 1 && file.type === "image/jpeg") {
-      bitmap.close?.()
+    const bitmap = await createImageBitmap(file)
+    const scale = Math.min(1, this.maxEdgeValue / Math.max(bitmap.width, bitmap.height))
+    if (scale === 1) {
+      bitmap.close?.() // already within the target — upload the original
       return null
     }
 
-    const outWidth = Math.round(displayWidth * scale)
-    const outHeight = Math.round(displayHeight * scale)
+    const outWidth = Math.round(bitmap.width * scale)
+    const outHeight = Math.round(bitmap.height * scale)
     const canvas = document.createElement("canvas")
     canvas.width = outWidth
     canvas.height = outHeight
-    const context = canvas.getContext("2d")
-    // Flatten transparency onto WHITE to match the server's ImageNormalizer
-    // (JPEG has no alpha; the canvas default is transparent-black).
-    context.fillStyle = "#ffffff"
-    context.fillRect(0, 0, outWidth, outHeight)
-    this.applyOrientation(context, orientation, outWidth, outHeight)
-    // After the orientation transform the drawing space is in the pre-swap
-    // (raw) axis, so draw scaled to the raw-oriented dimensions.
-    context.drawImage(bitmap, 0, 0, swap ? outHeight : outWidth, swap ? outWidth : outHeight)
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, outWidth, outHeight)
     bitmap.close?.()
 
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", this.qualityValue))
-    // Never make it worse: a small flat PNG/WebP can re-encode to a LARGER JPEG.
+    // Never make it worse (a re-encode can occasionally grow a small image).
     if (!blob || blob.size >= file.size) return null
 
     const name = `${(file.name || "capture").replace(/\.[^.]+$/, "")}.jpg`
     return new File([blob], name, { type: "image/jpeg" })
-  }
-
-  // Canonical EXIF-orientation → canvas transform (w, h are the OUTPUT dims).
-  applyOrientation(context, orientation, width, height) {
-    switch (orientation) {
-      case 2: context.transform(-1, 0, 0, 1, width, 0); break // flip-x
-      case 3: context.transform(-1, 0, 0, -1, width, height); break // 180°
-      case 4: context.transform(1, 0, 0, -1, 0, height); break // flip-y
-      case 5: context.transform(0, 1, 1, 0, 0, 0); break // transpose
-      case 6: context.transform(0, 1, -1, 0, height, 0); break // 90° CW
-      case 7: context.transform(0, -1, -1, 0, height, width); break // transverse
-      case 8: context.transform(0, -1, 1, 0, 0, width); break // 270° CW
-      default: break // 1 (or unknown): no transform
-    }
   }
 
   // Read the EXIF Orientation tag (1–8) from a JPEG's APP1 segment, or 1 if it's
