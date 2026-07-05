@@ -81,3 +81,28 @@ module SelfHealing
     def max_non_spec_lines = @size_limits.fetch("max_non_spec_lines")
   end
 end
+
+# CLI for the fix job's PRE-PUSH gate: newline-separated paths on stdin,
+# exit 1 (with reasons on stderr) on any violation. `--config` is accepted
+# here — unlike score.rb — because the caller stages PRISTINE copies of this
+# file and the config from origin/main into RUNNER_TEMP before invoking:
+# the agent can edit the working tree, so the working-tree copies of both
+# must never be the judge.
+if $PROGRAM_NAME == __FILE__
+  require "optparse"
+
+  config_path = SelfHealing::BlastRadius::DEFAULT_CONFIG_PATH
+  OptionParser.new do |opts|
+    opts.banner = "usage: blast_radius.rb [--config blast_radius.yml] < paths.txt"
+    opts.on("--config PATH") { |value| config_path = value }
+  end.parse!(ARGV)
+
+  paths = $stdin.read.split("\n").map(&:strip).reject(&:empty?)
+  violations = SelfHealing::BlastRadius.load(config_path).violations(paths)
+  if violations.empty?
+    puts "blast radius: #{paths.size} path(s) OK"
+  else
+    violations.each { |violation| warn "#{violation[:path]}: #{violation[:reason]}" }
+    exit 1
+  end
+end
