@@ -110,57 +110,9 @@ jobs:
       - name: Deploy
         run: bin/kamal deploy
 
-  # Tell Sentry this release exists, which commits it contains, and that it
-  # reached production. Events are ALREADY tagged with release=<git SHA> —
-  # Kamal injects KAMAL_VERSION into the container and sentry-ruby's
-  # ReleaseDetector picks it up (no app code) — so this job only creates/
-  # finalizes the release object and records a production deploy, which is
-  # what unlocks regressed-issue detection (`is:regressed`) and suspect
-  # commits for the self-healing pipeline (doc/project/self-healing.md).
-  #
-  # A SEPARATE job, deliberately:
-  # - The deploy job's env carries the full production secret set, and a
-  #   third-party action must never run in that environment. Here it sees
-  #   only the Sentry token + slugs.
-  # - `set_commits: auto` needs the full commit history to compute the range
-  #   since the previous release; the deploy job's checkout stays shallow.
-  # - continue-on-error at the job level: a Sentry hiccup must never mark a
-  #   completed deploy red. Missing secrets/vars (not yet provisioned) are a
-  #   clean SKIP of the release steps, not a swallowed failure.
-  sentry-release:
-    runs-on: ubuntu-latest
-    needs: deploy
-    continue-on-error: true
-    permissions:
-      contents: read
-    env:
-      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_RELEASE_TOKEN }}
-      SENTRY_ORG: ${{ vars.SENTRY_ORG_SLUG }}
-      SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT_SLUG }}
-    steps:
-      - name: Check Sentry credentials are provisioned
-        id: creds
-        run: |
-          if [ -n "$SENTRY_AUTH_TOKEN" ] && [ -n "$SENTRY_ORG" ] && [ -n "$SENTRY_PROJECT" ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "SENTRY_RELEASE_TOKEN / SENTRY_ORG_SLUG / SENTRY_PROJECT_SLUG not provisioned — skipping release finalization."
-          fi
-
-      - name: Checkout (full history for set_commits)
-        if: steps.creds.outputs.present == 'true'
-        uses: actions/checkout@v7
-        with:
-          # sentry-cli walks the commit range since the previous release;
-          # a shallow clone makes commit association fail (Codex P2, #555).
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Finalize Sentry release
-        if: steps.creds.outputs.present == 'true'
-        uses: getsentry/action-release@ff07929a6537bac57790c3451cf4d364aca38528 # v3
-        with:
-          environment: production
-          release: ${{ github.sha }}
-          inject: false # Ruby app — no JS sourcemaps to upload or inject
+# Sentry release finalization lives in its OWN workflow
+# (.github/workflows/sentry-release.yml, workflow_run on Deploy): it must not
+# run inside this workflow's `deploy-production` concurrency group, where it
+# would hold the deploy lock and delay a queued (possibly urgent) deploy, and
+# the third-party release action must never run in a job whose env carries
+# the production secret set.
