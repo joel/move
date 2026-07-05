@@ -23,12 +23,17 @@ configuration:
   `config.release` is unset (`config/initializers/sentry.rb` deliberately
   leaves it unset).
 
-The deploy workflow finalizes each release after `kamal deploy` succeeds
-(`getsentry/action-release@v3` — creates the release, associates commits,
-marks a `production` deploy; `continue-on-error`, so Sentry unavailability
-never fails a completed deploy). Finalized releases + deploys are what make
-Sentry's `is:regressed` query and suspect-commit attribution trustworthy for
-the pipeline.
+The deploy workflow finalizes each release after `kamal deploy` succeeds, in
+a **separate `sentry-release` job** (SHA-pinned `getsentry/action-release` —
+creates the release, associates commits from a full-history checkout, marks a
+`production` deploy). Separate on purpose: the deploy job's env carries the
+full production secret set and a third-party action must never run there —
+the release job sees only the Sentry token + slugs. The job is
+`continue-on-error` (Sentry unavailability never marks a completed deploy
+red), and unprovisioned credentials skip the steps explicitly rather than
+being swallowed. Finalized releases + deploys are what make Sentry's
+`is:regressed` query and suspect-commit attribution trustworthy for the
+pipeline.
 
 **Verify** (one-time, and after Sentry/Kamal upgrades): open any recent prod
 event in Sentry → the `release` tag equals the SHA of the currently deployed
