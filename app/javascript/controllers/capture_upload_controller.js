@@ -62,7 +62,10 @@ export default class extends Controller {
     bitmap.close?.()
 
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", this.qualityValue))
-    if (!blob) return null
+    // Never make it worse: a small flat PNG/WebP can re-encode to a LARGER JPEG.
+    // If the result isn't actually smaller, upload the original (the whole point
+    // is a smaller upload — the server normalizes either way).
+    if (!blob || blob.size >= file.size) return null
 
     const name = `${(file.name || "capture").replace(/\.[^.]+$/, "")}.jpg`
     return new File([blob], name, { type: "image/jpeg" })
