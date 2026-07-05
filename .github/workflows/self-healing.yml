@@ -288,6 +288,12 @@ jobs:
       - name: Prepare test database
         run: bin/rails db:create db:schema:load
 
+      # The agent's allowlist includes `git commit`, which needs an identity.
+      - name: Configure git identity for the agent's commits
+        run: |
+          git config user.name "move-autofix[bot]"
+          git config user.email "move-autofix[bot]@users.noreply.github.com"
+
       - name: Stage whitelist-reduced context for the agent
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
