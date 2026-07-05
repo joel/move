@@ -609,6 +609,16 @@ jobs:
           audit() { echo "::notice::steward: $*"; }
           echo "pr=" >> "$GITHUB_OUTPUT"
 
+          # --- Gate: circuit breaker, re-checked ----------------------------
+          # The sibling `verify` job can open a self-healing-halt issue AFTER
+          # the gate job passed in this same cycle — the steward must never
+          # act on a stale gate verdict.
+          halts=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label self-healing-halt --state open --json number --jq 'length')
+          if [ "$halts" -gt 0 ]; then
+            audit "circuit breaker open ($halts halt issue(s)) — standing down"; exit 0
+          fi
+
           # --- Gate: merge budget -------------------------------------------
           merged_24h=$(gh pr list --repo "$GITHUB_REPOSITORY" --label autofix \
             --state merged --limit 50 --json mergedAt \
@@ -752,6 +762,15 @@ jobs:
             *)
               audit "mergeStateStatus is '$merge_state' — waiting"; exit 0 ;;
           esac
+
+          # --- Gate: circuit breaker, final re-check ------------------------
+          # Moments before the irreversible act: a halt opened at any point
+          # during this cycle (e.g. by verify) aborts the merge.
+          halts=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label self-healing-halt --state open --json number --jq 'length')
+          if [ "$halts" -gt 0 ]; then
+            audit "circuit breaker opened mid-cycle — aborting merge"; exit 0
+          fi
 
           # --- Merge (direct, at decision time — no enable-vs-merge race) ---
           # --match-head-commit pins the merge to the EXACT head every gate

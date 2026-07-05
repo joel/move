@@ -109,8 +109,7 @@ RSpec.describe SelfHealing::Score do
   end
 
   describe "the spec-quality component" do
-    it "scores 30 without expectations, then 70/80/100 by example count" do
-      expect(verdict_for("diff" => spec_diff(expectations: 0))[:components][:spec_quality]).to eq(30)
+    it "scores 70/80/100 by example count (expectation presence is a hard gate)" do
       expect(verdict_for("diff" => spec_diff(examples: 1))[:components][:spec_quality]).to eq(70)
       expect(verdict_for("diff" => spec_diff(examples: 2))[:components][:spec_quality]).to eq(80)
       expect(verdict_for("diff" => spec_diff(examples: 5))[:components][:spec_quality]).to eq(100)
@@ -191,6 +190,13 @@ RSpec.describe SelfHealing::Score do
     it "gates a spec change that adds no example" do
       verdict = verdict_for("diff" => spec_diff(examples: 0))
       expect(verdict[:gate_failures].join).to include("no added example")
+    end
+
+    it "gates an empty example — an it block with no expectation is not evidence" do
+      verdict = verdict_for("diff" => spec_diff(examples: 1, expectations: 0))
+      expect(verdict[:verdict]).to eq("needs-human")
+      expect(verdict[:score]).to be_nil
+      expect(verdict[:gate_failures].join).to include("no added expectation")
     end
 
     it "gates skip markers wherever they could reach the squash commit message" do

@@ -149,6 +149,10 @@ module SelfHealing
     def spec_evidence_failure
       return "spec evidence: no spec file changed" if paths.none? { |path| DiffStats.spec_path?(path) }
       return "spec evidence: no added example (it/specify/scenario)" if @diff_stats.added_spec_examples.zero?
+      # An example with no expectation is not regression evidence — without
+      # this gate an empty `it` block plus max confidence could clear the
+      # autonomy threshold.
+      return "spec evidence: no added expectation (expect)" if @diff_stats.added_spec_expectations.zero?
 
       nil
     end
@@ -211,12 +215,12 @@ module SelfHealing
       (100.0 * (max - non_spec_lines) / (max - FULL_MARKS_LINES)).round.clamp(0, 100)
     end
 
+    # The spec-evidence hard gate guarantees at least one example WITH an
+    # expectation by the time this scores, so quality only grades example
+    # count.
     #: () -> Integer
     def spec_quality_score
-      examples = @diff_stats.added_spec_examples
-      return 30 if @diff_stats.added_spec_expectations.zero?
-
-      (70 + (10 * (examples - 1))).clamp(70, 100)
+      (70 + (10 * (@diff_stats.added_spec_examples - 1))).clamp(70, 100)
     end
 
     # Tighter fixes score higher: one production file is ideal; one directory
