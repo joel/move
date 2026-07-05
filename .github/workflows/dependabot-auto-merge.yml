@@ -20,10 +20,34 @@ jobs:
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+      # Auto-merge must be enabled with a GitHub App identity, NOT the default
+      # GITHUB_TOKEN: GitHub suppresses workflow runs for events created with
+      # GITHUB_TOKEN, so a dependabot PR merged that way lands on main with
+      # NEITHER CI nor Deploy running — the gem bump silently never reaches
+      # production until the next human push (observed on the merge commits of
+      # PRs #470/#471: no run exists for their merge SHAs). The merge push is
+      # attributed to the actor that enabled auto-merge, so enabling it with
+      # the `move-autofix` App token makes the eventual merge trigger CI-on-main
+      # and the production deploy like any human merge.
+      #
+      # NOTE: this workflow runs on dependabot-triggered `pull_request` events,
+      # which read from the *Dependabot* secrets store — the App credentials
+      # must be registered under Settings → Secrets and variables → Dependabot
+      # (in addition to Actions secrets, where the self-healing pipeline reads
+      # them). A missing secret fails this job loudly; auto-merge is then
+      # simply not enabled (fail closed).
+      - name: Mint GitHub App token
+        id: app-token
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.AUTOFIX_APP_ID }}
+          private-key: ${{ secrets.AUTOFIX_APP_PRIVATE_KEY }}
+
       - name: Enable auto-merge for Dependabot PRs
         # Only merge patch/minor updates to stay safe
         if: steps.metadata.outputs.update-type != 'version-update:semver-major'
         run: gh pr merge --auto --squash "$PR_URL"
         env:
-          PR_URL: ${{github.event.pull_request.html_url}}
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
