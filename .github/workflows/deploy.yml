@@ -45,6 +45,14 @@ jobs:
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      # Cloudflare-edge media transform Worker HMAC secret (#572). Required at
+      # deploy time (env.secret in deploy.yml) — MEDIA_TRANSFORM_HOST is always set
+      # in prod (env.clear), so MediaVariants::TransformUrl raises without this.
+      # Under KAMAL_SECRETS_FROM_ENV it must be exported here or .kamal/secrets
+      # resolves it to empty. Same value as the Worker's `wrangler secret`. In the
+      # required-secrets guard below so the Worker cutover (secret synced
+      # Doppler->GitHub) is enforced before a deploy mints edge URLs.
+      MEDIA_TRANSFORM_SECRET: ${{ secrets.MEDIA_TRANSFORM_SECRET }}
       # Encrypted DB backups (#536): restic repository URL + encryption password
       # and the R2 bucket-scoped S3 token pair for the `backup` accessory
       # (doc/project/backups.md). A deploy never touches accessories — the
@@ -81,7 +89,7 @@ jobs:
           for s in KAMAL_REGISTRY_PASSWORD RAILS_MASTER_KEY POSTGRES_PASSWORD \
                    NOTIF_MAIL_USERNAME NOTIF_MAIL_PASSWORD STORAGE_ACCESS_KEY_ID \
                    STORAGE_SECRET_ACCESS_KEY R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY \
-                   R2_ENDPOINT RESTIC_REPOSITORY RESTIC_PASSWORD \
+                   R2_ENDPOINT MEDIA_TRANSFORM_SECRET RESTIC_REPOSITORY RESTIC_PASSWORD \
                    AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
             [ -n "${!s}" ] || missing+=("$s")
           done
