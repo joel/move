@@ -222,6 +222,7 @@ jobs:
     if: needs.gate.outputs.proceed == 'true' && inputs.dry_run != true
     permissions:
       issues: read
+      pull-requests: read # gh pr list, for the open-PR cap headroom
     outputs:
       issues: ${{ steps.pick.outputs.issues }}
       count: ${{ steps.pick.outputs.count }}
