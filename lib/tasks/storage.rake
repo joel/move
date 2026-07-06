@@ -19,10 +19,13 @@ namespace :storage do
     # in which case every blob would "fail" and, without this allowlist, the task
     # would mark the whole store unreadable and exit DONE with nothing copied.
     # Build the allowlist of known-lost blob keys up front so anything else aborts.
+    # with_discarded: a soft-deleted media is hidden by Discardable's `kept`
+    # default scope, but its blob row is still swept below — so a discarded lost
+    # photo must stay on the allowlist, or its unreadable source would abort the run.
     expected_lost = Set.new
     Organization.pluck(:slug).each do |slug|
       Apartment::Tenant.switch(slug) do
-        Media.where(image_unavailable: true).with_attached_image.find_each { |m| expected_lost << m.image.blob.key }
+        Media.with_discarded.where(image_unavailable: true).with_attached_image.find_each { |m| expected_lost << m.image.blob.key }
       end
     end
     puts "[storage:backfill_to_r2] #{expected_lost.size} known-lost keys allowlisted (skippable)"
