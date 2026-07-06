@@ -21,6 +21,22 @@ seaweedfs:
   secret_access_key: <%= ENV.fetch("STORAGE_SECRET_ACCESS_KEY", "move-dev-secret") %>
   force_path_style: true
 
+# Cloudflare R2 — S3-compatible, OFF-BOX, ~11-nines durable object store backing
+# Active Storage in PRODUCTION (media migrated off the on-box SeaweedFS so a VM
+# resize can never corrupt it again — #567 / resolves #537). Same `service: S3`
+# block as seaweedfs; R2 is S3-compatible with a custom account endpoint + path
+# style. The endpoint carries the account id, so it lives in Doppler (R2_ENDPOINT),
+# not the repo. Dev/test never select this service (they stay on seaweedfs/Disk),
+# so the placeholder defaults below are only there to keep YAML parsing happy.
+r2:
+  service: S3
+  endpoint: <%= ENV.fetch("R2_ENDPOINT", "https://example.r2.cloudflarestorage.com") %>
+  bucket: <%= ENV.fetch("R2_BUCKET", "move-media") %>
+  region: <%= ENV.fetch("R2_REGION", "auto") %>
+  access_key_id: <%= ENV.fetch("R2_ACCESS_KEY_ID", "move-dev") %>
+  secret_access_key: <%= ENV.fetch("R2_SECRET_ACCESS_KEY", "move-dev-secret") %>
+  force_path_style: true
+
 # Use bin/rails credentials:edit to set the AWS secrets (as aws:access_key_id|secret_access_key)
 # amazon:
 #   service: S3
