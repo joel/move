@@ -21,8 +21,13 @@ Rails.application.configure do
   # Enable serving of images, stylesheets, and JavaScripts from an asset server.
   # config.asset_host = "http://assets.example.com"
 
-  # Uploaded files go to the SeaweedFS S3 accessory (see config/deploy.yml).
-  config.active_storage.service = :seaweedfs
+  # Uploaded files go to Cloudflare R2 — off-box, durable object storage (#567 /
+  # resolves #537). Migrated off the on-box SeaweedFS, which silently corrupted
+  # ~35% of stored photos (a bad volume file since ~2026-07-01); R2 makes a
+  # VM-coupled loss structurally impossible. Existing blobs were copied + repointed
+  # (their per-blob service_name is already `r2`); this only points NEW uploads at
+  # R2. Dev still uses :seaweedfs (config/environments/development.rb).
+  config.active_storage.service = :r2
 
   # Assume all access to the app is happening through a SSL-terminating reverse proxy.
   # config.assume_ssl = true
