@@ -341,8 +341,12 @@ capture → recognition):
         *other* source read failure aborts.
      5. **Cut over:** `config.active_storage.service = :r2` (`production.rb`) — this
         only points **new** uploads at R2 (existing blobs were repointed in step 4).
-        Deploy, live-verify; SeaweedFS stays as rollback, then empty **only** the
-        app's SeaweedFS bucket (leave the shared gateway for siblings).
+        Deploy, live-verify. SeaweedFS stays as rollback.
+     6. **Decommission:** any uploads that landed on SeaweedFS *between* the step-4
+        backfill and the step-5 cutover deploy still have `service_name = "seaweedfs"`
+        and are absent from R2, so **re-run `storage:backfill_to_r2` one final time**
+        (idempotent — it copies + repoints the delta) immediately before emptying
+        **only** the app's SeaweedFS bucket. Leave the shared gateway for siblings.
      Follow-up: Cloudflare Image Transformations could replace stored variants with
      edge resizing (serve masters only).
 3. **Background jobs (Solid Queue):** async in dev, `:inline` in **test** (so an
