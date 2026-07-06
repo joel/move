@@ -868,10 +868,10 @@ jobs:
         run: |
           set -euo pipefail
           merged=$(gh pr list --repo "$GITHUB_REPOSITORY" --label autofix \
-            --state merged --limit 20 --json number,mergedAt,labels \
+            --state merged --limit 20 --json number,mergedAt,mergeCommit,labels \
             --jq '[.[] | select(.mergedAt != null)
                        | select((now - (.mergedAt | fromdateiso8601)) < 86400)
-                       | {number, mergedAt,
+                       | {number, mergedAt, merge_sha: (.mergeCommit.oid // ""),
                           short_id: ([.labels[].name | select(startswith("sentry:"))][0] // "" | ltrimstr("sentry:"))}
                        | select(.short_id != "")]')
           echo "Autofix PRs merged in the last 24h: $(jq length <<< "$merged")"
@@ -897,18 +897,35 @@ jobs:
           merged="$MERGED_LIST"
 
           deploys=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml \
-            --branch main --status completed --limit 20 --json conclusion,createdAt,updatedAt)
+            --branch main --status completed --limit 20 --json conclusion,headSha,createdAt,updatedAt)
 
           while IFS= read -r item; do
             pr_number=$(jq -r '.number' <<< "$item")
             merged_at=$(jq -r '.mergedAt' <<< "$item")
+            merge_sha=$(jq -r '.merge_sha' <<< "$item")
             short_id=$(jq -r '.short_id' <<< "$item")
 
-            # The first successful deploy that STARTED after the merge is the
-            # one that shipped this fix; its completion time is the watermark.
-            deploy_done=$(jq -r --arg m "$merged_at" \
-              '[.[] | select(.conclusion == "success") | select(.createdAt > $m)]
-               | sort_by(.createdAt) | .[0].updatedAt // empty' <<< "$deploys")
+            # Match the deploy that shipped THIS fix by its head SHA (the
+            # squash-merge commit), not by timestamp: a merge and its
+            # push-triggered deploy can share a wall-clock second, and a
+            # strict `createdAt > merged_at` would drop the real deploy and
+            # let a bad autofix dodge the regression check. Fall back to the
+            # first successful deploy STARTED at/after the merge (>=, not >)
+            # only when the SHA isn't resolvable.
+            deploy_done=$(jq -r --arg sha "$merge_sha" \
+              '[.[] | select(.conclusion == "success") | select(.headSha == $sha)]
+               | .[0].updatedAt // empty' <<< "$deploys")
+            if [ -z "$deploy_done" ] && [ -n "$merge_sha" ]; then
+              # SHA known but no successful deploy for it yet (in flight,
+              # or skipped) — wait rather than borrow an unrelated deploy.
+              echo "PR #$pr_number (${short_id}): no successful deploy for ${merge_sha:0:7} yet — checking next cycle."
+              continue
+            fi
+            if [ -z "$deploy_done" ]; then
+              deploy_done=$(jq -r --arg m "$merged_at" \
+                '[.[] | select(.conclusion == "success") | select(.createdAt >= $m)]
+                 | sort_by(.createdAt) | .[0].updatedAt // empty' <<< "$deploys")
+            fi
             if [ -z "$deploy_done" ]; then
               echo "PR #$pr_number (${short_id}): no completed deploy after merge yet — checking next cycle."
               continue
