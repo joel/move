@@ -1,0 +1,1020 @@
+name: Self-Healing
+
+run-name: Self-Healing - ${{ github.event_name }}
+
+# Loop A of the self-healing pipeline (doc/project/self-healing.md):
+# Sentry error issues -> public-safe GitHub issues -> agent fix PRs ->
+# deterministic scoring -> confidence-gated auto-merge -> the existing
+# deploy-on-merge -> post-deploy verification. Stages land incrementally;
+# this workflow currently implements TRIAGE only (observe-only: it opens
+# issues, nothing merges).
+#
+# Safety engine:
+# - Kill switch: repo variable SELF_HEALING_ENABLED must be exactly 'true'.
+# - Circuit breaker: any OPEN issue labelled `self-healing-halt` stops every
+#   stage (opened automatically by post-deploy verification, closed manually
+#   after triage).
+# - Public-repo doctrine: everything written to issues/PRs/logs is
+#   non-sensitive BY CONSTRUCTION — Sentry data only enters via the whitelist
+#   reducer script/self_healing/sentry_fetch.rb (exception messages,
+#   breadcrumbs, request/user context never pass). See
+#   doc/project/security-model.md.
+#
+# Never triggered by pull_request/fork events — schedule + manual dispatch
+# only, so untrusted PR code can never run in this workflow's context.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List candidates without creating issues"
+        type: boolean
+        default: false
+
+# Jobs opt in to the narrowest permissions they need.
+permissions: {}
+
+# One pipeline cycle at a time; never interrupt an in-flight cycle (a steward
+# mid-merge must not be cancelled).
+concurrency:
+  group: self-healing
+  cancel-in-progress: false
+
+jobs:
+  # Every stage hangs off this gate: kill switch, circuit breaker, and
+  # never-on-forks. Downstream jobs require `needs.gate.outputs.proceed`.
+  gate:
+    runs-on: ubuntu-latest
+    if: github.repository == 'joel/move' && vars.SELF_HEALING_ENABLED == 'true'
+    permissions:
+      issues: read
+    outputs:
+      proceed: ${{ steps.breaker.outputs.proceed }}
+    steps:
+      - name: Circuit breaker — halt on an open self-healing-halt issue
+        id: breaker
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          halts=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label self-healing-halt --state open --json number --jq 'length')
+          if [ "$halts" -gt 0 ]; then
+            echo "::warning::Self-healing halted: $halts open self-healing-halt issue(s). Close them to resume."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Poll Sentry for unresolved production errors over the activity thresholds
+  # and open a fixed-format, public-safe GitHub issue per new candidate.
+  triage:
+    runs-on: ubuntu-latest
+    needs: gate
+    if: needs.gate.outputs.proceed == 'true'
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # The reducer is stdlib-only, so the runner's default Ruby suffices —
+      # no bundler-cache, no gem install, and the Sentry token is scoped to
+      # exactly this step.
+      - name: Fetch candidate issues from Sentry (whitelist-reduced)
+        env:
+          SENTRY_AUTOFIX_TOKEN: ${{ secrets.SENTRY_AUTOFIX_TOKEN }}
+          SENTRY_ORG_SLUG: ${{ vars.SENTRY_ORG_SLUG }}
+          SENTRY_PROJECT_SLUG: ${{ vars.SENTRY_PROJECT_SLUG }}
+        run: |
+          set -euo pipefail
+          ruby script/self_healing/sentry_fetch.rb list \
+            --org "$SENTRY_ORG_SLUG" --project "$SENTRY_PROJECT_SLUG" \
+            --query "is:unresolved level:error" > /tmp/candidates.json
+          echo "Candidates over threshold: $(jq length /tmp/candidates.json)"
+
+      - name: Open public-safe issues for new candidates
+        if: inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SENTRY_AUTOFIX_TOKEN: ${{ secrets.SENTRY_AUTOFIX_TOKEN }}
+          SENTRY_ORG_SLUG: ${{ vars.SENTRY_ORG_SLUG }}
+          MAX_NEW_ISSUES_PER_CYCLE: "2"
+          MAX_OPEN_AUTOFIX_PRS: "3"
+        run: |
+          set -euo pipefail
+
+          # The pipeline manages its own labels — the first cycle on a fresh
+          # repo must work without any manual label setup (`gh issue create
+          # --label` fails hard on an unknown label).
+          gh label create "autofix" --repo "$GITHUB_REPOSITORY" \
+            --color 1D76DB --description "Automated fix pipeline (self-healing.yml)" --force
+
+          open_prs=$(gh pr list --repo "$GITHUB_REPOSITORY" \
+            --label autofix --state open --json number --jq 'length')
+          if [ "$open_prs" -ge "$MAX_OPEN_AUTOFIX_PRS" ]; then
+            echo "::notice::Skipping: $open_prs open autofix PRs (cap $MAX_OPEN_AUTOFIX_PRS)."
+            exit 0
+          fi
+
+          created=0
+          while IFS= read -r candidate; do
+            [ "$created" -ge "$MAX_NEW_ISSUES_PER_CYCLE" ] && break
+
+            short_id=$(jq -r '.short_id' <<< "$candidate")
+            issue_id=$(jq -r '.issue_id' <<< "$candidate")
+            [ -n "$short_id" ] && [ "$short_id" != "null" ] || continue
+
+            # Dedupe across ALL issue states — one GitHub issue per Sentry
+            # issue — with ONE exception: a CLOSED ticket whose Sentry issue
+            # is marked `regressed` gets REOPENED. The post-deploy verifier
+            # only watches 24h, so without this a recurrence after that
+            # window would be invisible forever. A closed ticket that is NOT
+            # regressed stays closed (fixed-and-quiet, or a human triaged it
+            # away in GitHub while leaving Sentry unresolved). Reopening only
+            # restores visibility — a fresh fix attempt still requires a
+            # human to remove `autofix:attempted` (no unbounded fix loops).
+            existing=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+              --label "sentry:${short_id}" --state all --json number,state \
+              --jq 'sort_by(.number) | last // empty')
+            if [ -n "$existing" ]; then
+              number=$(jq -r '.number' <<< "$existing")
+              state=$(jq -r '.state' <<< "$existing")
+              substatus=$(jq -r '.substatus // ""' <<< "$candidate")
+              if [ "$state" = "OPEN" ]; then
+                echo "Skipping ${short_id}: already tracked (#${number})."
+                continue
+              fi
+              if [ "$substatus" != "regressed" ]; then
+                echo "Skipping ${short_id}: #${number} closed and not regressed."
+                continue
+              fi
+              gh issue reopen "$number" --repo "$GITHUB_REPOSITORY"
+              gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body \
+                "🤖 Sentry marked \`${short_id}\` REGRESSED after this issue was closed (events 24h: $(jq -r '.events_24h' <<< "$candidate"), total: $(jq -r '.count' <<< "$candidate")). Reopened for triage — remove the \`autofix:attempted\` label to allow a fresh automated attempt. $(jq -r '.permalink // ""' <<< "$candidate")"
+              echo "::notice::Reopened #${number} for regressed ${short_id}."
+              continue
+            fi
+
+            # Frames for the report come from the latest event, also
+            # whitelist-reduced.
+            ruby script/self_healing/sentry_fetch.rb event \
+              --org "$SENTRY_ORG_SLUG" --issue-id "$issue_id" > /tmp/event.json
+
+            title="[AutoFix] $(jq -r '.exception_type // "Error"' <<< "$candidate") in $(jq -r '.culprit // "unknown"' <<< "$candidate") (${short_id})"
+
+            {
+              echo "### Automated error report — ${short_id}"
+              echo
+              echo "| | |"
+              echo "|---|---|"
+              jq -r '"| Exception | `\(.exception_type // "?")` |",
+                     "| Location (culprit) | `\(.culprit // "?")` |",
+                     "| Level / substatus | \(.level // "?") / \(.substatus // "-") |",
+                     "| Events (24h / total) | \(.events_24h) / \(.count) |",
+                     "| Users affected | \(.user_count) |",
+                     "| First seen | \(.first_seen // "?") |",
+                     "| Last seen | \(.last_seen // "?") |",
+                     "| Sentry issue ID | \(.issue_id) |"' <<< "$candidate"
+              permalink=$(jq -r '.permalink // empty' <<< "$candidate")
+              [ -n "$permalink" ] && echo "| Sentry | $permalink |"
+              echo
+              echo "<details><summary>In-app stack frames (latest event, innermost last)</summary>"
+              echo
+              echo '```'
+              jq -r '.frames[] | "\(.filename):\(.line) in \(.function)"' /tmp/event.json
+              echo '```'
+              echo
+              echo "</details>"
+              echo
+              echo "---"
+              echo "_Opened automatically by the self-healing pipeline (\`self-healing.yml\` triage)._"
+              echo "_All fields are whitelist-reduced (\`script/self_healing/sentry_fetch.rb\`): exception messages and breadcrumbs never appear here — open the Sentry link for full detail._"
+            } > /tmp/issue_body.md
+
+            gh label create "sentry:${short_id}" --repo "$GITHUB_REPOSITORY" \
+              --color BFD4F2 --description "Tracks Sentry issue ${short_id}" --force
+            url=$(gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$title" --body-file /tmp/issue_body.md \
+              --label "autofix,bug,sentry:${short_id}")
+            echo "::notice::Opened ${url} for ${short_id}"
+            created=$((created + 1))
+          done < <(jq -c '.[]' /tmp/candidates.json)
+
+          echo "Created ${created} issue(s) this cycle."
+
+      - name: Dry run — list candidates only
+        if: inputs.dry_run == true
+        run: jq . /tmp/candidates.json
+
+  # Pick the open autofix issues that have not had a fix attempt yet (the
+  # `autofix:attempted` label marks an attempt BEFORE the agent runs, so a
+  # crashed attempt can never retry-loop every 30 minutes — a human removes
+  # the label to consciously retry).
+  select:
+    runs-on: ubuntu-latest
+    needs: [gate, triage]
+    if: needs.gate.outputs.proceed == 'true' && inputs.dry_run != true
+    permissions:
+      issues: read
+      pull-requests: read # gh pr list, for the open-PR cap headroom
+    outputs:
+      issues: ${{ steps.pick.outputs.issues }}
+      count: ${{ steps.pick.outputs.count }}
+    steps:
+      - name: Pick unattempted autofix issues
+        id: pick
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MAX_ATTEMPTS_PER_CYCLE: "2"
+          MAX_OPEN_AUTOFIX_PRS: "3"
+        run: |
+          set -euo pipefail
+
+          # The open-PR cap governs the FIX path too, not just new-issue
+          # triage: an unattempted issue from a prior cycle would otherwise
+          # let `fix` open a PR past the cap. Budget the remaining headroom
+          # and select at most that many (also bounded per cycle).
+          open_prs=$(gh pr list --repo "$GITHUB_REPOSITORY" \
+            --label autofix --state open --json number --jq 'length')
+          headroom=$(( MAX_OPEN_AUTOFIX_PRS - open_prs ))
+          if [ "$headroom" -lt 1 ]; then
+            echo "::notice::$open_prs open autofix PRs (cap $MAX_OPEN_AUTOFIX_PRS) — no fix slots this cycle."
+            echo "issues=[]" >> "$GITHUB_OUTPUT"
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          limit=$(( headroom < MAX_ATTEMPTS_PER_CYCLE ? headroom : MAX_ATTEMPTS_PER_CYCLE ))
+
+          issues=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label autofix --state open --json number,title,labels \
+            --jq '[.[]
+                   | select([.labels[].name] | index("autofix:attempted") | not)
+                   | {number, title, short_id: ([.labels[].name | select(startswith("sentry:"))][0] // "" | ltrimstr("sentry:"))}
+                   | select(.short_id != "")]
+                  | .[0:'"$limit"']')
+          echo "issues=$(jq -c . <<< "$issues")" >> "$GITHUB_OUTPUT"
+          echo "count=$(jq length <<< "$issues")" >> "$GITHUB_OUTPUT"
+          jq . <<< "$issues"
+
+  # One fix attempt per selected issue. The agent diagnoses, writes a failing
+  # regression spec, fixes, self-assesses — with NO push credential and no
+  # network tools. A deterministic step then publishes the branch + PR with a
+  # GitHub App token (the App identity is what makes CI run on the PR).
+  fix:
+    runs-on: ubuntu-latest
+    needs: [gate, select]
+    if: needs.gate.outputs.proceed == 'true' && needs.select.outputs.count != '0'
+    permissions:
+      contents: read
+      issues: write
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        issue: ${{ fromJSON(needs.select.outputs.issues) }}
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      RAILS_ENV: test
+      RAILS_LOG_LEVEL: error
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      DB_HOST: localhost
+      DB_PORT: 5432
+    steps:
+      - name: Mark the attempt (retry-loop guard)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh label create "autofix:attempted" --repo "$GITHUB_REPOSITORY" \
+            --color D4C5F9 --description "An automated fix attempt ran for this issue" --force
+          gh issue edit "${{ matrix.issue.number }}" --repo "$GITHUB_REPOSITORY" \
+            --add-label "autofix:attempted"
+
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      # Mirrors the CI test job: the agent must be able to RUN the failing
+      # regression spec (TDD evidence), and image-adjacent specs need libvips.
+      - name: Install libvips + HEIF decoders
+        run: |
+          sudo apt-get update
+          decoders="libheif1 libheif-plugin-libde265 libheif-plugin-dav1d"
+          sudo apt-get install -y --no-install-recommends libvips42t64 $decoders \
+            || sudo apt-get install -y --no-install-recommends libvips42 $decoders
+
+      - name: Prepare test database
+        run: bin/rails db:create db:schema:load
+
+      # The agent's allowlist includes `git commit`, which needs an identity.
+      - name: Configure git identity for the agent's commits
+        run: |
+          git config user.name "move-autofix[bot]"
+          git config user.email "move-autofix[bot]@users.noreply.github.com"
+
+      - name: Stage whitelist-reduced context for the agent
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SENTRY_AUTOFIX_TOKEN: ${{ secrets.SENTRY_AUTOFIX_TOKEN }}
+          SENTRY_ORG_SLUG: ${{ vars.SENTRY_ORG_SLUG }}
+        run: |
+          set -euo pipefail
+          mkdir -p tmp/autofix
+          gh issue view "${{ matrix.issue.number }}" --repo "$GITHUB_REPOSITORY" \
+            --json title,body --jq '"# " + .title + "\n\n" + .body' > tmp/autofix/issue.md
+          sentry_issue_id=$(grep -oP '\| Sentry issue ID \| \K[0-9]+' tmp/autofix/issue.md || true)
+          if [ -n "$sentry_issue_id" ]; then
+            ruby script/self_healing/sentry_fetch.rb event \
+              --org "$SENTRY_ORG_SLUG" --issue-id "$sentry_issue_id" > tmp/autofix/event.json
+          else
+            echo '{}' > tmp/autofix/event.json
+          fi
+
+      # The agent gets file tools + spec-running + local git only: no push
+      # credential (persist-credentials: false above), no gh, no network.
+      - name: Generate the fix (claude-code-action)
+        uses: anthropics/claude-code-action@558b1d6cab4085c7753fe402c10bef0fbb92ac7a # v1
+        with:
+          anthropic_api_key: ${{ secrets.AUTOFIX_ANTHROPIC_API_KEY }}
+          prompt: |
+            Read .github/autofix/fix-prompt.md and follow it exactly. Your
+            task: produce a candidate fix for GitHub issue
+            #${{ matrix.issue.number }} — its title and full report are in
+            the context files: tmp/autofix/issue.md and tmp/autofix/event.json.
+            Finish with local commits and tmp/autofix/assessment.json.
+          claude_args: |
+            --max-turns 40
+            --allowedTools "Edit,Write,Read,Grep,Glob,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(bundle exec rspec:*)"
+        timeout-minutes: 30
+
+      # Everything below is deterministic: validate the agent's output, then
+      # publish with the App identity. Fail closed: no assessment or no
+      # commits -> no PR, surfaced on the issue.
+      - name: Validate the attempt
+        id: validate
+        run: |
+          set -euo pipefail
+          commits=$(git rev-list --count origin/main..HEAD)
+          if [ "$commits" -eq 0 ]; then
+            echo "result=no-commits" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! jq -e '.confidence' tmp/autofix/assessment.json > /dev/null 2>&1; then
+            echo "result=no-assessment" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$(jq -r '.fixable' tmp/autofix/assessment.json)" = "false" ]; then
+            echo "result=not-fixable" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # PRE-PUSH blast-radius gate: a deny-listed path must never even be
+          # PUSHED — a pushed workflow file executes on push with the default
+          # token, so the scorer's later needs-human verdict would be too
+          # late. Judged with PRISTINE main copies of checker + config (the
+          # agent can edit the working tree, so the working-tree copies must
+          # never be the judge). Both sides of renames are included.
+          git show origin/main:script/self_healing/blast_radius.rb > "$RUNNER_TEMP/blast_radius.rb"
+          git show origin/main:.github/autofix/blast_radius.yml > "$RUNNER_TEMP/blast_radius.yml"
+          git diff --name-status origin/main..HEAD \
+            | awk '{print $2; if (NF > 2) print $3}' > "$RUNNER_TEMP/changed_paths.txt"
+          if ! ruby "$RUNNER_TEMP/blast_radius.rb" --config "$RUNNER_TEMP/blast_radius.yml" \
+               < "$RUNNER_TEMP/changed_paths.txt"; then
+            echo "result=deny-listed" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "result=ok" >> "$GITHUB_OUTPUT"
+
+      - name: Mint GitHub App token
+        id: app-token
+        if: steps.validate.outputs.result == 'ok'
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.AUTOFIX_APP_ID }}
+          private-key: ${{ secrets.AUTOFIX_APP_PRIVATE_KEY }}
+
+      - name: Push the fix branch and open the PR (App identity)
+        id: publish
+        if: steps.validate.outputs.result == 'ok'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          ISSUE_NUMBER: ${{ matrix.issue.number }}
+          ISSUE_TITLE: ${{ matrix.issue.title }}
+          SHORT_ID: ${{ matrix.issue.short_id }}
+        run: |
+          set -euo pipefail
+          branch="fix/sentry-$(tr '[:upper:]' '[:lower:]' <<< "$SHORT_ID")"
+          # A branch normally pre-exists here only when a human removed
+          # `autofix:attempted` to consciously retry — but never clobber a
+          # HUMAN branch that happens to share the name: only force-push
+          # over a tip authored by the bot identity.
+          if git fetch origin "refs/heads/${branch}" 2>/dev/null; then
+            tip_author=$(git log -1 --format=%ae FETCH_HEAD)
+            if [ "$tip_author" != "move-autofix[bot]@users.noreply.github.com" ]; then
+              echo "::warning::Branch ${branch} exists with a non-bot tip (${tip_author}) — not overwriting."
+              gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body \
+                "🤖 Fix attempt aborted: branch \`${branch}\` already exists with commits not authored by the autofix bot. Rename or delete that branch, then remove \`autofix:attempted\` to retry."
+              exit 0
+            fi
+          fi
+          git push --force \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "HEAD:refs/heads/${branch}"
+
+          {
+            echo "Closes #${ISSUE_NUMBER}"
+            echo
+            echo "## Automated fix attempt for ${SHORT_ID}"
+            echo
+            echo "**Diagnosis (agent, self-reported):** $(jq -r '.diagnosis' tmp/autofix/assessment.json)"
+            echo
+            echo "**Agent confidence:** $(jq -r '.confidence' tmp/autofix/assessment.json)/100 · **Regression spec:** \`$(jq -r '.spec_file // "?"' tmp/autofix/assessment.json)\` (failed before fix: $(jq -r '.spec_failed_before_fix // "?"' tmp/autofix/assessment.json))"
+            echo
+            notes=$(jq -r '.notes // empty' tmp/autofix/assessment.json)
+            [ -n "$notes" ] && { echo "**Reviewer notes:** ${notes}"; echo; }
+            echo "<!-- autofix:assessment"
+            jq -c . tmp/autofix/assessment.json
+            echo "-->"
+            echo
+            echo "---"
+            echo "🤖 Opened automatically by the self-healing pipeline (\`self-healing.yml\`). A deterministic scorer labels this PR \`autofix:auto-eligible\` or \`autofix:needs-human\`; nothing merges without green checks and a clean independent review. See \`doc/project/self-healing.md\`."
+          } > /tmp/pr_body.md
+
+          url=$(gh pr create --repo "$GITHUB_REPOSITORY" \
+            --base main --head "$branch" \
+            --title "[AutoFix] ${ISSUE_TITLE}" \
+            --body-file /tmp/pr_body.md \
+            --label "autofix,sentry:${SHORT_ID}")
+          echo "::notice::Opened ${url}"
+
+      # !cancelled(): an `if` without a status function gets an implicit
+      # success(), which would SKIP this report exactly on the opaque
+      # failures — the agent step timing out/crashing (validate skipped,
+      # result empty) or the publication path (token mint, push, pr create)
+      # failing after a green validation. Every such outcome must leave an
+      # explanatory comment, or the issue stays autofix:attempted (excluded
+      # from future cycles) with no trace outside the Actions log.
+      - name: Report a failed attempt on the issue
+        if: >-
+          ${{ !cancelled() &&
+              (steps.validate.outputs.result != 'ok' ||
+               steps.app-token.outcome == 'failure' ||
+               steps.publish.outcome == 'failure') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REASON: >-
+            ${{ steps.validate.outputs.result != 'ok'
+                && (steps.validate.outputs.result || 'agent-step-failed')
+                || 'publish-failed' }}
+        run: |
+          set -euo pipefail
+          gh issue comment "${{ matrix.issue.number }}" --repo "$GITHUB_REPOSITORY" --body \
+            "🤖 Automated fix attempt did not produce a PR (\`${REASON}\`). A human should triage this one — remove the \`autofix:attempted\` label to allow a retry. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+  # Deterministic scoring of every open autofix PR, from MAIN (a PR can never
+  # rewrite its own judge). Idempotent per cycle: labels + a single upserted
+  # breakdown comment.
+  score:
+    runs-on: ubuntu-latest
+    needs: [gate, fix]
+    # inputs.dry_run is empty on schedule events, so the != true guard only
+    # bites on an explicit dry-run dispatch (a dry run must mutate NOTHING —
+    # no labels, no comments, no merges).
+    if: ${{ !cancelled() && needs.gate.outputs.proceed == 'true' && inputs.dry_run != true }}
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      # Most 30-minute cycles have no open autofix PR — find that out with one
+      # cheap API call before paying for a full checkout.
+      - name: Count open autofix PRs
+        id: prs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          count=$(gh pr list --repo "$GITHUB_REPOSITORY" \
+            --label autofix --state open --json number --jq 'length')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Open autofix PRs: $count"
+
+      - name: Checkout main (the judge)
+        if: steps.prs.outputs.count != '0'
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Score open autofix PRs
+        if: steps.prs.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh label create "autofix:auto-eligible" --repo "$GITHUB_REPOSITORY" \
+            --color 0E8A16 --description "Deterministic scorer: eligible for automated merge" --force
+          gh label create "autofix:needs-human" --repo "$GITHUB_REPOSITORY" \
+            --color D93F0B --description "Deterministic scorer: requires human review" --force
+
+          for pr in $(gh pr list --repo "$GITHUB_REPOSITORY" --label autofix --state open --json number --jq '.[].number'); do
+            echo "--- scoring PR #$pr"
+            # previous_path: a rename exposes the denied SOURCE only via
+            # previous_filename — the scorer blast-radius checks both sides
+            # (a rename out of script/** must never look like app-only).
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$pr/files" --paginate \
+              --jq '[.[] | {path: .filename, previous_path: .previous_filename, additions: .additions, deletions: .deletions}]' | jq -s 'add' > /tmp/files.json
+            gh pr diff "$pr" --repo "$GITHUB_REPOSITORY" > /tmp/pr.diff
+            gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json title,body,commits > /tmp/pr.json
+            jq -r '.body' /tmp/pr.json | sed -n '/<!-- autofix:assessment/,/^-->/p' | sed '1d;$d' > /tmp/assessment.json
+            jq -e . /tmp/assessment.json > /dev/null 2>&1 || echo 'null' > /tmp/assessment.json
+
+            jq -n \
+              --slurpfile files /tmp/files.json \
+              --rawfile diff /tmp/pr.diff \
+              --slurpfile pr /tmp/pr.json \
+              --slurpfile assessment /tmp/assessment.json \
+              '{
+                files: $files[0],
+                diff: $diff,
+                pr_title: $pr[0].title,
+                pr_body: $pr[0].body,
+                commit_messages: [$pr[0].commits[] | (.messageHeadline + "\n" + .messageBody)],
+                assessment: $assessment[0]
+              }' > /tmp/score_input.json
+
+            ruby script/self_healing/score.rb /tmp/score_input.json > /tmp/verdict.json
+            jq . /tmp/verdict.json
+            verdict=$(jq -r '.verdict' /tmp/verdict.json)
+
+            # Label application is asymmetric on purpose: promotion may fail
+            # open (the PR just stays needs-human), but a DEMOTION that fails
+            # to strip autofix:auto-eligible would leave the steward a stale
+            # green light — that failure must kill the run loudly.
+            if [ "$verdict" = "auto-eligible" ]; then
+              gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" \
+                --add-label "autofix:auto-eligible" --remove-label "autofix:needs-human" || true
+            else
+              gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" \
+                --add-label "autofix:needs-human" || true
+              has_eligible=$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" \
+                --json labels --jq '[.labels[].name] | index("autofix:auto-eligible") != null')
+              if [ "$has_eligible" = "true" ]; then
+                if ! gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" \
+                     --remove-label "autofix:auto-eligible"; then
+                  echo "::error::Failed to demote PR #$pr — autofix:auto-eligible is STALE; failing closed."
+                  exit 1
+                fi
+              fi
+            fi
+
+            {
+              echo "<!-- autofix:score -->"
+              echo "## 🤖 Deterministic score: \`$verdict\`"
+              echo
+              if [ "$(jq -r '.score' /tmp/verdict.json)" != "null" ]; then
+                # Thresholds/weights come from the verdict itself (score.rb
+                # echoes its constants) so this comment can never go stale.
+                jq -r '"**Score: \(.score)** (auto-eligible ≥ \(.thresholds.score) with agent confidence ≥ \(.thresholds.agent_confidence))"' /tmp/verdict.json
+                echo
+                echo "| Component | Value | Weight |"
+                echo "|---|---|---|"
+                jq -r '.weights as $w | .components
+                       | "| Agent confidence | \(.agent) | \($w.agent) |",
+                         "| Size | \(.size) | \($w.size) |",
+                         "| Spec quality | \(.spec_quality) | \($w.spec_quality) |",
+                         "| Locality | \(.locality) | \($w.locality) |"' /tmp/verdict.json
+              fi
+              failures=$(jq -r '.gate_failures[]' /tmp/verdict.json)
+              if [ -n "$failures" ]; then
+                echo "**Hard-gate failures:**"
+                jq -r '.gate_failures[] | "- " + .' /tmp/verdict.json
+              fi
+              echo
+              echo "_Scored from \`main\` by \`script/self_healing/score.rb\` (run ${GITHUB_RUN_ID}). Labels are re-derived every cycle._"
+            } > /tmp/score_comment.md
+
+            existing=$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr/comments" --paginate | \
+              jq -s -r '[add[] | select(.body | startswith("<!-- autofix:score -->"))][0].id // empty')
+            if [ -n "$existing" ]; then
+              gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" \
+                -F body=@/tmp/score_comment.md > /dev/null
+            else
+              gh pr comment "$pr" --repo "$GITHUB_REPOSITORY" --body-file /tmp/score_comment.md
+            fi
+          done
+
+  # THE AUTONOMY SWITCH. At most ONE merge per cycle, of the OLDEST
+  # auto-eligible PR, and only when every gate agrees:
+  #   autonomy variable -> merge budget -> last deploy not red -> required
+  #   checks green on HEAD -> independent (Codex) review verdict clean ->
+  #   branch up to date. Every uncertain state fails CLOSED to the human path
+  #   or waits for the next cycle. Requires SELF_HEALING_AUTONOMY_ENABLED —
+  #   set it only after the canary drill in doc/project/self-healing.md.
+  steward:
+    runs-on: ubuntu-latest
+    # verify is a dependency, not a sibling: it must FINISH (creating any
+    # self-healing-halt for a regressed prior autofix) before the steward
+    # evaluates its halt gates — otherwise the two race and the steward
+    # could merge a new fix in the same cycle a prior one is found bad.
+    # "verify what shipped before shipping more."
+    needs: [gate, score, verify]
+    # The steward NEVER runs off a failed or skipped score/verify: score
+    # fails loudly precisely when a demotion could not strip a stale
+    # autofix:auto-eligible label, and a failed verify means the regression
+    # check didn't run — merging in either state is the exact failure mode
+    # being defended against. (`!cancelled()` would run on a FAILURE;
+    # explicit result checks close that.) Plus the dry_run guard: a dry-run
+    # dispatch must never reach a merge decision.
+    if: ${{ needs.gate.result == 'success' && needs.score.result == 'success' && needs.verify.result == 'success' && needs.gate.outputs.proceed == 'true' && vars.SELF_HEALING_AUTONOMY_ENABLED == 'true' && inputs.dry_run != true }}
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      actions: read
+    steps:
+      # Cheap gates first — most cycles end here with three API calls and no
+      # checkout, no App-token mint.
+      - name: Pick a candidate (budget + deploy health, no checkout)
+        id: pick
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MERGE_BUDGET_24H: "3"
+        run: |
+          set -euo pipefail
+          audit() { echo "::notice::steward: $*"; }
+          echo "pr=" >> "$GITHUB_OUTPUT"
+
+          # --- Gate: circuit breaker, re-checked ----------------------------
+          # The sibling `verify` job can open a self-healing-halt issue AFTER
+          # the gate job passed in this same cycle — the steward must never
+          # act on a stale gate verdict.
+          halts=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label self-healing-halt --state open --json number --jq 'length')
+          if [ "$halts" -gt 0 ]; then
+            audit "circuit breaker open ($halts halt issue(s)) — standing down"; exit 0
+          fi
+
+          # --- Gate: merge budget -------------------------------------------
+          merged_24h=$(gh pr list --repo "$GITHUB_REPOSITORY" --label autofix \
+            --state merged --limit 50 --json mergedAt \
+            --jq '[.[] | select(.mergedAt != null) | select((now - (.mergedAt | fromdateiso8601)) < 86400)] | length')
+          echo "merged_24h=$merged_24h" >> "$GITHUB_OUTPUT"
+          if [ "$merged_24h" -ge "$MERGE_BUDGET_24H" ]; then
+            audit "budget exhausted: $merged_24h automated merges in 24h (max $MERGE_BUDGET_24H)"; exit 0
+          fi
+
+          # --- Gate: last production deploy not red -------------------------
+          deploy=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml \
+            --branch main --limit 1 --json status,conclusion --jq '.[0] // empty')
+          if [ -n "$deploy" ]; then
+            status=$(jq -r '.status' <<< "$deploy"); conclusion=$(jq -r '.conclusion' <<< "$deploy")
+            if [ "$status" != "completed" ]; then audit "a deploy is in flight — waiting"; exit 0; fi
+            if [ "$conclusion" != "success" ] && [ "$conclusion" != "skipped" ]; then
+              audit "last deploy concluded '$conclusion' — not merging onto a broken pipeline"; exit 0
+            fi
+          fi
+
+          # --- Pick the oldest auto-eligible PR -----------------------------
+          # BOTH labels required: the scorer only ever evaluates `autofix`
+          # PRs, so `autofix:auto-eligible` alone (manually applied, or left
+          # behind by a label mishap) must never make a PR stewardable —
+          # nothing without the pipeline's own provenance gets auto-merged.
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" \
+            --label autofix --label autofix:auto-eligible \
+            --state open --json number,createdAt --jq 'sort_by(.createdAt) | .[0].number // empty')
+          if [ -z "$pr" ]; then audit "no auto-eligible PRs"; exit 0; fi
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+          audit "candidate: PR #$pr"
+
+      - name: Checkout main (steward code + Sentry reducer)
+        if: steps.pick.outputs.pr != ''
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      # The App identity performs update-branch and the merge so the resulting
+      # pushes trigger CI and the production deploy (GITHUB_TOKEN events are
+      # suppressed — the dependabot silent-deploy bug this pipeline must not
+      # reintroduce).
+      - name: Mint GitHub App token
+        id: app-token
+        if: steps.pick.outputs.pr != ''
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.AUTOFIX_APP_ID }}
+          private-key: ${{ secrets.AUTOFIX_APP_PRIVATE_KEY }}
+
+      - name: Evaluate gates and merge at most one PR
+        if: steps.pick.outputs.pr != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          SENTRY_AUTOFIX_TOKEN: ${{ secrets.SENTRY_AUTOFIX_TOKEN }}
+          SENTRY_ORG_SLUG: ${{ vars.SENTRY_ORG_SLUG }}
+          PR_NUMBER: ${{ steps.pick.outputs.pr }}
+          MERGED_24H: ${{ steps.pick.outputs.merged_24h }}
+          MERGE_BUDGET_24H: "3"
+          CODEX_WAIT_MINUTES: "90"
+          STALE_HOURS: "48"
+        run: |
+          set -euo pipefail
+          audit() { echo "::notice::steward: $*"; }
+          demote() { # demote <pr> <reason> — force the human path and stop
+            gh pr edit "$1" --repo "$GITHUB_REPOSITORY" \
+              --add-label "autofix:needs-human" --remove-label "autofix:auto-eligible"
+            gh pr comment "$1" --repo "$GITHUB_REPOSITORY" --body \
+              "🤖 Steward demoted this PR to \`autofix:needs-human\`: $2 (run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+            audit "PR #$1 demoted: $2"
+          }
+
+          pr="$PR_NUMBER"
+          merged_24h="$MERGED_24H"
+          view=$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" \
+            --json number,createdAt,mergeStateStatus,statusCheckRollup,commits,labels,headRefOid)
+          audit "considering PR #$pr"
+
+          # --- Gate: staleness ----------------------------------------------
+          created=$(jq -r '.createdAt' <<< "$view")
+          age_hours=$(( ($(date +%s) - $(date -d "$created" +%s)) / 3600 ))
+          if [ "$age_hours" -gt "$STALE_HOURS" ]; then
+            demote "$pr" "open for ${age_hours}h (> ${STALE_HOURS}h) without merging — too stale to auto-merge"; exit 0
+          fi
+
+          # --- Gate: no failing check on HEAD -------------------------------
+          # statusCheckRollup conclusions by name (canonical — `gh pr checks`
+          # buckets flap mid-run). Whether every REQUIRED context is green is
+          # NOT re-derived from a hard-coded list: GitHub's own
+          # mergeStateStatus (live branch protection) decides below, so a
+          # renamed or newly-required check can never be silently bypassed.
+          failed=$(jq -r '[.statusCheckRollup[]?
+                           | select((.conclusion // "") | IN("FAILURE", "ERROR", "TIMED_OUT", "CANCELLED"))
+                           | .name] | unique | join(", ")' <<< "$view")
+          if [ -n "$failed" ]; then
+            demote "$pr" "failing check(s) on HEAD: ${failed}"; exit 0
+          fi
+
+          # --- Gate: independent review verdict (dual-channel) --------------
+          # Findings arrive as a formal review + inline comments; a CLEAN
+          # round is an issue comment containing "Didn't find any major
+          # issues" (marker matched loosely — the exact prefix is canary-
+          # verified) with no commit_id — recency judged against the last
+          # commit. No verdict within CODEX_WAIT_MINUTES => FAIL CLOSED.
+          head_time=$(jq -r '.commits[-1].committedDate' <<< "$view")
+          # (--paginate emits one array per page; -s + add flattens them.)
+          findings=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr/reviews" --paginate | \
+            jq -s --arg t "$head_time" '[add[] | select(.user.login == "chatgpt-codex-connector[bot]")
+                       | select(.state != "APPROVED" and .state != "DISMISSED")
+                       | select(.submitted_at > $t)] | length')
+          clean=$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr/comments" --paginate | \
+            jq -s --arg t "$head_time" '[add[] | select(.user.login == "chatgpt-codex-connector[bot]")
+                       | select(.created_at > $t)
+                       | select(.body | test("Didn.t find any major issues"))] | length')
+          if [ "$findings" -gt 0 ]; then
+            demote "$pr" "the independent review left findings — a human must triage them"; exit 0
+          fi
+          if [ "$clean" -eq 0 ]; then
+            waited_minutes=$(( ($(date +%s) - $(date -d "$head_time" +%s)) / 60 ))
+            if [ "$waited_minutes" -gt "$CODEX_WAIT_MINUTES" ]; then
+              demote "$pr" "no independent review verdict after ${waited_minutes}m (> ${CODEX_WAIT_MINUTES}m) — failing closed"
+            else
+              audit "no review verdict yet (${waited_minutes}m) — waiting"
+            fi
+            exit 0
+          fi
+
+          # --- Gate: GitHub's own merge verdict (live branch protection) ----
+          # CLEAN = every required context green AND up to date. GitHub
+          # auto-merge never updates a behind branch, so the steward does it
+          # explicitly (App token => the update push retriggers CI) and
+          # finishes next cycle. Anything else uncertain waits (the staleness
+          # gate bounds how long).
+          merge_state=$(jq -r '.mergeStateStatus' <<< "$view")
+          case "$merge_state" in
+            BEHIND)
+              audit "PR #$pr is behind main — updating branch and waiting for CI"
+              GH_TOKEN="$APP_TOKEN" gh api -X PUT \
+                "repos/$GITHUB_REPOSITORY/pulls/$pr/update-branch" > /dev/null
+              exit 0 ;;
+            DIRTY)
+              demote "$pr" "merge conflicts with main"; exit 0 ;;
+            CLEAN) ;;
+            *)
+              audit "mergeStateStatus is '$merge_state' — waiting"; exit 0 ;;
+          esac
+
+          # --- Gate: circuit breaker, final re-check ------------------------
+          # Moments before the irreversible act: a halt opened at any point
+          # during this cycle (e.g. by verify) aborts the merge.
+          halts=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label self-healing-halt --state open --json number --jq 'length')
+          if [ "$halts" -gt 0 ]; then
+            audit "circuit breaker opened mid-cycle — aborting merge"; exit 0
+          fi
+
+          # --- Merge (direct, at decision time — no enable-vs-merge race) ---
+          # --match-head-commit pins the merge to the EXACT head every gate
+          # above judged: a push to the branch between snapshot and merge
+          # makes GitHub reject the merge (retried next cycle, re-gated).
+          head_oid=$(jq -r '.headRefOid' <<< "$view")
+          audit "all gates green — merging PR #$pr at ${head_oid}"
+          GH_TOKEN="$APP_TOKEN" gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --squash \
+            --match-head-commit "$head_oid"
+
+          # --- Post-merge bookkeeping (best effort, never fails the merge) --
+          short_id=$(jq -r '[.labels[].name | select(startswith("sentry:"))][0] // "" | ltrimstr("sentry:")' <<< "$view")
+          if [ -n "$short_id" ]; then
+            issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --label "sentry:${short_id}" \
+              --state all --json number,body --jq '.[0] // empty')
+            sentry_issue_id=$(jq -r '.body' <<< "$issue" | grep -oP '\| Sentry issue ID \| \K[0-9]+' || true)
+            if [ -n "$sentry_issue_id" ]; then
+              ruby script/self_healing/sentry_fetch.rb update-status \
+                --org "$SENTRY_ORG_SLUG" --issue-id "$sentry_issue_id" \
+                --status resolvedInNextRelease \
+                || echo "::warning::Sentry status update failed for ${short_id} (issue ${sentry_issue_id})"
+            fi
+          fi
+          gh pr comment "$pr" --repo "$GITHUB_REPOSITORY" --body \
+            "🤖 Auto-merged by the steward: score \`autofix:auto-eligible\`, required checks green, independent review clean, deploy pipeline healthy, budget ${merged_24h}/${MERGE_BUDGET_24H} used in 24h. The push to main triggers the production deploy; post-deploy verification watches the Sentry issue. (run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+
+  # THE CIRCUIT BREAKER'S TRIGGER. For every autofix PR merged in the last
+  # 24h whose production deploy has completed: if the Sentry issue records
+  # events AFTER the deploy finished, the fix didn't fix it — reopen the
+  # GitHub issue and open a `self-healing-halt` issue, which stops every
+  # stage (the gate job) until a human closes it. Timestamps, not release
+  # tags: a merge SHA can be superseded before its deploy, so "events after
+  # the deploy that shipped the fix completed" is the reliable signal.
+  verify:
+    runs-on: ubuntu-latest
+    needs: gate
+    # dry_run guard: verification reopens issues and can trip the circuit
+    # breaker — a dry-run dispatch must mutate nothing.
+    if: needs.gate.outputs.proceed == 'true' && inputs.dry_run != true
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      actions: read
+    steps:
+      # Most cycles have nothing to verify — find that out with one cheap API
+      # call before paying for a checkout.
+      - name: List autofix PRs merged in the last 24h
+        id: merged
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          merged=$(gh pr list --repo "$GITHUB_REPOSITORY" --label autofix \
+            --state merged --limit 20 --json number,mergedAt,mergeCommit,labels \
+            --jq '[.[] | select(.mergedAt != null)
+                       | select((now - (.mergedAt | fromdateiso8601)) < 86400)
+                       | {number, mergedAt, merge_sha: (.mergeCommit.oid // ""),
+                          short_id: ([.labels[].name | select(startswith("sentry:"))][0] // "" | ltrimstr("sentry:"))}
+                       | select(.short_id != "")]')
+          echo "Autofix PRs merged in the last 24h: $(jq length <<< "$merged")"
+          echo "list=$(jq -c . <<< "$merged")" >> "$GITHUB_OUTPUT"
+          echo "count=$(jq length <<< "$merged")" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout main (Sentry reducer)
+        if: steps.merged.outputs.count != '0'
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verify recently deployed autofixes against Sentry
+        if: steps.merged.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SENTRY_AUTOFIX_TOKEN: ${{ secrets.SENTRY_AUTOFIX_TOKEN }}
+          SENTRY_ORG_SLUG: ${{ vars.SENTRY_ORG_SLUG }}
+          MERGED_LIST: ${{ steps.merged.outputs.list }}
+        run: |
+          set -euo pipefail
+
+          merged="$MERGED_LIST"
+
+          deploys=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml \
+            --branch main --status completed --limit 20 --json conclusion,headSha,createdAt,updatedAt)
+
+          while IFS= read -r item; do
+            pr_number=$(jq -r '.number' <<< "$item")
+            merged_at=$(jq -r '.mergedAt' <<< "$item")
+            merge_sha=$(jq -r '.merge_sha' <<< "$item")
+            short_id=$(jq -r '.short_id' <<< "$item")
+
+            # Match the deploy that shipped THIS fix by its head SHA (the
+            # squash-merge commit), not by timestamp: a merge and its
+            # push-triggered deploy can share a wall-clock second, and a
+            # strict `createdAt > merged_at` would drop the real deploy and
+            # let a bad autofix dodge the regression check. Fall back to the
+            # first successful deploy STARTED at/after the merge (>=, not >)
+            # only when the SHA isn't resolvable.
+            deploy_done=$(jq -r --arg sha "$merge_sha" \
+              '[.[] | select(.conclusion == "success") | select(.headSha == $sha)]
+               | .[0].updatedAt // empty' <<< "$deploys")
+            if [ -z "$deploy_done" ] && [ -n "$merge_sha" ]; then
+              # SHA known but no successful deploy for it yet (in flight,
+              # or skipped) — wait rather than borrow an unrelated deploy.
+              echo "PR #$pr_number (${short_id}): no successful deploy for ${merge_sha:0:7} yet — checking next cycle."
+              continue
+            fi
+            if [ -z "$deploy_done" ]; then
+              deploy_done=$(jq -r --arg m "$merged_at" \
+                '[.[] | select(.conclusion == "success") | select(.createdAt >= $m)]
+                 | sort_by(.createdAt) | .[0].updatedAt // empty' <<< "$deploys")
+            fi
+            if [ -z "$deploy_done" ]; then
+              echo "PR #$pr_number (${short_id}): no completed deploy after merge yet — checking next cycle."
+              continue
+            fi
+
+            issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --label "sentry:${short_id}" \
+              --state all --json number,body,state --jq '.[0] // empty')
+            [ -n "$issue" ] || continue
+            gh_issue=$(jq -r '.number' <<< "$issue")
+            sentry_issue_id=$(jq -r '.body' <<< "$issue" | grep -oP '\| Sentry issue ID \| \K[0-9]+' || true)
+            [ -n "$sentry_issue_id" ] || continue
+
+            last_seen=$(ruby script/self_healing/sentry_fetch.rb issue \
+              --org "$SENTRY_ORG_SLUG" --issue-id "$sentry_issue_id" | jq -r '.last_seen // empty')
+            if [ -z "$last_seen" ]; then
+              echo "PR #$pr_number (${short_id}): Sentry reported no last_seen — nothing to compare."
+              continue
+            fi
+
+            # Compare EPOCHS, not strings: Sentry's last_seen carries
+            # fractional seconds while the deploy watermark is whole-second,
+            # and a lexicographic compare reads a same-second recurrence as
+            # clean ('.' < 'Z'). Same-second counts as AFTER, and an
+            # unparsable timestamp (e.g. the reducer's [INVALID-TIMESTAMP]
+            # sentinel) fails CLOSED into the regression branch.
+            to_epoch() { date -u -d "$1" +%s 2>/dev/null || true; }
+            last_epoch=$(to_epoch "$last_seen")
+            deploy_epoch=$(to_epoch "$deploy_done")
+            if [ -n "$last_epoch" ] && [ -n "$deploy_epoch" ] && [ "$last_epoch" -lt "$deploy_epoch" ]; then
+              echo "PR #$pr_number (${short_id}): clean — no events after deploy completion ($deploy_done)."
+              continue
+            fi
+            if [ -z "$last_epoch" ] || [ -z "$deploy_epoch" ]; then
+              echo "::warning::PR #$pr_number (${short_id}): unparsable timestamp (last_seen='${last_seen}', deploy_done='${deploy_done}') — failing closed."
+            fi
+
+            echo "::error::PR #$pr_number (${short_id}): Sentry recorded events at ${last_seen}, AFTER the deploy completed at ${deploy_done} — the fix did not hold."
+
+            if [ "$(jq -r '.state' <<< "$issue")" = "CLOSED" ]; then
+              gh issue reopen "$gh_issue" --repo "$GITHUB_REPOSITORY"
+            fi
+            gh issue comment "$gh_issue" --repo "$GITHUB_REPOSITORY" --body \
+              "🤖 Post-deploy verification FAILED: Sentry recorded new events (last seen \`${last_seen}\`) after the deploy that shipped PR #${pr_number} completed (\`${deploy_done}\`). The automated fix did not hold. (run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+
+            # One halt is enough — the gate stops every stage while it is open.
+            open_halts=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+              --label self-healing-halt --state open --json number --jq 'length')
+            if [ "$open_halts" -eq 0 ]; then
+              gh label create "self-healing-halt" --repo "$GITHUB_REPOSITORY" \
+                --color B60205 --description "Circuit breaker: self-healing is halted while this is open" --force
+              gh issue create --repo "$GITHUB_REPOSITORY" \
+                --title "[Self-Healing HALT] Post-deploy verification failed for ${short_id}" \
+                --label "self-healing-halt" \
+                --body "$(printf '%s\n' \
+                  "The self-healing circuit breaker tripped: **every pipeline stage is paused** while this issue is open." \
+                  "" \
+                  "| | |" \
+                  "|---|---|" \
+                  "| Autofix PR | #${pr_number} |" \
+                  "| Tracked error | #${gh_issue} (\`${short_id}\`) |" \
+                  "| Deploy completed | \`${deploy_done}\` |" \
+                  "| Events seen after deploy | last seen \`${last_seen}\` |" \
+                  "" \
+                  "**Runbook** (doc/project/self-healing.md § Runbooks): triage the regression, revert the PR if needed (\`git revert\` + merge, which redeploys), then close this issue to resume the pipeline." \
+                  "" \
+                  "_Opened automatically by the verify stage. (run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})_")"
+            fi
+          done < <(jq -c '.[]' <<< "$merged")

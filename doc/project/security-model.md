@@ -99,6 +99,21 @@ The headline boundaries an attacker probes:
 4. **External egress.** User text and images are sent to external AI providers for
    recognition/embedding. This is a one-way **data-egress** boundary: per-Move BYO
    keys, encrypted at rest, no secret/PII leakage.
+5. **Sentry-derived data entering CI (self-healing pipeline).** The `Self-Healing`
+   workflow ingests Sentry error data and writes to **world-readable** sinks
+   (GitHub issues, PRs, Actions logs) and into an agent prompt. Sentry event
+   content is **attacker-influenceable** (a crafted request becomes an exception
+   message becomes pipeline input — a prompt-injection and PII channel), so the
+   boundary is enforced **by construction**, not by prompt compliance: all Sentry
+   data enters through the whitelist reducer
+   [`script/self_healing/sentry_fetch.rb`](../../script/self_healing/sentry_fetch.rb)
+   — exception classes, culprits, in-app frame locations, counts, and timestamps
+   pass (charset-checked, truncated); exception **messages**, breadcrumbs,
+   request/user context, and tag values **never** do. Hostile-payload specs pin
+   the boundary (`spec/script/self_healing/sentry_fetch_spec.rb`). The pipeline's
+   own control plane (`.github/**`, `script/**`) is deny-listed for autofix PRs,
+   the scorer always executes from `main`, and the fix agent holds no push
+   credential. See [`self-healing.md`](self-healing.md).
 
 ---
 
@@ -213,6 +228,8 @@ each with where the control lives, so a finding can be traced to code:
   model (the non-adversarial counterpart to this doc).
 - [`app/misc/AGENTS.md`](../../app/misc/AGENTS.md) — auth-layer gotchas.
 - [`app/mcp/AGENTS.md`](../../app/mcp/AGENTS.md) — MCP token + upload handshake.
+- [`self-healing.md`](self-healing.md) — the automated Sentry→fix-PR pipeline and
+  its safety engine (trust boundary #5 above).
 - CI static checks: Brakeman + bundle-audit in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).
 
 _Last updated: 2026-07-02 (accepted risk: WebAuthn ceremonies bind to the request host — F4/PR-3 not pursued; earlier: tenant-membership boundary — F4; shared-schema Active Storage blob delivery — F5)._

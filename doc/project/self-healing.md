@@ -43,25 +43,31 @@ merge commit; the release page shows commits and a production deploy.
 
 ## Pipeline overview
 
-```
-Sentry (prod errors, PII-scrubbed at ingest — config/initializers/sentry.rb)
-  │ cron */30 poll (self-healing.yml `triage`)
-  ▼
-triage: kill switch + circuit breaker + dedupe + caps → public-safe GitHub issue
-  ▼
-fix:    whitelist-scrubbed event context → claude-code-action (failing spec →
-        minimal fix) → assessment.json → App-token push → PR "Closes #N"
-  ▼
-score:  deterministic scorer FROM MAIN (script/self_healing/score.rb)
-        → autofix:auto-eligible | autofix:needs-human + breakdown comment
-  ▼
-steward (later cycles): budget → deploy green → checks green → Codex verdict
-        → update-branch if behind → direct squash merge → Sentry resolved
-  ▼
-deploy.yml (existing push-to-main deploy) → production
-  ▼
-verify: new events on the Sentry issue after the deploy completed?
-        ⇒ reopen the GitHub issue + open a `self-healing-halt` issue (breaker)
+```mermaid
+flowchart TD
+    SENTRY["Sentry — prod errors,<br/>PII-scrubbed at ingest<br/>(config/initializers/sentry.rb)"]
+    TRIAGE["triage (cron */30)<br/>kill switch · circuit breaker ·<br/>dedupe · caps"]
+    ISSUE["Public-safe GitHub issue<br/>(whitelist-reduced fields only)"]
+    FIX["fix<br/>claude-code-action: failing spec →<br/>minimal fix → assessment.json<br/>(no push credential)"]
+    PR["PR via App token<br/>'Closes #N' — App identity<br/>makes CI run"]
+    SCORE["score (FROM MAIN)<br/>script/self_healing/score.rb<br/>hard gates + weighted score"]
+    STEWARD["steward (later cycles)<br/>budget → deploy green → no failing<br/>check → Codex verdict → mergeState<br/>CLEAN → direct squash merge"]
+    DEPLOY["deploy.yml<br/>(existing push-to-main deploy)"]
+    VERIFY["verify<br/>new Sentry events after<br/>deploy completed?"]
+    HALT["self-healing-halt issue<br/>(circuit breaker — every<br/>stage no-ops while open)"]
+
+    SENTRY -->|poll, whitelist-reduced| TRIAGE
+    TRIAGE --> ISSUE
+    ISSUE --> FIX
+    FIX --> PR
+    PR --> SCORE
+    SCORE -->|autofix:auto-eligible| STEWARD
+    SCORE -->|autofix:needs-human| HUMAN["Human review path"]
+    STEWARD -->|squash merge| DEPLOY
+    DEPLOY --> VERIFY
+    VERIFY -->|clean| DONE["Sentry: resolvedInNextRelease"]
+    VERIFY -->|fix did not hold| HALT
+    HALT -.->|blocks| TRIAGE
 ```
 
 Separation of duties: **Claude** (claude-code-action) writes the fix; **Codex**
@@ -99,6 +105,139 @@ token is minted by a deterministic workflow step after the agent finishes.
   attacker-influenceable → prompt-injection and PII channels). See
   `security-model.md`.
 
+**Accepted risk — no pre-merge live verification on the bot path.** Human PRs
+run the mandatory live `/product-review` (AGENTS.md §5) before pushing; the
+pipeline structurally cannot (no `bin/cli` container stack or real browser in
+CI, and `rack_test` system specs execute no JavaScript). Mitigations, layered:
+the browser-only failure classes this repo has been bitten by live behind
+deny-listed paths (`app/javascript/**`, `app/assets/**` — untestable under
+`rack_test`); the blast radius caps what an autofix may touch at all; Codex
+independently reviews every PR pre-merge; and post-deploy verification plus
+the circuit breaker bound the damage window to about one cron cycle. A
+regression class that slips all four layers is the residual risk accepted in
+exchange for autonomy — revisit if a real incident shows the layers are not
+enough.
+
+## Post-deploy verification (the breaker's trigger)
+
+Each cycle, for every autofix PR merged in the last 24 h whose deploy has
+completed: if the Sentry issue's `last_seen` is **after** the deploy's
+completion time, the fix did not hold — the verify stage reopens the GitHub
+issue and opens a `self-healing-halt` issue, halting every stage until a human
+closes it. Timestamps, not release tags, are the signal: a merge SHA can be
+superseded before its deploy runs, so "events after the deploy that shipped
+the fix completed" is the reliable check. Residual window: one cron cycle
+(~30 min) between a bad deploy and the breaker tripping.
+
+## Runbooks
+
+**Pause the pipeline** (planned work, noisy period): set the repo variable
+`SELF_HEALING_ENABLED` to anything but `true`. Autonomy alone can be paused by
+unsetting `SELF_HEALING_AUTONOMY_ENABLED` (issues and scored PRs keep flowing,
+nothing merges).
+
+**Triage a halt** (`self-healing-halt` issue open — the pipeline is stopped):
+
+1. Read the halt issue: it names the autofix PR, the tracked error issue, the
+   deploy completion time, and the post-deploy `last_seen`.
+2. Check the Sentry issue — same failure mode, or a new one at the same
+   location? (The GitHub issue's frames are the pre-fix snapshot to compare
+   against.)
+3. If the fix is wrong: **revert forward** — `git revert <squash SHA>` on a
+   branch, PR, merge (the merge push deploys the revert). Never rewrite main.
+4. If the fix is right but incomplete: fix forward on a new branch (a human
+   one — the Sentry issue's GitHub issue stays open and `autofix:attempted`,
+   so the pipeline won't touch it again).
+5. Close the halt issue to resume the pipeline.
+
+**Emergency rollback** (prod is broken now, can't wait for a revert deploy):
+`mise x -- kamal rollback <previous version>` from a local checkout — with the
+caveat that **the schema never rolls back** (the entrypoint runs
+`db:prepare && db:migrate` on boot), which is exactly why migrations are
+deny-listed for autofix PRs: an autofix rollback is always schema-safe.
+
+**Deploy didn't fire after a merge** (skip marker slipped through, workflow
+hiccup): `unset GITHUB_TOKEN && gh workflow run Deploy --ref main`.
+
+**Retry a failed fix attempt**: remove the issue's `autofix:attempted` label —
+the next cycle picks it up again (the fix branch is force-pushed).
+
+## Label state machine
+
+| Label | Lives on | Meaning |
+|---|---|---|
+| `autofix` | issue + PR | Created/managed by the pipeline. |
+| `sentry:<shortId>` | issue + PR | Binds them to one Sentry issue; the all-states dedupe key. Exception: a CLOSED ticket whose Sentry issue turns `regressed` is REOPENED by triage (the verifier only watches 24 h) — visibility is automatic, a fresh fix attempt still needs a human to remove `autofix:attempted`. |
+| `autofix:attempted` | issue | A fix attempt ran (set BEFORE the agent runs — the retry-loop guard). Remove it to consciously allow a retry. |
+| `autofix:auto-eligible` / `autofix:needs-human` | PR | The scorer's verdict, re-derived every cycle with an upserted breakdown comment. |
+| `self-healing-halt` | issue | Circuit breaker: while one is open, every stage no-ops. Close after triage to resume. |
+
+## Fix attempt lifecycle
+
+1. `select` picks up to 2 open, unattempted `autofix` issues.
+2. `fix` (per issue, matrix): labels the issue `autofix:attempted` first, checks
+   out `main` with **no persisted credentials**, boots the CI Postgres service,
+   stages whitelist-reduced context (`tmp/autofix/issue.md`, `event.json`), and
+   runs `claude-code-action` with `.github/autofix/fix-prompt.md` — strict TDD
+   (failing regression spec first), house conventions, path/size constraints,
+   an honesty-calibrated `assessment.json`, and **no push/gh/network tools**
+   (`--max-turns 40`, 30-minute timeout).
+3. Deterministic post-steps validate (commits exist, assessment well-formed,
+   `fixable: true`) and only then mint the App token, push
+   `fix/sentry-<shortid>`, and open the PR (`Closes #<issue>`, assessment
+   embedded in an HTML comment for the scorer). A failed attempt is reported on
+   the issue instead — nothing is pushed.
+4. `score` re-scores **every** open autofix PR from `main` each cycle:
+   hard gates + weighted score → labels + a transparent breakdown comment.
+
+Until autonomy is enabled (`SELF_HEALING_AUTONOMY_ENABLED` after the canary
+drill), nothing merges — scored PRs wait for a human, which doubles as the
+scorer's calibration window: compare `autofix:auto-eligible` labels against
+what review actually found before enabling autonomy.
+
+## Steward (the autonomy switch)
+
+One merge per cycle, of the **oldest** `autofix:auto-eligible` PR, only when
+every gate agrees — evaluated in order, every uncertain state failing closed
+(demote to `autofix:needs-human`) or waiting for the next cycle:
+
+1. **Autonomy variable** — the job doesn't run without
+   `SELF_HEALING_AUTONOMY_ENABLED == 'true'` (on top of the kill switch and
+   circuit breaker).
+2. **Merge budget** — ≤ 3 automated merges per 24 h.
+3. **Deploy pipeline healthy** — the last `Deploy` run on main completed and
+   didn't fail; an in-flight deploy means wait.
+4. **Staleness** — a PR open > 48 h is demoted (something kept it unmerged;
+   a human should look).
+5. **No failing check on HEAD** — any `statusCheckRollup` conclusion of
+   FAILURE/ERROR/TIMED_OUT/CANCELLED demotes (checked by name via the rollup,
+   never `gh pr checks` buckets, which flap mid-run). Whether every
+   *required* context is green is deliberately NOT re-derived from a
+   hard-coded list — GitHub's own `mergeStateStatus` (gate 7) answers that
+   from live branch protection, so a renamed or newly-required check can
+   never be silently bypassed.
+6. **Independent review verdict (dual-channel, recency-anchored)** — findings
+   are a formal `chatgpt-codex-connector[bot]` review after the last commit
+   (demote: a human triages findings, always — they override any score); a
+   clean round is an issue comment containing "Didn't find any major issues"
+   after the last commit (matched loosely — the exact wording is
+   canary-verified). **No verdict within 90 minutes of the last commit ⇒
+   fail closed** (demote). If the canary drill shows Codex ignores bot PRs
+   entirely, the designed fallback is a second-model review job
+   (`openai/codex-action`, read-only, machine-readable
+   `AUTOFIX_REVIEW_STATUS:` first line — the security-audit house pattern)
+   feeding this same gate.
+7. **GitHub's merge verdict (live branch protection)** — `mergeStateStatus`
+   must be `CLEAN` (every required context green AND up to date). `BEHIND`
+   triggers `update-branch` with the **App token** (so the update push
+   retriggers CI) and waits; `DIRTY` demotes; anything else waits (bounded by
+   the staleness gate).
+8. **Merge** — direct `gh pr merge --squash` with the App token at decision
+   time (no enable-auto-merge race, and the App identity is what makes the
+   merge push trigger CI-on-main + the production deploy). Post-merge: the
+   Sentry issue is set to `resolvedInNextRelease` and an audit-trail comment
+   records every gate's state.
+
 ## Manual setup checklist
 
 One-time provisioning, in order:
@@ -132,9 +271,10 @@ One-time provisioning, in order:
 4. **Anthropic** → Actions secret `AUTOFIX_ANTHROPIC_API_KEY`, with a spend
    cap configured in the Anthropic console (API key, not subscription OAuth —
    unattended CI billing must be capped and attributable).
-5. Repo variable `SELF_HEALING_ENABLED=true`; labels `autofix`,
-   `autofix:auto-eligible`, `autofix:needs-human`, `self-healing-halt`
-   (`sentry:<shortId>` labels are created lazily by triage).
+5. Repo variable `SELF_HEALING_ENABLED=true`. No label setup needed — the
+   pipeline creates/refreshes every label it uses (`autofix`, `sentry:*`,
+   `autofix:attempted`, `autofix:auto-eligible`, `autofix:needs-human`,
+   `self-healing-halt`) idempotently at its own use sites.
 6. Verify release tagging (§ Release tracking above).
 7. **Canary drill — gates autonomy.** Using the App identity: open a trivial
    PR → confirm (a) the branch push triggers CI, (b) whether Codex reviews a
