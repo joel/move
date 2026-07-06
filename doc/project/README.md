@@ -13,6 +13,7 @@ infrastructure / "how it actually runs and ships" reference.)
 | [`security-model.md`](security-model.md) | Trust boundaries, assets/controls, per-class review checklist, accepted risks — with a trust-boundary diagram. The threat-model reference for the dedicated security pass (`/execution-plan` Step 5d) and the scheduled `Security Audit` workflow. |
 | [`new-app-recipe.md`](new-app-recipe.md) | Step-by-step reproducible recipe (commands + config) to build/deploy a new multi-tenant app on this stack. |
 | [`backups.md`](backups.md) | Scheduled encrypted DB backups (kamal-backup accessory → restic → Cloudflare R2): architecture, secrets, ops + restore/drill runbooks, full-disaster recipe, known gaps (#536). |
+| [`postmortem-seaweedfs-corruption.md`](postmortem-seaweedfs-corruption.md) | Incident postmortem: silent progressive SeaweedFS corruption (~35% of photos lost, unrecoverable) → Cloudflare R2 migration. Root cause, the two mis-diagnoses, why recovery failed, and the **reusable lessons** (full-read detection, off-box durability, shared-resource delete guards). #537/#567. |
 | [`self-healing.md`](self-healing.md) | Sentry → issue → agent fix PR → confidence-gated auto-merge → deploy → post-deploy verification: pipeline stages, safety engine (kill switch, circuit breaker, blast radius, scorer), setup checklist, runbooks. |
 | [`ai-providers.md`](ai-providers.md) | Recognition + embedding provider adapters: fake vs. openai/anthropic, how to enable OpenAI in prod (key → flip → reindex), cost, rollback. |
 | [`ux-conventions.md`](ux-conventions.md) | Behavioural/interaction conventions (defaults, ordering, state coverage, post-action visibility, memory) — the *feel* counterpart to the Phase D0 *look* system. Applied at plan-time via the `/execution-plan` UX step, enforced via `/code-review`. |
@@ -35,4 +36,4 @@ Per root [`AGENTS.md`](../../AGENTS.md) §7, **every implementation that changes
 architecture, infrastructure, deploy, or a cross-cutting flow must update these
 docs and their diagrams** before the PR merges.
 
-_Last updated: 2026-07-04 (encrypted DB backups via kamal-backup → R2, #536)._
+_Last updated: 2026-07-06 (SeaweedFS→R2 media migration + corruption postmortem, #537/#567)._
