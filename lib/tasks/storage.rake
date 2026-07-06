@@ -25,7 +25,17 @@ namespace :storage do
     expected_lost = Set.new
     Organization.pluck(:slug).each do |slug|
       Apartment::Tenant.switch(slug) do
-        Media.with_discarded.where(image_unavailable: true).with_attached_image.find_each { |m| expected_lost << m.image.blob.key }
+        Media.with_discarded.where(image_unavailable: true).with_attached_image.find_each do |m|
+          master = m.image.blob
+          expected_lost << master.key
+          # A lost master's derived variants (:thumb/:detail) live in the same
+          # corrupt volume, so a missing/corrupt variant object of a known-lost
+          # photo would also fail to download and abort the sweep — allowlist
+          # those keys too.
+          ActiveStorage::VariantRecord.where(blob_id: master.id).includes(image_attachment: :blob).find_each do |vr|
+            expected_lost << vr.image.blob.key if vr.image.attached?
+          end
+        end
       end
     end
     puts "[storage:backfill_to_r2] #{expected_lost.size} known-lost keys allowlisted (skippable)"
