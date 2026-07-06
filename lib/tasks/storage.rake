@@ -13,6 +13,20 @@ namespace :storage do
     dst = ActiveStorage::Blob.services.fetch(:r2)
     $stdout.sync = true
 
+    # The ONLY source reads we tolerate failing are the masters already known-lost
+    # to the #560 corruption (flagged image_unavailable). Any OTHER download
+    # failure means the SOURCE itself is unhealthy (auth / network / misconfig) —
+    # in which case every blob would "fail" and, without this allowlist, the task
+    # would mark the whole store unreadable and exit DONE with nothing copied.
+    # Build the allowlist of known-lost blob keys up front so anything else aborts.
+    expected_lost = Set.new
+    Organization.pluck(:slug).each do |slug|
+      Apartment::Tenant.switch(slug) do
+        Media.where(image_unavailable: true).with_attached_image.find_each { |m| expected_lost << m.image.blob.key }
+      end
+    end
+    puts "[storage:backfill_to_r2] #{expected_lost.size} known-lost keys allowlisted (skippable)"
+
     total = ActiveStorage::Blob.count
     checked = copied = present = unreadable = 0
     puts "[storage:backfill_to_r2] #{total} blobs — SeaweedFS -> R2"
@@ -22,14 +36,16 @@ namespace :storage do
       if dst.exist?(blob.key)
         present += 1
       else
-        # Only an unreadable SOURCE (the #560 corruption) is skipped — an expected,
-        # known-lost object. Everything else propagates.
         data =
           begin
             src.download(blob.key)
-          rescue StandardError => e # rubocop:disable Move/BroadRescue -- a corrupt/missing source (#560) is skipped, not fatal
+          rescue StandardError => e # rubocop:disable Move/BroadRescue -- only allowlisted known-lost keys are skipped; every other source failure re-raises
+            # Tolerated ONLY for a known-lost key; any other source read failure
+            # means the source is unhealthy → re-raise and abort the whole run.
+            raise unless expected_lost.include?(blob.key)
+
             unreadable += 1
-            puts "[storage:backfill_to_r2] SKIP unreadable source key=#{blob.key} (#{e.class})"
+            puts "[storage:backfill_to_r2] SKIP known-lost key=#{blob.key} (#{e.class})"
             nil
           end
         # The upload is deliberately NOT rescued: a DESTINATION (R2) write failure
