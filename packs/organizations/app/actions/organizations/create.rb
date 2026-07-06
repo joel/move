@@ -8,7 +8,7 @@ module Organizations
   # and provisions the Apartment tenant schema. All in the public schema.
   class Create < BaseAction
     # Subdomains that route to the app/apex or sibling services, never tenants.
-    RESERVED_SLUGS = %w[move mail storage bucket www app admin api].freeze
+    RESERVED_SLUGS = %w[move mail storage bucket www app admin api media].freeze
 
     #: (name: untyped, slug: untyped, owner: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(name:, slug:, owner:)

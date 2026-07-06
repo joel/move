@@ -9,7 +9,8 @@
 #
 #   PUBLIC (app/public): Media, RecognitionRun, RecognitionSuggestion.
 #   PUBLIC (sigil): Captures::Create, Captures::SessionContent, RecognitionRuns::
-#     Enqueue, RecognitionRuns::Retry, RecognitionProviders.
+#     Enqueue, RecognitionRuns::Retry, RecognitionProviders, MediaVariants::
+#     TransformUrl (the display-URL builder the root views/components call).
 #   PRIVATE: ImageNormalizer, MediaVariants::Prewarm(+Job), RecognitionRuns::Process
 #     (+Job), the provider adapters, and the capture/prewarm subscribers.
 #

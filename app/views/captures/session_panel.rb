@@ -125,7 +125,7 @@ module Views
                    "rounded-lg bg-surface-container-high text-muted") do
           if media.image_displayable?
             img(
-              src: view_context.rails_storage_proxy_path(media.image.variant(:thumb)),
+              src: MediaVariants::TransformUrl.for(media, :thumb),
               class: "h-full w-full object-cover", alt: "", loading: "lazy"
             )
           elsif media.image_unavailable?

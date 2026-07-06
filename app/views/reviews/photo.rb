@@ -69,7 +69,7 @@ module Views
           div(class: "relative overflow-hidden rounded-card border border-card-border bg-surface-container-high") do
             badge
             if @media.image_displayable?
-              img(src: view_context.rails_storage_proxy_path(@media.image.variant(:detail)),
+              img(src: MediaVariants::TransformUrl.for(@media, :detail),
                   class: "aspect-square w-full object-cover lg:aspect-auto lg:h-full", alt: "", loading: "lazy")
             elsif @media.image_unavailable?
               div(class: "flex aspect-square w-full flex-col items-center justify-center gap-2 text-muted") do

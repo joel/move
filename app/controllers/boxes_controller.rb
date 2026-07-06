@@ -317,7 +317,8 @@ class BoxesController < MoveScopedController
     Views::Boxes::Show.new(
       move: @move, box: @box, items: items,
       # Gallery photos only (not_generated): generated images render via ItemCard.
-      # Preload the blob so the grid's :thumb variant proxy URLs don't N+1 the blob.
+      # Preload the blob so the grid's edge-transform URLs (which read blob.key)
+      # don't N+1 the blob (#572).
       # ready: exclude captures still ingesting / failed (#545) — those show
       # (with status) only in the capture panel, never as an inert gallery tile.
       media: @box.media.ready.not_generated.includes(image_attachment: :blob).recent_first,

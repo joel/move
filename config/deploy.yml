@@ -54,6 +54,11 @@ env:
     - R2_ACCESS_KEY_ID
     - R2_SECRET_ACCESS_KEY
     - R2_ENDPOINT
+    # Cloudflare-edge media transform (#572). DEDICATED HMAC secret shared with the
+    # media-transform Worker (workers/media-transform) — NOT secret_key_base, so it
+    # rotates independently and a Worker-side leak can't forge any other signed
+    # artefact. The same value is set on the Worker via `wrangler secret put`.
+    - MEDIA_TRANSFORM_SECRET
     # Google social sign-in (OmniAuth redirect button + One Tap). When unset,
     # the Google button/One Tap stay hidden, so the app runs fine without them.
     - GOOGLE_CLIENT_ID
@@ -87,6 +92,13 @@ env:
     # service; dev/test stay on seaweedfs/Disk.
     R2_BUCKET: move-media
     R2_REGION: auto
+
+    # Cloudflare-edge media transform Worker host (#572). Non-sensitive (public
+    # hostname), like R2_BUCKET. Present here means prod mints edge-transform URLs,
+    # so the Worker at this host MUST be deployed before this config ships (else
+    # images break) — see workers/media-transform/README.md. Dev/test leave it
+    # unset and fall back to the same-origin master proxy.
+    MEDIA_TRANSFORM_HOST: media.move-easy.org
     # R2 rejects the checksum integrity headers newer aws-sdk-s3 sends by default
     # ("when_supported"); "when_required" sends them only when the S3 op mandates
     # it, which R2 accepts. Global to the aws-sdk (both S3 services); SeaweedFS is

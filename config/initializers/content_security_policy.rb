@@ -25,11 +25,20 @@ Rails.application.configure do
   zone = Rails.application.config.x.tenant_zone.to_s.presence
   cable_origins = zone ? ["wss://#{zone}", "wss://*.#{zone}"] : ["wss:"]
 
+  # In prod, media <img> is served from the Cloudflare-edge transform Worker on a
+  # distinct host (media.<zone>), so img-src must allow it. Unset in dev/test — the
+  # master-proxy fallback is same-origin (:self), so the policy is unchanged there.
+  # Read ENV directly (like GOOGLE_CLIENT_ID above), NOT config.x.media_transform_host:
+  # this initializer sorts before media_transform.rb, so config.x isn't set yet here.
+  media_host = ENV["MEDIA_TRANSFORM_HOST"].presence
+  media_img = media_host ? ["https://#{media_host}"] : []
+
   config.content_security_policy do |policy|
     policy.default_src :self
     policy.script_src(:self, *google)                       # + nonce (below); no unsafe-inline
     policy.style_src(:self, :unsafe_inline, *google)        # inline style="…" attrs
-    policy.img_src(:self, :data, :blob, *google, *(google.empty? ? [] : ["https://*.googleusercontent.com"]))
+    policy.img_src(:self, :data, :blob, *media_img, *google,
+                   *(google.empty? ? [] : ["https://*.googleusercontent.com"]))
     policy.font_src :self, :data
     policy.connect_src(:self, *cable_origins, *google)      # + ActionCable wss (see above)
     policy.frame_src(*(google.empty? ? [:none] : google))   # One Tap iframe

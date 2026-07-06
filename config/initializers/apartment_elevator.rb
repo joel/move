@@ -11,7 +11,11 @@ require "apartment/elevators/generic"
 # PublicSuffix-based Subdomain elevator rejects — it would never extract the
 # subdomain in development.
 class MoveTenantElevator < Apartment::Elevators::Generic
-  EXCLUDED_SUBDOMAINS = %w[move mail storage bucket www].freeze
+  # `media` is the Cloudflare-edge image-transform Worker host (media.<zone>, #572):
+  # a Worker Custom Domain served entirely at Cloudflare's edge, so it never reaches
+  # Rails. Excluded defensively so it can never resolve as a tenant if a request
+  # ever fell through to the origin.
+  EXCLUDED_SUBDOMAINS = %w[move mail storage bucket www media].freeze
 
   # An unknown tenant subdomain must not disclose existence — return 404.
   def call(env)

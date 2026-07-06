@@ -75,7 +75,7 @@ module Components
         div(class: tile_classes) do
           if image?
             img(
-              src: view_context.rails_storage_proxy_path(@item.source_media.image.variant(:thumb)),
+              src: MediaVariants::TransformUrl.for(@item.source_media, :thumb),
               alt: "", loading: "lazy", class: "h-full w-full object-cover"
             )
           elsif @generating
