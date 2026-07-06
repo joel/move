@@ -697,6 +697,10 @@ class ::Media < ::ApplicationRecord
   def recognition_suggestions=: (::RecognitionSuggestion::ActiveRecord_Associations_CollectionProxy | ::Array[::RecognitionSuggestion]) -> (::RecognitionSuggestion::ActiveRecord_Associations_CollectionProxy | ::Array[::RecognitionSuggestion])
   def recognition_suggestion_ids: () -> ::Array[::String]
   def recognition_suggestion_ids=: (::Array[::String]) -> ::Array[::String]
+  def sourced_items: () -> ::Item::ActiveRecord_Associations_CollectionProxy
+  def sourced_items=: (::Item::ActiveRecord_Associations_CollectionProxy | ::Array[::Item]) -> (::Item::ActiveRecord_Associations_CollectionProxy | ::Array[::Item])
+  def sourced_item_ids: () -> ::Array[::String]
+  def sourced_item_ids=: (::Array[::String]) -> ::Array[::String]
 
   def image_attachment: () -> ::ActiveStorage::Attachment?
   def image_attachment=: (::ActiveStorage::Attachment?) -> ::ActiveStorage::Attachment?
@@ -789,6 +793,10 @@ end
 class ::RecognitionSuggestion < ::ApplicationRecord
 end
 class ::RecognitionSuggestion::ActiveRecord_Associations_CollectionProxy < ::ActiveRecord::Associations::CollectionProxy
+end
+class ::Item < ::ApplicationRecord
+end
+class ::Item::ActiveRecord_Associations_CollectionProxy < ::ActiveRecord::Associations::CollectionProxy
 end
 class ::Move < ::ApplicationRecord
 end

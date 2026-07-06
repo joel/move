@@ -43,6 +43,15 @@ class Media < ApplicationRecord
   belongs_to :box
   has_many :recognition_runs, dependent: :destroy
   has_many :recognition_suggestions, dependent: :destroy
+  # Items this photo produced (recognition or a review-time manual add). Not a
+  # persistence dependency — `Item#source_media` is optional and survives the
+  # photo — but the discard cascade below soft-deletes them with the photo so
+  # Photos::Delete removes a photo *and* everything it sourced in one batch.
+  has_many :sourced_items, class_name: "Item", foreign_key: :source_media_id, inverse_of: :source_media,
+                           dependent: nil
+  # Deleting a photo (Photos::Delete) cascade-soft-deletes its items under one
+  # batch, so a single Discards::CascadeRestore brings the whole set back.
+  discard_cascade_to :sourced_items
   # The attachment is the optimised master (≤2048px JPEG, written by
   # ImageNormalizer); display surfaces serve these sized variants off it rather
   # than the master blob (Phase 42, #299). :thumb feeds the gallery grid + capture

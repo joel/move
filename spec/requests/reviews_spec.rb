@@ -268,4 +268,51 @@ RSpec.describe "Per-photo review" do
       expect(flash[:alert]).to eq(I18n.t("moves.archived_alert"))
     end
   end
+
+  describe "DELETE .../review/photo/:media_id (delete photo)" do
+    it "deletes the photo and its items and redirects to the box" do
+      item = detected(name: "Lamp")
+
+      delete move_box_review_photo_path(move, box, media)
+
+      expect(response).to redirect_to(move_box_path(move, box))
+      expect(flash[:notice]).to eq(I18n.t("reviews.flash.photo_deleted"))
+      expect(Media.kept.exists?(media.id)).to be(false)
+      expect(Item.kept.exists?(item.id)).to be(false)
+    end
+
+    it "refuses on a sealed box (packing only) and keeps the photo" do
+      sealed = create(:box, :sealed, move:)
+      photo = create(:media, move:, box: sealed)
+
+      delete move_box_review_photo_path(move, sealed, photo)
+
+      expect(response).to redirect_to(move_box_review_photo_path(move, sealed, photo))
+      expect(flash[:alert]).to eq(I18n.t("reviews.flash.photo_delete_wrong_phase"))
+      expect(Media.kept.exists?(photo.id)).to be(true)
+    end
+  end
+
+  describe "POST .../review/photo/:media_id/retake (retake photo)" do
+    def upload
+      Rack::Test::UploadedFile.new(Rails.root.join("spec/fixtures/files/sample_image.png"), "image/png")
+    end
+
+    it "replaces the image, clears image_unavailable, and redirects back" do
+      media.update!(image_unavailable: true)
+
+      post move_box_review_retake_photo_path(move, box, media), params: { file: upload }
+
+      expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
+      expect(flash[:notice]).to eq(I18n.t("reviews.flash.photo_retaken"))
+      expect(media.reload.image_unavailable?).to be(false)
+    end
+
+    it "surfaces a friendly error when no file is chosen" do
+      post move_box_review_retake_photo_path(move, box, media)
+
+      expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
+      expect(flash[:alert]).to eq(I18n.t("reviews.flash.retake_errors.no_file"))
+    end
+  end
 end

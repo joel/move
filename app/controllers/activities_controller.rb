@@ -74,6 +74,9 @@ class ActivitiesController < MoveScopedController
     when "Item"
       item = @move.items.with_discarded.find_by(id: activity.subject_id)
       item && Items::Restore.new.call(item:, actor: current_user, source:)
+    when "Media"
+      media = @move.media.with_discarded.find_by(id: activity.subject_id)
+      media && Photos::Restore.new.call(media:, actor: current_user, source:)
     end
   end
 

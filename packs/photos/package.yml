@@ -1,5 +1,7 @@
-# packs/photos — moving a captured photo (Media) to another box.
-#   PUBLIC (sigil): Photos::Move — ReviewsController calls it.
+# packs/photos — photo (Media)-level actions: move, delete, restore.
+#   PUBLIC (sigil): Photos::Move (ReviewsController), Photos::Delete (ReviewsController),
+#   Photos::Restore (ActivitiesController). (Retake lives in packs/captures — it reuses
+#   the capture ingest: ImageNormalizer + recognition.)
 # dependencies: ['.'] (BaseAction + Media/Box are root). visible_to: ['.'].
 enforce_dependencies: true
 enforce_privacy: true

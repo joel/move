@@ -103,6 +103,8 @@ module Views
             list
             add_form if @editable
             move_photo_control if @editable && @move_boxes.any?
+            retake_control if @editable
+            delete_photo_control if @editable && @box.packing?
             footer
           end
         end
@@ -164,6 +166,53 @@ module Views
             render Components::Ui::Button.new(
               label: I18n.t("reviews.photo.move_submit"), type: "submit", variant: :secondary
             )
+          end
+        end
+      end
+
+      # Replace this photo's image in place (Captures::Retake) — recover a corrupt
+      # master or swap a bad shot. Any phase. The tappable button is a label around a
+      # hidden file input (camera on mobile); picking a photo auto-downscales
+      # (capture-upload) and submits. The auto-submit action is on the FILE input, not
+      # the form, so toggling the re-scan checkbox doesn't submit an empty upload.
+
+      #: () -> untyped
+      def retake_control
+        div(class: "mt-stack-gap border-t border-card-border pt-stack-gap") do
+          span(class: "text-label-caps uppercase text-muted") { I18n.t("reviews.photo.retake_heading") }
+          form_with(url: move_box_review_retake_photo_path(@move, @box, @media), method: :post,
+                    data: { controller: "capture-upload" }, class: "mt-2 flex flex-col gap-3") do |form|
+            label(class: "flex items-center gap-2 text-body-md text-muted") do
+              input(type: "checkbox", name: "rerun_recognition", value: "1",
+                    class: "h-4 w-4 rounded border-card-border text-accent-sage focus:ring-accent-sage")
+              plain I18n.t("reviews.photo.retake_rescan")
+            end
+            label(class: "inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full " \
+                         "border border-card-border bg-card px-5 py-2 text-sm font-bold text-text-warm " \
+                         "transition hover:border-accent-sage hover:text-accent-sage active:scale-[0.98]") do
+              render Components::Icons::Camera.new(css: "h-5 w-5")
+              plain I18n.t("reviews.photo.retake_submit")
+              form.file_field :file, accept: "image/*", capture: "environment", required: true, class: "sr-only",
+                                     data: { "capture-upload-target": "file", action: "change->capture-upload#submit" }
+            end
+          end
+        end
+      end
+
+      # Delete this photo and every item it sourced (Photos::Delete) — packing only,
+      # soft + restorable from the activity feed. A confirm guards the cascade.
+
+      #: () -> untyped
+      def delete_photo_control
+        div(class: "mt-stack-gap border-t border-card-border pt-stack-gap") do
+          span(class: "text-label-caps uppercase text-muted") { I18n.t("reviews.photo.delete_heading") }
+          danger_classes = "inline-flex w-full items-center justify-center gap-2 rounded-full bg-error " \
+                           "px-5 py-2 text-sm font-bold text-on-error transition hover:opacity-90 active:scale-[0.98]"
+          button_to(move_box_review_photo_path(@move, @box, @media), method: :delete, form_class: "mt-2",
+                                                                     class: danger_classes,
+                                                                     data: { turbo_confirm: I18n.t("reviews.photo.delete_confirm") }) do
+            render Components::Icons::Trash.new(css: "h-5 w-5")
+            plain I18n.t("reviews.photo.delete_submit")
           end
         end
       end
