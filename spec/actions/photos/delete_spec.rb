@@ -27,6 +27,17 @@ RSpec.describe Photos::Delete do
     expect(Item.with_discarded.where(id: a.id).pick(:discarded_by_parent_type)).to eq("Media")
   end
 
+  it "leaves items moved to another box alone (never reaches into another box, #577)" do
+    co_located = create(:item, move:, box:, source_media: media)
+    other = create(:box, :sealed, move:)
+    moved_away = create(:item, move:, box: other, source_media: media)
+
+    expect(call).to be_success
+
+    expect(Item.kept.exists?(co_located.id)).to be(false) # deleted with the photo
+    expect(Item.kept.exists?(moved_away.id)).to be(true)  # survives — it lives in another box now
+  end
+
   it "emits media.discarded with the batch id" do
     allow(Rails.event).to receive(:notify).and_call_original
 

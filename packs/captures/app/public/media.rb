@@ -43,15 +43,18 @@ class Media < ApplicationRecord
   belongs_to :box
   has_many :recognition_runs, dependent: :destroy
   has_many :recognition_suggestions, dependent: :destroy
-  # Items this photo produced (recognition or a review-time manual add). Not a
-  # persistence dependency — `Item#source_media` is optional and survives the
-  # photo — but the discard cascade below soft-deletes them with the photo so
-  # Photos::Delete removes a photo *and* everything it sourced in one batch.
-  has_many :sourced_items, class_name: "Item", foreign_key: :source_media_id, inverse_of: :source_media,
-                           dependent: nil
-  # Deleting a photo (Photos::Delete) cascade-soft-deletes its items under one
-  # batch, so a single Discards::CascadeRestore brings the whole set back.
-  discard_cascade_to :sourced_items
+  # Items this photo sourced that are STILL co-located in its box — the discard
+  # cascade for Photos::Delete. Scoped to the photo's own box on purpose (#577):
+  # an item moved to another box keeps its source_media_id (Items::Move), but
+  # deleting the photo must NOT reach into that other box, whose phase guard this
+  # action doesn't hold (it might be sealed/unpacking). Moved-away items survive
+  # with a now-dangling source_media (optional, valid) — mirrors Photos::Move's
+  # co-located rule (#317). Not an AR dependency (source_media survives the photo);
+  # the soft-delete cascade discards these under one batch so a single
+  # Discards::CascadeRestore brings the whole set back.
+  has_many :co_located_sourced_items, ->(media) { where(box_id: media.box_id) },
+           class_name: "Item", foreign_key: :source_media_id, dependent: nil
+  discard_cascade_to :co_located_sourced_items
   # The attachment is the optimised master (≤2048px JPEG, written by
   # ImageNormalizer); display surfaces serve these sized variants off it rather
   # than the master blob (Phase 42, #299). :thumb feeds the gallery grid + capture
