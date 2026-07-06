@@ -19,7 +19,7 @@ ever sees ciphertext.
 | Excluded | Why | Recovery path |
 |---|---|---|
 | `move_production_cache` / `_queue` / `_cable` | Transient by design; `db:prepare` recreates them. Queue contents are in-flight jobs (re-enqueueable); recurring schedules come from `config/recurring.yml`. | `db:prepare` on restore |
-| Media (photos) in the shared SeaweedFS store | Lives outside Kamal, host-wide, shared with sibling apps. | **Gap — tracked in [#537](https://github.com/joel/move/issues/537)** |
+| Media (photos) | **Migrating to Cloudflare R2** ([#567](https://github.com/joel/move/issues/567) / resolves [#537](https://github.com/joel/move/issues/537)) — off-box + ~11-nines durable, so a VM resize can't corrupt it (unlike the on-box SeaweedFS, which lost 126 photos on 2026-07-05). Config-only Active Storage backend swap; runbook in [new-app-recipe.md](new-app-recipe.md) §6b. | **Resolved via #567** (durability) |
 
 ## Architecture
 
@@ -234,7 +234,10 @@ consistency matters more than availability.
 
 ## Known gaps
 
-- **Media is not backed up** — [#537](https://github.com/joel/move/issues/537).
+- **Media durability** — photos are moving from the on-box SeaweedFS to Cloudflare
+  R2 ([#567](https://github.com/joel/move/issues/567) / resolves
+  [#537](https://github.com/joel/move/issues/537)): off-box + durable, so a VM
+  resize can't corrupt them. Runbook: [new-app-recipe.md](new-app-recipe.md) §6b.
   A DB-only restore brings back items/rooms/recognition rows whose photos are
   broken if SeaweedFS lost data.
 - **No backup-failure alerting.** A failing scheduler only shows in

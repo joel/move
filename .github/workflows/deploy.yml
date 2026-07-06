@@ -39,6 +39,12 @@ jobs:
       # move-app S3 identity for the shared SeaweedFS (Active Storage).
       STORAGE_ACCESS_KEY_ID: ${{ secrets.STORAGE_ACCESS_KEY_ID }}
       STORAGE_SECRET_ACCESS_KEY: ${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
+      # Cloudflare R2 — the production media store (#567). Required at deploy time
+      # (env.secret in deploy.yml); under KAMAL_SECRETS_FROM_ENV they must be
+      # exported here or .kamal/secrets resolves them to empty strings.
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       # Encrypted DB backups (#536): restic repository URL + encryption password
       # and the R2 bucket-scoped S3 token pair for the `backup` accessory
       # (doc/project/backups.md). A deploy never touches accessories — the
@@ -74,7 +80,8 @@ jobs:
           missing=()
           for s in KAMAL_REGISTRY_PASSWORD RAILS_MASTER_KEY POSTGRES_PASSWORD \
                    NOTIF_MAIL_USERNAME NOTIF_MAIL_PASSWORD STORAGE_ACCESS_KEY_ID \
-                   STORAGE_SECRET_ACCESS_KEY RESTIC_REPOSITORY RESTIC_PASSWORD \
+                   STORAGE_SECRET_ACCESS_KEY R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY \
+                   R2_ENDPOINT RESTIC_REPOSITORY RESTIC_PASSWORD \
                    AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
             [ -n "${!s}" ] || missing+=("$s")
           done

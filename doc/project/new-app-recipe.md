@@ -315,6 +315,40 @@ capture → recognition):
    - Caveat: a shared anonymous gateway isn't auth-isolated between buckets — it's
      the existing house setup; a per-app accessory is the alternative if you need
      hard isolation.
+   - **Production media is migrating to Cloudflare R2** (#567 / resolves #537). R2
+     is off-box + ~11-nines durable, so a VM resize can never corrupt media again
+     (the 2026-07-05 incident lost 126 photos this way). It's a config-only backend
+     swap — same Active Storage `service: S3`, path-style, account endpoint. The
+     `r2` service (`config/storage.yml`) coexists with `seaweedfs` during the
+     migration; **dev stays on SeaweedFS**; serving stays app-proxied. Runbook:
+     1. **Provision:** create an R2 bucket (`move-media`) + a bucket-scoped S3 API
+        token (Object Read & Write). Set in Doppler `<app>/prd`: `R2_ACCESS_KEY_ID`,
+        `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT` (`https://<account-id>.r2.cloudflarestorage.com`).
+        `R2_BUCKET` / `R2_REGION` (`auto`) are clear env in `deploy.yml`, plus
+        `AWS_REQUEST_CHECKSUM_CALCULATION=when_required` (R2 rejects newer aws-sdk-s3
+        default integrity checksums). Also export the three secrets in
+        `.github/workflows/deploy.yml` (env + guard), or CI deploys resolve them empty.
+     2. **Smoke-test:** `ActiveStorage::Blob.services.fetch(:r2)` → upload/download/
+        delete a test object (confirms aws-sdk-ruby ↔ R2).
+     3. **Shrink first:** `bin/rails images:optimize` so every master is ≤2048px —
+        only optimized images ever reach R2.
+     4. **Backfill + repoint:** `bin/rails storage:backfill_to_r2` — idempotent copy
+        of every readable blob SeaweedFS→R2, *and* it sets each copied blob's
+        `active_storage_blobs.service_name` to `r2`. Active Storage resolves each
+        blob through its persisted `service_name`, NOT the app default, so this
+        repoint is what actually makes existing attachments serve from R2 (and
+        survive emptying the SeaweedFS bucket). Skips the #560 known-lost keys; any
+        *other* source read failure aborts.
+     5. **Cut over:** `config.active_storage.service = :r2` (`production.rb`) — this
+        only points **new** uploads at R2 (existing blobs were repointed in step 4).
+        Deploy, live-verify. SeaweedFS stays as rollback.
+     6. **Decommission:** any uploads that landed on SeaweedFS *between* the step-4
+        backfill and the step-5 cutover deploy still have `service_name = "seaweedfs"`
+        and are absent from R2, so **re-run `storage:backfill_to_r2` one final time**
+        (idempotent — it copies + repoints the delta) immediately before emptying
+        **only** the app's SeaweedFS bucket. Leave the shared gateway for siblings.
+     Follow-up: Cloudflare Image Transformations could replace stored variants with
+     edge resizing (serve masters only).
 3. **Background jobs (Solid Queue):** async in dev, `:inline` in **test** (so an
    upload→process flow completes within an example), and **in-Puma in prod**
    (`SOLID_QUEUE_IN_PUMA: true` in `deploy.yml` env) — no separate jobs role.
