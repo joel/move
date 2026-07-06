@@ -362,6 +362,18 @@ jobs:
         uses: anthropics/claude-code-action@558b1d6cab4085c7753fe402c10bef0fbb92ac7a # v1
         with:
           anthropic_api_key: ${{ secrets.AUTOFIX_ANTHROPIC_API_KEY }}
+          # Pass a token explicitly so the action does NOT try the OIDC path
+          # (its default when no token is given — it exchanges a GitHub OIDC
+          # token for a Claude-App token, which we don't have installed and
+          # which needs `id-token: write` we don't grant; it fails at startup
+          # in setupGitHubToken → getOidcToken). GITHUB_TOKEN is safe here: the
+          # agent's allowedTools have no `git push`, and a GITHUB_TOKEN push
+          # would not trigger workflows anyway — the deterministic App-token
+          # step below is what actually pushes the branch.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Never spill Claude's fix write-up to the public Actions step
+          # summary (content-free-public-sink doctrine, security-model.md).
+          display_report: "false"
           prompt: |
             Read .github/autofix/fix-prompt.md and follow it exactly. Your
             task: produce a candidate fix for GitHub issue
