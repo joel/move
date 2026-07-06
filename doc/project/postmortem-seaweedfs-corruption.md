@@ -124,8 +124,16 @@ silent and slow — a backup taken after rot begins just preserves the rot.**
   same treatment.
 - **Re-shoot** the affected boxes (`~/move-missing-photos-reshoot.csv`, box-by-box —
   heaviest in `PMI → Corsica`). Inventory rows are intact; only photos are gone.
-- Optional hardening: R2 object versioning for point-in-time recovery of accidental
-  deletes.
+- Optional hardening — **delete/overwrite recovery**. R2 provides *durability* (the
+  #537 fix) but **not** object versioning: `Get/PutBucketVersioning` are
+  [unimplemented on R2](https://developers.cloudflare.com/r2/api/s3/api/), so there is
+  no point-in-time restore of an accidental delete/overwrite. Mitigations: (a) Active
+  Storage is content-addressed — it never overwrites a key and only deletes on an
+  explicit `purge`, so the practical residual risk is a buggy bulk-purge or a leaked
+  credential, not silent overwrite; (b) if that risk warrants it, run a periodic
+  **second-copy backup** of `move-media` (bucket→bucket or another provider), the same
+  pattern as the restic DB backups in [`backups.md`](backups.md). R2 has **Object
+  Lifecycle** rules, but those *expire* objects — they are not a recovery mechanism.
 
 ## 7. Tooling reference
 
