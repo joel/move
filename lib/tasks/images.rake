@@ -117,20 +117,32 @@ namespace :images do
 
   desc "Flag media whose master blob is unreadable so surfaces show a placeholder (#563)"
   task flag_unavailable: :environment do
-    # Derives the corrupt set at RUNTIME rather than hardcoding ids: reads a few
-    # bytes of each ready master and flags the ones storage can't return (the #560
-    # corruption). Env-safe — a no-op where storage is healthy (dev/CI/test), so it
-    # is the deploy-time companion to the image_unavailable migration. Idempotent;
-    # only ever sets the flag (a genuinely readable master is never re-hidden).
+    # Derives the corrupt set at RUNTIME rather than hardcoding ids and flags the
+    # masters storage can't return (the #560 corruption). Env-safe — a no-op where
+    # storage is healthy (dev/CI/test). Idempotent; only ever sets the flag (a
+    # genuinely readable master is never re-hidden). with_discarded so soft-deleted
+    # media (whose blobs are still swept by the R2 backfill) are flagged too.
+    #
+    # FULL=1 does a COMPLETE download of each master instead of the fast 64-byte
+    # range probe. The probe only reads the head, so it MISSES blobs truncated at
+    # the END (a SeaweedFS partial write): those pass the probe but fail a full
+    # read and would abort storage:backfill_to_r2. Run `FULL=1 rake
+    # images:flag_unavailable` before a backfill to catch the complete corrupt set;
+    # the default probe is the cheap health check.
     require "timeout"
+    full = ENV["FULL"].present?
     grand = 0
     Organization.pluck(:slug).each do |slug|
       Apartment::Tenant.switch(slug) do
         flagged = 0
-        Media.ready.where(image_unavailable: false).with_attached_image.find_each do |media|
+        Media.with_discarded.ready.where(image_unavailable: false).with_attached_image.find_each do |media|
           blob = media.image.blob
           readable = begin
-            Timeout.timeout(5) { blob.service.download_chunk(blob.key, 0..64) }
+            if full
+              Timeout.timeout(60) { blob.download }
+            else
+              Timeout.timeout(5) { blob.service.download_chunk(blob.key, 0..64) }
+            end
             true
           rescue StandardError # rubocop:disable Move/BroadRescue -- any read error (corrupt/missing/timeout) means "can't display"
             false

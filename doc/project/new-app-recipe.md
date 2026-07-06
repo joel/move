@@ -331,7 +331,16 @@ capture → recognition):
      2. **Smoke-test:** `ActiveStorage::Blob.services.fetch(:r2)` → upload/download/
         delete a test object (confirms aws-sdk-ruby ↔ R2).
      3. **Shrink first:** `bin/rails images:optimize` so every master is ≤2048px —
-        only optimized images ever reach R2.
+        only optimized images ever reach R2. (If the store has corrupt masters, run
+        a scoped variant that skips `image_unavailable` — the stock task aborts on
+        an `Aws::S3::Errors::InternalError` it doesn't rescue.)
+     3b. **Flag the FULL corrupt set:** `FULL=1 bin/rails images:flag_unavailable`.
+        The default probe reads only the first 64 bytes, so it MISSES masters
+        truncated at the END (a partial SeaweedFS write) — those pass the probe but
+        fail the backfill's full read and abort it. `FULL=1` does a complete
+        download of each master and flags every one that can't be fully read, so
+        the backfill's allowlist covers the true corrupt set and only aborts on a
+        genuinely-new failure.
      4. **Backfill + repoint:** `bin/rails storage:backfill_to_r2` — idempotent copy
         of every readable blob SeaweedFS→R2, *and* it sets each copied blob's
         `active_storage_blobs.service_name` to `r2`. Active Storage resolves each
