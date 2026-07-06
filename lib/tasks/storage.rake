@@ -22,13 +22,22 @@ namespace :storage do
       if dst.exist?(blob.key)
         present += 1
       else
-        begin
-          data = src.download(blob.key)
+        # Only an unreadable SOURCE (the #560 corruption) is skipped — an expected,
+        # known-lost object. Everything else propagates.
+        data =
+          begin
+            src.download(blob.key)
+          rescue StandardError => e # rubocop:disable Move/BroadRescue -- a corrupt/missing source (#560) is skipped, not fatal
+            unreadable += 1
+            puts "[storage:backfill_to_r2] SKIP unreadable source key=#{blob.key} (#{e.class})"
+            nil
+          end
+        # The upload is deliberately NOT rescued: a DESTINATION (R2) write failure
+        # — auth, checksum rejection, a transient error — must abort the backfill
+        # so operators never see a "DONE" that silently left blobs uncopied.
+        if data
           dst.upload(blob.key, StringIO.new(data), checksum: blob.checksum, content_type: blob.content_type)
           copied += 1
-        rescue StandardError => e # rubocop:disable Move/BroadRescue -- a corrupt/missing source (#560) must be skipped, not abort the sweep
-          unreadable += 1
-          puts "[storage:backfill_to_r2] SKIP unreadable key=#{blob.key} (#{e.class})"
         end
       end
       if (checked % 50).zero?
