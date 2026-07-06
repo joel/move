@@ -19,7 +19,7 @@ ever sees ciphertext.
 | Excluded | Why | Recovery path |
 |---|---|---|
 | `move_production_cache` / `_queue` / `_cable` | Transient by design; `db:prepare` recreates them. Queue contents are in-flight jobs (re-enqueueable); recurring schedules come from `config/recurring.yml`. | `db:prepare` on restore |
-| Media (photos) | **Migrating to Cloudflare R2** ([#567](https://github.com/joel/move/issues/567) / resolves [#537](https://github.com/joel/move/issues/537)) — off-box + ~11-nines durable, so a VM resize can't corrupt it (unlike the on-box SeaweedFS, which lost 126 photos on 2026-07-05). Config-only Active Storage backend swap; runbook in [new-app-recipe.md](new-app-recipe.md) §6b. | **Resolved via #567** (durability) |
+| Media (photos) | **Migrated to Cloudflare R2** ([#567](https://github.com/joel/move/issues/567) / resolves [#537](https://github.com/joel/move/issues/537)) — off-box + ~11-nines durable, so a VM-coupled loss is structurally impossible (unlike the on-box SeaweedFS, whose progressive volume rot corrupted ~35% of masters). 619 blobs live on R2; move's SeaweedFS bucket was decommissioned 2026-07-06 (738 objects, ~0.7 GB reclaimed). 136 photos were **permanently lost** — corruption predates the Jun-25 backup, so no snapshot has intact copies; the inventory rows survive and the affected boxes are on a re-shoot list. Config-only Active Storage backend swap; runbook in [new-app-recipe.md](new-app-recipe.md) §6b. | **Resolved via #567** (durability); the pre-migration loss is unrecoverable |
 
 ## Architecture
 
