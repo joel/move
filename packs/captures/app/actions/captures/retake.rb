@@ -14,16 +14,24 @@ module Captures
   # and a re-scan would layer new suggestions on top of them. Pass
   # `rerun_recognition: true` to also re-scan (RecognitionRuns::Enqueue).
   #
-  # Allowed in ANY box phase (only the writable-Move guard applies): retake fixes
-  # existing data rather than adding inventory, and the primary use case is
-  # recovering corrupt photos on already-sealed boxes. Refuses while a recognition
-  # run is still in flight (a re-scan could race the swap). Caller owns tenant context.
+  # The image SWAP is allowed in ANY box phase (only the writable-Move guard
+  # applies): it fixes existing data rather than adding inventory, and the primary
+  # use case is recovering corrupt photos on already-sealed boxes. The optional
+  # RE-SCAN is different — it materializes NEW items, which is capture, so it's
+  # gated to a capturable (packing) box exactly like Captures::Create; asking to
+  # re-scan a closed box fails rather than smuggling items into it. Refuses while a
+  # recognition run is still in flight (a re-scan could race the swap). Caller owns
+  # tenant context.
   class Retake < BaseAction
     #: (media: untyped, actor: untyped, ?file: untyped, ?rerun_recognition: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, actor:, file: nil, rerun_recognition: false)
       yield ensure_writable(media.move)
       return Failure(:no_file) if file.blank?
       return Failure(:recognition_in_flight) if media.recognition_in_flight?
+      # Re-scan adds items → only into a capturable (packing) box (mirrors
+      # Captures::Create's not_capturable guard). Validated up front so a rejected
+      # re-scan never leaves the image half-swapped.
+      return Failure(:rescan_wrong_phase) if rerun_recognition && !media.box.capturable?
 
       yield swap_image(media, file)
       yield RecognitionRuns::Enqueue.new.call(media: media) if rerun_recognition

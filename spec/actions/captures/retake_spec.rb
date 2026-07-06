@@ -64,6 +64,18 @@ RSpec.describe Captures::Retake do
     expect(retake(photo:)).to be_success
   end
 
+  it "refuses a re-scan on a non-packing box (re-scan adds items) and doesn't swap" do
+    sealed = create(:box, :sealed, move:)
+    photo = create(:media, move:, box: sealed)
+    old_blob_id = photo.image.blob.id
+
+    result = retake(photo:, rerun_recognition: true)
+
+    expect(result).to be_failure
+    expect(result.failure).to eq(:rescan_wrong_phase)
+    expect(photo.reload.image.blob.id).to eq(old_blob_id) # nothing swapped
+  end
+
   it "refuses without a file" do
     result = retake(file: nil)
     expect(result).to be_failure

@@ -182,10 +182,15 @@ module Views
           span(class: "text-label-caps uppercase text-muted") { I18n.t("reviews.photo.retake_heading") }
           form_with(url: move_box_review_retake_photo_path(@move, @box, @media), method: :post,
                     data: { controller: "capture-upload" }, class: "mt-2 flex flex-col gap-3") do |form|
-            label(class: "flex items-center gap-2 text-body-md text-muted") do
-              input(type: "checkbox", name: "rerun_recognition", value: "1",
-                    class: "h-4 w-4 rounded border-card-border text-accent-sage focus:ring-accent-sage")
-              plain I18n.t("reviews.photo.retake_rescan")
+            # Re-scan adds items, so it's only offered while the box can capture
+            # (packing) — the action rejects it otherwise. A plain image swap stays
+            # available in any phase.
+            if @box.capturable?
+              label(class: "flex items-center gap-2 text-body-md text-muted") do
+                input(type: "checkbox", name: "rerun_recognition", value: "1",
+                      class: "h-4 w-4 rounded border-card-border text-accent-sage focus:ring-accent-sage")
+                plain I18n.t("reviews.photo.retake_rescan")
+              end
             end
             label(class: "inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full " \
                          "border border-card-border bg-card px-5 py-2 text-sm font-bold text-text-warm " \

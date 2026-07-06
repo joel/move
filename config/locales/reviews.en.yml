@@ -40,6 +40,7 @@ en:
       retake_errors:
         no_file: "Choose a photo to replace it with."
         recognition_in_flight: "Recognition is still running on this photo — try again in a moment."
+        rescan_wrong_phase: "Re-scanning adds items, which is only possible while the box is packing. Replace the photo without re-scanning, or unseal the box first."
         image_too_large: "That image is too large. Try a smaller photo."
         unsupported_image: "That file isn't a supported image. Use a JPEG, PNG, or WEBP."
         failed: "Could not replace the photo. Try again."

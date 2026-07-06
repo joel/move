@@ -153,8 +153,8 @@ class ReviewsController < MoveScopedController
 
   #: (untyped reason) -> String
   def retake_error(reason)
-    key = %i[no_file recognition_in_flight image_too_large unsupported_image].include?(reason) ? reason : :failed
-    t("reviews.flash.retake_errors.#{key}")
+    known = %i[no_file recognition_in_flight rescan_wrong_phase image_too_large unsupported_image]
+    t("reviews.flash.retake_errors.#{known.include?(reason) ? reason : :failed}")
   end
 
   # Stream the new item in by replacing the whole list (highlighting the new row)
