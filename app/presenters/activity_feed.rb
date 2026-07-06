@@ -25,7 +25,7 @@
 # (e.g. the volume summary, #285), which is a different shape from this.
 class ActivityFeed
   UPDATE_ACTIONS = %w[item.updated box.updated].freeze
-  DELETE_ACTIONS = %w[box.deleted item.deleted].freeze
+  DELETE_ACTIONS = %w[box.deleted item.deleted media.discarded].freeze
 
   def initialize(activities, current_user_id:, editable:)
     @activities = activities
@@ -69,14 +69,16 @@ class ActivityFeed
     ids.any? ? User.where(id: ids).index_by(&:id) : {}
   end
 
-  # Boxes/Items resolve with_discarded (a deleted subject must still be nameable);
-  # the rest are never discardable. Target boxes (item.moved) are loaded too.
+  # Box/Item/Media resolve with_discarded (a deleted subject must still be nameable
+  # AND checkable for the Restore gate — Media is discardable via Photos::Delete,
+  # #577); Move/Room are never discardable. Target boxes (item.moved) are loaded too.
   def load_subjects
     by_type = @activities.group_by(&:subject_type)
     map = {}
     load_into(map, "Box", Box.with_discarded, box_ids(by_type))
     load_into(map, "Item", Item.with_discarded, ids_for(by_type, "Item"))
-    { "Move" => Move, "Media" => Media, "Room" => Room }
+    load_into(map, "Media", Media.with_discarded, ids_for(by_type, "Media"))
+    { "Move" => Move, "Room" => Room }
       .each { |type, klass| load_into(map, type, klass, ids_for(by_type, type)) }
     map
   end

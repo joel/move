@@ -47,6 +47,20 @@ RSpec.describe "Activities" do
       expect(response.body).to include("Box 7").and include(I18n.t("activities.restore.action"))
     end
 
+    # #577 — a deleted photo (Media, now discardable) must name its subject (loaded
+    # with_discarded) and offer Restore, same as a box/item.
+    it "renders a deleted photo with a Restore affordance" do
+      box = create(:box, move:)
+      media = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: media)
+      Photos::Delete.new.call(media:, actor: user)
+
+      get move_activity_path(move)
+
+      expect(response.body)
+        .to include(I18n.t("activities.subject.photo")).and include(I18n.t("activities.restore.action"))
+    end
+
     # #194 — the keyset cursor must survive the round-trip through the load-older
     # link at sub-second precision: occurred_at is timestamp(6), so a whole-second
     # cursor would skip every row inside the boundary second. Seed one PAGE worth
@@ -83,6 +97,20 @@ RSpec.describe "Activities" do
       expect(response).to redirect_to(move_activity_path(move))
       expect(Box.exists?(box.id)).to be(true)
       expect(box.items.count).to eq(1)
+    end
+
+    it "restores a deleted photo and its items (#577)" do
+      box = create(:box, move:)
+      media = create(:media, move:, box:)
+      item = create(:item, move:, box:, source_media: media)
+      Photos::Delete.new.call(media:, actor: user)
+      activity = move.activities.find_by!(action: "media.discarded")
+
+      post move_activity_restore_path(move, activity.id)
+
+      expect(response).to redirect_to(move_activity_path(move))
+      expect(Media.kept.exists?(media.id)).to be(true)
+      expect(Item.kept.exists?(item.id)).to be(true)
     end
 
     it "streams the re-rendered feed + a toast (no reload)" do
