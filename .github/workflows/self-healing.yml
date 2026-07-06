@@ -231,15 +231,32 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MAX_ATTEMPTS_PER_CYCLE: "2"
+          MAX_OPEN_AUTOFIX_PRS: "3"
         run: |
           set -euo pipefail
+
+          # The open-PR cap governs the FIX path too, not just new-issue
+          # triage: an unattempted issue from a prior cycle would otherwise
+          # let `fix` open a PR past the cap. Budget the remaining headroom
+          # and select at most that many (also bounded per cycle).
+          open_prs=$(gh pr list --repo "$GITHUB_REPOSITORY" \
+            --label autofix --state open --json number --jq 'length')
+          headroom=$(( MAX_OPEN_AUTOFIX_PRS - open_prs ))
+          if [ "$headroom" -lt 1 ]; then
+            echo "::notice::$open_prs open autofix PRs (cap $MAX_OPEN_AUTOFIX_PRS) — no fix slots this cycle."
+            echo "issues=[]" >> "$GITHUB_OUTPUT"
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          limit=$(( headroom < MAX_ATTEMPTS_PER_CYCLE ? headroom : MAX_ATTEMPTS_PER_CYCLE ))
+
           issues=$(gh issue list --repo "$GITHUB_REPOSITORY" \
             --label autofix --state open --json number,title,labels \
             --jq '[.[]
                    | select([.labels[].name] | index("autofix:attempted") | not)
                    | {number, title, short_id: ([.labels[].name | select(startswith("sentry:"))][0] // "" | ltrimstr("sentry:"))}
                    | select(.short_id != "")]
-                  | .[0:'"$MAX_ATTEMPTS_PER_CYCLE"']')
+                  | .[0:'"$limit"']')
           echo "issues=$(jq -c . <<< "$issues")" >> "$GITHUB_OUTPUT"
           echo "count=$(jq length <<< "$issues")" >> "$GITHUB_OUTPUT"
           jq . <<< "$issues"
@@ -621,14 +638,20 @@ jobs:
   #   set it only after the canary drill in doc/project/self-healing.md.
   steward:
     runs-on: ubuntu-latest
-    needs: [gate, score]
-    # The steward NEVER runs off a failed or skipped score: score fails
-    # loudly precisely when a demotion could not strip a stale
-    # autofix:auto-eligible label — merging in that state is the exact
-    # failure mode being defended against. (`!cancelled()` would run on a
-    # score FAILURE; explicit result checks close that.) Plus the dry_run
-    # guard: a dry-run dispatch must never reach a merge decision.
-    if: ${{ needs.gate.result == 'success' && needs.score.result == 'success' && needs.gate.outputs.proceed == 'true' && vars.SELF_HEALING_AUTONOMY_ENABLED == 'true' && inputs.dry_run != true }}
+    # verify is a dependency, not a sibling: it must FINISH (creating any
+    # self-healing-halt for a regressed prior autofix) before the steward
+    # evaluates its halt gates — otherwise the two race and the steward
+    # could merge a new fix in the same cycle a prior one is found bad.
+    # "verify what shipped before shipping more."
+    needs: [gate, score, verify]
+    # The steward NEVER runs off a failed or skipped score/verify: score
+    # fails loudly precisely when a demotion could not strip a stale
+    # autofix:auto-eligible label, and a failed verify means the regression
+    # check didn't run — merging in either state is the exact failure mode
+    # being defended against. (`!cancelled()` would run on a FAILURE;
+    # explicit result checks close that.) Plus the dry_run guard: a dry-run
+    # dispatch must never reach a merge decision.
+    if: ${{ needs.gate.result == 'success' && needs.score.result == 'success' && needs.verify.result == 'success' && needs.gate.outputs.proceed == 'true' && vars.SELF_HEALING_AUTONOMY_ENABLED == 'true' && inputs.dry_run != true }}
     permissions:
       contents: read
       issues: write
