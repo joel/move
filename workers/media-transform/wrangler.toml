@@ -1,0 +1,41 @@
+# Cloudflare Worker: edge media transformation (#572).
+#
+# Serves private, tenant-scoped Active Storage media (masters stored in R2 by the
+# Rails app's `:r2` service) through Cloudflare's image transforms, gated by a
+# short-lived HMAC token minted by Rails (MediaVariants::TransformUrl). The bucket
+# stays PRIVATE — nothing is publicly listable/readable; the only access is a
+# request carrying a currently-valid token.
+#
+# Deploys INDEPENDENTLY of the Rails app (Kamal never touches it): `wrangler deploy`.
+# See README.md for the full provisioning + verification runbook.
+
+name = "move-media-transform"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+
+# R2 binding — the SAME bucket Active Storage's `:r2` service writes to
+# (config/storage.yml `r2:`, config/deploy.yml R2_BUCKET). This is a native
+# platform binding, NOT the S3-compatible endpoint Rails uses — no access key /
+# secret / endpoint URL here.
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "move-media"
+
+# Cloudflare Images transform binding. Requires "Image Transformations" ENABLED on
+# the move-easy.org zone (dashboard toggle — see README §1); the binding alone is
+# not sufficient.
+[images]
+binding = "IMAGES"
+
+# Custom Domain: provisions (or reuses) an exact-match DNS record for this host,
+# which takes priority over the `*.move-easy.org` wildcard CNAME (the Cloudflare
+# Tunnel to kamal-proxy) — so requests hit the Worker at the edge and never reach
+# the origin. See README §6.
+routes = [
+  { pattern = "media.move-easy.org", custom_domain = true }
+]
+
+# MEDIA_TRANSFORM_SECRET is a Worker SECRET, provisioned out-of-band and never
+# committed:  wrangler secret put MEDIA_TRANSFORM_SECRET
+# (the same value lives in Doppler move/prd for the Rails minter). It is
+# deliberately NOT declared as a [vars] entry (those are plaintext).

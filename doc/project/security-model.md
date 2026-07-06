@@ -121,13 +121,14 @@ The headline boundaries an attacker probes:
 
 | Asset | Threat | Control | Where it lives |
 |---|---|---|---|
-| Other tenants' data | Cross-tenant read/write | Apartment schema-per-tenant + per-request elevator; unknown subdomain ⇒ 404 (no disclosure); `TenantController#require_membership!` ⇒ 404 for an authenticated non-member of the org | `config/initializers/apartment.rb`, `config/initializers/apartment_elevator.rb` (`EXCLUDED_SUBDOMAINS = %w[move mail storage bucket www]`), `app/controllers/tenant_controller.rb` |
+| Other tenants' data | Cross-tenant read/write | Apartment schema-per-tenant + per-request elevator; unknown subdomain ⇒ 404 (no disclosure); `TenantController#require_membership!` ⇒ 404 for an authenticated non-member of the org | `config/initializers/apartment.rb`, `config/initializers/apartment_elevator.rb` (`EXCLUDED_SUBDOMAINS = %w[move mail storage bucket www media]`), `app/controllers/tenant_controller.rb` |
 | Auth / account tables | Empty-tenant-clone footgun, cross-tenant auth | `excluded_models` + `persistent_schemas %w[public]`; schema-qualify auth SQL to `public.` | `config/initializers/apartment.rb`, `app/misc/` |
 | Per-resource access | IDOR / privilege escalation | ActionPolicy `authorize` on every action + `authorized_scope` for row visibility; membership gate | `app/policies/` (`*_policy.rb`, `concerns/move_membership_authorization.rb`) |
 | Domain invariants | Forged param / stale form / direct MCP call | Phase/state + ownership guards in the **shared action**, gating on the validated result | `app/actions/` |
 | Sessions | Hijack, fixation, cross-host leak | Passwordless Rodauth; verify-before-login; host-only cookies; single-use `SessionHandoffToken`; remember-me scoped to subdomain | `app/misc/`, `app/jobs/purge_stale_session_handoff_tokens_job.rb` |
 | API keys / secrets | Leakage | Encrypted per-Move attributes; Doppler / Rails credentials only; nothing in code or logs | `app/models/` (encrypted attrs), Doppler `move/prd` |
 | Uploaded media | Malicious upload, oversized payload, attach-others' | Magic-byte sniff (`image/*`) + size cap (`Media::MAX_IMAGE_BYTES`) + Move-scoped `signed_id`; transcode-on-attach | `app/controllers/mcp_uploads_controller.rb`, `app/services/image_normalizer.rb` |
+| Media display URLs (edge transform, #572) | Forged/replayed edge-image request; unbounded/abusive transform sizes | Short-lived HMAC-SHA256 over `blob_key\|size\|exp` under a **dedicated** secret (never `secret_key_base`), verified constant-time in the Worker; `exp` expiry (unlike the never-expiring AS proxy id — closes F5's residual); size restricted to a **bounded** 2-value set (billing/abuse cap); R2 bucket stays private (Worker R2 binding, never public) | `workers/media-transform/src/index.js`, `packs/captures/app/services/media_variants/transform_url.rb` |
 | MCP endpoints | Token theft / cross-Move | Per-Move Bearer (digest-stored), resolved within tenant; every tool reuses an authorized `app/actions` call; `mcp.tool_called` audit events | `app/mcp/` |
 | Error-report egress | Auth material (magic-link `key` — in query strings, Sequel-literalized SQL, and mailer-job args — session/remember cookies, MCP Bearer tokens, outbound OAuth bodies) shipped to Sentry with the request context (`send_default_pii`) or inside traced db-span SQL | Fail-closed scrub in `before_send` **and** `before_send_transaction`: cookies + `Authorization` + job `arguments` + breadcrumb `body`/`query` dropped; query string + form/JSON bodies through `ActiveSupport::ParameterFilter` (unparseable ⇒ `[FILTERED]`); `:sql` removed from breadcrumb payloads; quoted SQL string literals redacted from `db.*` span descriptions (#531); init gated on DSN presence + `enabled_environments=%w[production]`; DSN an optional Doppler secret, never committed (#528) | `config/initializers/sentry.rb`, `spec/config/sentry_spec.rb` |
 | Soft-deleted user data | Indefinite retention of "deleted" content (rows + photo blobs kept forever) | 30-day retention window (`Discardable::RETENTION`): the nightly `PurgeExpiredDiscardsJob` → `Discards::PurgeExpired` hard-deletes expired discards per tenant, blobs included. After the purge, the data persists only in the encrypted restic DB backups until the backup retention (7 daily / 4 weekly / 6 monthly) lapses | `app/actions/discards/purge_expired.rb`, `app/jobs/purge_expired_discards_job.rb`, `config/recurring.yml`, `config/kamal-backup.yml` |
@@ -192,6 +193,16 @@ each with where the control lives, so a finding can be traced to code:
   second authorization layer behind the URL. Revisit if blob contents ever hold
   higher-sensitivity data than move-inventory photos, or wrap proxy delivery in an
   authorization check at that point. (Audit finding F5, 2026-07-02.)
+  **Update (#572):** the display path is moving off the Active Storage proxy to a
+  Cloudflare-edge transform Worker (`workers/media-transform`), reached via a
+  server-minted signed URL (`MediaVariants::TransformUrl`). This is the **same**
+  risk shape — URL-secrecy substitutes for a membership check, since a stateless
+  edge Worker has no session/tenant context and can only verify
+  `HMAC(blob_key\|size\|exp)` — but with a materially **shorter blast radius**: the
+  token carries a real `exp` (≤1h), so a leaked URL goes dead within the hour
+  rather than never. Tenant/Move binding stays enforced at *mint* time (a URL is
+  only rendered to an authorized in-tenant member). Dev/test keep the same-origin
+  master proxy (no Worker locally).
 
 - **WebAuthn ceremonies bind to the request host, not a pinned apex origin.**
   `webauthn_origin` falls back to the request host (`base_url` in

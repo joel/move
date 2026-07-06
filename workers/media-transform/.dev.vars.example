@@ -1,0 +1,4 @@
+# Copy to `.dev.vars` (gitignored) for local `wrangler dev`. Use a THROWAWAY value
+# here — the real secret lives only in `wrangler secret put` + Doppler move/prd.
+# Must match whatever secret you sign test tokens with locally.
+MEDIA_TRANSFORM_SECRET=dev-only-throwaway-secret

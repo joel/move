@@ -370,8 +370,9 @@ capture → recognition):
         ~18 %→~35 % of masters over ~9 days: a slow SeaweedFS volume rot, not the
         one-off resize). Sibling apps on the shared instance carry the same latent
         risk — scan their buckets too.
-     Follow-up: Cloudflare Image Transformations could replace stored variants with
-     edge resizing (serve masters only).
+     Follow-up (#572): the in-app Active Storage variant pipeline is being replaced
+     by Cloudflare-edge image transformations — serve the master only, resize at the
+     edge behind a signed token. See **§6f** below.
 3. **Background jobs (Solid Queue):** async in dev, `:inline` in **test** (so an
    upload→process flow completes within an example), and **in-Puma in prod**
    (`SOLID_QUEUE_IN_PUMA: true` in `deploy.yml` env) — no separate jobs role.
@@ -564,6 +565,34 @@ Full architecture + runbooks: [`backups.md`](backups.md). The reproducible setup
    mode) **and an explicit snapshot id — `latest` fails in a DB-only setup**
    (no `type:files` snapshot exists; commit a `kamal-backup.local.yml` with
    `paths: []`). Exact commands in [`backups.md`](backups.md).
+
+## 6f. Cloudflare-edge media transforms (Worker + R2 + Images, #572)
+
+Replaces the in-app Active Storage variant pipeline: store only the ≤2048px
+master in R2 (§6b), resize display sizes on demand at Cloudflare's edge behind a
+signed token. Source + full runbook: `workers/media-transform/` (`README.md`).
+
+1. **Enable Image Transformations on the zone.** Dashboard → zone → **Speed →
+   Optimization → Image Resizing** → *Enable image transformations* ON. The
+   Worker's `[images]` binding is inert without this. Billing is per unique
+   (source, size, format) — bounded here to 2 sizes × ≤3 formats per master.
+2. **Dedicated HMAC secret** (never `secret_key_base`): `openssl rand -hex 32`,
+   then `wrangler secret put MEDIA_TRANSFORM_SECRET` **and** mirror the same value
+   to Doppler `<app>/prd` as `MEDIA_TRANSFORM_SECRET`; set `MEDIA_TRANSFORM_HOST`
+   (`media.<zone>`) in Doppler too. Rails reads both via
+   `config/initializers/media_transform.rb`; `.kamal/secrets` + `deploy.yml` wire
+   the secret (secret) + host (clear). Dev/test leave them unset and fall back to
+   the same-origin master proxy.
+3. **Deploy the Worker** (`cd workers/media-transform && wrangler deploy`) — it
+   provisions the `media.<zone>` **Custom Domain** (an exact-match DNS record that
+   outranks the `*.<zone>` wildcard, so it never hits the Tunnel/kamal-proxy).
+4. **Verify** with a token minted against a real blob key (valid → 200 immutable;
+   expired/tampered → 403; bad size → 400; unknown key → 404 `no-store`) — see the
+   Worker README curl matrix.
+5. **Ordering (critical):** `MEDIA_TRANSFORM_HOST` in `deploy.yml` means the next
+   Rails deploy mints edge URLs, so the Worker + secret must be **live and verified
+   before the Rails PR merges** (same discipline as an accessory cutover). Add
+   `media` to `EXCLUDED_SUBDOMAINS` + `RESERVED_SLUGS` (defense in depth).
 
 ## 7. Cutover order (zero-confusion sequence)
 
