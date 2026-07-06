@@ -622,8 +622,13 @@ jobs:
   steward:
     runs-on: ubuntu-latest
     needs: [gate, score]
-    # dry_run guard: a dry-run dispatch must never reach a merge decision.
-    if: ${{ !cancelled() && needs.gate.outputs.proceed == 'true' && vars.SELF_HEALING_AUTONOMY_ENABLED == 'true' && inputs.dry_run != true }}
+    # The steward NEVER runs off a failed or skipped score: score fails
+    # loudly precisely when a demotion could not strip a stale
+    # autofix:auto-eligible label — merging in that state is the exact
+    # failure mode being defended against. (`!cancelled()` would run on a
+    # score FAILURE; explicit result checks close that.) Plus the dry_run
+    # guard: a dry-run dispatch must never reach a merge decision.
+    if: ${{ needs.gate.result == 'success' && needs.score.result == 'success' && needs.gate.outputs.proceed == 'true' && vars.SELF_HEALING_AUTONOMY_ENABLED == 'true' && inputs.dry_run != true }}
     permissions:
       contents: read
       issues: write
