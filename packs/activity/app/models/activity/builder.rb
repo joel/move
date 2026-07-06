@@ -17,6 +17,8 @@ class Activity
       "item.undeleted" => ["Item", :item_id],
       "media.captured" => ["Media", :media_id],
       "media.moved" => ["Media", :media_id],
+      "media.discarded" => ["Media", :media_id], "media.undiscarded" => ["Media", :media_id],
+      "media.retaken" => ["Media", :media_id],
       "move.created" => ["Move", :move_id],
       "move.unit_system_changed" => ["Move", :move_id],
       "move.auto_confirm_threshold_changed" => ["Move", :move_id],

@@ -57,6 +57,9 @@ en:
       media:
         captured: "added %{subject}"
         moved: "moved %{subject} to %{target}"
+        discarded: "deleted %{subject}"
+        undiscarded: "restored %{subject}"
+        retaken: "re-took %{subject}"
       move:
         created: "created %{subject}"
         unit_system_changed: "switched units to %{unit_system}"

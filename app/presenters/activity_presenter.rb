@@ -7,7 +7,7 @@
 # "destructive" tone); everything else is neutral.
 class ActivityPresenter
   ACCENT_ACTIONS = %w[box.deleted item.deleted box.restored item.undeleted
-                      vocabulary.removed].freeze
+                      media.discarded media.undiscarded vocabulary.removed].freeze
 
   def initialize(activity, actors:, subjects:, current_user_id:)
     @activity = activity

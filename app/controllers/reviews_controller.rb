@@ -8,9 +8,10 @@
 # authorize, call the action, render/redirect.
 class ReviewsController < MoveScopedController
   before_action :set_box
-  before_action :set_media, only: %i[photo rename_item remove_item add_item move_photo]
+  before_action :set_media, only: %i[photo rename_item remove_item add_item move_photo delete_photo retake_photo]
   before_action :set_item, only: %i[rename_item remove_item]
-  before_action :require_writable_move!, only: %i[rename_item remove_item add_item move_photo]
+  before_action :require_writable_move!,
+                only: %i[rename_item remove_item add_item move_photo delete_photo retake_photo]
 
   # GET /moves/:move_id/boxes/:box_id/review
   # Enter at the first photo that still has *unreviewed* items (resuming a
@@ -114,7 +115,47 @@ class ReviewsController < MoveScopedController
     end
   end
 
+  # DELETE .../review/photo/:media_id — delete this photo and every item it
+  # sourced (Photos::Delete, packing only, soft + cascading). The page's subject is
+  # gone, so redirect to the box like the box/item delete flows.
+
+  #: () -> untyped
+  def delete_photo
+    case Photos::Delete.new.call(media: @media, actor: current_user)
+    in Dry::Monads::Success(_media)
+      redirect_to move_box_path(@move, @box), notice: t("reviews.flash.photo_deleted")
+    in Dry::Monads::Failure(:wrong_phase)
+      redirect_to move_box_review_photo_path(@move, @box, @media), alert: t("reviews.flash.photo_delete_wrong_phase")
+    in Dry::Monads::Failure(_)
+      redirect_to move_box_review_photo_path(@move, @box, @media), alert: t("reviews.flash.photo_delete_failed")
+    end
+  end
+
+  # POST .../review/photo/:media_id/retake — replace this photo's image (recover a
+  # corrupt master or swap a bad shot); any phase, optional AI re-scan (#577).
+
+  #: () -> untyped
+  def retake_photo
+    result = Captures::Retake.new.call(
+      media: @media, actor: current_user, file: params[:file],
+      rerun_recognition: ActiveModel::Type::Boolean.new.cast(params[:rerun_recognition])
+    )
+
+    case result
+    in Dry::Monads::Success(_media)
+      redirect_to move_box_review_photo_path(@move, @box, @media), notice: t("reviews.flash.photo_retaken")
+    in Dry::Monads::Failure(reason)
+      redirect_to move_box_review_photo_path(@move, @box, @media), alert: retake_error(reason)
+    end
+  end
+
   private
+
+  #: (untyped reason) -> String
+  def retake_error(reason)
+    known = %i[no_file recognition_in_flight rescan_wrong_phase image_too_large unsupported_image]
+    t("reviews.flash.retake_errors.#{known.include?(reason) ? reason : :failed}")
+  end
 
   # Stream the new item in by replacing the whole list (highlighting the new row)
   # plus a toast. We always replace — never append — because the append target

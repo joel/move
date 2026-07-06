@@ -32,6 +32,9 @@
 
 # Ignore key files for decrypting credentials and more.
 /config/*.key
+# Private keys must never be committed (e.g. a downloaded GitHub App .pem).
+*.pem
+*.key
 
 
 /app/assets/builds/*

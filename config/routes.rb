@@ -42,11 +42,17 @@ Rails.application.routes.draw do
       # navigates; opening a photo marks its unreviewed items reviewed.
       get "review", to: "reviews#index", as: :review
       get "review/photo/:media_id", to: "reviews#photo", as: :review_photo
+      # Delete a whole photo (and its items) — packing only; reuses the review_photo
+      # path with the DELETE verb.
+      delete "review/photo/:media_id", to: "reviews#delete_photo"
       patch "review/photo/:media_id/items/:id/rename", to: "reviews#rename_item", as: :review_rename_item
       patch "review/photo/:media_id/items/:id/remove", to: "reviews#remove_item", as: :review_remove_item
       post "review/photo/:media_id/items", to: "reviews#add_item", as: :review_add_item
       # C3 — move a whole photo (and its co-located items) to another box (#317).
       patch "review/photo/:media_id/move", to: "reviews#move_photo", as: :review_move_photo
+      # Retake — replace a photo's image in place (recover a corrupt master); any
+      # phase, optional re-scan. (#577)
+      post "review/photo/:media_id/retake", to: "reviews#retake_photo", as: :review_retake_photo
       # Recovery — a persistent entry point for an orphaned photo (recognition
       # failed or found nothing, so no item). Re-run recognition or hand off to the
       # manual add (B3). `state` is the polled status fragment.
