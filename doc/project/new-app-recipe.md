@@ -351,11 +351,25 @@ capture → recognition):
      5. **Cut over:** `config.active_storage.service = :r2` (`production.rb`) — this
         only points **new** uploads at R2 (existing blobs were repointed in step 4).
         Deploy, live-verify. SeaweedFS stays as rollback.
-     6. **Decommission:** any uploads that landed on SeaweedFS *between* the step-4
-        backfill and the step-5 cutover deploy still have `service_name = "seaweedfs"`
-        and are absent from R2, so **re-run `storage:backfill_to_r2` one final time**
-        (idempotent — it copies + repoints the delta) immediately before emptying
-        **only** the app's SeaweedFS bucket. Leave the shared gateway for siblings.
+     6. **Decommission** *(done 2026-07-06)*: any uploads that landed on SeaweedFS
+        *between* the step-4 backfill and the step-5 cutover deploy still have
+        `service_name = "seaweedfs"` and are absent from R2, so **re-run
+        `storage:backfill_to_r2` one final time** (idempotent — it copies + repoints
+        the delta). Then, before deleting anything, run the **safety gate**: assert
+        every remaining `service_name = "seaweedfs"` blob key is in the known-lost
+        allowlist (the `image_unavailable` masters + their variant keys) — i.e.
+        `NOT_IN_ALLOWLIST == 0`, so nothing *readable* is stranded on SeaweedFS.
+        Only then empty **only** the app's SeaweedFS bucket, with a **hard
+        `bucket.name == "move"` assert** in the delete script so a misconfig can
+        never touch a sibling's bucket. Leave the shared gateway + sibling buckets
+        intact. Result here: 618 readable blobs already on R2, 136 known-lost stayed
+        behind, 738 objects deleted / 0 remaining, ~0.7 GB reclaimed; post-empty a
+        repointed blob + a `:thumb` variant still served from R2. **The 136 lost
+        photos are permanently unrecoverable** — both the Jul-2 *and* Jun-25 Vultr
+        backups carry the same corruption (it predates Jun-25 and was *progressive*,
+        ~18 %→~35 % of masters over ~9 days: a slow SeaweedFS volume rot, not the
+        one-off resize). Sibling apps on the shared instance carry the same latent
+        risk — scan their buckets too.
      Follow-up: Cloudflare Image Transformations could replace stored variants with
      edge resizing (serve masters only).
 3. **Background jobs (Solid Queue):** async in dev, `:inline` in **test** (so an
