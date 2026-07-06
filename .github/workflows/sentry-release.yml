@@ -73,4 +73,11 @@ jobs:
         with:
           environment: production
           release: ${{ github.event.workflow_run.head_sha }}
+          # Associate the commit(s) in this release from the full-history
+          # checkout above, so Sentry can attribute suspect commits + authors
+          # (without this the release knows the SHA but not what it changed).
+          set_commits: auto
+          # First run (or a superseded deploy) has no resolvable previous
+          # release commit; don't fail the release job over it.
+          ignore_missing: true
           inject: false # Ruby app — no JS sourcemaps to upload or inject
