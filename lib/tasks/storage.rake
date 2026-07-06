@@ -28,12 +28,13 @@ namespace :storage do
     puts "[storage:backfill_to_r2] #{expected_lost.size} known-lost keys allowlisted (skippable)"
 
     total = ActiveStorage::Blob.count
-    checked = copied = present = unreadable = 0
+    checked = copied = present = unreadable = repointed = 0
     puts "[storage:backfill_to_r2] #{total} blobs — SeaweedFS -> R2"
 
     ActiveStorage::Blob.find_each(batch_size: 200) do |blob|
       checked += 1
-      if dst.exist?(blob.key)
+      in_r2 = dst.exist?(blob.key)
+      if in_r2
         present += 1
       else
         data =
@@ -54,13 +55,25 @@ namespace :storage do
         if data
           dst.upload(blob.key, StringIO.new(data), checksum: blob.checksum, content_type: blob.content_type)
           copied += 1
+          in_r2 = true
         end
       end
+
+      # Repoint the blob ROW at r2 once its bytes are in R2. Active Storage
+      # resolves each blob through its persisted `service_name`, NOT the app's
+      # default, so without this an existing blob keeps serving from SeaweedFS
+      # after cutover and emptying that bucket would break it despite the object
+      # being in R2. Only unreadable/known-lost blobs (not in R2) stay unpointed.
+      if in_r2 && blob.service_name != "r2"
+        blob.update_column(:service_name, "r2") # rubocop:disable Rails/SkipsModelValidations -- deliberate: repoint the row, no callbacks needed
+        repointed += 1
+      end
+
       if (checked % 50).zero?
-        puts "[storage:backfill_to_r2] progress checked=#{checked}/#{total} copied=#{copied} present=#{present} unreadable=#{unreadable}"
+        puts "[backfill_to_r2] #{checked}/#{total} copied=#{copied} present=#{present} repointed=#{repointed} unreadable=#{unreadable}"
       end
     end
 
-    puts "[storage:backfill_to_r2] DONE checked=#{checked} copied=#{copied} already_present=#{present} unreadable=#{unreadable}"
+    puts "[storage:backfill_to_r2] DONE checked=#{checked} copied=#{copied} already_present=#{present} repointed=#{repointed} unreadable=#{unreadable}"
   end
 end

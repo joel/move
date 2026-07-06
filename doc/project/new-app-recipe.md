@@ -332,12 +332,17 @@ capture → recognition):
         delete a test object (confirms aws-sdk-ruby ↔ R2).
      3. **Shrink first:** `bin/rails images:optimize` so every master is ≤2048px —
         only optimized images ever reach R2.
-     4. **Backfill:** `bin/rails storage:backfill_to_r2` — idempotent copy of every
-        readable blob SeaweedFS→R2 (skips the #560 known-lost keys; any *other*
-        source read failure aborts the run).
-     5. **Cut over:** `config.active_storage.service = :r2` (`production.rb`), deploy,
-        live-verify; SeaweedFS stays as rollback, then empty **only** the app's
-        SeaweedFS bucket (leave the shared gateway for siblings).
+     4. **Backfill + repoint:** `bin/rails storage:backfill_to_r2` — idempotent copy
+        of every readable blob SeaweedFS→R2, *and* it sets each copied blob's
+        `active_storage_blobs.service_name` to `r2`. Active Storage resolves each
+        blob through its persisted `service_name`, NOT the app default, so this
+        repoint is what actually makes existing attachments serve from R2 (and
+        survive emptying the SeaweedFS bucket). Skips the #560 known-lost keys; any
+        *other* source read failure aborts.
+     5. **Cut over:** `config.active_storage.service = :r2` (`production.rb`) — this
+        only points **new** uploads at R2 (existing blobs were repointed in step 4).
+        Deploy, live-verify; SeaweedFS stays as rollback, then empty **only** the
+        app's SeaweedFS bucket (leave the shared gateway for siblings).
      Follow-up: Cloudflare Image Transformations could replace stored variants with
      edge resizing (serve masters only).
 3. **Background jobs (Solid Queue):** async in dev, `:inline` in **test** (so an
