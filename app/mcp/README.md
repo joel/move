@@ -27,7 +27,7 @@ def handle
   Current.source = :mcp                       # domain events are attributed to the assistant
 
   server    = MoveMcp::ServerBuilder.build(token: @token, base_url: request.base_url)
-  transport = MCP::Server::Transports::StreamableHTTPTransport.new(server, stateless: true, enable_json_response: true)
+  transport = MCP::Server::Transports::StreamableHTTPTransport.new(server, stateless: true, enable_json_response: true, dns_rebinding_protection: false) # bearer-auth API behind a proxy; Host validated upstream
   status, headers, body = transport.handle_request(request)
   # … render body/status/headers …
 end
