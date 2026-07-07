@@ -46,6 +46,11 @@ export default {
     if (!Number.isFinite(exp)) return errorResponse(403, "Bad token");
     if (exp < Math.floor(Date.now() / 1000)) return errorResponse(403, "Token expired");
 
+    // Missing secret binding is a deploy misconfiguration, not a client error —
+    // surface it distinctly (500) rather than letting importKey throw an opaque
+    // one, and NEVER let it read as an auth pass.
+    if (!env.MEDIA_TRANSFORM_SECRET) return errorResponse(500, "Server misconfigured: no signing secret");
+
     const ok = await verifyToken(env.MEDIA_TRANSFORM_SECRET, blobKey, size, exp, token);
     if (!ok) return errorResponse(403, "Bad token");
 
@@ -101,15 +106,21 @@ async function verifyToken(secret, blobKey, size, exp, hexToken) {
   const signature = hexToBytes(hexToken);
   if (!signature) return false;
 
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["verify"],
-  );
-  const message = new TextEncoder().encode(`${blobKey}|${size}|${exp}`);
-  return crypto.subtle.verify("HMAC", key, signature, message);
+  // Any crypto error (unexpected key/signature shape) must fail CLOSED — deny,
+  // never throw an uncaught 500 that could read as a non-403.
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"],
+    );
+    const message = new TextEncoder().encode(`${blobKey}|${size}|${exp}`);
+    return await crypto.subtle.verify("HMAC", key, signature, message);
+  } catch {
+    return false;
+  }
 }
 
 function hexToBytes(hex) {
