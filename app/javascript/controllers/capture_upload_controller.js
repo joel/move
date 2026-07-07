@@ -33,7 +33,11 @@ export default class extends Controller {
     timeout: { type: Number, default: 2500 },
     // When present (#572), the browser PUTs straight to R2 via this presign
     // endpoint and submits a signed_id; absent → the server-proxied POST.
-    directUploadUrl: { type: String, default: "" }
+    directUploadUrl: { type: String, default: "" },
+    // Upper bound on the R2 PUT before we give up and fall back to the
+    // server-proxied POST (#596). Generous — a real upload legitimately takes a
+    // few seconds on mobile — but bounded so a stalled request can't wedge capture.
+    directUploadTimeout: { type: Number, default: 15000 }
   }
 
   // change -> capture-upload#submit
@@ -70,7 +74,16 @@ export default class extends Controller {
     // through to the server-proxied POST below — capture must never break.
     if (this.directUploadUrlValue) {
       const uploading = input.files[0]
-      const signedId = await this.directUpload(uploading)
+      // Bound the R2 PUT the same way the downscale above is bounded: it can STALL
+      // (flaky network, or a CORS failure that hangs rather than erroring) and
+      // DirectUpload carries no timeout of its own, so a hang would wedge submit()
+      // short of the fallback. Race it against a timeout → null → fall through to
+      // the server-proxied POST. A late-completing PUT just leaves an unattached
+      // blob (reaped by PurgeAbandonedUploadsJob). #596.
+      const signedId = await Promise.race([
+        this.directUpload(uploading),
+        new Promise((resolve) => setTimeout(() => resolve(null), this.directUploadTimeoutValue))
+      ])
       // The R2 PUT is another async wait: if the user re-picked during it, this
       // upload is stale — the newer change event owns the newer file. Bail so we
       // never submit the old signed_id (nor disable the input under the new file).
