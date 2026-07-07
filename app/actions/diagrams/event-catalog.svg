@@ -23,8 +23,7 @@
     <circle cx="190" cy="88" r="5" class="cyan"/><text class="sub" x="200" y="92">S — Search reindex</text>
     <circle cx="338" cy="88" r="5" class="terra"/><text class="sub" x="348" y="92">M — Manifest audit</text>
     <circle cx="486" cy="88" r="5" class="pink"/><text class="sub" x="496" y="92">X — MCP audit</text>
-    <circle cx="600" cy="88" r="5" class="gold"/><text class="sub" x="610" y="92">P — Variant prewarm</text>
-    <text class="sub" x="760" y="92">— — no subscriber (state / advisory only)</text>
+    <text class="sub" x="620" y="92">— — no subscriber (state / advisory only)</text>
   </g>
 
   <!-- ================= COLUMN 1 ================= -->
@@ -105,7 +104,7 @@
   <text class="sub" x="794" y="376" font-size="11">authenticated sensitive-read audit</text>
 
   <rect class="card" x="776" y="408" width="348" height="62" rx="12"/>
-  <text class="hd mono" x="794" y="434" font-size="13">qr.* <tspan class="ev" font-weight="400" font-size="12">resolved <tspan class="sage">A</tspan></tspan> &#160;&#160; media.* <tspan class="ev" font-weight="400" font-size="12">captured <tspan class="sage">A</tspan> <tspan class="gold">P</tspan></tspan></text>
+  <text class="hd mono" x="794" y="434" font-size="13">qr.* <tspan class="ev" font-weight="400" font-size="12">resolved <tspan class="sage">A</tspan></tspan> &#160;&#160; media.* <tspan class="ev" font-weight="400" font-size="12">captured <tspan class="sage">A</tspan></tspan></text>
   <text class="sub" x="794" y="456" font-size="11">qr / summary / manifest are low-signal (filtered)</text>
 
   <rect class="card" x="776" y="488" width="348" height="58" rx="12"/>
@@ -118,7 +117,6 @@
   <g font-size="12">
     <text class="ev" x="54" y="634"><tspan class="sage" font-weight="700">A</tspan>  Activity::RecordSubscriber — filter <tspan class="mono">Builder.records?</tspan> → append-only feed row</text>
     <text class="ev" x="54" y="654"><tspan class="cyan" font-weight="700">S</tspan>  Search::IndexSubscriber — filter <tspan class="mono">item.*</tspan> → RefreshDocumentJob (async)</text>
-    <text class="ev" x="54" y="674"><tspan class="gold" font-weight="700">P</tspan>  MediaVariants::PrewarmSubscriber — filter <tspan class="mono">media.captured</tspan> → PrewarmJob (async)</text>
     <text class="ev" x="600" y="634"><tspan class="terra" font-weight="700">M</tspan>  Manifests::AuditSubscriber — filter <tspan class="mono">manifest.*</tspan> → audit log</text>
     <text class="ev" x="600" y="654"><tspan class="pink" font-weight="700">X</tspan>  MoveMcp::AuditSubscriber — filter <tspan class="mono">integration_token. / mcp.</tspan></text>
   </g>
