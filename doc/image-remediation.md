@@ -1,5 +1,14 @@
 # Image Remediation Effort (2026-07-01)
 
+> **Superseded (#572, 2026-07-07).** The in-app Active Storage variant pipeline
+> this effort remediated (`:thumb`/`:detail` variant records + stored objects,
+> `MediaVariants::Prewarm`, `images:repair`) has since been **decommissioned** —
+> display sizes are now produced on demand at Cloudflare's edge from the master
+> alone (see `architecture.md` §1a). The "orphaned variant" bug class documented
+> below is therefore **structurally impossible** now: there are no variant objects
+> to orphan. Kept as a historical record; `images:cleanup_variants` purges the
+> leftover variant records/objects.
+
 ## Problem Statement
 
 Production reported broken image variants on gallery photos in v0.71.0. Two photos

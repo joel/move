@@ -11,8 +11,9 @@
 #   PUBLIC (sigil): Captures::Create, Captures::SessionContent, RecognitionRuns::
 #     Enqueue, RecognitionRuns::Retry, RecognitionProviders, MediaVariants::
 #     TransformUrl (the display-URL builder the root views/components call).
-#   PRIVATE: ImageNormalizer, MediaVariants::Prewarm(+Job), RecognitionRuns::Process
-#     (+Job), the provider adapters, and the capture/prewarm subscribers.
+#   PRIVATE: ImageNormalizer, RecognitionRuns::Process (+Job), the provider
+#     adapters, and the capture subscribers. (The MediaVariants::Prewarm variant
+#     pipeline was decommissioned with the edge-transform cutover — #572.)
 #
 # dependencies: ['.', 'packs/utility']. visible_to: root + packs/accounts (which
 # references Media). Recognition's own constants are referenced only from the root.

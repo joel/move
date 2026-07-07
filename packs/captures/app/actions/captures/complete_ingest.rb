@@ -5,9 +5,8 @@ module Captures
   # the `media.captured` event is emitted from the ACTION layer (a jobs-emitting
   # event would violate the "Rails.event.notify lives only in app/actions"
   # architecture rule). Given a pending Media and the normalized master bytes:
-  # attach → flip to `ready` → enqueue recognition → emit `media.captured` (which
-  # fans out to variant prewarm). The orchestration (tenant, guards, failure
-  # marking, broadcast) stays in the job.
+  # attach → flip to `ready` → enqueue recognition → emit `media.captured`. The
+  # orchestration (tenant, guards, failure marking, broadcast) stays in the job.
   class CompleteIngest < BaseAction
     #: (media: untyped, normalized: untyped, ?captured_by_id: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, normalized:, captured_by_id: nil)

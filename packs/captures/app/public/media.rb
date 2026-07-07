@@ -56,13 +56,12 @@ class Media < ApplicationRecord
            class_name: "Item", foreign_key: :source_media_id, dependent: nil
   discard_cascade_to :co_located_sourced_items
   # The attachment is the optimised master (≤2048px JPEG, written by
-  # ImageNormalizer); display surfaces serve these sized variants off it rather
-  # than the master blob (Phase 42, #299). :thumb feeds the gallery grid + capture
-  # preview; :detail feeds the full-width viewers (item/review/recovery).
-  has_one_attached :image do |attachable|
-    attachable.variant :thumb,  resize_to_limit: [400, 400]
-    attachable.variant :detail, resize_to_limit: [1600, 1600]
-  end
+  # ImageNormalizer). Display sizes are produced on demand at Cloudflare's edge —
+  # `MediaVariants::TransformUrl.for(media, :thumb|:detail)` mints a signed URL to
+  # the media-transform Worker (#572) — so the master is the ONLY stored object.
+  # No in-app Active Storage variants: the variant pipeline (declarations +
+  # MediaVariants::Prewarm) was decommissioned with the edge cutover.
+  has_one_attached :image
 
   validates :media_type, inclusion: { in: MEDIA_TYPES }
   validates :captured_via, inclusion: { in: CAPTURED_VIA }
