@@ -83,7 +83,7 @@ module Views
       def media_image
         if @item.source_media&.image_displayable?
           img(
-            src: view_context.rails_storage_proxy_path(@item.source_media.image.variant(:detail)),
+            src: MediaVariants::TransformUrl.for(@item.source_media, :detail),
             class: "aspect-square w-full object-cover", alt: "", loading: "lazy"
           )
         elsif @item.source_media&.image_unavailable?

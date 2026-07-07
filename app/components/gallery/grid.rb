@@ -89,7 +89,7 @@ module Components
       def image(media)
         if media.image_displayable?
           img(
-            src: view_context.rails_storage_proxy_path(media.image.variant(:thumb)), alt: "", loading: "lazy",
+            src: MediaVariants::TransformUrl.for(media, :thumb), alt: "", loading: "lazy",
             class: "h-full w-full object-cover transition group-hover:scale-105"
           )
         elsif media.image_unavailable?
@@ -121,9 +121,7 @@ module Components
 
       #: (untyped media) -> untyped
       def detail_src(media)
-        return unless media.image_displayable?
-
-        view_context.rails_storage_proxy_path(media.image.variant(:detail))
+        MediaVariants::TransformUrl.for(media, :detail) # nil for a non-displayable photo
       end
 
       #: (untyped media) -> untyped
