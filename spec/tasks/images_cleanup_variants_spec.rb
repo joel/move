@@ -11,7 +11,11 @@ RSpec.describe "images:cleanup_variants", type: :task do
   # rubocop:disable RSpec/BeforeAfterAll -- one-time rake-task load, not test state
   before(:all) do
     Rake.application = Rake::Application.new
-    Rake.application.rake_require("tasks/images", [Rails.root.join("lib").to_s])
+    # Pass an empty `loaded` list (not the default `$"`) so the rakefile is
+    # (re)loaded into THIS fresh Rake application even when another task spec
+    # (images_optimize_spec) already required "tasks/images" earlier in the run —
+    # rake_require otherwise skips a file already in `$"`, leaving the task undefined.
+    Rake.application.rake_require("tasks/images", [Rails.root.join("lib").to_s], [])
     Rake::Task.define_task(:environment)
   end
   # rubocop:enable RSpec/BeforeAfterAll
