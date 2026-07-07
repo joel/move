@@ -97,9 +97,13 @@ Run the design agents in proportion to the work — don't over-process a one-lin
   the design agents.** Go straight to the issue → branch → commit governance steps.
 - **Already designed this session** (a plan-mode pass — Explore/Plan agents plus a
   user-approved plan grounded in real code — or an equivalent exploration + design
-  round preceded this skill): **do not re-run the design agents.** Feed the existing
-  findings and approved plan into the issue (Step 1) and proceed; duplicate
-  exploration is pure cost.
+  round preceded this skill): **do not re-run the exploration/architecture agents**
+  (steps 1–2 and 5 below). Feed the existing findings and approved plan into the
+  issue (Step 1); duplicate exploration is pure cost. This exemption does **not**
+  waive the passes with their own mandates — the customer-facing UI pass (step 3,
+  `frontend-design`/Stitch), the UX/interaction pass (step 4), and the
+  concurrency/failure-mode pre-mortem (step 4b) still apply when the work triggers
+  them, unless the prior session's pass already covered them explicitly.
 - **Feature / multi-file / architectural** (touches multiple files, adds a surface,
   or needs a design decision): **run the full design pass before writing the issue**,
   so the issue's plan (Step 1) is grounded in real code, not guesses:
@@ -928,8 +932,11 @@ git checkout main && git pull origin main
 # Confirm the merge commit is present and its main CI/Deploy run is green.
 # Get the merge sha from `gh pr view <PR> --json mergeCommit` — NEVER hand-expand
 # a short sha into a full one for `gh run list --commit` filters (a wrong guess
-# makes the watch match nothing and idle forever); match runs by headSha prefix
-# or poll the PR's statusCheckRollup instead.
+# makes the watch match nothing and idle forever). Verify against the MERGE
+# COMMIT's own runs (`gh run list --branch main`, matching headSha against that
+# sha) — the PR's statusCheckRollup describes the PR-head checks, NOT the
+# push-to-main CI/Deploy runs of the squash commit, so it can look green while
+# the deploy is still queued or has failed.
 # Confirm CHANGELOG.md carries this version's entry (see the note above).
 
 # Idempotent: stop if the tag/release already exists.
