@@ -184,6 +184,7 @@ action emits and returns; it **never** calls a subscriber directly.
 | `recognition_run` | `queued` `processing` `succeeded` `failed` | `recognition_run_id, box_id` (+ `item_count`/`error_code`) | — (drives run state / UI) |
 | `session_handoff` | `minted` `consumed` | `token_id, user_id, organization_slug` | — (audit trail; apex→subdomain handoff, #280) |
 | `organization` | `created` | `organization_id, slug` | **D** — provisions the onboarding sample Move (#432) |
+| `discards` | `purged` `purge_failed` | per-model counts / `record_type, record_id, error` | — (observability; the nightly retention sweep, #582) |
 
 > **Rails 8.1 events.** Subscribers respond to `#emit(event)` (not `#call`); the
 > event is a hash — `event[:name]`, `event[:payload]`. See root `AGENTS.md` §4.
@@ -235,7 +236,7 @@ app/actions/
 ├── README.md  ·  AGENTS.md  ·  CLAUDE.md  ·  diagrams/  (svg + editable excalidraw)
 ├── boxes/          create · update · delete · restore · transition_status · suggest_description · room_resolution
 ├── captures/       create
-├── discards/       cascade · cascade_restore
+├── discards/       cascade · cascade_restore · purge_expired
 ├── items/          create_manual · update · rename · move · mark_removed · delete · restore · restore_to_box · form_resolution
 ├── manifests/      generate
 ├── move_integration_tokens/   create · revoke

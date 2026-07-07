@@ -11,10 +11,22 @@
 module Discardable
   extend ActiveSupport::Concern
 
+  # How long a discarded record stays restorable before the nightly sweep
+  # (Discards::PurgeExpired via PurgeExpiredDiscardsJob) hard-deletes it, blobs
+  # included. Lives here — on the soft-delete concern — so the sweep and any UI
+  # copy share one source of truth.
+  RETENTION = 30.days
+
   included do
     include Discard::Model
 
     default_scope { kept }
+
+    # All rows — kept scope removed — whose retention window has lapsed: the
+    # predicate behind the nightly purge sweep. Lives here beside RETENTION so no
+    # caller re-derives it against the default scope (a bare `Model.discarded` is
+    # neutered by `default_scope { kept }`).
+    scope :retention_expired, ->(cutoff = RETENTION.ago) { with_discarded.where(discarded_at: ..cutoff) }
   end
 
   class_methods do
