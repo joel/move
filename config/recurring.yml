@@ -22,3 +22,6 @@ production:
   purge_stale_session_handoff_tokens:
     class: PurgeStaleSessionHandoffTokensJob
     schedule: every day at 4am
+  purge_expired_discards:
+    class: PurgeExpiredDiscardsJob
+    schedule: every day at 4am

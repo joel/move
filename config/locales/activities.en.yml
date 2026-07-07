@@ -37,6 +37,7 @@ en:
       move: "this move"
       member: "a member"
       unknown: "an item"
+      unknown_box: "a deleted box"
     kind:
       room: "room"
     summary:

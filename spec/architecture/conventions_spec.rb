@@ -91,4 +91,19 @@ RSpec.describe "Architecture conventions" do
       expect(hits).to be_empty, "Rails.event.notify outside the action layer: #{hits.join(", ")}"
     end
   end
+
+  describe "soft-deleted data is retention-bounded (#582)" do
+    it "the purge sweep covers every Discardable model" do
+      Rails.application.eager_load! # populate ApplicationRecord.descendants (idempotent)
+      discardable = ApplicationRecord.descendants.select { |klass| klass.include?(Discardable) }
+      missing = discardable - Discards::PurgeExpired::PASSES
+
+      # A model gaining `include Discardable` without joining PASSES would retain
+      # its discarded rows (and blobs) forever — the exact drift this test forbids.
+      expect(missing).to be_empty,
+                         "Discardable models missing from Discards::PurgeExpired::PASSES: " \
+                         "#{missing.map(&:name).join(", ")}"
+      expect(Discards::PurgeExpired::PASSES).to match_array(discardable)
+    end
+  end
 end

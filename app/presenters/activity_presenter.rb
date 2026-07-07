@@ -98,8 +98,13 @@ class ActivityPresenter
   end
 
   def target_label
-    box = @subjects[["Box", activity.metadata["to_box_id"]]]
-    box && I18n.t("activities.subject.box", number: box.number)
+    to_box_id = activity.metadata["to_box_id"]
+    return nil if to_box_id.nil?
+
+    box = @subjects[["Box", to_box_id]]
+    # The destination box can be hard-deleted by the retention sweep (#582); a nil
+    # here would render truncated copy ("moved Lamp to ").
+    box ? I18n.t("activities.subject.box", number: box.number) : I18n.t("activities.subject.unknown_box")
   end
 
   def kind_label

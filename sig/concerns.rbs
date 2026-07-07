@@ -6,6 +6,7 @@
 
 # ── Model concerns (packs/utility/app/models/concerns) ──
 module Discardable
+  RETENTION: ActiveSupport::Duration
 end
 
 module Roleable
