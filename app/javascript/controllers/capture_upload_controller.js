@@ -69,7 +69,12 @@ export default class extends Controller {
     // photo never transits the app. On ANY failure (CORS, network, disabled), fall
     // through to the server-proxied POST below — capture must never break.
     if (this.directUploadUrlValue) {
-      const signedId = await this.directUpload(input.files[0])
+      const uploading = input.files[0]
+      const signedId = await this.directUpload(uploading)
+      // The R2 PUT is another async wait: if the user re-picked during it, this
+      // upload is stale — the newer change event owns the newer file. Bail so we
+      // never submit the old signed_id (nor disable the input under the new file).
+      if (input.files[0] !== uploading) return
       if (signedId) {
         this.signedIdTarget.value = signedId
         // Exclude the file from the form so we don't ALSO push the bytes through
