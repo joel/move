@@ -196,7 +196,7 @@ jobs:
         # resolved from the committed rbs_collection.lock.yaml. Cached on the
         # lockfile so CI only hits GitHub when the lock changes.
         name: "Types / rbs collection cache"
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .gem_rbs_collection
           key: rbs-collection-${{ hashFiles('rbs_collection.lock.yaml') }}
