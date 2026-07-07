@@ -25,6 +25,7 @@ interface ::_RbsRailsPathHelpers
   def move_box_recovery_photo_state_path: (*untyped) -> ::String
   def move_box_recovery_photo_retry_path: (*untyped) -> ::String
   def move_box_capture_path: (*untyped) -> ::String
+  def move_box_capture_direct_upload_path: (*untyped) -> ::String
   def move_box_capture_retry_path: (*untyped) -> ::String
   def move_box_label_path: (*untyped) -> ::String
   def move_box_manifest_path: (*untyped) -> ::String
@@ -134,6 +135,7 @@ interface ::_RbsRailsPathHelpers
   def move_box_recovery_photo_state_url: (*untyped) -> ::String
   def move_box_recovery_photo_retry_url: (*untyped) -> ::String
   def move_box_capture_url: (*untyped) -> ::String
+  def move_box_capture_direct_upload_url: (*untyped) -> ::String
   def move_box_capture_retry_url: (*untyped) -> ::String
   def move_box_label_url: (*untyped) -> ::String
   def move_box_manifest_url: (*untyped) -> ::String
