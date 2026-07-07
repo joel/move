@@ -29,6 +29,12 @@ Rails.application.configure do
   # R2. Dev still uses :seaweedfs (config/environments/development.rb).
   config.active_storage.service = :r2
 
+  # Browser uploads captured photos straight to R2 via a presigned PUT (#572),
+  # instead of proxying 2–8 MB through the single app box. Requires R2 CORS for the
+  # apex + org-subdomain origins (see new-app-recipe.md). The client falls back to
+  # a server-proxied POST if a direct upload fails, so capture never breaks.
+  config.x.direct_upload_enabled = true
+
   # Assume all access to the app is happening through a SSL-terminating reverse proxy.
   # config.assume_ssl = true
 

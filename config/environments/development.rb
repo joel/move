@@ -40,6 +40,13 @@ Rails.application.configure do
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :seaweedfs
 
+  # Off in dev: local SeaweedFS presigns point at the internal `seaweedfs:8333`
+  # host (not browser-reachable) and no CORS is set, so a direct PUT would fail and
+  # fall back anyway. Capture uses the server-proxied POST locally. Flip to true
+  # (and add SeaweedFS CORS — see new-app-recipe.md) only to exercise direct upload
+  # against the dev bucket host.
+  config.x.direct_upload_enabled = false
+
   # Don't care if the mailer can't send.
   # config.action_mailer.raise_delivery_errors = false
 

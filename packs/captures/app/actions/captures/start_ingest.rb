@@ -13,21 +13,62 @@ module Captures
   # job exist, so the tile renders immediately as a placeholder and fills in over
   # ActionCable.
   class StartIngest < BaseAction
-    #: (box: untyped, file: untyped, captured_by: untyped) -> Dry::Monads::Result[untyped, untyped]
-    def call(box:, file:, captured_by:)
+    # Binds a direct-upload signed_id to the Move (mirrors Captures::Create's MCP
+    # purpose): CapturesController#direct_upload mints the blob's signed_id with it,
+    # and #resolve_direct_upload verifies with it — so a token can only reserve a
+    # blob for its own Move, and a leaked/replayed id can't attach elsewhere. The
+    # tenant schema is included so an id from one Organization can never verify
+    # under another. Distinct from the `mcp_media_upload` purpose (different path).
+    # Singleton defs aren't supported by inline RBS yet; declared in sig/captures.rbs.
+
+    # @rbs skip
+    def self.signed_id_purpose(move)
+      "web_media_upload/#{Apartment::Tenant.current}/#{move.id}"
+    end
+
+    #: (box: untyped, captured_by: untyped, ?file: untyped, ?signed_id: untyped) -> Dry::Monads::Result[untyped, untyped]
+    def call(box:, captured_by:, file: nil, signed_id: nil)
       yield ensure_writable(box.move)
       return Failure(:not_capturable) unless box.capturable?
-      return Failure(:no_file) if file.blank?
-      return Failure(:image_too_large) if oversize?(file)
-      return Failure(:unsupported_image) unless image_bytes?(file)
 
-      blob = yield store_raw(file)
+      blob = yield reserve_blob(box, file, signed_id)
       media = yield create_pending(box, blob.byte_size)
       IngestJob.perform_later(media.id, blob.id, captured_by_id: captured_by&.id, tenant: Apartment::Tenant.current)
       Success(media)
     end
 
     private
+
+    # Either the raw bytes came through the app (`file`, server-proxied) or the
+    # browser already PUT them straight to R2 and handed us a Move-scoped `signed_id`
+    # (#572 direct upload). Direct upload skips the up-front byte sniff — the bytes
+    # aren't local, and IngestJob's ImageNormalizer re-sniffs, size-caps, strips
+    # EXIF/GPS and transcodes regardless (never bypassed) — but still cheaply
+    # re-checks the known byte_size against the cap.
+
+    #: (untyped box, untyped file, untyped signed_id) -> Dry::Monads::Result[untyped, untyped]
+    def reserve_blob(box, file, signed_id)
+      return resolve_direct_upload(box, signed_id) if signed_id.present?
+      return Failure(:no_file) if file.blank?
+      return Failure(:image_too_large) if oversize?(file)
+      return Failure(:unsupported_image) unless image_bytes?(file)
+
+      store_raw(file)
+    end
+
+    # The blob was created by CapturesController#direct_upload (validated + capped
+    # there) and uploaded to R2 by the browser. Verify the Move-scoped purpose so
+    # it can only be attached to its own Move, and re-assert the size cap.
+
+    #: (untyped box, untyped signed_id) -> Dry::Monads::Result[untyped, untyped]
+    def resolve_direct_upload(box, signed_id)
+      blob = ActiveStorage::Blob.find_signed!(signed_id, purpose: self.class.signed_id_purpose(box.move)) # steep:ignore ArgumentTypeMismatch
+      return Failure(:image_too_large) if blob.byte_size > Media::MAX_IMAGE_BYTES
+
+      Success(blob)
+    rescue ActiveSupport::MessageVerifier::InvalidSignature, ActiveRecord::RecordNotFound
+      Failure(:invalid_upload)
+    end
 
     # Cheap up-front reject before we store bytes; ImageNormalizer re-checks in
     # the job as the storage backstop.

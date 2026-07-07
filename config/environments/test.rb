@@ -37,6 +37,10 @@ Rails.application.configure do
   # Store uploaded files on the local file system in a temporary directory.
   config.active_storage.service = :test
 
+  # The Disk service has no presigned direct upload; capture uses the server-proxied
+  # POST in tests. A request spec stubs this true to exercise the presign action.
+  config.x.direct_upload_enabled = false
+
   # Run jobs synchronously so capture → recognition completes within the example
   # (the recognition pipeline is enqueued via perform_later).
   config.active_job.queue_adapter = :inline
