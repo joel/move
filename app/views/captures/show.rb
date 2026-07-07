@@ -78,9 +78,12 @@ module Views
           # capture-upload (#547): downscales the photo to <=2048px JPEG in the
           # browser before submitting, so a small file goes over the wire (the
           # server still normalizes it as the authority). Falls back to the
-          # original on any error, so capture never breaks.
+          # original on any error, so capture never breaks. When direct upload is
+          # enabled (#572), it also PUTs the photo straight to R2 and submits a
+          # signed_id instead of the bytes — falling back to this same POST if the
+          # direct upload fails.
           form_with(url: move_box_capture_path(@move, @box), method: :post,
-                    data: { controller: "capture-upload", action: "change->capture-upload#submit" }) do |form|
+                    data: capture_form_data) do |form|
             label(
               class: "flex h-56 w-full cursor-pointer flex-col items-center justify-center gap-3 " \
                      "rounded-card border border-dashed border-card-border bg-surface-container-high " \
@@ -96,8 +99,26 @@ module Views
                                      required: true, class: "sr-only",
                                      data: { "capture-upload-target": "file" }
             end
+            # Carries the R2 signed_id when the browser direct-uploads (#572); empty
+            # on the server-proxied path. StartIngest prefers it over :file.
+            form.hidden_field :signed_id, data: { "capture-upload-target": "signedId" }
           end
         end
+      end
+
+      # Only advertise the presign endpoint when direct upload is enabled (prod) —
+      # otherwise the controller stays on the server-proxied POST with no wasted
+      # presign round-trip.
+
+      #: () -> Hash[Symbol, untyped]
+      def capture_form_data
+        data = { controller: "capture-upload",
+                 action: "change->capture-upload#submit turbo:submit-end->capture-upload#reset" }
+        if Rails.application.config.x.direct_upload_enabled
+          data[:"capture-upload-direct-upload-url-value"] =
+            view_context.move_box_capture_direct_upload_path(@move, @box)
+        end
+        data
       end
 
       #: () -> untyped
