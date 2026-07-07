@@ -33,8 +33,17 @@ class McpController < ActionController::API
     # Stateless Streamable HTTP transport (JSON response mode) so real MCP clients
     # get spec-compliant HTTP semantics: Accept/Content-Type validation, 400 on
     # malformed JSON, and the right status codes — not a bare JSON-RPC handler.
+    #
+    # dns_rebinding_protection: false — the gem's Host/Origin allow-list (added in
+    # 0.23.0, loopback-only by default) is for locally-bound servers that trust
+    # ambient/same-origin context. This endpoint is different on both counts: it is
+    # authenticated by a Bearer token (a DNS-rebinding attack conveys no ambient
+    # credential, so it gains nothing), and it serves dynamic `<slug>.move-easy.org`
+    # subdomains that can't be enumerated into an allow-list. The Host is already
+    # validated upstream by Rails host authorization (`config.hosts`) + the Apartment
+    # elevator (unknown subdomain ⇒ 404). Leaving it on 403s every real request.
     transport = MCP::Server::Transports::StreamableHTTPTransport.new(
-      server, stateless: true, enable_json_response: true
+      server, stateless: true, enable_json_response: true, dns_rebinding_protection: false
     )
     status, headers, body = transport.handle_request(request)
 
