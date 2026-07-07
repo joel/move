@@ -95,6 +95,11 @@ Run the design agents in proportion to the work — don't over-process a one-lin
 
 - **Trivial** (one-line fix, copy/docs change, dependency bump, config tweak): **skip
   the design agents.** Go straight to the issue → branch → commit governance steps.
+- **Already designed this session** (a plan-mode pass — Explore/Plan agents plus a
+  user-approved plan grounded in real code — or an equivalent exploration + design
+  round preceded this skill): **do not re-run the design agents.** Feed the existing
+  findings and approved plan into the issue (Step 1) and proceed; duplicate
+  exploration is pure cost.
 - **Feature / multi-file / architectural** (touches multiple files, adds a surface,
   or needs a design decision): **run the full design pass before writing the issue**,
   so the issue's plan (Step 1) is grounded in real code, not guesses:
@@ -251,6 +256,11 @@ gh project item-edit \
   --single-select-option-id <in-progress-option-id>
 ```
 
+When work starts immediately after issue creation (the common case for an
+agent-driven run), collapse the two moves into a single edit straight to
+**In Progress** — the Ready hop only earns its keep when the issue will sit
+queued before someone picks it up.
+
 ### Step 4: Create Feature Branch
 
 ```bash
@@ -313,6 +323,17 @@ Most Codex round-trips are findings we could have caught locally; this phase exi
 specifically to absorb them in a cheap local loop and keep the expensive
 PR → CI → Codex loop short. Skip only for trivial changes.
 
+> **Steps 5c + 5d are ONE combined before-push review gate — decide BOTH here,
+> before any `git push`.** Run `/code-review` (this step), and ALSO run
+> `/security-review` (Step 5d) when the diff touches: auth (`app/misc/`),
+> authorization (`app/policies/`), tenancy (`config/initializers/apartment*`,
+> any `Apartment::Tenant.switch`), the actions layer (`app/actions/`),
+> params / raw SQL, upload/media, MCP tools (`app/mcp/`), external-provider
+> calls, secrets, or any new endpoint/route. This repo is **open source** — a
+> push publishes the diff, so sequencing 5d after the push (e.g. once already
+> focused on the Codex/CI loop) defeats its purpose. Step 5d holds the
+> canonical trigger list and loop; the *decision* to run it happens now.
+
 Use the official Anthropic **`/code-review`** skill on your working-tree diff (it
 runs confidence-scored, multi-agent passes over the current diff, reads
 `CLAUDE.md`/`AGENTS.md`, and surfaces only high-confidence issues):
@@ -371,7 +392,8 @@ Point it at — and read yourself —
 [`doc/project/security-model.md`](../../../doc/project/security-model.md)
 (trust boundaries + per-class checklist).
 
-**When to run (MANDATORY) — the diff touches any of:**
+**When to run (MANDATORY — decided at the Step 5c gate, before any push) — the
+diff touches any of:**
 - auth (`app/misc/`), authorization (`app/policies/`), or tenancy
   (`config/initializers/apartment*`, any `Apartment::Tenant.switch`);
 - the actions layer (`app/actions/`), params / strong-params, or raw SQL /
@@ -904,6 +926,10 @@ If your project versions releases, tag/publish a release after the PR is merged 
 ```bash
 git checkout main && git pull origin main
 # Confirm the merge commit is present and its main CI/Deploy run is green.
+# Get the merge sha from `gh pr view <PR> --json mergeCommit` — NEVER hand-expand
+# a short sha into a full one for `gh run list --commit` filters (a wrong guess
+# makes the watch match nothing and idle forever); match runs by headSha prefix
+# or poll the PR's statusCheckRollup instead.
 # Confirm CHANGELOG.md carries this version's entry (see the note above).
 
 # Idempotent: stop if the tag/release already exists.
@@ -961,8 +987,8 @@ and expensive to reconstruct later.
 4.  git checkout -b feature/                           → Create branch
 5.  <implement the architect blueprint>                → Write code (respect Packwerk pack boundaries — §1#6; public API only, no cycles)
 5b. extend db/seeds.rb (+ bundle exec rails db:seed)   → Showcase-ready demo data
-5c. /code-review (loop until clean; mind the stop rule) → Internal CR before push (skip if trivial)
-5d. /security-review (when security-sensitive; loop until clean) → Adversarial SR before push
+5c. /code-review (loop until clean; mind the stop rule) → Internal CR — one combined pre-push gate with 5d (skip if trivial)
+5d. /security-review (trigger decided AT 5c, before any push; loop until clean) → Adversarial SR before push
 6.  bundle exec rake + packwerk validate && packwerk check → Lint + tests + system tests + boundary gate (must be green)
 7.  git commit (+ append sha to audit log)             → Overcommit hooks validate
 8.  /product-review (or /verify, or agent-browser+curl) → Live verification (curl Set-Cookie scope for auth/cookie changes)
