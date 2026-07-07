@@ -26,11 +26,14 @@ import { Controller } from "@hotwired/stimulus"
 // (re-sniff, EXIF/GPS strip, size cap, transcode). Any failure — or a hang, via
 // submit()'s timeout — uploads the original, so capture can never break.
 export default class extends Controller {
-  static targets = ["file"]
+  static targets = ["file", "signedId"]
   static values = {
     maxEdge: { type: Number, default: 2048 },
     quality: { type: Number, default: 0.85 },
-    timeout: { type: Number, default: 2500 }
+    timeout: { type: Number, default: 2500 },
+    // When present (#572), the browser PUTs straight to R2 via this presign
+    // endpoint and submits a signed_id; absent → the server-proxied POST.
+    directUploadUrl: { type: String, default: "" }
   }
 
   // change -> capture-upload#submit
@@ -61,7 +64,55 @@ export default class extends Controller {
     if (input.files[0] !== selected) return
 
     if (downscaled) this.replaceFile(input, downscaled)
+
+    // Direct upload (#572): PUT straight to R2 and submit the signed_id, so the
+    // photo never transits the app. On ANY failure (CORS, network, disabled), fall
+    // through to the server-proxied POST below — capture must never break.
+    if (this.directUploadUrlValue) {
+      const uploading = input.files[0]
+      const signedId = await this.directUpload(uploading)
+      // The R2 PUT is another async wait: if the user re-picked during it, this
+      // upload is stale — the newer change event owns the newer file. Bail so we
+      // never submit the old signed_id (nor disable the input under the new file).
+      if (input.files[0] !== uploading) return
+      if (signedId) {
+        this.signedIdTarget.value = signedId
+        // Exclude the file from the form so we don't ALSO push the bytes through
+        // the app (a disabled control is omitted from the submission and skips the
+        // `required` check); `reset` re-enables it for the next capture.
+        input.disabled = true
+        this.element.requestSubmit()
+        return
+      }
+    }
+
     this.element.requestSubmit()
+  }
+
+  // Upload the file straight to R2 via Active Storage's DirectUpload and resolve
+  // its Move-scoped signed_id, or null on any error (→ server-proxied fallback).
+  // @rails/activestorage is imported DYNAMICALLY (only when direct upload actually
+  // runs) so the controller still loads where the pin isn't present — dev/test,
+  // where direct upload is disabled — instead of the import 404ing the whole file.
+  async directUpload(file) {
+    try {
+      const { DirectUpload } = await import("@rails/activestorage")
+      return await new Promise((resolve) => {
+        new DirectUpload(file, this.directUploadUrlValue).create((error, blob) => {
+          resolve(error ? null : blob.signed_id)
+        })
+      })
+    } catch {
+      return null
+    }
+  }
+
+  // After each submit (turbo:submit-end), clear the carried state and re-enable the
+  // file input so the persistent capture form is ready for the next photo.
+  reset() {
+    if (this.hasSignedIdTarget) this.signedIdTarget.value = ""
+    this.fileTarget.disabled = false
+    this.fileTarget.value = ""
   }
 
   // Returns a downscaled JPEG File, or null → "upload the original as-is".

@@ -7,4 +7,8 @@ module Captures
   class Create
     def self.signed_id_purpose: (untyped move) -> String
   end
+
+  class StartIngest
+    def self.signed_id_purpose: (untyped move) -> String
+  end
 end

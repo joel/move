@@ -33,6 +33,13 @@ Rails.application.configure do
   media_host = ENV["MEDIA_TRANSFORM_HOST"].presence
   media_img = media_host ? ["https://#{media_host}"] : []
 
+  # Active Storage Direct Upload (#572) PUTs the captured photo straight to R2's S3
+  # endpoint via fetch/XHR, so connect-src must allow that origin. R2_ENDPOINT is
+  # the account-scoped origin (https://<account-id>.r2.cloudflarestorage.com); unset
+  # in dev/test (direct upload disabled there), so connect-src is unchanged.
+  r2_origin = ENV["R2_ENDPOINT"].presence
+  direct_upload_connect = r2_origin ? [r2_origin] : []
+
   config.content_security_policy do |policy|
     policy.default_src :self
     policy.script_src(:self, *google)                       # + nonce (below); no unsafe-inline
@@ -40,8 +47,8 @@ Rails.application.configure do
     policy.img_src(:self, :data, :blob, *media_img, *google,
                    *(google.empty? ? [] : ["https://*.googleusercontent.com"]))
     policy.font_src :self, :data
-    policy.connect_src(:self, *cable_origins, *google)      # + ActionCable wss (see above)
-    policy.frame_src(*(google.empty? ? [:none] : google))   # One Tap iframe
+    policy.connect_src(:self, *cable_origins, *google, *direct_upload_connect) # + wss + R2 direct upload
+    policy.frame_src(*(google.empty? ? [:none] : google)) # One Tap iframe
     policy.object_src :none
     policy.base_uri :self
     # NB: form-action is intentionally omitted. The passwordless apex↔subdomain auth

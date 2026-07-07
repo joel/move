@@ -29,6 +29,22 @@ Rails.application.configure do
   # R2. Dev still uses :seaweedfs (config/environments/development.rb).
   config.active_storage.service = :r2
 
+  # Browser uploads captured photos straight to R2 via a presigned PUT (#572),
+  # instead of proxying 2–8 MB through the single app box. Requires R2 CORS for the
+  # apex + org-subdomain origins (see new-app-recipe.md). The client falls back to
+  # a server-proxied POST if a direct upload fails, so capture never breaks.
+  config.x.direct_upload_enabled = true
+
+  # Disable Active Storage's built-in routes in PROD (#572). The stock
+  # `POST /rails/active_storage/direct_uploads` is UNAUTHENTICATED and would mint R2
+  # presigned PUTs bypassing the membership/size/type guards on
+  # CapturesController#direct_upload — a storage-abuse vector. Prod uses NONE of the
+  # stock AS routes (media is served by the edge Worker, uploads go through the
+  # custom presign + an S3 URL, and the `rails_storage_proxy` fallback only fires in
+  # dev/test), so removing them all is safe. Dev/test keep them (default) for the
+  # master-proxy fallback and the Disk-service direct-upload specs.
+  config.active_storage.draw_routes = false
+
   # Assume all access to the app is happening through a SSL-terminating reverse proxy.
   # config.assume_ssl = true
 

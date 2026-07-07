@@ -7,7 +7,7 @@ class CapturesController < MoveScopedController
   before_action :set_box
   before_action :require_writable_move!
   # Capture is blocked on a sealed box, but a pre-seal run can still be retried.
-  before_action :require_capturable!, only: %i[show create]
+  before_action :require_capturable!, only: %i[show create direct_upload]
 
   # GET /moves/:move_id/boxes/:box_id/capture
 
@@ -23,7 +23,9 @@ class CapturesController < MoveScopedController
 
   #: () -> untyped
   def create
-    result = Captures::StartIngest.new.call(box: @box, file: params[:file], captured_by: current_user)
+    result = Captures::StartIngest.new.call(
+      box: @box, file: params[:file], signed_id: params[:signed_id], captured_by: current_user
+    )
 
     case result
     in Dry::Monads::Success(_media)
@@ -43,6 +45,39 @@ class CapturesController < MoveScopedController
     in Dry::Monads::Failure(reason)
       redirect_to move_box_capture_path(@move, @box), alert: capture_error(reason)
     end
+  end
+
+  # POST /moves/:move_id/boxes/:box_id/capture/direct_upload
+  #
+  # Direct-upload presign (#572). Reached only from the browser's @rails/activestorage
+  # DirectUpload before it PUTs straight to R2. Reuses the capture guards
+  # (membership + writable + capturable) so an unauthenticated or non-member request
+  # can never mint a presigned URL. Validates the client-declared size/type up front
+  # (the real content sniff + EXIF/GPS strip is still done server-side by
+  # ImageNormalizer in IngestJob), and returns a Move-scoped signed_id so the blob
+  # can only be attached to this Move.
+
+  #: () -> untyped
+  def direct_upload
+    return head :not_found unless Rails.application.config.x.direct_upload_enabled
+
+    blob_params = params.expect(blob: %i[filename byte_size checksum content_type])
+    byte_size = blob_params[:byte_size].to_i
+    return head :content_too_large unless byte_size.positive? && byte_size <= Media::MAX_IMAGE_BYTES
+
+    content_type = blob_params[:content_type].to_s
+    return head :unsupported_media_type unless content_type.start_with?("image/") && content_type != "image/svg+xml"
+
+    # The R2 (S3) service builds a presigned S3 URL that needs no Rails host, but the
+    # dev/test Disk service builds a Rails route URL that does — set the request host
+    # so the presign works under every service (mirrors ActiveStorage's own controller).
+    ActiveStorage::Current.url_options = { protocol: request.protocol, host: request.host, port: request.optional_port }
+
+    blob = ActiveStorage::Blob.create_before_direct_upload!(
+      filename: blob_params[:filename], byte_size: byte_size,
+      checksum: blob_params[:checksum], content_type: content_type
+    )
+    render json: direct_upload_response(blob)
   end
 
   # POST /moves/:move_id/boxes/:box_id/capture/retry — new run for a failed media.
@@ -89,6 +124,21 @@ class CapturesController < MoveScopedController
     when ActiveModel::Errors then reason.full_messages.to_sentence.presence || t("captures.errors.failed")
     else t("captures.errors.failed")
     end
+  end
+
+  # The @rails/activestorage DirectUpload response shape: the blob attrs + the
+  # presigned PUT (url + headers) it uploads with, plus a Move-scoped signed_id (NOT
+  # the default global one) that StartIngest verifies against this Move.
+
+  #: (untyped blob) -> Hash[untyped, untyped]
+  def direct_upload_response(blob)
+    blob.as_json(root: false).merge(
+      "signed_id" => blob.signed_id(purpose: Captures::StartIngest.signed_id_purpose(@move)),
+      "direct_upload" => {
+        "url" => blob.service_url_for_direct_upload,
+        "headers" => blob.service_headers_for_direct_upload
+      }
+    )
   end
 
   # Archived-Move redirect target (require_writable_move!) — back to the box.

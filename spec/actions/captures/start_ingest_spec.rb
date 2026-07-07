@@ -60,4 +60,55 @@ RSpec.describe Captures::StartIngest do
     result = described_class.new.call(box: sealed, file: upload, captured_by: user)
     expect(result.failure).to eq(:not_capturable)
   end
+
+  # Direct upload (#572): the browser already PUT the bytes to R2 and hands us a
+  # Move-scoped signed_id instead of a file.
+  describe "direct upload (signed_id)" do
+    # A reserved blob as CapturesController#direct_upload would create it — no bytes
+    # need to be uploaded to exercise StartIngest's request-time contract.
+    def reserved_blob(byte_size: 1234, content_type: "image/jpeg")
+      ActiveStorage::Blob.create_before_direct_upload!(
+        filename: "capture.jpg", byte_size:, checksum: "0" * 22, content_type:
+      )
+    end
+
+    def signed_for(blob, move) = blob.signed_id(purpose: Captures::StartIngest.signed_id_purpose(move))
+
+    it "reserves the already-uploaded blob, creates a pending media, and enqueues ingest" do
+      blob = reserved_blob
+      result = nil
+      expect { result = described_class.new.call(box:, signed_id: signed_for(blob, box.move), captured_by: user) }
+        .to change(box.media.pending, :count).by(1)
+
+      media = result.value!
+      expect(media).to be_pending
+      expect(media.original_byte_size).to eq(blob.byte_size)
+      # Enqueues against the SAME reserved blob — no server-side re-upload.
+      expect(Captures::IngestJob).to have_received(:perform_later)
+        .with(media.id, blob.id, hash_including(tenant: Apartment::Tenant.current))
+    end
+
+    it "rejects a signed_id whose purpose is bound to a different Move (no cross-Move attach)" do
+      other = create(:move, created_by: user)
+      blob = reserved_blob
+      result = described_class.new.call(box:, signed_id: signed_for(blob, other), captured_by: user)
+
+      expect(result.failure).to eq(:invalid_upload)
+      expect(Captures::IngestJob).not_to have_received(:perform_later)
+    end
+
+    it "rejects a tampered / unverifiable signed_id" do
+      result = described_class.new.call(box:, signed_id: "not-a-real-signed-id", captured_by: user)
+      expect(result.failure).to eq(:invalid_upload)
+    end
+
+    it "re-asserts the size cap on the reserved blob" do
+      stub_const("Media::MAX_IMAGE_BYTES", 5)
+      blob = reserved_blob(byte_size: 6)
+      result = described_class.new.call(box:, signed_id: signed_for(blob, box.move), captured_by: user)
+
+      expect(result.failure).to eq(:image_too_large)
+      expect(Captures::IngestJob).not_to have_received(:perform_later)
+    end
+  end
 end

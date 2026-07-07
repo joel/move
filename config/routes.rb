@@ -63,6 +63,11 @@ Rails.application.routes.draw do
       # ActionCable (#241); there is no polled fragment endpoint any more.
       get "capture", to: "captures#show", as: :capture
       post "capture", to: "captures#create"
+      # Direct-upload presign (#572): tenant + membership + writable + capturable
+      # gated (CapturesController before_actions), mints an R2 presigned PUT + a
+      # Move-scoped signed_id so the browser uploads straight to R2 (not through the
+      # app). Falls back to POST capture (server-proxied) when disabled/unavailable.
+      post "capture/direct_upload", to: "captures#direct_upload", as: :capture_direct_upload
       post "capture/retry", to: "captures#retry_recognition", as: :capture_retry
       # E1 — Box label (A7, opaque) and authenticated manifest (A4) as inline PDFs.
       get "label", to: "labels#show", as: :label

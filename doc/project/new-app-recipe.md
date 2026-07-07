@@ -594,6 +594,50 @@ signed token. Source + full runbook: `workers/media-transform/` (`README.md`).
    before the Rails PR merges** (same discipline as an accessory cutover). Add
    `media` to `EXCLUDED_SUBDOMAINS` + `RESERVED_SLUGS` (defense in depth).
 
+## 6g. Active Storage Direct Upload to R2 (#572)
+
+The browser PUTs the captured photo **straight to R2** (presigned) instead of
+proxying 2–8 MB through the single app box. Server authority is preserved: raw
+bytes land in R2, then `ImageNormalizer` runs in `Captures::IngestJob` as a
+mandatory post-upload step (re-sniff, **strip EXIF/GPS**, size-cap, transcode) and
+**replaces** the master — so no raw metadata-bearing object is ever served.
+
+1. **R2 CORS** (the one infra step — dashboard **R2 → move-media → Settings →
+   CORS Policy**, or the S3 API). A browser direct PUT is preflighted, so allow it
+   from the app origins:
+   ```json
+   [
+     {
+       "AllowedOrigins": ["https://move-easy.org", "https://*.move-easy.org"],
+       "AllowedMethods": ["PUT"],
+       "AllowedHeaders": ["*"],
+       "ExposeHeaders": ["ETag"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+   (GET isn't needed — images are served by the media-transform Worker, §6f, not a
+   direct R2 GET.) **Dev parity:** to exercise direct upload locally, set the same
+   CORS on the SeaweedFS `move` bucket and flip `config.x.direct_upload_enabled`
+   in `development.rb`; otherwise dev stays on the server-proxied POST.
+2. **No new secret.** `config.x.direct_upload_enabled = true` lives in
+   `production.rb` (code, not Doppler). CSP `connect-src` is widened to the R2 S3
+   origin automatically from the existing `R2_ENDPOINT`
+   (`content_security_policy.rb`). `AWS_REQUEST_CHECKSUM_CALCULATION=when_required`
+   (already set for the R2 service, §6b) is what lets R2 accept the presigned PUT's
+   integrity headers.
+3. **How it fails safe.** The presign endpoint
+   (`POST …/capture/direct_upload`) is behind the capture guards and rejects
+   over-cap / non-image before minting a URL; the `signed_id` is Move-purpose-bound.
+   The client falls back to the server-proxied POST on any direct-upload error, so
+   **capture never breaks** even before CORS is applied. Abandoned presigns (never
+   PUT) are reaped by `PurgeAbandonedUploadsJob` (daily).
+4. **Verify (needs a real browser):** on an org subdomain, capture a photo and
+   confirm in DevTools → Network that the PUT goes to
+   `<account>.r2.cloudflarestorage.com` and returns 200 (no CORS error), the form
+   POST carries `signed_id` (not the file bytes), and the photo renders. Then check
+   the stored master has **no** EXIF/GPS (ImageNormalizer ran).
+
 ## 7. Cutover order (zero-confusion sequence)
 
 1. Buy domain → add Cloudflare zone → registrar nameservers → wait active.

@@ -205,4 +205,66 @@ RSpec.describe "Captures" do
       end.to change(box.recognition_runs, :count).by(1)
     end
   end
+
+  describe "POST capture/direct_upload (#572 presign)" do
+    def blob_params(byte_size: 1234, content_type: "image/jpeg")
+      { blob: { filename: "capture.jpg", byte_size:, checksum: Digest::MD5.base64digest("x"),
+                content_type: } }
+    end
+
+    it "404s when direct upload is disabled (the default in test)" do
+      post move_box_capture_direct_upload_path(move, box), params: blob_params, as: :json
+      expect(response).to have_http_status(:not_found)
+    end
+
+    context "when direct upload is enabled" do
+      around do |example|
+        previous = Rails.application.config.x.direct_upload_enabled
+        Rails.application.config.x.direct_upload_enabled = true
+        example.run
+        Rails.application.config.x.direct_upload_enabled = previous
+      end
+
+      it "returns the presigned PUT and a MOVE-SCOPED signed_id (not the global one)" do
+        expect { post move_box_capture_direct_upload_path(move, box), params: blob_params, as: :json }
+          .to change(ActiveStorage::Blob, :count).by(1)
+
+        expect(response).to have_http_status(:ok)
+        body = response.parsed_body
+        expect(body.dig("direct_upload", "url")).to be_present
+        expect(body.dig("direct_upload", "headers")).to be_a(Hash)
+        expect(body["signed_id"]).to be_present
+        # It is purpose-bound: verifying WITHOUT the Move purpose must fail, proving
+        # it isn't Active Storage's global signed_id.
+        expect { ActiveStorage::Blob.find_signed!(body["signed_id"]) }
+          .to raise_error(ActiveSupport::MessageVerifier::InvalidSignature)
+      end
+
+      it "rejects an over-cap byte_size before minting a URL (413)" do
+        expect do
+          post move_box_capture_direct_upload_path(move, box),
+               params: blob_params(byte_size: Media::MAX_IMAGE_BYTES + 1), as: :json
+        end.not_to change(ActiveStorage::Blob, :count)
+        expect(response).to have_http_status(:content_too_large)
+      end
+
+      it "rejects a non-image declared type (415)" do
+        post move_box_capture_direct_upload_path(move, box),
+             params: blob_params(content_type: "application/pdf"), as: :json
+        expect(response).to have_http_status(:unsupported_media_type)
+      end
+
+      it "rejects an SVG declared type (415)" do
+        post move_box_capture_direct_upload_path(move, box),
+             params: blob_params(content_type: "image/svg+xml"), as: :json
+        expect(response).to have_http_status(:unsupported_media_type)
+      end
+
+      it "blocks a sealed (non-capturable) box" do
+        sealed = create(:box, move:, number: "9", status: "sealed")
+        post move_box_capture_direct_upload_path(move, sealed), params: blob_params, as: :json
+        expect(response).to have_http_status(:redirect)
+      end
+    end
+  end
 end
