@@ -8,10 +8,29 @@
 #
 # Deploys INDEPENDENTLY of the Rails app (Kamal never touches it): `wrangler deploy`.
 # See README.md for the full provisioning + verification runbook.
+#
+# NB: TOML tables are terminated by the NEXT header, so every top-level key
+# (name/main/compatibility_date/workers_dev/routes) MUST appear BEFORE the
+# `[[r2_buckets]]` / `[images]` headers below — otherwise it is parsed as a field
+# of that table (wrangler warned "Unexpected fields found in images field: routes"
+# and silently dropped the Custom Domain when `routes` sat after `[images]`).
 
 name = "move-media-transform"
 main = "src/index.js"
 compatibility_date = "2026-07-01"
+
+# Do NOT expose the Worker on a *.workers.dev subdomain — it must be reachable ONLY
+# via the media.<zone> Custom Domain below (defense in depth; the token is still
+# required either way, but there's no reason to publish a second public hostname).
+workers_dev = false
+
+# Custom Domain: provisions (or reuses) an exact-match DNS record for this host,
+# which takes priority over the `*.move-easy.org` wildcard CNAME (the Cloudflare
+# Tunnel to kamal-proxy) — so requests hit the Worker at the edge and never reach
+# the origin. See README §6. (Must be above the table headers — see NB above.)
+routes = [
+  { pattern = "media.move-easy.org", custom_domain = true }
+]
 
 # R2 binding — the SAME bucket Active Storage's `:r2` service writes to
 # (config/storage.yml `r2:`, config/deploy.yml R2_BUCKET). This is a native
@@ -26,14 +45,6 @@ bucket_name = "move-media"
 # not sufficient.
 [images]
 binding = "IMAGES"
-
-# Custom Domain: provisions (or reuses) an exact-match DNS record for this host,
-# which takes priority over the `*.move-easy.org` wildcard CNAME (the Cloudflare
-# Tunnel to kamal-proxy) — so requests hit the Worker at the edge and never reach
-# the origin. See README §6.
-routes = [
-  { pattern = "media.move-easy.org", custom_domain = true }
-]
 
 # MEDIA_TRANSFORM_SECRET is a Worker SECRET, provisioned out-of-band and never
 # committed:  wrangler secret put MEDIA_TRANSFORM_SECRET
