@@ -63,56 +63,32 @@ namespace :images do
          "#{ActiveSupport::NumberHelper.number_to_human_size(grand_total)}"
   end
 
-  desc "Pre-generate display variants (:thumb/:detail) for existing media so first views are warm (#316)"
-  task prewarm: :environment do
-    grand_total = 0
-    # Media lives per tenant schema; switch in to find the rows, then warm each
-    # one's variants. Skip discarded media — it's never displayed, so warming it
-    # would only burn storage/CPU. MediaVariants::Prewarm is idempotent, so a
-    # re-run is a cheap existence check per variant (no re-transform).
-    Organization.pluck(:slug).each do |slug|
-      Apartment::Tenant.switch(slug) do
-        warmed = 0
-        # Eager-load the attachment + blob so the per-record attached? guard in
-        # Prewarm doesn't issue an N+1 of active_storage_attachments lookups.
-        Media.with_attached_image.find_each { |media| warmed += MediaVariants::Prewarm.call(media) }
-        grand_total += warmed
-        line = "[images:prewarm] #{slug}: #{warmed} variants warmed"
-        Rails.logger.info(line)
-        puts line
+  desc "One-off: purge orphaned Active Storage variant records + their stored objects (#572 decommission)"
+  task cleanup_variants: :environment do
+    # After the edge-transform cutover (#572) the app no longer generates Active
+    # Storage display variants — the master is the only object we serve. Any
+    # `active_storage_variant_records` (and their stored :thumb/:detail objects in
+    # R2/SeaweedFS) left from the old MediaVariants::Prewarm pipeline are now dead
+    # weight. Purge them. Idempotent: a re-run finds nothing.
+    #
+    # Blob/Attachment/VariantRecord are Apartment-EXCLUDED (shared `public` schema),
+    # so this runs once against `public` — NOT per tenant. `variant.image.purge`
+    # deletes the stored object + its attachment + blob rows; then the record goes.
+    total = purged = 0
+    ActiveStorage::VariantRecord.find_each do |record|
+      total += 1
+      begin
+        record.image.purge if record.image.attached? # deletes the stored variant object
+        record.destroy!
+        purged += 1
+      rescue ActiveStorage::Error, ActiveRecord::RecordNotDestroyed => e
+        warn "[images:cleanup_variants] skip variant_record #{record.id}: #{e.class} (#{e.message})"
       end
     end
 
-    puts "[images:prewarm] total variants warmed: #{grand_total}"
-  end
-
-  desc "Repair broken display variants — rebuild any whose file is missing from storage (#486)"
-  task repair: :environment do
-    grand_total = 0
-    # Same tenant sweep as :prewarm, but in repair mode: MediaVariants::Prewarm
-    # drops any variant record whose file has gone missing from object storage
-    # (isolated SeaweedFS loss) so it is rebuilt from the master, rather than
-    # no-opping on the stale record and serving a broken image forever. Costs a
-    # storage existence check per variant, so it's a deliberate maintenance run,
-    # not the per-capture hot path. Skips discarded media (never displayed).
-    grand_repaired = 0
-    Organization.pluck(:slug).each do |slug|
-      Apartment::Tenant.switch(slug) do
-        # One accumulating warmer per tenant so `#repaired` reports how many broken
-        # variants this run actually healed — the summary otherwise can't tell a
-        # fully-healthy sweep from one that fixed real orphans.
-        warmer = MediaVariants::Prewarm.new(repair: true)
-        ensured = 0
-        Media.with_attached_image.find_each { |media| ensured += warmer.call(media) }
-        grand_total += ensured
-        grand_repaired += warmer.repaired
-        line = "[images:repair] #{slug}: #{warmer.repaired} repaired, #{ensured} variants ensured present"
-        Rails.logger.info(line)
-        puts line
-      end
-    end
-
-    puts "[images:repair] total: #{grand_repaired} repaired, #{grand_total} variants ensured present"
+    line = "[images:cleanup_variants] purged #{purged}/#{total} variant records + their stored objects"
+    Rails.logger.info(line)
+    puts line
   end
 
   desc "Flag media whose master blob is unreadable so surfaces show a placeholder (#563)"

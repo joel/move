@@ -4,8 +4,8 @@ module Captures
   # Normalizes a pending capture off the request (#545): downloads the reserved
   # raw blob, runs ImageNormalizer (sniff → transcode → optimise master),
   # attaches the master, flips the Media to `ready`, enqueues recognition, emits
-  # `media.captured` (which fans out to variant prewarm), and broadcasts the
-  # refreshed panel. A processing failure flips the Media to `failed` (surfaced
+  # `media.captured`, and broadcasts the refreshed panel. A processing failure
+  # flips the Media to `failed` (surfaced
   # in the panel) rather than leaving a stuck placeholder. Runs on the dedicated
   # image_ingest pool (#543). Idempotent: a retry once the media has left
   # `pending` no-ops.

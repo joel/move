@@ -4,7 +4,7 @@ default: &default
       batch_size: 500
   workers:
     # Dedicated pool for CPU-bound image ingest (#543) — ImageNormalizer/libvips
-    # transcode + variant prewarm, i.e. the user-visible "thumbnail appears"
+    # transcode of the captured master, i.e. the user-visible "photo appears"
     # path. Isolated from the general pool so a burst of captures isn't starved
     # by slow, IO-bound vision-API recognition jobs (and vice versa). CPU-bound,
     # so threads are kept modest to leave headroom on the 4 vCPU box.

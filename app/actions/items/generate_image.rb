@@ -71,7 +71,7 @@ module Items
 
     # Same per-tenant Active Storage attach as a capture, but tagged
     # captured_via: "generated" so it's never mistaken for a real photo and never
-    # trips the recognition/prewarm pipeline (which keys off media.captured).
+    # trips the recognition pipeline (which keys off media.captured).
 
     #: (untyped item, untyped result) -> untyped
     def build_media(item, result)

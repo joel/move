@@ -17,9 +17,6 @@ RSpec.describe Captures::CompleteIngest do
   before do
     allow(RecognitionRuns::Enqueue).to receive(:new)
       .and_return(instance_double(RecognitionRuns::Enqueue, call: Dry::Monads::Success()))
-    # media.captured fans out to variant prewarm (inline in test → libvips);
-    # stub it so this stays a fast, libvips-free unit spec.
-    allow(MediaVariants::Prewarm).to receive(:call).and_return(0)
   end
 
   it "attaches the master, flips the pending media to ready, and enqueues recognition" do

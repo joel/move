@@ -77,8 +77,8 @@ module Captures
     end
 
     # `media.retaken` (not `media.captured`) so the activity feed reads "re-took a
-    # photo", not "added" — the prewarm subscriber is subscribed to both so the new
-    # image's variants still warm.
+    # photo", not "added". Display sizes are produced on demand at the edge (#572),
+    # so a retaken master needs no variant pre-warming.
 
     #: (untyped media, untyped actor) -> Dry::Monads::Success[nil]
     def emit_event(media, actor)

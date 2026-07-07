@@ -7,10 +7,12 @@ RSpec.describe MediaVariants::TransformUrl do
     URI.decode_www_form(URI.parse(url).query).to_h
   end
 
-  it "exposes the same sizes declared on Media#image (kept in sync with Prewarm)" do
-    declared = Media.reflect_on_attachment(:image).named_variants.keys
-    expect(described_class::SIZES.keys).to match_array(declared)
-    expect(described_class::SIZES.keys).to match_array(MediaVariants::Prewarm::VARIANTS)
+  # SIZES is now the SOLE source of truth for display geometry — the in-app Active
+  # Storage variants (and MediaVariants::Prewarm) were decommissioned in #572, so
+  # Media#image declares no named variants any more.
+  it "declares exactly the thumb + detail sizes, and Media#image has no in-app variants" do
+    expect(described_class::SIZES.keys).to contain_exactly(:thumb, :detail)
+    expect(Media.reflect_on_attachment(:image).named_variants).to be_empty
   end
 
   # The Worker (workers/media-transform/src/index.js) carries a hardcoded copy of
