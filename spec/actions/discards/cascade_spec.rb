@@ -45,6 +45,19 @@ RSpec.describe "Discards cascade" do # rubocop:disable RSpec/DescribeClass
       expect(discarded_box.reload.discard_batch_id).to be_nil
     end
 
+    # #582 / Codex #583 — the retention window is enforced on the restore path
+    # itself, so a restore racing the nightly sweep's child-first passes can never
+    # bring back a parent whose batch children were already hard-deleted.
+    it "refuses to restore a record whose retention window has lapsed" do
+      create(:item, move:, box:)
+      travel_to((Discardable::RETENTION + 1.day).ago) { Boxes::Delete.new.call(box:, actor:) }
+
+      result = described_class.new.call(box: Box.with_discarded.find(box.id), actor:)
+
+      expect(result).to eq(Dry::Monads::Failure(:retention_expired))
+      expect(Box.with_discarded.find(box.id)).to be_discarded
+    end
+
     it "does not resurrect a child discarded independently before the parent" do
       kept_item = create(:item, move:, box:)
       early_item = create(:item, move:, box:)

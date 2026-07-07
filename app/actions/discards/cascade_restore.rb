@@ -10,6 +10,7 @@ module Discards
     #: (record: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(record:, actor:, source: :web) # rubocop:disable Lint/UnusedMethodArgument
       yield ensure_writable(record.move)
+      yield ensure_restorable(record)
       batch_id = record.discard_batch_id
       ActiveRecord::Base.transaction do
         record.undiscard_in_batch!
@@ -21,6 +22,20 @@ module Discards
     end
 
     private
+
+    # The retention window is a property of the record, not of sweep timing: past
+    # Discardable::RETENTION the record is no longer restorable at all — even if
+    # the nightly Discards::PurgeExpired hasn't reached it yet, or is mid-run (its
+    # child-first passes may already have hard-deleted the batch's children, and
+    # restoring the parent then would bring it back visibly empty — Codex #583).
+
+    #: (untyped record) -> (Dry::Monads::Failure[Symbol] | Dry::Monads::Success[nil])
+    def ensure_restorable(record)
+      return Failure(:retention_expired) if record.discarded? &&
+                                            record.discarded_at <= Discardable::RETENTION.ago
+
+      Success()
+    end
 
     #: (untyped parent, untyped batch_id) -> untyped
     def restore_children(parent, batch_id)

@@ -100,7 +100,11 @@ class ActivityFeed
   def restorable?(activity)
     return false unless DELETE_ACTIONS.include?(activity.action)
 
-    @subjects[[activity.subject_type, activity.subject_id]]&.try(:discarded?)
+    subject = @subjects[[activity.subject_type, activity.subject_id]]
+    # Still discarded AND inside the retention window — past it the record is no
+    # longer restorable (Discards::CascadeRestore refuses, and the nightly sweep
+    # may already be dismantling the batch), so don't offer the button.
+    !!subject&.try(:discarded?) && subject.discarded_at > Discardable::RETENTION.ago
   end
 
   def latest_updates

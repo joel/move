@@ -61,6 +61,20 @@ RSpec.describe "Activities" do
         .to include(I18n.t("activities.subject.photo")).and include(I18n.t("activities.restore.action"))
     end
 
+    # #582 — once the retention window lapses the Restore button disappears even
+    # BEFORE the sweep has hard-deleted the subject (CascadeRestore refuses too),
+    # so the feed never offers a restore that would race the purge.
+    it "offers no Restore for an expired subject the sweep has not purged yet" do
+      box = create(:box, move:, number: "7")
+      travel_to((Discardable::RETENTION + 1.day).ago) { Boxes::Delete.new.call(box:, actor: user) }
+
+      get move_activity_path(move)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Box 7") # subject row still renders, named
+      expect(response.body).not_to include(I18n.t("activities.restore.action"))
+    end
+
     # After the retention sweep hard-deletes a subject, its feed row must still
     # render (activities are append-only history) — with fallback copy and no
     # Restore affordance.
