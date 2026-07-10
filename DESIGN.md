@@ -195,12 +195,17 @@ controller (`open` / `close` / `backdropClose`); the third has its own:
   so the screen shows one contextual hero. Rows are full-width `surface-container-high`
   pills (`text-error` for the destructive Delete row).
 - **`.ha-lightbox`** — full-viewport, transparent/borderless photo viewer over a heavy
-  (85%) blurred `::backdrop`; the contained `:detail` `<img>` floats centred
-  (`object-contain`). Driven by the **`lightbox`** Stimulus controller
-  (`open` / `close` / `prev` / `next` / `key` / `backdropClose`): grid tiles carry the
-  photo's `:detail` src + caption + box href as `data-*`, and prev/next cycle (wrapping)
-  over the rendered set with arrow-key support. Used by **`Components::Gallery::Grid`**
-  (the Move-wide Gallery).
+  (85%) blurred `::backdrop`. Inside it, **`.ha-lightbox-track`** is a 3-slide
+  draggable strip (prev / current / next as real `<img>`s, so neighbours preload;
+  baseline `translateX(-100%)` centres the middle slide, `transform` transition 200ms,
+  disabled under `prefers-reduced-motion`). Driven by the **`lightbox`** Stimulus
+  controller: grid tiles carry the photo's `:thumb` + `:detail` srcs, caption and box
+  href as `data-*`; slides render **thumb-first** (LQIP — the grid-cached thumb shows
+  instantly, sharpening when `:detail` lands). Navigation wraps and is by finger swipe
+  (follow-finger drag, commit past ~20% width or a flick), arrow keys, or prev/next
+  buttons — the buttons only render on devices with a fine pointer
+  (`any-pointer-fine:flex`); on touch screens the swipe is the affordance. Used by
+  **`Components::Gallery::Grid`** (the Move-wide Gallery).
 
 ### Navigation chrome
 `Ui::BottomTabBar` (mobile, docked) and `Ui::Sidebar` (desktop ≥`lg`, 280px) render

@@ -46,6 +46,21 @@ RSpec.describe "Gallery lightbox (JS)", :js do
     end
   end
 
+  # A horizontal touch drag across the open lightbox, via W3C touch pointer
+  # actions — ChromeDriver synthesizes real touchstart/move/end from these, so
+  # the controller's follow-finger handlers are exercised end to end. 300px on a
+  # 1400px window clears the 20%-of-track commit threshold on distance alone.
+  def swipe(distance:)
+    touch = Selenium::WebDriver::Interactions.pointer(:touch, name: "finger")
+    dialog = find("dialog.ha-lightbox")
+    page.driver.browser.action(devices: [touch])
+        .move_to(dialog.native)
+        .pointer_down(:left)
+        .move_by(distance, 0)
+        .pointer_up(:left)
+        .perform
+  end
+
   it "opens the lightbox on tap and sets the box link" do
     move = seed_two_photos
     login_as(user: user)
@@ -64,18 +79,36 @@ RSpec.describe "Gallery lightbox (JS)", :js do
     expect(page).to have_css("a[data-lightbox-target='link'][href='#{move_box_path(move, box_two)}']")
   end
 
-  it "cycles photos with next/prev and closes" do
+  # Arrow keys, not the prev/next buttons: those are `any-pointer-fine:` gated,
+  # and headless Chrome's reported pointer capabilities are not guaranteed, so
+  # clicking them would be flaky. The request spec covers the buttons' markup.
+  it "cycles photos with arrow keys and closes" do
     move = seed_two_photos
     login_as(user: user)
     visit move_gallery_path(move)
     first("button[data-lightbox-target='tile']").click
+    expect(page).to have_css("dialog.ha-lightbox[open]")
 
-    find("button[aria-label='#{I18n.t("galleries.index.lightbox.next")}']").click
+    page.driver.browser.action.send_keys(:arrow_right).perform
     expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 1/i)
-    find("button[aria-label='#{I18n.t("galleries.index.lightbox.prev")}']").click
+    page.driver.browser.action.send_keys(:arrow_left).perform
     expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 2/i)
 
     find("button[aria-label='#{I18n.t("galleries.index.lightbox.close")}']").click
     expect(page).to have_no_css("dialog.ha-lightbox[open]")
+  end
+
+  it "navigates with a horizontal finger swipe" do
+    move = seed_two_photos
+    login_as(user: user)
+    visit move_gallery_path(move)
+    first("button[data-lightbox-target='tile']").click
+    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 2/i)
+
+    swipe(distance: -300)
+    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 1/i)
+
+    swipe(distance: 300)
+    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 2/i)
   end
 end

@@ -603,6 +603,15 @@
     background: rgba(0, 0, 0, 0.85);
     backdrop-filter: blur(4px);
   }
+
+  /* The 3-slide strip behind the viewer: translateX(-100%) centres the middle
+   * slide; a finger drag offsets it inline and the controller animates the
+   * turn. The transition lives here so reduced-motion can zero it (below). */
+  .ha-lightbox-track {
+    transform: translateX(-100%);
+    transition: transform 200ms ease-out;
+    will-change: transform;
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────────
@@ -651,6 +660,7 @@
   .ha-rise,
   .ha-button,
   .ui-pulse-glow,
+  .ha-lightbox-track,
   .box-added-highlight {
     animation: none;
     transition: none;

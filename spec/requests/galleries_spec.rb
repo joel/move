@@ -65,6 +65,27 @@ RSpec.describe "Galleries" do
       end
     end
 
+    it "renders the draggable track with thumb-first tiles and pointer-gated arrows" do
+      box = create(:box, move:, number: "7")
+      create(:media, move:, box:)
+
+      get move_gallery_path(move)
+
+      aggregate_failures do
+        # Tiles carry both srcs for the thumb-first swap (in test both resolve to
+        # the proxied master, so assert presence, not distinctness).
+        expect(response.body).to include("data-thumb=")
+        expect(response.body).to include("data-src=")
+        # The 3-slide track the drag/animation recentres.
+        expect(response.body).to include('data-lightbox-target="track"')
+        expect(response.body.scan('data-lightbox-target="slide"').size).to eq(3)
+        # Arrows are an affordance for fine pointers only; touch users swipe.
+        expect(response.body).to include("any-pointer-fine:flex")
+        # Turbo must never snapshot an open dialog.
+        expect(response.body).to include("turbo:before-cache@document->lightbox#close")
+      end
+    end
+
     it "offers a room as a filter chip only when it has at least one photo" do
       kitchen = create(:room, move:, name: "Kitchen")
       create(:room, move:, name: "EmptyAttic")
