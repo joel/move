@@ -46,15 +46,15 @@ RSpec.describe "Gallery lightbox (JS)", :js do
     end
   end
 
-  # A horizontal touch drag across the open lightbox, via W3C touch pointer
-  # actions — ChromeDriver synthesizes real touchstart/move/end from these, so
-  # the controller's follow-finger handlers are exercised end to end. 300px on a
-  # 1400px window clears the 20%-of-track commit threshold on distance alone.
+  # A horizontal touch drag across the open PhotoSwipe viewer, via W3C touch
+  # pointer actions — ChromeDriver synthesizes real pointer/touch events, so
+  # PhotoSwipe's own gesture engine is exercised end to end. 500px on a 1400px
+  # window clears its next-slide pan threshold comfortably.
   def swipe(distance:)
     touch = Selenium::WebDriver::Interactions.pointer(:touch, name: "finger")
-    dialog = find("dialog.ha-lightbox")
+    viewer = find(".pswp")
     page.driver.browser.action(devices: [touch])
-        .move_to(dialog.native)
+        .move_to(viewer.native)
         .pointer_down(:left)
         .move_by(distance, 0)
         .pointer_up(:left)
@@ -66,36 +66,35 @@ RSpec.describe "Gallery lightbox (JS)", :js do
     login_as(user: user)
     visit move_gallery_path(move)
 
-    # Closed until a tile is tapped; tapping the first (most-recent) tile opens it.
+    # No viewer until a tile is tapped; tapping the first (most-recent) tile
+    # opens PhotoSwipe (it appends its DOM to <body> on demand).
     expect(page).to have_css("button[data-lightbox-target='tile']", minimum: 2)
-    expect(page).to have_no_css("dialog.ha-lightbox[open]")
+    expect(page).to have_no_css(".pswp")
     first("button[data-lightbox-target='tile']").click
 
-    expect(page).to have_css("dialog.ha-lightbox[open]")
-    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 2/i)
+    expect(page).to have_css(".pswp--open")
+    expect(page).to have_css(".pswp__move-caption", text: /Box 2/i)
     # The caption text is CSS-uppercased, so match the box link by href, not text.
     # Look the box up inside the tenant — the thread has left the schema by now.
     box_two = Apartment::Tenant.switch(slug) { move.boxes.find_by(number: "2") }
-    expect(page).to have_css("a[data-lightbox-target='link'][href='#{move_box_path(move, box_two)}']")
+    expect(page).to have_css("a.pswp__button--move-view-box[href='#{move_box_path(move, box_two)}']")
   end
 
-  # Arrow keys, not the prev/next buttons: those are `any-pointer-fine:` gated,
-  # and headless Chrome's reported pointer capabilities are not guaranteed, so
-  # clicking them would be flaky. The request spec covers the buttons' markup.
   it "cycles photos with arrow keys and closes" do
     move = seed_two_photos
     login_as(user: user)
     visit move_gallery_path(move)
     first("button[data-lightbox-target='tile']").click
-    expect(page).to have_css("dialog.ha-lightbox[open]")
+    expect(page).to have_css(".pswp--open")
 
     page.driver.browser.action.send_keys(:arrow_right).perform
-    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 1/i)
+    expect(page).to have_css(".pswp__move-caption", text: /Box 1/i)
     page.driver.browser.action.send_keys(:arrow_left).perform
-    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 2/i)
+    expect(page).to have_css(".pswp__move-caption", text: /Box 2/i)
 
-    find("button[aria-label='#{I18n.t("galleries.index.lightbox.close")}']").click
-    expect(page).to have_no_css("dialog.ha-lightbox[open]")
+    # PhotoSwipe's built-in close button carries our closeTitle as its title.
+    click_button(I18n.t("galleries.index.lightbox.close"))
+    expect(page).to have_no_css(".pswp")
   end
 
   it "navigates with a horizontal finger swipe" do
@@ -103,12 +102,12 @@ RSpec.describe "Gallery lightbox (JS)", :js do
     login_as(user: user)
     visit move_gallery_path(move)
     first("button[data-lightbox-target='tile']").click
-    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 2/i)
+    expect(page).to have_css(".pswp__move-caption", text: /Box 2/i)
 
-    swipe(distance: -300)
-    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 1/i)
+    swipe(distance: -500)
+    expect(page).to have_css(".pswp__move-caption", text: /Box 1/i)
 
-    swipe(distance: 300)
-    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 2/i)
+    swipe(distance: 500)
+    expect(page).to have_css(".pswp__move-caption", text: /Box 2/i)
   end
 end

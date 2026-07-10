@@ -1,313 +1,139 @@
 import { Controller } from "@hotwired/stimulus"
+import PhotoSwipeLightbox from "photoswipe/lightbox"
 
-// Gallery lightbox. A single native <dialog> viewer shared by every grid tile.
-// Each tile is a target carrying the photo's :thumb/:detail srcs, caption and box
-// href as data-*; opening reads the clicked tile. showModal() gives focus-trap,
-// Escape and the ::backdrop for free.
+// Gallery lightbox — a thin wrapper around vendored PhotoSwipe 5 (#598), which
+// owns the hard parts: follow-finger swipe with real physics, pinch/double-tap
+// zoom, neighbour preloading, keyboard nav, focus trap and a11y. Each grid tile
+// is a target carrying the photo's :thumb/:detail srcs, caption and box href as
+// data-*; open() builds the slide list from the rendered tiles.
 //
-// Navigation is a 3-slide draggable track (prev / current / next, wrapping):
-// neighbours are real <img>s so they preload once shown, and a finger drag
-// follows the touch, committing past a distance or flick threshold. Every slide
-// renders thumb-first — the grid's :thumb is usually already in the browser
-// cache, so the photo changes instantly and sharpens when :detail lands (LQIP).
-// Arrow buttons (fine pointers only) and ArrowLeft/Right reuse the same slide
-// animation.
+// PhotoSwipe requires per-slide pixel dimensions up front, which the app can't
+// reliably supply (blobs may be unanalyzed). Strategy: estimate from the tile's
+// already-loaded grid thumb (exact aspect ratio) scaled into the :detail
+// bounds, then correct to the real naturalWidth/Height once the full image
+// loads (loadComplete), persisting the exact size back onto the tile for
+// subsequent opens.
 //
-//   div(data: { controller: "lightbox", action: "turbo:before-cache@document->lightbox#close" })
-//     button(data: { lightbox_target: "tile", action: "click->lightbox#open", src/thumb/caption/href })
-//     dialog(data: { lightbox_target: "dialog", action: "keydown->lightbox#key close->lightbox#closed touch...:passive" })
-//       div(track target) > 3 × img(data-lightbox-target="slide"), span(caption), a(link)
+//   div(data: { controller: "lightbox", lightbox_labels_value: {…}.to_json,
+//               action: "turbo:before-cache@document->lightbox#teardown" })
+//     button(data: { lightbox_target: "tile", action: "click->lightbox#open",
+//                    src/thumb/caption/href }) > img (grid thumb)
 
-// Commit a drag past this fraction of the track width…
-const COMMIT_RATIO = 0.2
-// …or past this velocity (px/ms) — a short, fast flick.
-const FLICK_VELOCITY = 0.5
-// Movement below this (px) hasn't chosen an axis yet — taps stay taps.
-const AXIS_SLOP = 8
-// Detail upgrades start this long after a render settles, so flying past photos
-// (each turn bumps seq before the timer fires) never fetches their full images.
-const DETAIL_DELAY = 100
+// MediaVariants::TransformUrl::SIZES[:detail] — the served image's bounding box.
+const DETAIL_BOX = 1600
 
 export default class extends Controller {
-  static targets = ["tile", "dialog", "track", "slide", "caption", "link"]
+  static targets = ["tile"]
+  static values = { labels: Object }
 
   connect() {
-    // Detail loads are guarded by a token: any render or close bumps it, so a
-    // stale in-flight load can never overwrite a newer slide (or a closed viewer).
-    this.seq = 0
-    // Detail URLs that finished loading — skip the thumb-first step for them so
-    // re-rendering a slide (after a turn) doesn't flash back to the blurry thumb.
-    this.loaded = new Set()
-    this.animationId = 0
-    this.animating = false
-    this.pendingFinish = null
-    this.gesture = null
-    this.detailTimer = null
+    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches
+    this.lightbox = new PhotoSwipeLightbox({
+      pswpModule: () => import("photoswipe"),
+      showHideAnimationType: reducedMotion ? "none" : "zoom",
+      bgOpacity: 0.85,
+      wheelToZoom: true,
+      counter: false, // the location caption is the context; a counter would sit under it
+      arrowPrevTitle: this.labelsValue.prev,
+      arrowNextTitle: this.labelsValue.next,
+      closeTitle: this.labelsValue.close,
+      zoomTitle: this.labelsValue.zoom,
+      errorMsg: this.labelsValue.error
+    })
+    this.registerChrome()
+    this.correctSizesOnLoad()
+    this.lightbox.init()
+  }
+
+  disconnect() {
+    this.teardown()
+    this.lightbox?.destroy()
+    this.lightbox = null
   }
 
   open(event) {
-    this.index = this.tileTargets.indexOf(event.currentTarget)
-    if (this.index < 0) this.index = 0
-    this.resetTrack()
-    this.render()
-    this.dialogTarget.showModal()
+    if (!this.lightbox) return
+    const index = this.tileTargets.indexOf(event.currentTarget)
+    if (index < 0) return
+    this.lightbox.options.dataSource = this.tileTargets.map((tile) => this.slideFor(tile))
+    this.lightbox.loadAndOpen(index)
   }
 
-  close() {
-    this.teardown()
-    this.dialogTarget.close()
-  }
-
-  // The dialog's native close event — fires on Escape too, which never goes
-  // through close(); teardown is idempotent so both paths can run.
-  closed() {
-    this.teardown()
-  }
-
+  // turbo:before-cache — Turbo must never snapshot an open viewer (PhotoSwipe
+  // appends its DOM to <body>); destroy() removes it instantly.
   teardown() {
-    this.seq += 1
-    this.animationId += 1
-    this.animating = false
-    this.pendingFinish = null
-    this.gesture = null
-    clearTimeout(this.detailTimer)
-    // Drop the heavy images so they aren't held in memory between views.
-    this.slideTargets.forEach((img) => img.removeAttribute("src"))
+    this.lightbox?.pswp?.destroy()
   }
 
-  next() {
-    this.slideTo(1)
+  slideFor(tile) {
+    const { src, thumb, caption, href } = tile.dataset
+    const [width, height] = this.dimensionsFor(tile)
+    // element: the tile anchors PhotoSwipe's zoom-from-thumbnail open/close
+    // animation; caption/href/tile ride along for the custom chrome below.
+    return { src, msrc: thumb, alt: caption || "", width, height, element: tile, caption, href, tile }
   }
 
-  prev() {
-    this.slideTo(-1)
+  // Exact size once a previous view corrected it; otherwise the grid thumb's
+  // natural size (its ratio is the photo's) scaled into the :detail box; a
+  // square placeholder when the thumb hasn't loaded yet (lazy, off-screen).
+  dimensionsFor(tile) {
+    if (tile.dataset.pswpWidth) return [Number(tile.dataset.pswpWidth), Number(tile.dataset.pswpHeight)]
+    const thumb = tile.querySelector("img")
+    const w = thumb?.naturalWidth
+    const h = thumb?.naturalHeight
+    if (!w || !h) return [DETAIL_BOX, DETAIL_BOX]
+    const scale = Math.min(DETAIL_BOX / w, DETAIL_BOX / h)
+    return [Math.round(w * scale), Math.round(h * scale)]
   }
 
-  // Fill the 3 slides from the tiles around the current index and point the
-  // caption/link at the current photo. Detail upgrades are deferred behind one
-  // seq-guarded timer (see DETAIL_DELAY).
-  render() {
-    this.seq += 1
-    const seq = this.seq
-    clearTimeout(this.detailTimer)
-
-    const upgrades = []
-    this.slideTargets.forEach((img, position) => {
-      const upgrade = this.renderSlide(img, this.tileAt(this.index + position - 1), position === 1)
-      if (upgrade) upgrades.push(upgrade)
+  // The served image is authoritative: replace the estimate with its real
+  // pixel size (re-rendering the slide when they differ) and persist it on the
+  // tile so the next open needs no correction.
+  correctSizesOnLoad() {
+    this.lightbox.on("loadComplete", ({ content }) => {
+      const data = content.data
+      const img = content.element
+      if (!img?.naturalWidth) return
+      data.tile?.setAttribute("data-pswp-width", img.naturalWidth)
+      data.tile?.setAttribute("data-pswp-height", img.naturalHeight)
+      if (data.width === img.naturalWidth && data.height === img.naturalHeight) return
+      data.width = img.naturalWidth
+      data.height = img.naturalHeight
+      content.slide?.pswp?.refreshSlideContent(content.slide.index)
     })
-    this.updateMeta(this.tileAt(this.index))
-
-    if (upgrades.length === 0) return
-    this.detailTimer = setTimeout(() => {
-      if (seq !== this.seq) return
-      upgrades.forEach(({ img, src }) => this.loadDetail(img, src, seq))
-    }, DETAIL_DELAY)
   }
 
-  // Thumb-first: show the (grid-cached) thumb immediately; return the pending
-  // :detail upgrade for render() to schedule. Only the centre slide is exposed
-  // to assistive tech — the offscreen neighbours are visual preloads, and
-  // announcing all three would read three photos for the one on screen.
-  renderSlide(img, tile, current) {
-    const { src, thumb, caption } = tile?.dataset || {}
-    const initial = this.loaded.has(src) ? src : thumb || src
-    // Clear rather than retain the previous photo when a tile has no image, so
-    // the viewer never shows the wrong photo under the new caption.
-    if (initial) img.src = initial
-    else img.removeAttribute("src")
-    img.alt = current ? caption || "" : ""
-    img.setAttribute("aria-hidden", current ? "false" : "true")
+  // Custom chrome: the location caption (top-left) and the "view box" link
+  // (top-right, before the close button) — both follow the current slide.
+  registerChrome() {
+    this.lightbox.on("uiRegister", () => {
+      const pswp = this.lightbox.pswp
 
-    if (!src || src === initial) return null
-    return { img, src }
-  }
+      pswp.ui.registerElement({
+        name: "move-caption",
+        appendTo: "root",
+        onInit: (el) => {
+          const update = () => { el.textContent = pswp.currSlide?.data?.caption || "" }
+          pswp.on("change", update)
+          update()
+        }
+      })
 
-  // No onerror handling — deliberate: an expired detail URL (the signed URL's
-  // TTL) simply leaves the thumb showing.
-  loadDetail(img, src, seq) {
-    const loader = new Image()
-    loader.onload = () => {
-      this.loaded.add(src)
-      if (seq === this.seq) img.src = src
-    }
-    loader.src = src
-  }
-
-  // The caption and "view box" link describe the photo the user is looking at —
-  // updated the moment a turn commits (not when its animation ends), so a tap on
-  // "view box" mid-animation can never open the previous photo's box.
-  updateMeta(tile) {
-    const { caption, href } = tile?.dataset || {}
-    if (this.hasCaptionTarget) this.captionTarget.textContent = caption || ""
-    if (this.hasLinkTarget && href) this.linkTarget.href = href
-  }
-
-  tileAt(index) {
-    const count = this.tileTargets.length
-    if (count === 0) return null
-    return this.tileTargets[((index % count) + count) % count]
-  }
-
-  // Animate the track one slide left/right, then recentre it around the new
-  // index. A request landing mid-animation fast-forwards the pending turn
-  // instead of being dropped, so key-repeat zips through the set.
-  slideTo(step) {
-    // A live drag must not fight the animation over the transform (hybrid
-    // devices: finger down + arrow key/button).
-    this.gesture = null
-    if (this.tileTargets.length === 0) return
-    if (this.animating) this.pendingFinish?.()
-    if (this.animating) return
-    this.animating = true
-    const id = (this.animationId += 1)
-    let timer = null
-    let onTransitionEnd = null
-
-    const finish = () => {
-      clearTimeout(timer)
-      if (onTransitionEnd) this.trackTarget.removeEventListener("transitionend", onTransitionEnd)
-      // The id makes finish one-shot per animation: a stale transitionend or
-      // safety timer from an earlier turn can never cut a newer one short.
-      if (id !== this.animationId || !this.animating) return
-      this.animating = false
-      this.pendingFinish = null
-      this.index += step // tileAt() wraps every read, so the raw sum is fine
-      this.resetTrack()
-      this.render()
-    }
-    this.pendingFinish = finish
-    // Filtered so a transitionend bubbling from a future slide/img transition
-    // can never cut the turn short — only the track's own transform counts.
-    onTransitionEnd = (event) => {
-      if (event.target !== this.trackTarget || event.propertyName !== "transform") return
-      finish()
-    }
-
-    this.updateMeta(this.tileAt(this.index + step))
-    this.trackTarget.style.transition = ""
-    // This read doubles as the style flush that re-arms the CSS transition
-    // after a drag set transition:none — do not remove it as "just a lookup".
-    const duration = parseFloat(getComputedStyle(this.trackTarget).transitionDuration) || 0
-    this.trackTarget.style.transform = `translateX(${step === 1 ? "-200%" : "0%"})`
-    if (duration === 0) {
-      // prefers-reduced-motion (or a hidden dialog): no transition will run, so
-      // no transitionend — recentre synchronously.
-      finish()
-    } else {
-      this.trackTarget.addEventListener("transitionend", onTransitionEnd)
-      // Safety net: transitionend can be swallowed (tab hidden, dialog closed,
-      // or a drag released exactly one track-width out so the transform doesn't
-      // change).
-      timer = setTimeout(finish, duration * 1000 + 100)
-    }
-  }
-
-  // Snap the track back to the centre slide without animating. Synchronous —
-  // the forced reflow between the transition:none write and its restore keeps
-  // the jump invisible without leaving an async window that could clobber a
-  // following touchstart's transition:none (rapid consecutive swipes).
-  resetTrack() {
-    this.trackTarget.style.transition = "none"
-    this.trackTarget.style.transform = "translateX(-100%)"
-    void this.trackTarget.offsetWidth
-    this.trackTarget.style.transition = ""
-  }
-
-  // ── Follow-finger drag ──────────────────────────────────────────────
-  // Single-touch only: a second finger landing mid-drag abandons the gesture
-  // and recentres (pinch-zoom must not end in a page turn). The first
-  // significant movement locks the axis; vertical intent abandons the drag.
-  // All handlers are passive — we never preventDefault.
-
-  touchStart(event) {
-    if (event.touches.length > 1) {
-      // Only settle when a drag was actually in progress: gesture implies not
-      // animating, so the recentre can't fight a running turn.
-      if (this.gesture) this.abandonDrag()
-      return
-    }
-    // Grabbing the track mid-turn completes the turn instantly and starts the
-    // drag from the settled position.
-    if (this.animating) this.pendingFinish?.()
-    if (this.animating) return
-    const touch = event.touches[0]
-    this.gesture = { x: touch.clientX, y: touch.clientY, time: event.timeStamp, axis: null, dx: 0 }
-    this.trackTarget.style.transition = "none"
-  }
-
-  touchMove(event) {
-    const gesture = this.gesture
-    if (!gesture) return
-    if (event.touches.length > 1) {
-      this.abandonDrag()
-      return
-    }
-
-    const touch = event.touches[0]
-    const dx = touch.clientX - gesture.x
-    const dy = touch.clientY - gesture.y
-    if (!gesture.axis) {
-      if (Math.abs(dx) < AXIS_SLOP && Math.abs(dy) < AXIS_SLOP) return
-      gesture.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y"
-      if (gesture.axis === "y") {
-        this.abandonDrag()
-        return
-      }
-    }
-
-    gesture.dx = dx
-    this.trackTarget.style.transform = `translateX(calc(-100% + ${dx}px))`
-  }
-
-  touchEnd(event) {
-    const gesture = this.gesture
-    this.gesture = null
-    if (!gesture) return
-    if (gesture.axis !== "x") {
-      // A tap (no axis chosen): just restore the transition killed on touchstart.
-      this.trackTarget.style.transition = ""
-      return
-    }
-
-    const width = this.trackTarget.clientWidth || 1
-    const elapsed = Math.max(event.timeStamp - gesture.time, 1)
-    const commits = Math.abs(gesture.dx) > width * COMMIT_RATIO ||
-      Math.abs(gesture.dx) / elapsed > FLICK_VELOCITY
-    if (commits) this.slideTo(gesture.dx < 0 ? 1 : -1)
-    else this.settle()
-  }
-
-  touchCancel() {
-    this.abandonDrag()
-  }
-
-  abandonDrag() {
-    this.gesture = null
-    this.settle()
-  }
-
-  // Animate the track back to the centre slide (an uncommitted drag).
-  settle() {
-    this.trackTarget.style.transition = ""
-    this.trackTarget.style.transform = "translateX(-100%)"
-  }
-
-  // Arrow keys cycle; Escape is handled natively by <dialog>.
-  key(event) {
-    if (event.key === "ArrowRight") {
-      event.preventDefault()
-      this.next()
-    } else if (event.key === "ArrowLeft") {
-      event.preventDefault()
-      this.prev()
-    }
-  }
-
-  // A click whose target is the backdrop wrapper itself (not the image or a
-  // control) closes the viewer. The track is pointer-events-none (images opt
-  // back in), so clicks on empty slide area reach the wrapper.
-  backdropClose(event) {
-    if (event.target === event.currentTarget) this.close()
+      pswp.ui.registerElement({
+        name: "move-view-box",
+        tagName: "a",
+        isButton: true,
+        appendTo: "root",
+        html: this.labelsValue.viewBox,
+        onInit: (el) => {
+          const update = () => {
+            const href = pswp.currSlide?.data?.href
+            if (href) el.setAttribute("href", href)
+          }
+          pswp.on("change", update)
+          update()
+        }
+      })
+    })
   }
 }

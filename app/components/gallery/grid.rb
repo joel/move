@@ -4,12 +4,11 @@ module Components
   module Gallery
     # The Move-wide photo grid + its lightbox. Mirrors the box ContentsGrid tile
     # (square :thumb, lazy-loaded, group-hover zoom) but every tile is a button
-    # that opens a single shared <dialog> lightbox driven by the `lightbox`
-    # Stimulus controller. Each tile carries its :thumb/:detail srcs, a caption
-    # and a "view box" href as data-*; the controller renders them thumb-first
-    # into a 3-slide draggable track (prev/current/next, wrapping) so navigation
-    # is instant and neighbours preload. Swipe, arrows (fine pointers only) and
-    # arrow keys all turn the page. Read-only — no mutating affordances.
+    # that opens a PhotoSwipe viewer driven by the `lightbox` Stimulus wrapper
+    # (vendored PhotoSwipe 5 — swipe physics, pinch/double-tap zoom, preloading,
+    # keyboard, focus trap). Each tile carries its :thumb/:detail srcs, a
+    # caption and a "view box" href as data-*; PhotoSwipe injects its own DOM at
+    # open, seeded thumb-first via msrc. Read-only — no mutating affordances.
     class Grid < Components::Base
       #: (move: untyped, media: untyped) -> void
       def initialize(move:, media:)
@@ -19,12 +18,16 @@ module Components
 
       #: () -> void
       def view_template
-        # turbo:before-cache closes the viewer — Turbo would otherwise snapshot
-        # the page with an open <dialog> (modal top-layer state isn't restorable)
-        # and a mutated, possibly expired img src.
-        div(data: { controller: "lightbox", action: "turbo:before-cache@document->lightbox#close" }) do
+        # turbo:before-cache tears the viewer down — Turbo must never snapshot
+        # PhotoSwipe's body-appended DOM.
+        div(
+          data: {
+            controller: "lightbox",
+            action: "turbo:before-cache@document->lightbox#teardown",
+            lightbox_labels_value: labels.to_json
+          }
+        ) do
           grid
-          lightbox
         end
       end
 
@@ -155,107 +158,19 @@ module Components
         parts.join(" · ")
       end
 
-      # The single shared viewer. Hidden until a tile opens it. The inner wrapper is
-      # the backdrop (click-to-close); the track is pointer-events-none (images opt
-      # back in), so clicks on empty slide area reach the wrapper and close, while
-      # clicks on the photo or the controls do not.
-      #
-      # Touch handlers live on the dialog so a drag can start anywhere in the
-      # viewer; all passive — the drag never calls preventDefault (Phlex forbids
-      # inline on* handlers by design, so this is Stimulus data-action anyway).
+      # PhotoSwipe's chrome labels (its buttons + the custom caption/"view box"
+      # elements), passed to the Stimulus wrapper as a JSON value.
 
-      #: () -> untyped
-      def lightbox
-        dialog(
-          class: "ha-lightbox",
-          data: {
-            lightbox_target: "dialog",
-            action: "keydown->lightbox#key close->lightbox#closed " \
-                    "touchstart->lightbox#touchStart:passive " \
-                    "touchmove->lightbox#touchMove:passive touchend->lightbox#touchEnd:passive " \
-                    "touchcancel->lightbox#touchCancel:passive"
-          }
-        ) do
-          div(
-            class: "relative flex h-full w-full items-center justify-center overflow-hidden p-4",
-            data: { action: "click->lightbox#backdropClose" }
-          ) do
-            top_bar
-            nav_button(:prev, "left-2", "rotate-180")
-            track
-            nav_button(:next, "right-2", "")
-          end
-        end
-      end
-
-      # The 3-slide draggable strip: prev / current / next photos as real <img>s
-      # (so neighbours preload), recentred by the controller after each turn.
-
-      #: () -> untyped
-      def track
-        div(
-          class: "ha-lightbox-track pointer-events-none flex h-full w-full",
-          data: { lightbox_target: "track" }
-        ) do
-          3.times { slide }
-        end
-      end
-
-      # aria-hidden by default: the controller exposes only the centre slide to
-      # assistive tech (the neighbours are visual preloads).
-
-      #: () -> untyped
-      def slide
-        div(class: "flex h-full w-full shrink-0 items-center justify-center") do
-          img(
-            data: { lightbox_target: "slide" }, alt: "", aria_hidden: "true",
-            class: "pointer-events-auto max-h-[88dvh] max-w-[92vw] rounded-card object-contain shadow-lg"
-          )
-        end
-      end
-
-      #: () -> untyped
-      def top_bar
-        div(class: "absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 p-4") do
-          span(
-            data: { lightbox_target: "caption" },
-            class: "truncate rounded-full bg-page/70 px-3 py-1 text-label-caps uppercase " \
-                   "text-text-warm backdrop-blur"
-          )
-          div(class: "flex items-center gap-2") do
-            a(
-              data: { lightbox_target: "link" },
-              class: "rounded-full bg-page/70 px-3 py-1 text-label-caps uppercase text-text-warm " \
-                     "backdrop-blur transition hover:bg-page"
-            ) { I18n.t("galleries.index.lightbox.view_box") }
-            close_button
-          end
-        end
-      end
-
-      #: () -> untyped
-      def close_button
-        button(
-          type: "button", aria_label: I18n.t("galleries.index.lightbox.close"),
-          data: { action: "lightbox#close" },
-          class: "flex h-8 w-8 items-center justify-center rounded-full bg-page/70 text-text-warm " \
-                 "backdrop-blur transition hover:bg-page"
-        ) { render Components::Icons::Close.new(css: "h-5 w-5") }
-      end
-
-      # Rendered only when SOME fine pointer exists (any-pointer, not the primary
-      # pointer — a tablet with a mouse attached still gets arrows); on pure touch
-      # screens the swipe is the affordance. Keyboard arrows work regardless.
-
-      #: (untyped direction, untyped side, untyped rotate) -> untyped
-      def nav_button(direction, side, rotate)
-        button(
-          type: "button", aria_label: I18n.t("galleries.index.lightbox.#{direction}"),
-          data: { action: "lightbox##{direction}" },
-          class: "absolute #{side} top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center " \
-                 "justify-center rounded-full bg-page/70 text-text-warm backdrop-blur " \
-                 "transition any-pointer-fine:flex hover:bg-page"
-        ) { render Components::Icons::ChevronRight.new(css: "h-6 w-6 #{rotate}") }
+      #: () -> Hash[Symbol, String]
+      def labels
+        {
+          prev: I18n.t("galleries.index.lightbox.prev"),
+          next: I18n.t("galleries.index.lightbox.next"),
+          close: I18n.t("galleries.index.lightbox.close"),
+          zoom: I18n.t("galleries.index.lightbox.zoom"),
+          error: I18n.t("galleries.index.lightbox.error"),
+          viewBox: I18n.t("galleries.index.lightbox.view_box")
+        }
       end
     end
   end

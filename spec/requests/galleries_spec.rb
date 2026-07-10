@@ -51,38 +51,37 @@ RSpec.describe "Galleries" do
       expect(response.body).not_to include("Box 2")
     end
 
-    it "renders the lightbox dialog and tiles that open it with a box link" do
+    it "renders the lightbox controller and tiles that open it with a box link" do
       box = create(:box, move:, number: "7")
       create(:media, move:, box:)
 
       get move_gallery_path(move)
 
       aggregate_failures do
-        expect(response.body).to include("ha-lightbox")
+        expect(response.body).to include('data-controller="lightbox"')
         expect(response.body).to include("lightbox#open")
         expect(response.body).to include(move_box_path(move, box))
         expect(response.body).to include(I18n.t("galleries.index.lightbox.view_box"))
       end
     end
 
-    it "renders the draggable track with thumb-first tiles and pointer-gated arrows" do
+    it "seeds the PhotoSwipe wrapper with thumb-first tile data and chrome labels" do
       box = create(:box, move:, number: "7")
       create(:media, move:, box:)
 
       get move_gallery_path(move)
 
       aggregate_failures do
-        # Tiles carry both srcs for the thumb-first swap (in test both resolve to
-        # the proxied master, so assert presence, not distinctness).
+        # Tiles carry both srcs — msrc (thumb, grid-cached) + src (detail). In
+        # test both resolve to the proxied master, so assert presence, not
+        # distinctness.
         expect(response.body).to include("data-thumb=")
         expect(response.body).to include("data-src=")
-        # The 3-slide track the drag/animation recentres.
-        expect(response.body).to include('data-lightbox-target="track"')
-        expect(response.body.scan('data-lightbox-target="slide"').size).to eq(3)
-        # Arrows are an affordance for fine pointers only; touch users swipe.
-        expect(response.body).to include("any-pointer-fine:flex")
-        # Turbo must never snapshot an open dialog.
-        expect(response.body).to include("turbo:before-cache@document->lightbox#close")
+        # PhotoSwipe's chrome labels ride a Stimulus Object value.
+        expect(response.body).to include("data-lightbox-labels-value=")
+        expect(response.body).to include(I18n.t("galleries.index.lightbox.prev"))
+        # Turbo must never snapshot PhotoSwipe's body-appended DOM.
+        expect(response.body).to include("turbo:before-cache@document->lightbox#teardown")
       end
     end
 

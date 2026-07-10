@@ -20,6 +20,11 @@
  */
 
 @import "tailwindcss";
+/* Vendored PhotoSwipe 5.4.4 stylesheet (gallery lightbox, #598) — inlined into
+   the build by Tailwind's CSS-first pipeline. Imported INTO the components
+   layer: unlayered CSS would beat every @layer rule, so the "PhotoSwipe
+   theming" overrides below (same layer, later in source) could never win. */
+@import "./vendor/photoswipe.css" layer(components);
 
 @source "../../views";
 @source "../../components";
@@ -582,36 +587,54 @@
     }
   }
 
-  /* Native <dialog> lightbox (Gallery) — a full-viewport photo viewer over a
-   * heavy dimmed/blurred backdrop. showModal() gives focus-trap, Escape and the
-   * ::backdrop for free; the dialog itself is transparent and borderless so the
-   * contained :detail <img> floats centred. The grid tile supplies the src on
-   * open (lazy — detail variants are only fetched when a photo is viewed). */
-  .ha-lightbox {
-    width: 100vw;
-    height: 100dvh;
-    max-width: 100vw;
-    max-height: 100dvh;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--c-text-warm);
-  }
-
-  .ha-lightbox::backdrop {
-    background: rgba(0, 0, 0, 0.85);
+  /* PhotoSwipe theming (Gallery lightbox, #598) — the vendored stylesheet is
+   * imported at the top of this file; these overrides bend its chrome to the
+   * design system. The heavy dim matches the old dialog ::backdrop. */
+  .pswp__bg {
     backdrop-filter: blur(4px);
   }
 
-  /* The 3-slide strip behind the viewer: translateX(-100%) centres the middle
-   * slide; a finger drag offsets it inline and the controller animates the
-   * turn. The transition lives here so reduced-motion can zero it (below). */
-  .ha-lightbox-track {
-    transform: translateX(-100%);
-    transition: transform 200ms ease-out;
-    will-change: transform;
+  /* Caption + "View box" chips (custom UI elements registered by the lightbox
+   * Stimulus controller) — same pill chrome as the app's overlay chips. */
+  .pswp__move-caption,
+  .pswp__button--move-view-box {
+    position: absolute;
+    top: 16px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--c-page) 70%, transparent);
+    backdrop-filter: blur(8px);
+    color: var(--c-text-warm);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    line-height: 1.5rem;
   }
+
+  .pswp__move-caption {
+    left: 16px;
+    max-width: 50vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .pswp__button--move-view-box {
+    right: 60px;
+    width: auto;
+    height: auto;
+    transition: background-color 150ms ease-out;
+  }
+
+  .pswp__button--move-view-box:hover {
+    background: var(--c-page);
+  }
+
+  /* No custom arrow gating: PhotoSwipe hides `.pswp__button--arrow` on touch
+   * devices and reveals them when a mouse is used (.pswp--touch /
+   * .pswp--has_mouse) — the behaviour we want, owned by the library. */
 }
 
 /* ──────────────────────────────────────────────────────────────────
@@ -660,7 +683,6 @@
   .ha-rise,
   .ha-button,
   .ui-pulse-glow,
-  .ha-lightbox-track,
   .box-added-highlight {
     animation: none;
     transition: none;
