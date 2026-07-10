@@ -108,12 +108,16 @@ export default class extends Controller {
   registerChrome() {
     this.lightbox.on("uiRegister", () => {
       const pswp = this.lightbox.pswp
+      // Read the slide by index, not `pswp.currSlide` — during a `change` the
+      // current slide can momentarily be a placeholder whose `.data` isn't
+      // populated yet, which would blank the caption/link mid-turn.
+      const dataFor = () => pswp.options.dataSource?.[pswp.currIndex] || {}
 
       pswp.ui.registerElement({
         name: "move-caption",
         appendTo: "root",
         onInit: (el) => {
-          const update = () => { el.textContent = pswp.currSlide?.data?.caption || "" }
+          const update = () => { el.textContent = dataFor().caption || "" }
           pswp.on("change", update)
           update()
         }
@@ -127,7 +131,7 @@ export default class extends Controller {
         html: this.labelsValue.viewBox,
         onInit: (el) => {
           const update = () => {
-            const href = pswp.currSlide?.data?.href
+            const href = dataFor().href
             if (href) el.setAttribute("href", href)
           }
           pswp.on("change", update)
