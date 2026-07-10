@@ -621,8 +621,11 @@
     pointer-events: none;
   }
 
+  /* Clear BOTH built-in top-right controls: close (~56px incl. its margin) and
+   * the zoom button (~50px) that PhotoSwipe shows for a zoomable photo, plus a
+   * gap — otherwise the chip overlaps the zoom control (Codex #599). */
   .pswp__button--move-view-box {
-    right: 60px;
+    right: 116px;
     width: auto;
     height: auto;
     transition: background-color 150ms ease-out;
