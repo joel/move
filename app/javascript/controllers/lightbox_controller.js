@@ -60,9 +60,16 @@ export default class extends Controller {
   }
 
   // turbo:before-cache — Turbo must never snapshot an open viewer (PhotoSwipe
-  // appends its DOM to <body>); destroy() removes it instantly.
+  // appends its DOM to <body>). destroy() on an open viewer routes through
+  // close(), which removes the `.pswp` root only on a 0ms timeout — but Turbo
+  // clones the document synchronously right after this event, so we must strip
+  // the element ourselves or a stale overlay is cached and reappears on
+  // back-navigation (Codex #599).
   teardown() {
-    this.lightbox?.pswp?.destroy()
+    const pswp = this.lightbox?.pswp
+    if (!pswp) return
+    pswp.destroy()
+    pswp.element?.remove()
   }
 
   slideFor(tile) {
