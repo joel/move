@@ -40,9 +40,20 @@ export default class extends Controller {
       zoomTitle: this.labelsValue.zoom,
       errorMsg: this.labelsValue.error
     })
+    this.seedThumbPlaceholders()
     this.registerChrome()
     this.correctSizesOnLoad()
     this.lightbox.init()
+  }
+
+  // Show each slide's grid thumb as its placeholder while :detail loads.
+  // PhotoSwipe's default only does this for the first-opened slide
+  // (isFirstSlide), so without this filter, swiping/clicking to an as-yet-
+  // unloaded slide flashes a blank frame until the full image arrives — undoing
+  // the thumb-first feedback for the very navigation case this viewer targets.
+  seedThumbPlaceholders() {
+    this.lightbox.addFilter("placeholderSrc", (placeholderSrc, content) =>
+      content?.data?.msrc || placeholderSrc)
   }
 
   disconnect() {
