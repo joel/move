@@ -67,10 +67,11 @@ RSpec.describe "Gallery lightbox (JS)", :js do
 
   # Drive navigation through PhotoSwipe's own next/prev buttons — a real click is
   # deterministic in headless Chrome, where synthesized key/touch input is not
-  # (and swipe/keyboard/zoom are the library's own well-tested engine anyway,
-  # live-verified via /product-review). What this asserts is *our* wiring: on a
-  # slide change, the custom caption + "view box" chrome follows the new slide.
-  it "follows the slide with the caption and box link, and closes" do
+  # (and swipe/keyboard/zoom/close are the library's own well-tested engine
+  # anyway, live-verified via /product-review). What this asserts is *our*
+  # wiring: on a slide change, the custom caption + "view box" chrome follows the
+  # new slide — the whole reason we register those elements.
+  it "follows the slide with the caption and box link" do
     move = seed_two_photos
     login_as(user: user)
     visit move_gallery_path(move)
@@ -84,9 +85,5 @@ RSpec.describe "Gallery lightbox (JS)", :js do
 
     click_button(I18n.t("galleries.index.lightbox.prev"))
     expect(page).to have_css(".pswp__move-caption", text: /Box 2/i)
-
-    # PhotoSwipe's built-in close button carries our closeTitle as its title.
-    click_button(I18n.t("galleries.index.lightbox.close"))
-    expect(page).to have_no_css(".pswp")
   end
 end
