@@ -66,6 +66,12 @@ export default class extends Controller {
     if (!this.lightbox) return
     const index = this.tileTargets.indexOf(event.currentTarget)
     if (index < 0) return
+    // Align `loop` with PhotoSwipe's own `canLoop()` (which requires > 2 items):
+    // otherwise a 2-photo gallery keeps `loop: true`, so the end arrows never get
+    // the disabled treatment (that branch is gated on `!options.loop`) yet
+    // navigation can't wrap — leaving enabled-but-dead arrows. With loop off for
+    // ≤ 2 photos the arrows disable cleanly at the ends (Codex #599).
+    this.lightbox.options.loop = this.tileTargets.length > 2
     this.lightbox.options.dataSource = this.tileTargets.map((tile) => this.slideFor(tile))
     this.lightbox.loadAndOpen(index)
   }
