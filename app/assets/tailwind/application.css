@@ -612,9 +612,12 @@
     line-height: 1.5rem;
   }
 
+  /* Cap so the caption never runs under the right-hand cluster (view-box chip
+   * ~116px + close/zoom) on narrow phones: reserve ~240px on the right, but
+   * stay at most 50vw on wide screens where the chip is far away (Codex #599). */
   .pswp__move-caption {
     left: 16px;
-    max-width: 50vw;
+    max-width: min(50vw, calc(100vw - 240px));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
