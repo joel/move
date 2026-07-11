@@ -58,6 +58,8 @@ RSpec.describe "Per-photo review" do
       # The add-form clears + refocuses after a streamed add (Turbo doesn't reset a
       # stream-responding form) — keep that wiring so rapid entry stays usable.
       expect(response.body).to include("reset-form")
+      # Rows swipe-reveal their Edit/Remove options below lg (Ui::SwipeActions).
+      expect(response.body).to include("swipe-actions")
     end
 
     it "marks the photo's unreviewed items confirmed when shown" do
