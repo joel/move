@@ -28,12 +28,18 @@ module Components
         @highlight = highlight
       end
 
+      # Below lg the pencil/× are swipe-revealed (Ui::SwipeActions layers);
+      # at lg+ the inline row_actions stay, so the desktop row is unchanged.
+
       #: () -> void
       def view_template
-        div(
+        render Components::Ui::SwipeActions.new(
           id: self.class.dom_id(@item), data: row_data,
-          class: "group flex items-center gap-3 rounded-card border border-card-border bg-card p-4 " \
-                 "transition focus-within:border-accent-sage"
+          css: "group rounded-card border border-card-border bg-card " \
+               "transition focus-within:border-accent-sage",
+          content_css: "flex items-center gap-3 p-4",
+          leading: (edit_action if @editable),
+          trailing: (remove_action if @editable)
         ) do
           div(class: "flex flex-1 flex-col gap-1") do
             name_field
@@ -90,7 +96,7 @@ module Components
 
       #: () -> untyped
       def row_actions
-        div(class: "flex shrink-0 items-center gap-1") do
+        div(class: "hidden shrink-0 items-center gap-1 lg:flex") do
           button(type: "button", data: { action: "inline-rename#focus" }, class: icon_button(:sage)) do
             render Components::Icons::Pencil.new(css: "h-5 w-5")
             span(class: "sr-only") { I18n.t("reviews.photo.edit") }
@@ -101,6 +107,43 @@ module Components
           ) do
             render Components::Icons::Close.new(css: "h-5 w-5")
             span(class: "sr-only") { I18n.t("reviews.photo.remove_named", name: @item.name) }
+          end
+        end
+      end
+
+      # Swipe-right (leading) option: closes the row and focuses the
+      # inline-rename input — both controllers share the wrapper scope.
+
+      #: () -> untyped
+      def edit_action
+        lambda do |_c|
+          button(
+            type: "button", aria_label: I18n.t("reviews.photo.edit"),
+            data: { action: "swipe-actions#close inline-rename#focus" },
+            class: "#{Components::Ui::SwipeActions::OPTION_CLASSES} bg-accent-sage/15 text-accent-sage"
+          ) do
+            render Components::Icons::Pencil.new(css: "h-5 w-5")
+            span(class: "text-label-caps uppercase") { I18n.t("reviews.photo.swipe_edit") }
+          end
+        end
+      end
+
+      # Swipe-left (trailing) option: the same PATCH remove as the desktop ×.
+      # The visible label is the short "Remove"; the full accessible name
+      # (remove_named) rides an aria-label so the desktop button stays the
+      # unique Capybara match for it.
+
+      #: () -> untyped
+      def remove_action
+        lambda do |_c|
+          button_to(
+            move_box_review_remove_item_path(@move, @box, @media, @item),
+            method: :patch, form_class: "contents",
+            aria: { label: I18n.t("reviews.photo.remove_named", name: @item.name) },
+            class: "#{Components::Ui::SwipeActions::OPTION_CLASSES} bg-error text-on-error"
+          ) do
+            render Components::Icons::Trash.new(css: "h-5 w-5")
+            span(class: "text-label-caps uppercase") { I18n.t("reviews.photo.swipe_remove") }
           end
         end
       end

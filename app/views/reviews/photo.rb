@@ -114,7 +114,15 @@ module Views
       def header
         h2(class: "text-headline-lg text-text-warm") { I18n.t("reviews.photo.title") }
         p(class: "mt-1 text-body-md text-muted") do
-          I18n.t(@editable ? "reviews.photo.subtitle" : "reviews.photo.view_only")
+          if @editable
+            # Below lg the row actions are swipe-revealed, so the instruction
+            # must name the gesture; at lg+ the inline pencil/× make the
+            # original copy true.
+            span(class: "lg:hidden") { I18n.t("reviews.photo.subtitle_touch") }
+            span(class: "hidden lg:inline") { I18n.t("reviews.photo.subtitle") }
+          else
+            plain I18n.t("reviews.photo.view_only")
+          end
         end
       end
 

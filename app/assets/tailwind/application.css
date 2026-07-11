@@ -587,6 +587,28 @@
     }
   }
 
+  /* Swipe-to-reveal row actions (Ui::SwipeActions) — the content layer slides
+   * on a translateX driven by the swipe-actions Stimulus controller; option
+   * layers sit beneath it. pan-y keeps native vertical scrolling; the
+   * controller owns horizontal. */
+  .ha-swipe-content {
+    touch-action: pan-y;
+    transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1); /* snap open/closed */
+  }
+
+  [data-swipe-state="dragging"] .ha-swipe-content {
+    transition: none; /* follow the finger 1:1 */
+    will-change: transform; /* promote only during the gesture, not per idle row */
+    user-select: none;
+    -webkit-user-select: none; /* stop mouse-drag text selection */
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ha-swipe-content {
+      transition: none;
+    }
+  }
+
   /* PhotoSwipe theming (Gallery lightbox, #598) — the vendored stylesheet is
    * imported at the top of this file; these overrides bend its chrome to the
    * design system. The heavy dim matches the old dialog ::backdrop. */

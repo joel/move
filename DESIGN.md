@@ -176,6 +176,27 @@ Seven states, each an icon + tint: `queued` (clock, neutral) · `processing`
 terracotta/error border + Retry overlay) · `needs_correction` (pencil, terracotta) ·
 `auto_confirmed` (bolt, sage outline) · `pending_review` (eye, tertiary).
 
+### `Ui::SwipeActions` — swipe-to-reveal row actions (mobile)
+iOS-style sliding item: the content layer (`.ha-swipe-content`, `touch-action:
+pan-y`, 200ms snap transition, `bg-inherit` — so the wrapper `css:` must carry an
+opaque background) slides over `leading:` (swipe right) and `trailing:` (swipe
+left) proc-slot option layers — fixed `w-24`, full-height, `lg:hidden`. CSS owns
+the breakpoint: the controller gates on the layers' computed visibility, and at
+`lg`+ callers show inline buttons instead (`hidden lg:flex`). With no slots the
+wrapper renders the same DOM shape with no swipe wiring (read-only rows cost
+nothing). The caller's `id` stays on the wrapper (Turbo Stream targets keep
+working) and caller `data[:controller]`/`data[:action]` tokens are merged. Slot
+button recipe: `Ui::SwipeActions::OPTION_CLASSES` + a tint pair
+(`bg-accent-sage/15 text-accent-sage` for edit, `bg-error text-on-error` for
+destructive), an icon, a short visible `label-caps` label, and the full accessible
+name on `aria-label`; a `button_to` slot uses `form_class: "contents"` so the
+button fills the layer. Rails helpers in a slot come from the *caller's* includes
+(use the caller's lexical scope, not the yielded component), and an action string
+naming another controller (e.g. `inline-rename#focus`) requires that controller on
+the same wrapper. One row open per page; closes on tap-away, tap of the row, or
+focus moving on; `turbo:before-cache` resets. First use: C2 review item rows
+(#602).
+
 ### Other primitives
 `Ui::ProgressBar` (pill, sage fill) ·
 `Ui::EmptyState` · `Ui::SectionHeader` / `Ui::PageHeader` · `Ui::Toast` /
