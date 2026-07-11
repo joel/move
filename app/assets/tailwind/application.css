@@ -612,10 +612,16 @@
     line-height: 1.5rem;
   }
 
-  /* Cap so the caption never runs under the right-hand cluster (view-box chip
-   * ~116px + close/zoom) on narrow phones: reserve ~240px on the right, but
-   * stay at most 50vw on wide screens where the chip is far away (Codex #599). */
-  .pswp__move-caption {
+  /* Qualified with the `.pswp` ancestor (0,2,0): PhotoSwipe tags registered UI
+   * elements `pswp__hide-on-close`, and its `.pswp--ui-visible .pswp__hide-on-close`
+   * rule resets `pointer-events: auto` — which would make the caption swallow
+   * swipes/taps starting on the top-left. This wins by source order and keeps
+   * the label transparent to pointers (Codex #599).
+   *
+   * max-width caps so the caption never runs under the right-hand cluster
+   * (view-box chip ~116px + close/zoom) on narrow phones — reserve ~240px — but
+   * stay at most 50vw on wide screens where the chip is far away. */
+  .pswp .pswp__move-caption {
     left: 16px;
     max-width: min(50vw, calc(100vw - 240px));
     overflow: hidden;
