@@ -84,6 +84,12 @@ export default class extends Controller {
     pswp.destroy()
     pswp.element?.remove()
     pswp.events?.removeAll?.()
+    // PhotoSwipe sets `window.pswp` on open and clears it only in its own
+    // destroy-event handler — which the mid-open bail skips. A stale global
+    // makes loadAndOpen() short-circuit (`if (window.pswp) return`), so the
+    // viewer would never open again after this race until a full reload. Clear
+    // the global we know points at this instance (Codex #599).
+    if (window.pswp === pswp) delete window.pswp
   }
 
   slideFor(tile) {
