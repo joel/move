@@ -20,6 +20,11 @@
  */
 
 @import "tailwindcss";
+/* Vendored PhotoSwipe 5.4.4 stylesheet (gallery lightbox, #598) — inlined into
+   the build by Tailwind's CSS-first pipeline. Imported INTO the components
+   layer: unlayered CSS would beat every @layer rule, so the "PhotoSwipe
+   theming" overrides below (same layer, later in source) could never win. */
+@import "./vendor/photoswipe.css" layer(components);
 
 @source "../../views";
 @source "../../components";
@@ -582,27 +587,78 @@
     }
   }
 
-  /* Native <dialog> lightbox (Gallery) — a full-viewport photo viewer over a
-   * heavy dimmed/blurred backdrop. showModal() gives focus-trap, Escape and the
-   * ::backdrop for free; the dialog itself is transparent and borderless so the
-   * contained :detail <img> floats centred. The grid tile supplies the src on
-   * open (lazy — detail variants are only fetched when a photo is viewed). */
-  .ha-lightbox {
-    width: 100vw;
-    height: 100dvh;
-    max-width: 100vw;
-    max-height: 100dvh;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--c-text-warm);
-  }
-
-  .ha-lightbox::backdrop {
-    background: rgba(0, 0, 0, 0.85);
+  /* PhotoSwipe theming (Gallery lightbox, #598) — the vendored stylesheet is
+   * imported at the top of this file; these overrides bend its chrome to the
+   * design system. The heavy dim matches the old dialog ::backdrop. */
+  .pswp__bg {
     backdrop-filter: blur(4px);
   }
+
+  /* Caption + "View box" chips (custom UI elements registered by the lightbox
+   * Stimulus controller) — same pill chrome as the app's overlay chips. */
+  .pswp__move-caption,
+  .pswp__button--move-view-box {
+    position: absolute;
+    top: 16px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--c-page) 70%, transparent);
+    backdrop-filter: blur(8px);
+    color: var(--c-text-warm);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    line-height: 1.5rem;
+  }
+
+  /* Qualified with the `.pswp` ancestor (0,2,0): PhotoSwipe tags registered UI
+   * elements `pswp__hide-on-close`, and its `.pswp--ui-visible .pswp__hide-on-close`
+   * rule resets `pointer-events: auto` — which would make the caption swallow
+   * swipes/taps starting on the top-left. This wins by source order and keeps
+   * the label transparent to pointers (Codex #599).
+   *
+   * max-width caps so the caption never runs under the right-hand cluster
+   * (view-box chip ~116px + close/zoom) on narrow phones — reserve ~240px — but
+   * stay at most 50vw on wide screens where the chip is far away. */
+  .pswp .pswp__move-caption {
+    left: 16px;
+    max-width: min(50vw, calc(100vw - 240px));
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* The chip carries PhotoSwipe's own `.pswp__button` class, whose
+   * :hover/:active/:focus rule (imported above) resets padding/background at a
+   * higher specificity (0,2,0) than a single class — so qualify with the `.pswp`
+   * ancestor (0,3,0 for the states) and restate the pill for EVERY interactive
+   * state, or it collapses under the pointer and loses its chip on keyboard
+   * focus (Codex #599).
+   *
+   * right: clears BOTH built-in top-right controls — close (~56px incl. margin)
+   * and the zoom button (~50px) shown for a zoomable photo — plus a gap. */
+  .pswp .pswp__button--move-view-box,
+  .pswp .pswp__button--move-view-box:hover,
+  .pswp .pswp__button--move-view-box:focus,
+  .pswp .pswp__button--move-view-box:active {
+    right: 116px;
+    width: auto;
+    height: auto;
+    padding: 4px 12px;
+    background: color-mix(in srgb, var(--c-page) 70%, transparent);
+    transition: background-color 150ms ease-out;
+  }
+
+  .pswp .pswp__button--move-view-box:hover,
+  .pswp .pswp__button--move-view-box:focus {
+    background: var(--c-page);
+  }
+
+  /* No custom arrow gating: PhotoSwipe hides `.pswp__button--arrow` on touch
+   * devices and reveals them when a mouse is used (.pswp--touch /
+   * .pswp--has_mouse) — the behaviour we want, owned by the library. */
 }
 
 /* ──────────────────────────────────────────────────────────────────

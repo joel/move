@@ -22,6 +22,8 @@ en:
         prev: "Previous photo"
         next: "Next photo"
         close: "Close"
+        zoom: "Zoom photo"
+        error: "The photo could not be loaded."
       empty:
         title: "No photos yet"
         description: "Photos you capture while packing boxes will appear here."

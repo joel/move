@@ -42,9 +42,11 @@ RSpec.describe "Type annotation coverage" do
   end
 
   def checked_files
+    # rel is a String path and `include?` is SUBSTRING matching — the cop's
+    # suggested Array#intersect? would raise TypeError.
     steep_checked_globs.flat_map { |glob| Rails.root.glob(glob) }
                        .map { |path| path.relative_path_from(Rails.root).to_s }
-                       .reject { |rel| excluded_from_checking.any? { |fragment| rel.include?(fragment) } }
+                       .reject { |rel| excluded_from_checking.any? { |fragment| rel.include?(fragment) } } # rubocop:disable Style/ArrayIntersect
   end
 
   def unannotated_defs

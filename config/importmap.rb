@@ -15,3 +15,12 @@ pin_all_from "app/javascript/controllers", under: "controllers"
 # D9 — QR decode for the in-app scanner (E2). Vendored ESM build of jsQR
 # (vendor/javascript/jsqr.js); driven by controllers/qr_scanner_controller.js.
 pin "jsqr", to: "jsqr.js"
+
+# Gallery lightbox (#598) — vendored PhotoSwipe 5.4.4 ESM builds (MIT,
+# dependency-free, self-contained). The lightbox shell is imported by
+# controllers/lightbox_controller.js; the core loads on demand via the shell's
+# `pswpModule` dynamic import, so its weight is only paid when a photo is
+# actually opened. The stylesheet rides the Tailwind build
+# (app/assets/tailwind/vendor/photoswipe.css).
+pin "photoswipe", to: "photoswipe.esm.min.js"
+pin "photoswipe/lightbox", to: "photoswipe-lightbox.esm.min.js"

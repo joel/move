@@ -38,9 +38,11 @@ RSpec.describe "Architecture conventions" do
   end
 
   def relative_paths(glob, except)
+    # rel is a String path and `include?` is SUBSTRING matching — the cop's
+    # suggested Array#intersect? would raise TypeError.
     Rails.root.glob(glob)
          .map { |path| path.relative_path_from(Rails.root).to_s }
-         .reject { |rel| except.any? { |fragment| rel.include?(fragment) } }
+         .reject { |rel| except.any? { |fragment| rel.include?(fragment) } } # rubocop:disable Style/ArrayIntersect
   end
 
   def matches_in(rel, pattern)

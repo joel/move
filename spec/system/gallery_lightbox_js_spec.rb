@@ -51,31 +51,39 @@ RSpec.describe "Gallery lightbox (JS)", :js do
     login_as(user: user)
     visit move_gallery_path(move)
 
-    # Closed until a tile is tapped; tapping the first (most-recent) tile opens it.
+    # No viewer until a tile is tapped; tapping the first (most-recent) tile
+    # opens PhotoSwipe (it appends its DOM to <body> on demand).
     expect(page).to have_css("button[data-lightbox-target='tile']", minimum: 2)
-    expect(page).to have_no_css("dialog.ha-lightbox[open]")
+    expect(page).to have_no_css(".pswp")
     first("button[data-lightbox-target='tile']").click
 
-    expect(page).to have_css("dialog.ha-lightbox[open]")
-    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 2/i)
+    expect(page).to have_css(".pswp--open")
+    expect(page).to have_css(".pswp__move-caption", text: /Box 2/i)
     # The caption text is CSS-uppercased, so match the box link by href, not text.
     # Look the box up inside the tenant — the thread has left the schema by now.
     box_two = Apartment::Tenant.switch(slug) { move.boxes.find_by(number: "2") }
-    expect(page).to have_css("a[data-lightbox-target='link'][href='#{move_box_path(move, box_two)}']")
+    expect(page).to have_css("a.pswp__button--move-view-box[href='#{move_box_path(move, box_two)}']")
   end
 
-  it "cycles photos with next/prev and closes" do
+  # Drive navigation through PhotoSwipe's own next/prev buttons — a real click is
+  # deterministic in headless Chrome, where synthesized key/touch input is not
+  # (and swipe/keyboard/zoom/close are the library's own well-tested engine
+  # anyway, live-verified via /product-review). What this asserts is *our*
+  # wiring: on a slide change, the custom caption + "view box" chrome follows the
+  # new slide — the whole reason we register those elements.
+  it "follows the slide with the caption and box link" do
     move = seed_two_photos
     login_as(user: user)
     visit move_gallery_path(move)
     first("button[data-lightbox-target='tile']").click
+    expect(page).to have_css(".pswp--open")
 
-    find("button[aria-label='#{I18n.t("galleries.index.lightbox.next")}']").click
-    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 1/i)
-    find("button[aria-label='#{I18n.t("galleries.index.lightbox.prev")}']").click
-    expect(page).to have_css("[data-lightbox-target='caption']", text: /Box 2/i)
+    box_one = Apartment::Tenant.switch(slug) { move.boxes.find_by(number: "1") }
+    click_button(I18n.t("galleries.index.lightbox.next"))
+    expect(page).to have_css(".pswp__move-caption", text: /Box 1/i)
+    expect(page).to have_css("a.pswp__button--move-view-box[href='#{move_box_path(move, box_one)}']")
 
-    find("button[aria-label='#{I18n.t("galleries.index.lightbox.close")}']").click
-    expect(page).to have_no_css("dialog.ha-lightbox[open]")
+    click_button(I18n.t("galleries.index.lightbox.prev"))
+    expect(page).to have_css(".pswp__move-caption", text: /Box 2/i)
   end
 end

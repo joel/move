@@ -1,74 +1,176 @@
 import { Controller } from "@hotwired/stimulus"
+import PhotoSwipeLightbox from "photoswipe/lightbox"
 
-// Gallery lightbox. A single native <dialog> viewer shared by every grid tile.
-// Each tile is a target carrying the photo's :detail src, caption and box href as
-// data-*; opening reads the clicked tile, prev/next cycle (wrapping) over the
-// rendered set. showModal() gives focus-trap, Escape and the ::backdrop for free;
-// we add arrow-key nav and click-outside-to-close.
+// Gallery lightbox — a thin wrapper around vendored PhotoSwipe 5 (#598), which
+// owns the hard parts: follow-finger swipe with real physics, pinch/double-tap
+// zoom, neighbour preloading, keyboard nav, focus trap and a11y. Each grid tile
+// is a target carrying the photo's :thumb/:detail srcs, caption and box href as
+// data-*; open() builds the slide list from the rendered tiles.
 //
-//   div(data: { controller: "lightbox" })
-//     button(data: { lightbox_target: "tile", action: "click->lightbox#open", src/caption/href })
-//     dialog(data: { lightbox_target: "dialog", action: "keydown->lightbox#key" })
-//       img(data-lightbox-target="image"), span(caption), a(link)
+// PhotoSwipe requires per-slide pixel dimensions up front, which the app can't
+// reliably supply (blobs may be unanalyzed). Strategy: estimate from the tile's
+// already-loaded grid thumb (exact aspect ratio) scaled into the :detail
+// bounds, then correct to the real naturalWidth/Height once the full image
+// loads (loadComplete), persisting the exact size back onto the tile for
+// subsequent opens.
+//
+//   div(data: { controller: "lightbox", lightbox_labels_value: {…}.to_json,
+//               action: "turbo:before-cache@document->lightbox#teardown" })
+//     button(data: { lightbox_target: "tile", action: "click->lightbox#open",
+//                    src/thumb/caption/href }) > img (grid thumb)
+
+// MediaVariants::TransformUrl::SIZES[:detail] — the served image's bounding box.
+const DETAIL_BOX = 1600
+
 export default class extends Controller {
-  static targets = ["tile", "dialog", "image", "caption", "link"]
+  static targets = ["tile"]
+  static values = { labels: Object }
+
+  connect() {
+    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches
+    this.lightbox = new PhotoSwipeLightbox({
+      pswpModule: () => import("photoswipe"),
+      showHideAnimationType: reducedMotion ? "none" : "zoom",
+      bgOpacity: 0.85,
+      wheelToZoom: true,
+      counter: false, // the location caption is the context; a counter would sit under it
+      arrowPrevTitle: this.labelsValue.prev,
+      arrowNextTitle: this.labelsValue.next,
+      closeTitle: this.labelsValue.close,
+      zoomTitle: this.labelsValue.zoom,
+      errorMsg: this.labelsValue.error
+    })
+    this.seedThumbPlaceholders()
+    this.registerChrome()
+    this.correctSizesOnLoad()
+    this.lightbox.init()
+  }
+
+  // Show each slide's grid thumb as its placeholder while :detail loads.
+  // PhotoSwipe's default only does this for the first-opened slide
+  // (isFirstSlide), so without this filter, swiping/clicking to an as-yet-
+  // unloaded slide flashes a blank frame until the full image arrives — undoing
+  // the thumb-first feedback for the very navigation case this viewer targets.
+  seedThumbPlaceholders() {
+    this.lightbox.addFilter("placeholderSrc", (placeholderSrc, content) =>
+      content?.data?.msrc || placeholderSrc)
+  }
+
+  disconnect() {
+    this.teardown()
+    this.lightbox?.destroy()
+    this.lightbox = null
+  }
 
   open(event) {
-    this.index = this.tileTargets.indexOf(event.currentTarget)
-    if (this.index < 0) this.index = 0
-    this.render()
-    this.dialogTarget.showModal()
+    if (!this.lightbox) return
+    const index = this.tileTargets.indexOf(event.currentTarget)
+    if (index < 0) return
+    // Align `loop` with PhotoSwipe's own `canLoop()` (which requires > 2 items):
+    // otherwise a 2-photo gallery keeps `loop: true`, so the end arrows never get
+    // the disabled treatment (that branch is gated on `!options.loop`) yet
+    // navigation can't wrap — leaving enabled-but-dead arrows. With loop off for
+    // ≤ 2 photos the arrows disable cleanly at the ends (Codex #599).
+    this.lightbox.options.loop = this.tileTargets.length > 2
+    this.lightbox.options.dataSource = this.tileTargets.map((tile) => this.slideFor(tile))
+    this.lightbox.loadAndOpen(index)
   }
 
-  close() {
-    this.dialogTarget.close()
-    // Drop the heavy detail image so it isn't held in memory between views.
-    this.imageTarget.removeAttribute("src")
+  // turbo:before-cache — Turbo must never snapshot an open viewer (PhotoSwipe
+  // appends its DOM to <body>), and clones the document synchronously right
+  // after this event. `destroy()` fully tears down a fully-open viewer, but if
+  // it fires during the OPEN animation its close() bails (opener not yet open),
+  // so it neither removes the `.pswp` root nor its global listeners. Do both
+  // ourselves — strip the element so no stale overlay is cached, and remove the
+  // listeners so nothing lingers into the next page (Codex #599). Both are
+  // no-ops when destroy() already handled them.
+  teardown() {
+    const pswp = this.lightbox?.pswp
+    if (!pswp) return
+    pswp.destroy()
+    pswp.element?.remove()
+    pswp.events?.removeAll?.()
+    // PhotoSwipe sets `window.pswp` on open and clears it only in its own
+    // destroy-event handler — which the mid-open bail skips. A stale global
+    // makes loadAndOpen() short-circuit (`if (window.pswp) return`), so the
+    // viewer would never open again after this race until a full reload. Clear
+    // the global we know points at this instance (Codex #599).
+    if (window.pswp === pswp) delete window.pswp
   }
 
-  next() {
-    this.move(1)
+  slideFor(tile) {
+    const { src, thumb, caption, href } = tile.dataset
+    const [width, height] = this.dimensionsFor(tile)
+    // element: the tile anchors PhotoSwipe's zoom-from-thumbnail open/close
+    // animation; caption/href/tile ride along for the custom chrome below.
+    return { src, msrc: thumb, alt: caption || "", width, height, element: tile, caption, href, tile }
   }
 
-  prev() {
-    this.move(-1)
+  // Exact size once a previous view corrected it; otherwise the grid thumb's
+  // natural size (its ratio is the photo's) scaled into the :detail box; a
+  // square placeholder when the thumb hasn't loaded yet (lazy, off-screen).
+  dimensionsFor(tile) {
+    if (tile.dataset.pswpWidth) return [Number(tile.dataset.pswpWidth), Number(tile.dataset.pswpHeight)]
+    const thumb = tile.querySelector("img")
+    const w = thumb?.naturalWidth
+    const h = thumb?.naturalHeight
+    if (!w || !h) return [DETAIL_BOX, DETAIL_BOX]
+    const scale = Math.min(DETAIL_BOX / w, DETAIL_BOX / h)
+    return [Math.round(w * scale), Math.round(h * scale)]
   }
 
-  move(step) {
-    const count = this.tileTargets.length
-    if (count === 0) return
-    this.index = (this.index + step + count) % count
-    this.render()
+  // The served image is authoritative: replace the estimate with its real
+  // pixel size (re-rendering the slide when they differ) and persist it on the
+  // tile so the next open needs no correction.
+  correctSizesOnLoad() {
+    this.lightbox.on("loadComplete", ({ content }) => {
+      const data = content.data
+      const img = content.element
+      if (!img?.naturalWidth) return
+      data.tile?.setAttribute("data-pswp-width", img.naturalWidth)
+      data.tile?.setAttribute("data-pswp-height", img.naturalHeight)
+      if (data.width === img.naturalWidth && data.height === img.naturalHeight) return
+      data.width = img.naturalWidth
+      data.height = img.naturalHeight
+      content.slide?.pswp?.refreshSlideContent(content.slide.index)
+    })
   }
 
-  // Render the current tile's photo into the viewer.
-  render() {
-    const tile = this.tileTargets[this.index]
-    if (!tile) return
-    const { src, caption, href } = tile.dataset
-    // Clear rather than retain the previous photo when a tile has no detail image,
-    // so the viewer never shows the wrong photo under the new caption.
-    if (src) this.imageTarget.src = src
-    else this.imageTarget.removeAttribute("src")
-    this.imageTarget.alt = caption || ""
-    if (this.hasCaptionTarget) this.captionTarget.textContent = caption || ""
-    if (this.hasLinkTarget && href) this.linkTarget.href = href
-  }
+  // Custom chrome: the location caption (top-left) and the "view box" link
+  // (top-right, before the close button) — both follow the current slide.
+  registerChrome() {
+    this.lightbox.on("uiRegister", () => {
+      const pswp = this.lightbox.pswp
+      // Read the slide by index, not `pswp.currSlide` — during a `change` the
+      // current slide can momentarily be a placeholder whose `.data` isn't
+      // populated yet, which would blank the caption/link mid-turn.
+      const dataFor = () => pswp.options.dataSource?.[pswp.currIndex] || {}
 
-  // Arrow keys cycle; Escape is handled natively by <dialog>.
-  key(event) {
-    if (event.key === "ArrowRight") {
-      event.preventDefault()
-      this.next()
-    } else if (event.key === "ArrowLeft") {
-      event.preventDefault()
-      this.prev()
-    }
-  }
+      pswp.ui.registerElement({
+        name: "move-caption",
+        appendTo: "root",
+        onInit: (el) => {
+          const update = () => { el.textContent = dataFor().caption || "" }
+          pswp.on("change", update)
+          update()
+        }
+      })
 
-  // A click whose target is the backdrop wrapper itself (not the image or a
-  // control) closes the viewer.
-  backdropClose(event) {
-    if (event.target === event.currentTarget) this.close()
+      pswp.ui.registerElement({
+        name: "move-view-box",
+        tagName: "a",
+        isButton: true,
+        appendTo: "root",
+        html: this.labelsValue.viewBox,
+        onInit: (el) => {
+          const update = () => {
+            const href = dataFor().href
+            if (href) el.setAttribute("href", href)
+          }
+          pswp.on("change", update)
+          update()
+        }
+      })
+    })
   }
 }

@@ -194,13 +194,20 @@ controller (`open` / `close` / `backdropClose`); the third has its own:
   plus the secondary actions (lifecycle step(s), print label/manifest, edit, delete)
   so the screen shows one contextual hero. Rows are full-width `surface-container-high`
   pills (`text-error` for the destructive Delete row).
-- **`.ha-lightbox`** — full-viewport, transparent/borderless photo viewer over a heavy
-  (85%) blurred `::backdrop`; the contained `:detail` `<img>` floats centred
-  (`object-contain`). Driven by the **`lightbox`** Stimulus controller
-  (`open` / `close` / `prev` / `next` / `key` / `backdropClose`): grid tiles carry the
-  photo's `:detail` src + caption + box href as `data-*`, and prev/next cycle (wrapping)
-  over the rendered set with arrow-key support. Used by **`Components::Gallery::Grid`**
-  (the Move-wide Gallery).
+- **Gallery lightbox — vendored PhotoSwipe 5** (not a `.ha-*` dialog): the
+  **`lightbox`** Stimulus controller is a thin wrapper around PhotoSwipe
+  (`vendor/javascript/photoswipe*.esm.min.js`, stylesheet inlined into the
+  Tailwind build from `app/assets/tailwind/vendor/photoswipe.css`). Grid tiles
+  carry the photo's `:thumb` + `:detail` srcs, caption and box href as `data-*`;
+  slides open **thumb-first** (`msrc` = the grid-cached thumb, sharpening when
+  `:detail` lands). PhotoSwipe owns follow-finger swipe physics, pinch/double-tap
+  zoom, neighbour preloading, wrap-around, arrow keys, focus trap and Escape.
+  Theming lives in `application.css` ("PhotoSwipe theming" block): 85% dim +
+  blur to match the app's overlays, pill chips for the custom caption
+  (`.pswp__move-caption`) and "view box" link (`.pswp__button--move-view-box`).
+  Arrows follow PhotoSwipe's own device detection (`.pswp--touch` hides them,
+  `.pswp--has_mouse` reveals them) — on touch screens the swipe is the
+  affordance. Used by **`Components::Gallery::Grid`** (the Move-wide Gallery).
 
 ### Navigation chrome
 `Ui::BottomTabBar` (mobile, docked) and `Ui::Sidebar` (desktop ≥`lg`, 280px) render
