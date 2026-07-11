@@ -5,6 +5,17 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.84.0] — 2026-07-11
+
+### Changed
+- **Swipe to edit or remove detected items on phones.** On the photo review
+  screen, each detected item row used to show permanent edit/remove buttons
+  that crowded the row on small screens. On a phone you now swipe a row
+  right to edit its name, or left to reveal Remove — desktop keeps the
+  familiar inline buttons, and the on-screen instructions name the gesture.
+  Rows still work with a keyboard (tabbing to a hidden action slides it into
+  view). Built on a new reusable swipe-to-reveal component (#602, #603).
+
 ## [v0.80.0] — 2026-07-04
 
 ### Added
