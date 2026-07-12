@@ -13,9 +13,9 @@ RSpec.describe MoveInvitations::Accept do
            invited_by: admin, token_digest: MoveInvitation.digest(raw_token))
   end
 
-  # A plain constant, not a let — keeps the memoized-helper count down and the
-  # digest correspondence obvious.
-  raw_token = "d14-test-raw-token"
+  # A method, not a let — keeps the memoized-helper count at five, and let!
+  # blocks resolve it like any helper.
+  define_method(:raw_token) { "d14-test-raw-token" }
 
   before do
     # The joins run on the apex; the tenant switch resolves against the (public)
@@ -25,8 +25,8 @@ RSpec.describe MoveInvitations::Accept do
     allow(Rails.event).to receive(:notify)
   end
 
-  define_method(:accept) do |raw: raw_token, user: invitee|
-    described_class.new.call(raw_token: raw, user:)
+  def accept(raw: nil, user: nil)
+    described_class.new.call(raw_token: raw || raw_token, user: user || invitee)
   end
 
   it "claims the invitation, joins the organization THEN the move, and emits" do

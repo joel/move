@@ -33,7 +33,7 @@ module Views
 
       #: () -> untyped
       def sign_out_button
-        button_to(I18n.t("invitations.unavailable.sign_out"), "/logout",
+        button_to(I18n.t("invitations.unavailable.sign_out"), view_context.rodauth.logout_path,
                   method: :post, class: "ha-button")
       end
     end

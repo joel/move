@@ -19,6 +19,16 @@ class SessionHandoffToken
   def self.digest: (untyped raw_token) -> String
 end
 
+class MoveInvitation
+  def self.generate_raw_token: () -> String
+
+  def self.digest: (untyped raw_token) -> String
+end
+
+class MoveMembership
+  def self.role_options: () -> untyped
+end
+
 class Organization
   def self.primary_for: (untyped user_id) -> untyped
 

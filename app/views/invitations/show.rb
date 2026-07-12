@@ -26,7 +26,8 @@ module Views
           h1(class: "text-headline-lg text-text-warm") { I18n.t("invitations.show.title") }
           p(class: "mt-3 text-body-md text-muted") { intro_copy }
           p(class: "mt-1 text-body-md text-muted") do
-            I18n.t("invitations.show.role_intro", role: @invitation.role)
+            I18n.t("invitations.show.role_intro",
+                   role: I18n.t("members.roles.#{@invitation.role}"))
           end
           div(class: "mt-6 flex flex-wrap items-center gap-3") { cta }
         end
@@ -50,8 +51,11 @@ module Views
       def cta
         case @state
         when :acceptable then accept_button
-        when :sign_in then auth_link(I18n.t("invitations.show.sign_in"), "/login")
-        else auth_link(I18n.t("invitations.show.create_account"), "/create-account")
+        when :sign_in
+          auth_link(I18n.t("invitations.show.sign_in"), view_context.rodauth.login_path)
+        else
+          auth_link(I18n.t("invitations.show.create_account"),
+                    view_context.rodauth.create_account_path)
         end
       end
 
@@ -65,11 +69,14 @@ module Views
       end
 
       # The token and the invited email ride the query string so the auth forms
-      # can prefill the login and re-carry the token through hidden fields.
+      # can prefill the login and re-carry the token through hidden fields. The
+      # prefill key is Rodauth's login_param ("email" in this app, not the gem
+      # default "login") — the form components read params[login_param].
 
       #: (untyped label, untyped path) -> untyped
       def auth_link(label, path)
-        query = { login: @invitation.email, invite_token: @raw_token }.to_query
+        query = { view_context.rodauth.login_param => @invitation.email,
+                  invite_token: @raw_token }.to_query
         link_to(label, "#{path}?#{query}", class: "ha-button ha-button-primary")
       end
     end

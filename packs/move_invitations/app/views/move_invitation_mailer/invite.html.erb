@@ -8,12 +8,12 @@
           inviter: @inviter_name,
           move: @move_name || @invitation.organization.name,
           organization: @invitation.organization.name,
-          role: @invitation.role) %>
+          role: t("members.roles.#{@invitation.role}")) %>
   <% else %>
     <%= t("move_invitation_mailer.invite.body_anonymous",
           move: @move_name || @invitation.organization.name,
           organization: @invitation.organization.name,
-          role: @invitation.role) %>
+          role: t("members.roles.#{@invitation.role}")) %>
   <% end %>
 </p>
 

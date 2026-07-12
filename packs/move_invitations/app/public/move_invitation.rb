@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "digest"
-
 # An email invitation to join a Move (Phase D14, #608): a Move admin invites any
 # address with a role; the recipient proves mailbox ownership by authenticating
 # as that email (passwordless), and acceptance creates the OrganizationMembership
@@ -16,6 +14,8 @@ require "digest"
 # Create/revoke/resend/accept live in app/actions/move_invitations; this model
 # stays persistence-focused (digesting, state predicates, scopes).
 class MoveInvitation < ApplicationRecord
+  include DigestedToken
+
   # How long an invitation link stays valid. Long enough to survive a weekend
   # inbox; resend rotates the token and restarts the clock.
   TTL = 7.days
@@ -42,6 +42,15 @@ class MoveInvitation < ApplicationRecord
   # Live invitations: not yet accepted or revoked, clock still running.
   scope :pending, -> { where(accepted_at: nil, revoked_at: nil).where(expires_at: Time.current..) }
 
+  # The Members-page pending list: every un-terminal invitation for the Move,
+  # newest first (recency — UX rule #2). Deliberately INCLUDES expired rows —
+  # they still hold the one-live-invitation partial unique index, so they must
+  # stay visible (Expired tint) and revivable via Resend, never an invisible
+  # dead end blocking a re-invite.
+  scope :open_for, lambda { |move_id|
+    where(accepted_at: nil, revoked_at: nil).where(move_id: move_id).order(created_at: :desc)
+  }
+
   # Rows the nightly sweep (PurgeStaleMoveInvitationsJob) reaps: anything
   # terminal (accepted, revoked, or expired-unaccepted) older than RETENTION.
   scope :purgeable, lambda {
@@ -50,21 +59,6 @@ class MoveInvitation < ApplicationRecord
       .or(where(revoked_at: ...cutoff))
       .or(where(accepted_at: nil, revoked_at: nil).where(expires_at: ...cutoff))
   }
-
-  # Generate a fresh raw token. Returned to the caller once; never stored.
-
-  # @rbs skip
-  def self.generate_raw_token
-    SecureRandom.urlsafe_base64(32)
-  end
-
-  # SHA-256 hex digest of a raw token — persisted on create/resend, recomputed
-  # on accept for a single indexed lookup.
-
-  # @rbs skip
-  def self.digest(raw_token)
-    Digest::SHA256.hexdigest(raw_token.to_s)
-  end
 
   #: () -> bool
   def expired?

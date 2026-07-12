@@ -121,6 +121,10 @@ class RodauthMain < Rodauth::Rails::Auth
       email_auth_additional_form_tags { invite_token_form_tag }
       verify_account_additional_form_tags { invite_token_form_tag }
       verify_account_resend_additional_form_tags { invite_token_form_tag }
+      # An invitee signing in with a passkey must not drop the token either —
+      # the webauthn form renders inside multi-phase login, whose POST carried
+      # the param via the login form's hidden field.
+      webauthn_auth_additional_form_tags { invite_token_form_tag }
 
       send_email do |email|
         db.after_commit { email.deliver_later }

@@ -129,6 +129,16 @@ RSpec.describe "Invitations (tenant)" do
       expect(response.body.index("new@example.com")).to be < response.body.index("old@example.com")
     end
 
+    it "keeps an expired invitation visible (it still blocks a re-invite until revived/revoked)" do
+      create(:move_invitation, :expired, organization:, move_id: move.id, email: "late@example.com")
+
+      get move_members_path(move)
+
+      expect(response.body)
+        .to include("late@example.com")
+        .and include(I18n.t("members.pending.expired"))
+    end
+
     it "renders no pending section when nothing is pending" do
       get move_members_path(move)
 

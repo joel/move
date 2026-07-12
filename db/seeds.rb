@@ -52,6 +52,8 @@ DemoData.auto_provision = false
 #     -H "Content-Type: application/json" \
 #     -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_boxes","arguments":{}}}'
 DEMO_MCP_TOKEN = "mcp_demo_seattle_relocation_dev_token"
+# D14 — the demo pending invitation's raw token (header comment shows the URL).
+DEMO_INVITE_TOKEN = "move_invite_demo_pending_dev_token"
 DEMO = {
   owner_email: "demo@example.com",
   owner_name: "Demo Mover",
@@ -147,16 +149,27 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   # MoveInvitation is public-schema (Apartment-excluded), so this write lands
   # in public even inside the tenant switch. Idempotent: keyed on
   # (move, email); a revoked/expired demo row is revived with a fresh clock.
+  demo_invite_digest = MoveInvitation.digest(DEMO_INVITE_TOKEN)
   demo_invitation = MoveInvitation.find_or_create_by!(move_id: move.id, email: "pending@example.com") do |inv|
     inv.organization = organization
     inv.role = "contributor"
     inv.invited_by = owner
-    inv.token_digest = MoveInvitation.digest("move_invite_demo_pending_dev_token")
+    inv.token_digest = demo_invite_digest
     inv.expires_at = MoveInvitation::TTL.from_now
   end
   unless demo_invitation.accepted?
-    demo_invitation.update!(token_digest: MoveInvitation.digest("move_invite_demo_pending_dev_token"),
+    demo_invitation.update!(token_digest: demo_invite_digest,
                             expires_at: MoveInvitation::TTL.from_now, revoked_at: nil)
+  end
+  # An EXPIRED pending invitation exercises the Expired tint + revive-via-Resend
+  # branch of the pending row (§8: seed every state the surface renders). Kept
+  # expired on re-runs; Resend in the UI revives it.
+  MoveInvitation.find_or_create_by!(move_id: move.id, email: "expired@example.com") do |inv|
+    inv.organization = organization
+    inv.role = "viewer"
+    inv.invited_by = owner
+    inv.token_digest = MoveInvitation.digest(SecureRandom.urlsafe_base64(32))
+    inv.expires_at = 2.days.ago
   end
   # #187 — showcase a per-provider model override. The demo keeps `fake` active
   # (offline), but OpenAI is pinned to a custom model: switching the provider pill

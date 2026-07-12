@@ -112,7 +112,7 @@ class InvitationsController < MoveScopedController
 
   #: () -> untyped
   def pending_invitations
-    MoveInvitation.pending.where(move_id: @move.id).order(created_at: :desc)
+    MoveInvitation.open_for(@move.id)
   end
 
   # Replace the whole stable pending-list container — a new invitation lands at

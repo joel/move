@@ -1,5 +1,8 @@
-# D14 — Move invitation apex pages (#608). Mailer copy lives in
-# move_invitations.en.yml; the F1 management strings in members.en.yml.
+# D14 — Move invitations (#608): the tenant management flashes
+# (create/resend/destroy — InvitationsController lazy lookup) AND the apex
+# landing/unavailable pages. F1 form/row LABELS live in members.en.yml
+# (members.invite_form / members.pending); mailer copy in
+# move_invitations.en.yml.
 en:
   invitations:
     create:

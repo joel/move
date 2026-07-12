@@ -170,6 +170,6 @@ class MembersController < MoveScopedController
 
   #: () -> untyped
   def pending_invitations
-    MoveInvitation.pending.where(move_id: @move.id).order(created_at: :desc)
+    MoveInvitation.open_for(@move.id)
   end
 end

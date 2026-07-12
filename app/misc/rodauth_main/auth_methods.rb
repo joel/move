@@ -165,38 +165,46 @@ class RodauthMain < Rodauth::Rails::Auth
     # fields + emailed links). Charset-validated before ANY use — it is echoed
     # into HTML and URLs, so only the raw-token shape ever passes through.
     #
-    # The session stash below bridges ONE hop: Rodauth's GET-with-key handlers
-    # (verify-account, email-auth) stash the key in the session and redirect to
-    # a clean URL, dropping our query param — so the re-rendered form would
-    # lose the carry. Param always wins; the stash dies with the session wipe
-    # at login (login_session/clear_session), so it can never go stale into a
-    # later unrelated sign-in.
-    # Memoized onto the instance because the login machinery WIPES both other
-    # carriers mid-request: autologin/login_session calls clear_session (killing
-    # the stash) before login_redirect / ensure_personal_organization run. The
-    # positive value is pinned at route entry (before_*_route below), so those
-    # late hooks still see it.
+    # Memoized onto the instance because the login machinery WIPES the request
+    # param's siblings mid-request: autologin/login_session calls clear_session
+    # before login_redirect / ensure_personal_organization run. The positive
+    # value is pinned at route entry (before_*_route below), so those late
+    # hooks still see it. Param-only here — the session stash is consumed
+    # exclusively by the two key-redirect routes below.
     def carried_invite_token
       return @carried_invite_token if defined?(@carried_invite_token) && @carried_invite_token
 
-      token = param_or_nil("invite_token") || session[:invite_token]
+      token = param_or_nil("invite_token")
       token = nil unless token.is_a?(String) && token.match?(MoveInvitation::TOKEN_FORMAT)
       @carried_invite_token = token
     end
 
+    # The stash bridges EXACTLY one hop: Rodauth's GET-with-key handlers
+    # (verify-account, email-auth) stash the key in the session and redirect to
+    # a clean URL, dropping our query param. Only those two routes read it, and
+    # the read CONSUMES it (one-shot), so an abandoned invite flow can taint at
+    # most the next verify/email-auth request — whose worst case is landing on
+    # the invitation page (generic + recoverable), never a wrong session.
     def stash_invite_token
       token = param_or_nil("invite_token")
       session[:invite_token] = token if token&.match?(MoveInvitation::TOKEN_FORMAT)
     end
 
+    def consume_stashed_invite_token
+      token = session.delete(:invite_token)
+      return unless token.is_a?(String) && token.match?(MoveInvitation::TOKEN_FORMAT)
+
+      @carried_invite_token = token
+    end
+
     def before_verify_account_route
-      carried_invite_token # pin before the auto-verify path clears the session
+      carried_invite_token || consume_stashed_invite_token # pin before the auto-verify clears the session
       stash_invite_token
       super
     end
 
     def before_email_auth_route
-      carried_invite_token
+      carried_invite_token || consume_stashed_invite_token
       stash_invite_token
       super
     end

@@ -56,7 +56,7 @@ module Components
 
       #: () -> untyped
       def role_options
-        MoveMembership::ROLES.map { |role| [I18n.t("members.roles.#{role}"), role] }
+        MoveMembership.role_options
       end
 
       #: (untyped user) -> untyped

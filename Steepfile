@@ -110,6 +110,7 @@ target :actions do
   check "packs/captures/app/public", inline: true
   check "packs/labels/app/public", inline: true
   check "packs/move_integration_tokens/app/public", inline: true
+  check "packs/move_invitations/app/public", inline: true
   check "packs/move_memberships/app/public", inline: true
   check "packs/organizations/app/public", inline: true
   check "packs/search/app/public", inline: true
@@ -133,6 +134,7 @@ target :actions do
   check "packs/captures/app/actions", inline: true
   check "packs/demo_data/app/actions", inline: true
   check "packs/labels/app/actions", inline: true
+  check "packs/move_invitations/app/actions", inline: true
   check "packs/manifests/app/actions", inline: true
   check "packs/move_integration_tokens/app/actions", inline: true
   check "packs/move_memberships/app/actions", inline: true

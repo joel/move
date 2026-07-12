@@ -548,10 +548,13 @@ class ::MoveInvitation < ::ApplicationRecord
   include ::MoveInvitation::GeneratedAssociationMethods
 
   def self.pending: () -> ::MoveInvitation::ActiveRecord_Relation
+  def self.open_for: (untyped move_id) -> ::MoveInvitation::ActiveRecord_Relation
   def self.purgeable: () -> ::MoveInvitation::ActiveRecord_Relation
 
   module ::MoveInvitation::GeneratedRelationMethods
     def pending: () -> ::MoveInvitation::ActiveRecord_Relation
+
+    def open_for: (untyped move_id) -> ::MoveInvitation::ActiveRecord_Relation
 
     def purgeable: () -> ::MoveInvitation::ActiveRecord_Relation
   end
