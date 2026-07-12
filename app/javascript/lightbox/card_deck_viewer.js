@@ -68,7 +68,11 @@ export class CardDeckViewer {
 
     overlay.appendChild(this.buildChrome())
 
-    const swiperEl = el("div", { class: "move-deck__swiper swiper relative z-10 mx-auto my-auto w-[86vw] max-w-[520px]" })
+    // EffectCards sizes each card to the container, so it needs an explicit
+    // height as well as width — without one the deck collapses to zero height.
+    const swiperEl = el("div", {
+      class: "move-deck__swiper swiper relative z-10 mx-auto my-auto w-[86vw] max-w-[480px] h-[68vh] max-h-[560px]"
+    })
     const wrapper = el("div", { class: "swiper-wrapper" })
     slides.forEach((slide, i) => wrapper.appendChild(this.buildSlide(slide, i)))
     swiperEl.appendChild(wrapper)
@@ -108,7 +112,7 @@ export class CardDeckViewer {
 
   buildChrome() {
     const chrome = el("div", {
-      class: "move-deck__chrome relative z-20 flex items-center gap-3 px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-3"
+      class: "move-deck__chrome relative z-20 flex items-center gap-3 px-4 pt-[calc(env(safe-area-inset-top)_+_0.75rem)] pb-3"
     })
 
     this.caption = el("span", { class: "move-deck__caption min-w-0 flex-1 truncate text-label-caps uppercase text-text-warm" })
@@ -196,7 +200,9 @@ export class CardDeckViewer {
 
   focusableElements() {
     if (!this.overlay) return []
-    return Array.from(this.overlay.querySelectorAll("a[href], button:not([disabled])"))
+    return Array.from(
+      this.overlay.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])')
+    )
   }
 
   lockScroll() {

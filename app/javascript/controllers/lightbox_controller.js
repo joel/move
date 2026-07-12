@@ -58,12 +58,18 @@ export default class extends Controller {
   // in-flight promise so concurrent opens share one construction.
   buildViewer() {
     if (this.viewer) return Promise.resolve(this.viewer)
-    this.viewerPromise ||= this.importViewer().then((Viewer) => {
-      // Torn down while the module was loading — don't construct a stray viewer.
-      if (this.viewerPromise === null) return null
-      this.viewer = new Viewer(this.labelsValue)
-      return this.viewer
-    })
+    if (!this.viewerPromise) {
+      // Capture the promise so the resolver can prove it's still the current
+      // one: a teardown (viewerPromise → null) or a teardown-then-reopen
+      // (viewerPromise → a new promise) mid-import must NOT construct a stray,
+      // never-destroyed viewer.
+      const promise = this.importViewer().then((Viewer) => {
+        if (this.viewerPromise !== promise) return null
+        this.viewer = new Viewer(this.labelsValue)
+        return this.viewer
+      })
+      this.viewerPromise = promise
+    }
     return this.viewerPromise
   }
 
