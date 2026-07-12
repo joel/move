@@ -169,7 +169,9 @@ module Components
           close: I18n.t("galleries.index.lightbox.close"),
           zoom: I18n.t("galleries.index.lightbox.zoom"),
           error: I18n.t("galleries.index.lightbox.error"),
-          viewBox: I18n.t("galleries.index.lightbox.view_box")
+          viewBox: I18n.t("galleries.index.lightbox.view_box"),
+          dialog: I18n.t("galleries.index.lightbox.dialog"),
+          counter: I18n.t("galleries.index.lightbox.counter")
         }
       end
     end

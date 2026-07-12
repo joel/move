@@ -11,6 +11,11 @@ pin "@hotwired/stimulus-loading", to: "stimulus-loading.js"
 # + app restart; prod precompiles at image build.
 pin "@rails/activestorage", to: "activestorage.esm.js"
 pin_all_from "app/javascript/controllers", under: "controllers"
+# Gallery viewer strategy modules (#604), imported lazily by
+# controllers/lightbox_controller.js: photoswipe_viewer (desktop) and
+# card_deck_viewer (touch). Split out so each device downloads only the viewer
+# it opens.
+pin_all_from "app/javascript/lightbox", under: "lightbox"
 
 # D9 — QR decode for the in-app scanner (E2). Vendored ESM build of jsQR
 # (vendor/javascript/jsqr.js); driven by controllers/qr_scanner_controller.js.
