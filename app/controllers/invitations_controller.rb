@@ -41,6 +41,11 @@ class InvitationsController < MoveScopedController
 
   #: () -> untyped
   def resend
+    # An archived Move is read-only and Accept refuses it, so resending would
+    # only mail a fresh dead link — reject like Create does (the tenant Move is
+    # already loaded here; Resend itself only sees the public invitation row).
+    return archived_response unless @move.writable?
+
     result = MoveInvitations::Resend.new.call(invitation: invitation, actor: current_user)
 
     case result
@@ -93,6 +98,18 @@ class InvitationsController < MoveScopedController
   #: (Symbol key) -> untyped
   def invitation_param(key)
     params.dig(:invitation, key)
+  end
+
+  # Archived-Move rejection shared by create (via the action's :move_archived)
+  # and resend (guarded here). Revoke stays allowed on an archived Move —
+  # cleaning up a dead invite is a read-only-safe teardown (AGENTS.md §2).
+
+  #: () -> untyped
+  def archived_response
+    respond_with_streams([], redirect: index_path,
+                             toast: true, status: :unprocessable_content) do
+      [:alert, t("invitations.create.move_archived")]
+    end
   end
 
   #: (untyped reason) -> String

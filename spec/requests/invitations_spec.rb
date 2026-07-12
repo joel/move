@@ -93,6 +93,18 @@ RSpec.describe "Invitations (tenant)" do
         .to include(%(action="replace" target="#{Components::Members::PendingRow.dom_id(invitation)}"))
     end
 
+    it "refuses to resend on an archived move" do
+      invitation = create(:move_invitation, organization:, move_id: move.id)
+      move.update!(status: "archived")
+
+      expect do
+        post resend_move_invitation_path(move, invitation), as: :turbo_stream
+      end.not_to change(ActionMailer::Base.deliveries, :size)
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include(I18n.t("invitations.create.move_archived"))
+    end
+
     it "refreshes the list when the invitation is no longer pending" do
       invitation = create(:move_invitation, :accepted, organization:, move_id: move.id)
 
