@@ -2282,7 +2282,7 @@ ALTER TABLE ONLY public.boxes
 --
 
 ALTER TABLE ONLY public.move_invitations
-    ADD CONSTRAINT fk_rails_82e2e1d44f FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+    ADD CONSTRAINT fk_rails_82e2e1d44f FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -2404,6 +2404,7 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260712123000'),
 ('20260712121000'),
 ('20260712120000'),
 ('20260705170000'),
