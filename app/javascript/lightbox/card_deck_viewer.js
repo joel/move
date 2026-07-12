@@ -98,13 +98,22 @@ export class CardDeckViewer {
     }
     const img = el("img", {
       class: "h-full w-full object-contain",
-      src: slide.src,
       alt: slide.caption || "",
-      // Eager for the opened card and its neighbours; lazy for the rest of the
-      // deck so a large gallery doesn't fetch every :detail up front.
-      loading: Math.abs(i - this.pendingIndex) <= EAGER_RADIUS ? "eager" : "lazy",
       draggable: "false"
     })
+    // Only the opened card and its immediate neighbours get a real `src`; the
+    // rest hold their URL in data-src and are hydrated by hydrateNear() as they
+    // approach the active index. A gallery can render up to 300 photos, and the
+    // whole deck is inserted into the DOM at once — setting every `src` here
+    // (even with loading="lazy", which the browser can start before the hint
+    // applies) would let opening ONE photo download the entire high-res set on
+    // mobile. The thumb backdrop (the already-loaded grid thumb) covers the
+    // not-yet-hydrated cards.
+    if (Math.abs(i - this.pendingIndex) <= EAGER_RADIUS) {
+      img.src = slide.src
+    } else {
+      img.dataset.src = slide.src
+    }
     // Parity with the desktop lightbox's errorMsg: if the :detail image fails
     // (e.g. an expired signed URL), show the localized error instead of a broken
     // image. The thumb backdrop is cleared too — it's a same-expiry signed URL,
@@ -113,6 +122,21 @@ export class CardDeckViewer {
     zoom.appendChild(img)
     slideEl.appendChild(zoom)
     return slideEl
+  }
+
+  // Give the active card and its immediate neighbours a real `src` (from
+  // data-src) as they come into range, so navigating the deck loads detail
+  // images just-in-time instead of all at once.
+  hydrateNear() {
+    if (!this.swiper) return
+    const active = this.swiper.activeIndex
+    this.swiper.slides.forEach((slideEl, i) => {
+      if (Math.abs(i - active) > EAGER_RADIUS) return
+      const img = slideEl.querySelector("img[data-src]")
+      if (!img) return
+      img.src = img.dataset.src
+      delete img.dataset.src
+    })
   }
 
   markSlideFailed(zoom) {
@@ -176,7 +200,12 @@ export class CardDeckViewer {
         prevSlideMessage: this.labels.prev,
         nextSlideMessage: this.labels.next
       },
-      on: { slideChange: () => this.syncChrome() }
+      on: {
+        slideChange: () => {
+          this.syncChrome()
+          this.hydrateNear()
+        }
+      }
     })
   }
 
