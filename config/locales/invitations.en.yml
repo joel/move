@@ -1,0 +1,17 @@
+# D14 — Move invitation apex pages (#608). Mailer copy lives in
+# move_invitations.en.yml; the F1 management strings in members.en.yml.
+en:
+  invitations:
+    show:
+      title: "You're invited"
+      invited_by: "%{inviter} invited you to join \"%{move}\" at %{organization}."
+      invited_anonymous: "You've been invited to join \"%{move}\" at %{organization}."
+      role_intro: "You'll join as a %{role}."
+      accept: "Accept invitation"
+      sign_in: "Sign in to accept"
+      create_account: "Create your account to accept"
+    unavailable:
+      title: "This invitation isn't available"
+      body: "The link may have expired, been withdrawn, or belong to a different email address. Ask the person who invited you to send a fresh one."
+      back_home: "Go to Move"
+      sign_out: "Sign out and try again"
