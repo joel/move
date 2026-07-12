@@ -105,9 +105,24 @@ export class CardDeckViewer {
       loading: Math.abs(i - this.pendingIndex) <= EAGER_RADIUS ? "eager" : "lazy",
       draggable: "false"
     })
+    // Parity with the desktop lightbox's errorMsg: if the :detail image fails
+    // (e.g. an expired signed URL), show the localized error instead of a broken
+    // image. The thumb backdrop is cleared too — it's a same-expiry signed URL,
+    // so it has almost certainly failed as well.
+    img.addEventListener("error", () => this.markSlideFailed(zoom), { once: true })
     zoom.appendChild(img)
     slideEl.appendChild(zoom)
     return slideEl
+  }
+
+  markSlideFailed(zoom) {
+    zoom.replaceChildren()
+    zoom.style.backgroundImage = "none"
+    const message = el("div", {
+      class: "move-deck__error grid h-full w-full place-items-center px-6 text-center text-muted"
+    })
+    message.textContent = this.labels.error
+    zoom.appendChild(message)
   }
 
   buildChrome() {
