@@ -12,8 +12,8 @@ import { Thumbs, FreeMode, Zoom, Keyboard, A11y } from "swiper"
 // the Zoom module — parity with PhotoSwipe) and the thumbs (free-scrolling).
 // This class owns the app shell: a fullscreen overlay appended to <body>, the
 // caption / counter / "view box" link / close chrome that follows the active
-// image, keyboard + a11y, a focus trap, ESC / backdrop close, body-scroll lock
-// and reduced-motion fallback. Like PhotoSwipe it lives outside the Turbo-cached
+// image, keyboard + a11y, a focus trap, ESC / tap-outside-the-image close,
+// body-scroll lock and reduced-motion. Like PhotoSwipe it lives outside the Turbo-cached
 // DOM, so the controller tears it down on turbo:before-cache.
 //
 // slides: [{ src, thumb, caption, href, tile }] built by the controller from the
