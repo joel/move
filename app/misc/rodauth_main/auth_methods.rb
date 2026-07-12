@@ -174,7 +174,10 @@ class RodauthMain < Rodauth::Rails::Auth
     def carried_invite_token
       return @carried_invite_token if defined?(@carried_invite_token) && @carried_invite_token
 
-      token = param_or_nil("invite_token")
+      # The request param on the passwordless forms, or — on the Google callback,
+      # where there is no request param — the value round-tripped through OmniAuth
+      # (GoogleAuthButton forwards it; #346's `org` uses the same channel).
+      token = param_or_nil("invite_token") || omniauth_params&.dig("invite_token")
       token = nil unless token.is_a?(String) && token.match?(MoveInvitation::TOKEN_FORMAT)
       @carried_invite_token = token
     end

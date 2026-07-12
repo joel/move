@@ -38,7 +38,7 @@ module Components
     #: () -> untyped
     def apex_button
       button_to(
-        view_context.rodauth.omniauth_request_path(:google, **origin_org_param),
+        view_context.rodauth.omniauth_request_path(:google, **omniauth_forward_params),
         method: :post,
         # data-turbo=false on the FORM: the response is a cross-origin 302 to
         # Google, which Turbo can't follow — force a native submit/redirect.
@@ -47,15 +47,18 @@ module Components
       ) { contents }
     end
 
-    # Forward the originating org (carried from the subdomain link as ?org=<slug>)
-    # into the OmniAuth request as a query param, so it survives the round-trip to
-    # Google and reaches the callback via omniauth.params (#346). Membership is
-    # validated server-side before it's honoured, so a stray value is harmless.
+    # Forward query params that must survive the round-trip to Google and reach
+    # the callback via omniauth.params: the originating org (#346) and a Move
+    # invitation token (D14 #608 — an invitee who signs in with Google would
+    # otherwise drop the token, get a stray personal org, and miss the accept
+    # landing). Both are validated server-side before they're honoured, so a
+    # stray value is harmless.
 
     #: () -> untyped
-    def origin_org_param
-      slug = view_context.params[:org].to_s
-      slug.present? ? { org: slug } : {}
+    def omniauth_forward_params
+      { org: view_context.params[:org], invite_token: view_context.params[:invite_token] }
+        .transform_values { |v| v.to_s.presence }
+        .compact
     end
 
     # When routed here from a subdomain (?via=google), auto-submit on connect.
@@ -90,7 +93,9 @@ module Components
       url = "https://#{host}/login?via=google"
       slug = view_context.current_tenant
       # Escape defensively even though slugs are format-validated (DNS-label safe).
-      slug.present? ? "#{url}&org=#{CGI.escape(slug)}" : url
+      url = "#{url}&org=#{CGI.escape(slug)}" if slug.present?
+      token = view_context.params[:invite_token].to_s
+      token.present? ? "#{url}&invite_token=#{CGI.escape(token)}" : url
     end
 
     #: () -> untyped
