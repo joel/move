@@ -60,14 +60,21 @@ RSpec.describe MoveInvitations::Accept do
     expect(accept.failure).to eq(:expired)
   end
 
-  it "re-running for the matching user resumes the idempotent joins (crash/two tabs)" do
+  it "re-clicking an already-accepted invite is a no-write no-op (two tabs / back button)" do
     accept
-    move.move_memberships.find_by(user: invitee).destroy! # simulate a crash between claim and join
+    expect { accept }.not_to change(MoveMembership, :count)
+    expect(accept).to be_success # still hands off; just writes nothing
+  end
+
+  it "does NOT let a removed member re-add themselves with the consumed link" do
+    accept
+    # Admin removes them from the Move after they accepted.
+    move.move_memberships.find_by(user: invitee).destroy!
 
     result = accept
 
-    expect(result).to be_success
-    expect(move.move_memberships.find_by(user: invitee)&.role).to eq("contributor")
+    expect(result).to be_success # generic hand-off, not an error
+    expect(move.move_memberships.exists?(user_id: invitee.id)).to be(false) # NOT re-added
   end
 
   it "skips the org-join idempotently for an existing organization member" do

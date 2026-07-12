@@ -112,15 +112,24 @@ RSpec.describe "Invitation acceptance (apex)" do
       expect(token.return_path).to eq("/moves/#{move.id}/boxes")
     end
 
-    it "re-accepting resumes and hands off again (two tabs / crash recovery)" do
+    it "re-posting an accepted invite hands off but writes nothing (two tabs / back)" do
+      stub_current_user(invitee)
+      post "/invitations", params: { token: raw_token }
+
+      expect { post "/invitations", params: { token: raw_token } }
+        .not_to change(MoveMembership, :count)
+      expect(response).to have_http_status(:redirect)
+    end
+
+    it "does not re-add a member removed after they accepted (consumed link)" do
       stub_current_user(invitee)
       post "/invitations", params: { token: raw_token }
       move.move_memberships.find_by(user: invitee).destroy!
 
       post "/invitations", params: { token: raw_token }
 
-      expect(response).to have_http_status(:redirect)
-      expect(move.move_memberships.find_by(user: invitee)&.role).to eq("contributor")
+      expect(response).to have_http_status(:redirect) # generic hand-off
+      expect(move.move_memberships.exists?(user_id: invitee.id)).to be(false)
     end
 
     it "renders the generic page for anonymous and mismatched accepts" do

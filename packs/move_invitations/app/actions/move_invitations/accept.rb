@@ -26,9 +26,18 @@ module MoveInvitations
       yield ensure_email_match(invitation, user)
       organization = invitation.organization
       yield ensure_move_writable(organization, invitation)
-      yield claim_or_resume(invitation)
-      yield join_organization(organization, user)
-      yield join_move_and_record(organization, invitation, user)
+      # The joins run ONLY on a fresh claim. An already-accepted invitation (a
+      # re-click, second tab, or the back button) performs NO membership writes
+      # — otherwise a user removed from the Move after accepting could re-add
+      # themselves by re-POSTing the consumed link. Resume just hands off; if
+      # they are still a member the tenant lands them on the Move, if they were
+      # removed the Move stays inaccessible. A crash between the claim and the
+      # joins is recovered by re-invite / manual add (they may be a bare org
+      # member), never by the consumed link.
+      if (yield claim_or_resume(invitation)) == :claimed
+        yield join_organization(organization, user)
+        yield join_move_and_record(organization, invitation, user)
+      end
       Success({ organization: organization, move_id: invitation.move_id })
     end
 
@@ -68,10 +77,10 @@ module MoveInvitations
       Failure(:gone)
     end
 
-    # Atomic single-use claim (SessionHandoffs::Consume pattern), with a resume
-    # path: an invitation this user already accepted re-runs the idempotent
-    # joins instead of failing — two tabs, a crash between claim and joins, or a
-    # lost redirect all recover by re-clicking the link.
+    # Atomic single-use claim (SessionHandoffs::Consume pattern). Returns
+    # :claimed on the first, winning accept (the caller then runs the joins) or
+    # :resumed for an already-accepted invitation (the caller writes nothing and
+    # just hands off — see #call). Revoked/expired collapse to failures.
 
     #: (untyped invitation) -> Dry::Monads::Result[untyped, untyped]
     def claim_or_resume(invitation)
@@ -130,11 +139,11 @@ module MoveInvitations
       Failure(:gone)
     end
 
-    # Idempotent: an existing membership is success (the resume path re-runs the
-    # join). The pre-check catches the sequential duplicate — MoveMembership's
-    # uniqueness VALIDATION fires before the index, so Add would return
-    # Failure(errors), not :already_member — and Add's RecordNotUnique rescue
-    # still covers the concurrent one.
+    # Runs only on a fresh claim (see #call). Idempotent for safety anyway: an
+    # existing membership is success. The pre-check catches the sequential
+    # duplicate — MoveMembership's uniqueness VALIDATION fires before the index,
+    # so Add would return Failure(errors), not :already_member — and Add's
+    # RecordNotUnique rescue still covers the concurrent one.
 
     #: (untyped move, untyped invitation, untyped user) -> Dry::Monads::Result[untyped, untyped]
     def join_move(move, invitation, user)
