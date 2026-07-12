@@ -160,12 +160,78 @@ class RodauthMain < Rodauth::Rails::Auth
       verify_account_response
     end
 
+    # ── D14 (#608): Move-invitation token carry ───────────────
+    # The invite token rides the auth flows as a request param (hidden form
+    # fields + emailed links). Charset-validated before ANY use — it is echoed
+    # into HTML and URLs, so only the raw-token shape ever passes through.
+    #
+    # The session stash below bridges ONE hop: Rodauth's GET-with-key handlers
+    # (verify-account, email-auth) stash the key in the session and redirect to
+    # a clean URL, dropping our query param — so the re-rendered form would
+    # lose the carry. Param always wins; the stash dies with the session wipe
+    # at login (login_session/clear_session), so it can never go stale into a
+    # later unrelated sign-in.
+    # Memoized onto the instance because the login machinery WIPES both other
+    # carriers mid-request: autologin/login_session calls clear_session (killing
+    # the stash) before login_redirect / ensure_personal_organization run. The
+    # positive value is pinned at route entry (before_*_route below), so those
+    # late hooks still see it.
+    def carried_invite_token
+      return @carried_invite_token if defined?(@carried_invite_token) && @carried_invite_token
+
+      token = param_or_nil("invite_token") || session[:invite_token]
+      token = nil unless token.is_a?(String) && token.match?(MoveInvitation::TOKEN_FORMAT)
+      @carried_invite_token = token
+    end
+
+    def stash_invite_token
+      token = param_or_nil("invite_token")
+      session[:invite_token] = token if token&.match?(MoveInvitation::TOKEN_FORMAT)
+    end
+
+    def before_verify_account_route
+      carried_invite_token # pin before the auto-verify path clears the session
+      stash_invite_token
+      super
+    end
+
+    def before_email_auth_route
+      carried_invite_token
+      stash_invite_token
+      super
+    end
+
+    # The hidden field every auth form re-emits (each view already renders its
+    # *_additional_form_tags). Empty string when no valid token is carried.
+    def invite_token_form_tag
+      token = carried_invite_token
+      return "" unless token
+
+      "<input type=\"hidden\" name=\"invite_token\" value=\"#{token}\">"
+    end
+
+    # An invited signup should not get a stray personal Organization — they
+    # authenticated to join someone else's. Only a live invitation bound to
+    # THIS account's email suppresses provisioning; anything else (stale token,
+    # someone else's invite) falls back to the normal personal org.
+    def invited_signup?
+      token = carried_invite_token
+      return false unless token
+
+      invitation = MoveInvitation.find_by(token_digest: MoveInvitation.digest(token))
+      return false if invitation.nil? || !invitation.pending?
+
+      invitation.email.to_s.casecmp?(::User.find_by(id: account_id)&.email.to_s) || false
+    end
+
     # ── Tenant onboarding ─────────────────────────────────────
     # Every verified account gets a personal Organization (an Apartment
     # tenant) so it has somewhere to create Moves. Idempotent; sets
-    # @onboarding_slug for the post-verify redirect.
+    # @onboarding_slug for the post-verify redirect. Invited signups skip it
+    # (D14) — the accept flow creates their OrganizationMembership instead.
     def ensure_personal_organization
       return if member_of_any_organization?
+      return if invited_signup?
 
       user = ::User.find(account_id)
       result = Organizations::Create.new.call(

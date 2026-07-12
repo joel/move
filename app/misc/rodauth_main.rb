@@ -96,7 +96,8 @@ class RodauthMain < Rodauth::Rails::Auth
       end
 
       create_verify_account_email do
-        RodauthMailer.verify_account(self.class.configuration_name, account_id, verify_account_key_value)
+        RodauthMailer.verify_account(self.class.configuration_name, account_id,
+                                     verify_account_key_value, carried_invite_token)
       end
 
       # Pass the request-time tenant (#353): when the sign-in link is requested
@@ -105,8 +106,21 @@ class RodauthMain < Rodauth::Rails::Auth
       # handoff targets the originating org instead of the primary.
       create_email_auth_email do
         RodauthMailer.email_auth(self.class.configuration_name, account_id,
-                                 email_auth_key_value, Apartment::Tenant.current)
+                                 email_auth_key_value, Apartment::Tenant.current,
+                                 carried_invite_token)
       end
+
+      # ── D14 (#608): carry a Move-invitation token through the auth flows ──
+      # Rodauth form POSTs drop query params, so every form in the passwordless
+      # journey re-emits the token as a hidden field (each view renders its
+      # *_additional_form_tags), and both emailed links append it — whichever
+      # path the invitee takes, they land back on /invitations/<token>.
+      login_additional_form_tags { invite_token_form_tag }
+      create_account_additional_form_tags { invite_token_form_tag }
+      email_auth_request_additional_form_tags { invite_token_form_tag }
+      email_auth_additional_form_tags { invite_token_form_tag }
+      verify_account_additional_form_tags { invite_token_form_tag }
+      verify_account_resend_additional_form_tags { invite_token_form_tag }
 
       send_email do |email|
         db.after_commit { email.deliver_later }
@@ -191,8 +205,17 @@ class RodauthMain < Rodauth::Rails::Auth
       # own session. The target is the org the login started from when applicable
       # (#346, membership-validated). Falls back to the apex when the user has no
       # Organization yet.
+      # A carried invite token overrides both post-auth destinations: the user
+      # authenticated in order to accept an invitation, so send them back to the
+      # apex landing (session INTACT — the accept POST hands off from there).
+      # Invited signups also skip personal-org provisioning (AuthMethods), so
+      # @onboarding_slug stays nil and this branch is what routes them.
       login_redirect do
-        (slug = handoff_target_slug) ? tenant_handoff_url(slug) : "/"
+        if (invite = carried_invite_token)
+          "/invitations/#{invite}"
+        else
+          (slug = handoff_target_slug) ? tenant_handoff_url(slug) : "/"
+        end
       end
       verify_account_redirect do
         @onboarding_slug ? tenant_handoff_url(@onboarding_slug) : login_redirect

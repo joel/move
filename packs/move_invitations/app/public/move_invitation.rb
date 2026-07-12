@@ -20,6 +20,11 @@ class MoveInvitation < ApplicationRecord
   # inbox; resend rotates the token and restarts the clock.
   TTL = 7.days
 
+  # Raw tokens are urlsafe-base64 (43 chars for 32 bytes); anything outside this
+  # shape is rejected before digesting — the auth-flow carry (hidden fields,
+  # emailed links) only ever forwards a value matching it.
+  TOKEN_FORMAT = /\A[A-Za-z0-9_-]{1,128}\z/
+
   # How long terminal rows (accepted/revoked/expired) are kept before the sweep
   # reaps them — the activity feed is the durable audit trail.
   RETENTION = 30.days
