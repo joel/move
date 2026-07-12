@@ -68,12 +68,6 @@ export class ThumbsViewer {
       "aria-label": this.labels.dialog
     })
 
-    // Backdrop — a tap outside the image dismisses. It sits behind the chrome,
-    // main image and thumbs (which come later in source and carry z-10/z-20).
-    const backdrop = el("div", { class: "move-gallery__backdrop absolute inset-0", "aria-hidden": "true" })
-    backdrop.addEventListener("click", () => this.close())
-    overlay.appendChild(backdrop)
-
     overlay.appendChild(this.buildChrome())
 
     // Main image swiper — fills the space between chrome and thumbs.
@@ -228,6 +222,12 @@ export class ThumbsViewer {
         slideChange: () => {
           this.syncChrome()
           this.hydrateNear()
+        },
+        // Tap the letterbox area around the photo to dismiss (a full-screen
+        // backdrop can't work — the main Swiper covers that area). Skip taps on
+        // the image itself and while zoomed, so it doesn't fight zoom/pan.
+        click: (swiper, event) => {
+          if (swiper.zoom.scale <= 1 && event.target.tagName !== "IMG") this.close()
         }
       }
     })

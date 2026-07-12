@@ -104,8 +104,10 @@ RSpec.describe "Gallery lightbox (JS)", :js do
 
       expect(page).to have_css(".move-gallery[role='dialog']")
       # A main image and a thumbnail per photo; opened on the most-recent (Box 2).
-      expect(page).to have_css(".move-gallery__slide", count: 2)
-      expect(page).to have_css(".move-gallery__thumb", count: 2)
+      # Swiper keeps only the active main slide on-screen (the rest are translated
+      # off), so count the main slides regardless of visibility.
+      expect(page).to have_css(".move-gallery__slide", count: 2, visible: :all)
+      expect(page).to have_css(".move-gallery__thumb", count: 2, visible: :all)
       expect(page).to have_css(".move-gallery__caption", text: /Box 2/i)
       # Counter text is CSS-uppercased ("1 OF 2"), so match case-insensitively.
       expect(page).to have_css(".move-gallery__counter", text: /1 of 2/i)
