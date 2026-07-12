@@ -64,6 +64,24 @@ RSpec.describe "Invitation token carry through auth (D14)" do
     expect(OrganizationMembership.exists?(user_id: user.id)).to be(false)
   end
 
+  it "self-heals an invited signup that verified but abandoned the accept" do
+    # Verify while carrying the invite (no personal org provisioned)…
+    post "/create-account", params: { email: "newbie@example.com", invite_token: raw_token }
+    verify_path = URI.parse(link_from_last_mail).then { |u| "#{u.path}?#{u.query}" }
+    get verify_path
+    follow_redirect!
+    user = User.find_by(email: "newbie@example.com")
+    expect(OrganizationMembership.exists?(user_id: user.id)).to be(false)
+
+    # …then they abandon and later sign in normally (no invite token). Rather
+    # than strand them orgless, after_login provisions their personal org.
+    post "/email-auth-request", params: { email: "newbie@example.com" }
+    key = Rack::Utils.parse_query(URI.parse(link_from_last_mail).query)["key"]
+    post "/email-auth", params: { key: key }
+
+    expect(OrganizationMembership.exists?(user_id: user.id)).to be(true)
+  end
+
   it "carries the token through the existing-user magic-link journey" do
     create(:user, email: "newbie@example.com", status: 2)
 

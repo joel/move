@@ -14,6 +14,21 @@ Issue: [#608](https://github.com/joel/move/issues/608) · Plan: `Phase D14 - Mem
 | Review fixes | `28f18d9` | Internal /code-review, 8 angles: expired-pending invisible dead end (open_for scope), one-shot scoped session stash, webauthn carry, login_param prefill, localized roles, DigestedToken concern (3rd copy), role_options + open_for single sources, Steepfile coverage. Refuted with evidence: none needed beyond design notes. Accepted: two tenant switches in Accept (phase boundary), landing/action rule duplication (read vs write side), handoff-URL shape in two homes |
 | Security review | `44e22e9` (amended) | /security-review: no high-confidence findings; fixed the one real residual — raw token moved off the URL path into the filtered query/form param. Accepted residual: token in mailer job args (mirrors documented Rodauth pattern) |
 
+| Live verify | `73e30ae` | /product-review walked the full new-user journey to a working Move; caught the one bug specs can't (cross-host accept redirect needed `turbo: false` — rack_test follows redirects regardless of Turbo). Cleaned up the verify user afterward |
+| Codex round 1 | `bb08c37` | 2×P2: fixed archived-Move accept refusal (Move#writable?); accepted raw-token-in-job-args (identical to documented Rodauth key pattern) |
+| Codex round 2 | `657d730` | **2×P1 + P2**: consumed-link re-grant (removed member could re-add themselves — acceptance now single-shot, no writes on resume); org-destroy FK (InvalidForeignKey on account deletion — FK now ON DELETE CASCADE); Google sign-in dropped the invite token (now carried through omniauth.params) |
+| Codex round 3 | `78089e6` | P2: archived-Move invite creation blocked (Create ensure_writable) — symmetric with the accept guard |
+| Codex round 4 | `1d3e580` | 2×P2: archived-Move resend blocked (guard trio complete); invited-signup onboarding self-heal (verified-but-abandoned invitee no longer stranded orgless — after_login provisions when orgless and not carrying a live invite) |
+
+## Codex loop note
+
+Five rounds. Severity converged as the skill's stop rule predicts: round 2 held
+the real P1 security bugs (re-grant, FK), rounds 3-4 were P2 follow-ons on the
+same archived-Move and onboarding themes (all real, all cheap, all fixed). The
+archived-Move story is now symmetric across create/accept/resend; the invited-
+signup lifecycle self-heals. Every round's findings were legitimate — none
+contrived — so each was fixed rather than accepted.
+
 ## Decisions recorded (beyond the phase doc)
 
 - **Product:** invited signups skip `ensure_personal_organization` only for a live

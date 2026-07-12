@@ -184,15 +184,18 @@ class RodauthMain < Rodauth::Rails::Auth
         # clears its own session on handoff (tenant_handoff_url) and never keeps a
         # remember cookie. "Stay signed in" is established on the org subdomain
         # when it consumes the handoff token (SessionHandoffsController).
-        next unless authenticated_by&.include?("omniauth")
 
-        # Google (OmniAuth) sign-in bypasses verify_account_view, so an account
-        # freshly created by omniauth_create_account? would otherwise land with
-        # no Organization and nowhere to create Moves. Provision the personal
-        # tenant here (idempotent — guards on member_of_any_organization?). Runs
-        # after the account-creation transaction has committed, so the tenant
-        # DDL/pg_dump is not nested in a transaction.
-        ensure_personal_organization
+        # D14 (#608): self-heal a stranded invited signup. The verify-time skip
+        # of ensure_personal_organization (invited_signup?) assumes the accept
+        # will create the org membership. If the invitee abandoned the accept —
+        # or the invite was revoked/expired/the Move archived before they
+        # accepted — a later plain login carries no live invite, so provision
+        # their personal org now rather than leave them orgless with no tenant
+        # (handoff_target_slug would return nil). Idempotent + skipped while an
+        # invite is actively being carried, so it never pre-empts an accept.
+        ensure_personal_organization unless invited_signup?
+
+        next unless authenticated_by&.include?("omniauth")
 
         # Backfill the user's name from the Google profile on first login.
         next if omniauth_name.blank?
