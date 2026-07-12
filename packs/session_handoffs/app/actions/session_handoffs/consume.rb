@@ -13,6 +13,9 @@ module SessionHandoffs
   # `organization_slug` is the request's active tenant; a token minted for another
   # org is rejected, so a leaked/replayed token cannot cross tenants.
   class Consume < BaseAction
+    # Returns the bound user plus the token's optional in-tenant return_path
+    # (D14) — the controller validates the path before honoring it.
+
     #: (raw_token: untyped, organization_slug: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(raw_token:, organization_slug:)
       token = yield find(raw_token)
@@ -20,7 +23,7 @@ module SessionHandoffs
       yield claim(token)
       user = yield resolve_user(token)
       yield emit_event(token, user)
-      Success(user)
+      Success([user, token.return_path])
     end
 
     private

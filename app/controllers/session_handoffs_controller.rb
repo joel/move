@@ -22,8 +22,8 @@ class SessionHandoffsController < ApplicationController
     result = SessionHandoffs::Consume.new.call(raw_token: params[:token], organization_slug: slug)
 
     case result
-    in Dry::Monads::Success(user)
-      establish_session(user)
+    in Dry::Monads::Success[user, return_path]
+      establish_session(user, return_path)
     in Dry::Monads::Failure(_reason)
       render_expired
     end
@@ -31,8 +31,8 @@ class SessionHandoffsController < ApplicationController
 
   private
 
-  #: (untyped user) -> untyped
-  def establish_session(user)
+  #: (untyped user, untyped return_path) -> untyped
+  def establish_session(user, return_path)
     # A handoff token is only minted right after a successful apex authentication
     # (Rodauth's own open-status gate has already run), so a non-open status here
     # means the account was closed/downgraded within the token's brief lifetime —
@@ -50,7 +50,20 @@ class SessionHandoffsController < ApplicationController
     # Re-issue a host-only remember cookie on THIS subdomain so persistent login
     # survives per-domain (each host holds its own remember key) — #280.
     rodauth.remember_login
-    redirect_to root_path
+    redirect_to safe_return_path(return_path) || root_path
+  end
+
+  # Honor a minted in-tenant destination (D14 invitations land on the Move) only
+  # when it is a plain internal path: a leading single "/" — "//host" and
+  # "/\\host" are protocol-relative escapes browsers honor, so both are refused.
+
+  #: (untyped return_path) -> String?
+  def safe_return_path(return_path)
+    path = return_path.to_s
+    return nil unless path.start_with?("/")
+    return nil if path.start_with?("//", "/\\")
+
+    path
   end
 
   #: () -> untyped

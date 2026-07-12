@@ -323,6 +323,46 @@ class ::SessionHandoffToken < ::ApplicationRecord
     def updated_at_before_type_cast: () -> ::Time
 
     def updated_at_for_database: () -> ::Time
+
+    def return_path: () -> ::String?
+
+    def return_path=: (::String?) -> ::String?
+
+    def return_path?: () -> bool
+
+    def return_path_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def return_path_change: () -> [ ::String?, ::String? ]
+
+    def return_path_will_change!: () -> void
+
+    def return_path_was: () -> ::String?
+
+    def return_path_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def return_path_previous_change: () -> ::Array[::String?]?
+
+    def return_path_previously_was: () -> ::String?
+
+    def return_path_before_last_save: () -> ::String?
+
+    def return_path_change_to_be_saved: () -> ::Array[::String?]?
+
+    def return_path_in_database: () -> ::String?
+
+    def saved_change_to_return_path: () -> ::Array[::String?]?
+
+    def saved_change_to_return_path?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_return_path?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_return_path!: () -> void
+
+    def clear_return_path_change: () -> void
+
+    def return_path_before_type_cast: () -> ::String?
+
+    def return_path_for_database: () -> ::String?
   end
   include ::SessionHandoffToken::GeneratedAttributeMethods
   module ::SessionHandoffToken::GeneratedAliasAttributeMethods

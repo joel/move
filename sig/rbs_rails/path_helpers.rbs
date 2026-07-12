@@ -3,6 +3,7 @@
 interface ::_RbsRailsPathHelpers
   def auth_google_one_tap_path: (*untyped) -> ::String
   def session_handoff_path: (*untyped) -> ::String
+  def invitation_acceptance_path: (*untyped) -> ::String
   def agreement_path: (*untyped) -> ::String
   def accept_agreement_path: (*untyped) -> ::String
   def account_path: (*untyped) -> ::String
@@ -113,6 +114,7 @@ interface ::_RbsRailsPathHelpers
   def rails_storage_redirect_path: (*untyped) -> ::String
   def auth_google_one_tap_url: (*untyped) -> ::String
   def session_handoff_url: (*untyped) -> ::String
+  def invitation_acceptance_url: (*untyped) -> ::String
   def agreement_url: (*untyped) -> ::String
   def accept_agreement_url: (*untyped) -> ::String
   def account_url: (*untyped) -> ::String

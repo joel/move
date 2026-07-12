@@ -1223,7 +1223,8 @@ CREATE TABLE public.session_handoff_tokens (
     expires_at timestamp(6) without time zone NOT NULL,
     consumed_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    return_path character varying
 );
 
 
@@ -2403,6 +2404,7 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260712121000'),
 ('20260712120000'),
 ('20260705170000'),
 ('20260704191306'),

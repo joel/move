@@ -17,7 +17,17 @@ RSpec.describe SessionHandoffs::Consume do
     result = described_class.new.call(raw_token: raw, organization_slug: "acme")
 
     expect(result).to be_success
-    expect(result.value!).to eq(user)
+    expect(result.value!).to eq([user, nil])
+  end
+
+  it "returns the minted return_path alongside the user (D14 invitations)" do
+    raw = SessionHandoffs::Mint.new.call(
+      user:, organization_slug: "acme", return_path: "/moves/abc/boxes"
+    ).value!
+
+    result = described_class.new.call(raw_token: raw, organization_slug: "acme")
+
+    expect(result.value!).to eq([user, "/moves/abc/boxes"])
   end
 
   it "consumes the token (single-use): a second consume fails" do

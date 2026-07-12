@@ -13,23 +13,28 @@ module SessionHandoffs
   # SessionHandoffToken is an excluded Apartment model, so the row lands in public
   # regardless of the caller's schema.
   class Mint < BaseAction
-    #: (user: untyped, organization_slug: untyped) -> Dry::Monads::Result[untyped, untyped]
-    def call(user:, organization_slug:)
+    # return_path: an optional in-tenant destination the consuming subdomain
+    # redirects to after establishing the session (D14 invitations land on the
+    # Move). The consumer validates it as a safe internal path.
+
+    #: (user: untyped, organization_slug: untyped, ?return_path: untyped) -> Dry::Monads::Result[untyped, untyped]
+    def call(user:, organization_slug:, return_path: nil)
       raw = SessionHandoffToken.generate_raw_token
-      token = yield persist(user, organization_slug, raw)
+      token = yield persist(user, organization_slug, raw, return_path)
       yield emit_event(token)
       Success(raw)
     end
 
     private
 
-    #: (untyped user, untyped organization_slug, untyped raw) -> Dry::Monads::Result[untyped, untyped]
-    def persist(user, organization_slug, raw)
+    #: (untyped user, untyped organization_slug, untyped raw, untyped return_path) -> Dry::Monads::Result[untyped, untyped]
+    def persist(user, organization_slug, raw, return_path)
       token = SessionHandoffToken.create!(
         user: user,
         organization_slug: organization_slug.to_s,
         token_digest: SessionHandoffToken.digest(raw),
-        expires_at: SessionHandoffToken::TTL.from_now
+        expires_at: SessionHandoffToken::TTL.from_now,
+        return_path: return_path
       )
       Success(token)
     rescue ActiveRecord::RecordInvalid => e
