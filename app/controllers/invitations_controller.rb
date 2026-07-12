@@ -100,6 +100,7 @@ class InvitationsController < MoveScopedController
     case reason
     when :already_invited then t(".already_invited", email: invitation_param(:email).to_s.strip)
     when :already_member then t(".already_member")
+    when :move_archived then t(".move_archived")
     when :invalid_email then t(".invalid_email")
     else t(".failed")
     end

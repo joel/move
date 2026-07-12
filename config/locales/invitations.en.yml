@@ -9,6 +9,7 @@ en:
       sent: "Invitation sent to %{email}."
       already_invited: "%{email} already has a pending invitation — use Resend."
       already_member: "That person is already a member of this move."
+      move_archived: "This move is archived — unarchive it before inviting anyone."
       invalid_email: "Enter a valid email address."
       failed: "The invitation could not be sent."
     resend:

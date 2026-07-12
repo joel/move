@@ -16,6 +16,9 @@ module MoveInvitations
   class Create < BaseAction
     #: (move: untyped, email: untyped, role: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, email:, role:, actor:)
+      # An archived Move is read-only: Accept refuses it, so an invite here would
+      # only mint a dead link. Reject up front (BaseAction guard → :move_archived).
+      yield ensure_writable(move)
       normalized = email.to_s.strip
       yield ensure_email(normalized)
       yield ensure_known_role(role)

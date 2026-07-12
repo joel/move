@@ -51,6 +51,13 @@ RSpec.describe MoveInvitations::Create do
     expect(invite(role: "owner").failure).to eq(:invalid_role)
   end
 
+  it "refuses to invite to an archived (read-only) Move" do
+    move.update!(status: "archived")
+
+    expect { invite }.not_to change(MoveInvitation, :count)
+    expect(invite.failure).to eq(:move_archived)
+  end
+
   it "rejects an email already on the Move, case-insensitively" do
     member = create(:user, email: "pat@example.com")
     move.move_memberships.create!(user: member, role: "viewer")

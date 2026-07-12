@@ -56,6 +56,17 @@ RSpec.describe "Invitations (tenant)" do
       expect(response.body).to include(I18n.t("invitations.create.invalid_email"))
     end
 
+    it "refuses an invite to an archived move with a friendly message" do
+      move.update!(status: "archived")
+
+      post move_invitations_path(move),
+           params: { invitation: { email: "pat@example.com", role: "viewer" } }, as: :turbo_stream
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include(I18n.t("invitations.create.move_archived"))
+      expect(MoveInvitation.exists?(email: "pat@example.com")).to be(false)
+    end
+
     it "forbids non-admins (UI and server)" do
       contributor = create(:user)
       create(:move_membership, move:, user: contributor, role: "contributor")
