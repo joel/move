@@ -16,6 +16,47 @@ This project adheres to [Semantic Versioning](https://semver.org) and the
   Rows still work with a keyboard (tabbing to a hidden action slides it into
   view). Built on a new reusable swipe-to-reveal component (#602, #603).
 
+## [v0.83.0] — 2026-07-11
+
+### Changed
+- **Gallery lightbox navigation is instant.** Swiping or arrowing between
+  photos flips immediately to the already-loaded thumbnail and sharpens in
+  place, instead of waiting for the full-size image (#598, #599).
+
+### Fixed
+- **Photo uploads no longer hang on a flaky connection.** A capture upload
+  that can't reach storage promptly now falls back to uploading through the
+  server instead of stalling the capture flow (#596, #597).
+
+## [v0.82.0] — 2026-07-07
+
+### Changed
+- **Photo sizes are now made on the CDN edge.** Thumbnails and gallery sizes
+  are resized at request time by the CDN instead of being pre-generated and
+  stored by the app, and photo uploads go from the browser straight to
+  storage — fewer moving parts, faster photo-heavy pages, no variant backlog
+  after big capture sessions (#572).
+
+## [v0.81.0] — 2026-07-07
+
+### Changed
+- **Capturing boxes is much faster.** Photos are downscaled on your device
+  before upload (including iPhone HEIC and rotated shots), uploads no longer
+  block the shutter, and image processing runs on a dedicated queue — batch
+  snapping keeps pace with you, and a downscale problem can never block a
+  submission (#541, #545, #547, #549, #558).
+- **Photos moved to Cloudflare R2.** Production photo storage was migrated
+  off the old SeaweedFS cluster (decommissioned after a corruption
+  postmortem); the rare photo lost to that corruption now shows a graceful
+  "photo unavailable" placeholder instead of a broken image (#537, #563,
+  #567).
+
+### Added
+- **Self-healing pipeline (internal — no user-facing change).** A
+  Sentry-driven loop can open autofix issues and generate candidate fix PRs
+  with confidence-gated autonomy, plus Sentry release tracking wired into the
+  deploy (#561, #555).
+
 ## [v0.80.0] — 2026-07-04
 
 ### Added

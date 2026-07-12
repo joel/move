@@ -249,19 +249,20 @@ Pick the label that best fits: `enhancement` for features, `bug` for fixes, `cle
 ### Step 2: Add to Kanban Board → Backlog
 
 ```bash
-gh project item-add <project-number> --owner <owner> --url <issue-url>
+gh project item-add <project-number> --owner <owner> --url <issue-url> --format json | jq -r .id
 ```
 
-The issue starts in **Backlog** by default. Save the item ID from the output (or retrieve it later with `gh project item-list`).
+The issue starts in **Backlog** by default. **Capture the item ID from `item-add`'s
+own JSON output** (shown above) — `item-add` is idempotent, so re-running it for an
+already-added issue just returns the same item's ID.
 
 ### Step 3: Move to Ready, Then In Progress
 
-To move an issue on the board, you need its **item ID**. Retrieve it:
-
-```bash
-gh project item-list <project-number> --owner <owner> --format json \
-  | jq -r '.items[] | select(.content.number == <ISSUE_NUMBER>) | .id'
-```
+To move an issue on the board, you need its **item ID** — use the idempotent
+`item-add --format json | jq -r .id` from Step 2 (re-run it if you lost the ID).
+Avoid `gh project item-list | jq 'select(.content.number == N)'`: its default page
+misses freshly added items on a large board (bit on #602 — the lookup returned
+nothing for an item that existed).
 
 Then update the status (option IDs from `gh project field-list`, see Project References):
 
@@ -947,6 +948,10 @@ If your project versions releases, tag/publish a release after the PR is merged 
 > Auto-generated release notes (`--generate-notes`) summarise merged PRs; they do
 > **not** replace the curated changelog entry. Belongs in the **same PR** as the
 > feature when practical, so the changelog merges with the code it describes.
+> **Also check for drift**: confirm the changelog's newest heading is the previous
+> tag — if releases were cut without entries (v0.81–v0.83 drifted this way until
+> the v0.84.0 backfill), backfill them from the GitHub release notes while you're
+> here rather than letting the gap compound.
 
 ```bash
 git checkout main && git pull origin main

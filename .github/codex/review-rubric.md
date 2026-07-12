@@ -45,6 +45,16 @@ enforced — flag only genuine escapes; items marked **[review]** need judgement
 - **[review] Phlex pitfalls** — no inline `on*` handlers (use Stimulus
   `data-action`); boolean-`false` attrs render as nothing (use `"false"`); Turbo
   ignores a non-redirect 200 on form submit.
+- **[review] Client-side gesture/interaction state machines** (pointer tracking,
+  drag/swipe, optimistic UI) — check the interleavings, not the happy path:
+  external close/reset mid-gesture (an exclusivity claim from another instance,
+  tap-away dismissal, a Turbo Stream replacing the element); a pointer lost
+  without a terminal up/cancel; stale time-derived values (velocity read after a
+  still hold); ghost-click suppression must be time-bounded, never a latch;
+  keyboard/AT must reach gesture-revealed controls (and focus moving on must
+  restore state); the enabling breakpoint flipping while active;
+  `turbo:before-cache` snapshotting mid-state. Every terminal path (own release,
+  external close, teardown) revokes the tracking the gesture start claimed (#602).
 
 ## Security & data
 

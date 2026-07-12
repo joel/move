@@ -136,13 +136,20 @@ House rules (`spec/architecture` of the type system, so to speak):
 4. **The annotation must be its own comment block.** A `#:`/`@rbs` line that
    shares a contiguous comment block with prose can fail to parse
    ("unexpected token for inline leading annotation") — put a blank line
-   between a prose comment and the annotation.
-5. **`def self.` is not supported by inline RBS yet.** Put `# @rbs skip`
+   between a prose comment and the annotation. The parse failure can also
+   surface as an absurd downstream error on a *different* annotation in the
+   same file (`Cannot find type ::untype` — #602), so suspect comment
+   adjacency before suspecting the flagged line.
+5. **One line per annotation — there is no continuation syntax.** A `#:` type
+   split across lines with `#|` is a syntax error to Steep 2.0's inline
+   parser. Write the full signature on one long line; comments are exempt
+   from line-length linting and the repo has 150+-char precedents (#602).
+6. **`def self.` is not supported by inline RBS yet.** Put `# @rbs skip`
    (bare — no `-- comment` suffix) above the def and declare the singleton
    method in a `sig/*.rbs` file (see `sig/default_vocabularies.rbs`).
-6. **`Data.define` / `Struct.new` constants stay unannotated** (dynamic class
+7. **`Data.define` / `Struct.new` constants stay unannotated** (dynamic class
    definitions; inline RBS ignores them and inference copes).
-7. Local escape hatch, sparingly: `move = nil #: untyped` (a trailing type
+8. Local escape hatch, sparingly: `move = nil #: untyped` (a trailing type
    assertion) when flow analysis over unknown constants narrows a local too
    hard. RuboCop is configured to leave `#:` comments alone
    (`Layout/LeadingCommentSpace: AllowRBSInlineAnnotation`).
