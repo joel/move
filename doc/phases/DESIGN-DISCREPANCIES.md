@@ -303,6 +303,15 @@ E1 (`ea5a8a69…` + mobile) and the four E2 state screens were implemented in D9
 
 ---
 
+## ⚠️ §F1-INVITES — Member email invitations (D14, #608) — screens not in Stitch
+
+- **Observation:** The Design Spec's F1 rule set anticipates invitations that create new users ("If an invite creates a new user, it must also add them to the Organization before adding the MoveMembership"), but the Stitch F1 screens (`b909f3a2…` responsive, `4ba298fa…` mobile) predate D14 and show no invite-by-email form, no pending-invitation rows, and no apex landing/unavailable pages.
+- **Decision:** D14 shipped the surfaces from the Phase D0 tokens + existing F1 component idioms (SectionHeader CTA, Ui::Card forms, roster-row chrome for pending rows; apex pages mirror the session-handoff Expired card). The F1 header CTA is now unconditional (it anchors the always-rendered invite form — previously an org with no spare users showed no invite affordance at all).
+- **Risk:** Cosmetic — the built surfaces extend an existing designed screen with its own idioms.
+- **Remediation:** Generate the four missing Stitch screens (F1-with-pending, invite form states, apex landing, apex unavailable) on the canonical design system and record their `screens/<id>`s here + README §2. **Status: ⚠️ decided; Stitch backfill pending.**
+
+---
+
 ## Resolution tracker
 
 | ID | Blocking? | Phase | Status | Action |
@@ -318,6 +327,7 @@ E1 (`ea5a8a69…` + mobile) and the four E2 state screens were implemented in D9
 | E3 | ✅ | D10 | resolved | 2 screens created (`8e990c6d…`, `2cb7c29c…`) |
 | F3 | ✅ | D13 | resolved | 3 screens created (`6f780b58…`, `11d53a11…`, `02012642…`) |
 | PALETTE | ⚠️ | D0 | ✅ decided | Refined Palette canonical |
+| F1-INVITES | ⚠️ | D14 | ✅ decided | built from tokens/F1 idioms; Stitch screen backfill pending |
 | NAV | ⚠️ | D0 | ✅ decided | bottom tab + sidebar |
 | AUTH | ⚠️ | D0 | ✅ decided | re-skin Rodauth/welcome |
 | VARIANTS | ⚠️ | all | watch | fill light/missing variants on demand |

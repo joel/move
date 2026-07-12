@@ -41,6 +41,9 @@ DemoData.auto_provision = false
 #   member@example.com   — contributor (add/edit boxes & items; no member mgmt)
 #   viewer@example.com   — viewer      (read-only; no edit/manage affordances)
 #   invitee@example.com  — org member, addable to the Move via F1
+#   pending@example.com  — D14: a pending email invitation on the Move; walk the
+#                          accept journey without mail at
+#                          https://move.move-easy.docker/invitations/move_invite_demo_pending_dev_token
 #
 # D13 — the demo Move's "Main Assistant" MCP token is the fixed dev value below,
 # so you can call the assistant endpoint immediately:
@@ -136,6 +139,25 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   move.update!(sample: true) unless move.sample?
   # No live "preparing…" placeholder in dev — this Move is built synchronously.
   organization.update!(demo_data_status: "provisioned") unless organization.demo_data_status == "provisioned"
+
+  # D14 (#608) — a pending email invitation so the Members page shows the
+  # pending list (Resend/Revoke) and the apex accept journey is walkable
+  # without mail: the deterministic dev token in the header comment maps to
+  # /invitations/move_invite_demo_pending_dev_token on the apex host.
+  # MoveInvitation is public-schema (Apartment-excluded), so this write lands
+  # in public even inside the tenant switch. Idempotent: keyed on
+  # (move, email); a revoked/expired demo row is revived with a fresh clock.
+  demo_invitation = MoveInvitation.find_or_create_by!(move_id: move.id, email: "pending@example.com") do |inv|
+    inv.organization = organization
+    inv.role = "contributor"
+    inv.invited_by = owner
+    inv.token_digest = MoveInvitation.digest("move_invite_demo_pending_dev_token")
+    inv.expires_at = MoveInvitation::TTL.from_now
+  end
+  unless demo_invitation.accepted?
+    demo_invitation.update!(token_digest: MoveInvitation.digest("move_invite_demo_pending_dev_token"),
+                            expires_at: MoveInvitation::TTL.from_now, revoked_at: nil)
+  end
   # #187 — showcase a per-provider model override. The demo keeps `fake` active
   # (offline), but OpenAI is pinned to a custom model: switching the provider pill
   # in the Settings "Recognition & AI" panel reveals "gpt-5" pre-filled in the

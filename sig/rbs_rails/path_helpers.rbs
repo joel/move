@@ -53,6 +53,9 @@ interface ::_RbsRailsPathHelpers
   def update_role_move_member_path: (*untyped) -> ::String
   def move_members_path: (*untyped) -> ::String
   def move_member_path: (*untyped) -> ::String
+  def resend_move_invitation_path: (*untyped) -> ::String
+  def move_invitations_path: (*untyped) -> ::String
+  def move_invitation_path: (*untyped) -> ::String
   def move_summary_path: (*untyped) -> ::String
   def move_summary_unit_system_path: (*untyped) -> ::String
   def move_activity_path: (*untyped) -> ::String
@@ -164,6 +167,9 @@ interface ::_RbsRailsPathHelpers
   def update_role_move_member_url: (*untyped) -> ::String
   def move_members_url: (*untyped) -> ::String
   def move_member_url: (*untyped) -> ::String
+  def resend_move_invitation_url: (*untyped) -> ::String
+  def move_invitations_url: (*untyped) -> ::String
+  def move_invitation_url: (*untyped) -> ::String
   def move_summary_url: (*untyped) -> ::String
   def move_summary_unit_system_url: (*untyped) -> ::String
   def move_activity_url: (*untyped) -> ::String

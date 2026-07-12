@@ -3,15 +3,15 @@
 module Views
   module Members
     # F1 — Members & Roles (admin-only). A header with an invite action, a
-    # bento of role definitions (admin/contributor/viewer), and the current
-    # member list with inline role changes and removal. Built against the Stitch
-    # "Members & Roles (Dark) - Responsive" screen, rendered from project tokens
-    # (Stitch is dark-only). New-user email invitations are deferred, so there is
-    # no pending-invite row — members are existing Organization users added
-    # immediately.
+    # bento of role definitions (admin/contributor/viewer), the invite-by-email
+    # card + pending invitations (D14 #608), the add-existing-member card, and
+    # the current member list with inline role changes and removal. Built
+    # against the Stitch "Members & Roles (Dark) - Responsive" screen, rendered
+    # from project tokens (Stitch is dark-only; the invite/pending additions are
+    # a logged design gap — see DESIGN-DISCREPANCIES §F1-INVITES).
     #
-    # The add form, list and rows are extracted into stable-id Components so the
-    # controller can stream add/role-change/remove without a reload (#385).
+    # The forms, lists and rows are extracted into stable-id Components so the
+    # controller can stream every mutation without a reload (#385).
     class Index < Views::Base
       ROLE_ICONS = {
         "admin" => Components::Icons::Bolt,
@@ -19,19 +19,24 @@ module Views
         "viewer" => Components::Icons::Eye
       }.freeze
 
-      #: (move: untyped, memberships: untyped, candidates: untyped, current_user_id: untyped) -> void
-      def initialize(move:, memberships:, candidates:, current_user_id:)
+      #: (move: untyped, memberships: untyped, candidates: untyped, pending_invitations: untyped, current_user_id: untyped) -> void
+      def initialize(move:, memberships:, candidates:, pending_invitations:, current_user_id:)
         @move = move
         @memberships = memberships
         @candidates = candidates
+        @pending_invitations = pending_invitations
         @current_user_id = current_user_id
       end
 
       #: () -> void
       def view_template
         div(class: "flex flex-col gap-section-gap") do
-          render Components::Members::Header.new(move: @move, candidates: @candidates)
+          render Components::Members::Header.new(move: @move)
           role_definitions
+          render Components::Members::InviteForm.new(move: @move)
+          render Components::Members::PendingInvitations.new(
+            move: @move, invitations: @pending_invitations
+          )
           render Components::Members::AddForm.new(move: @move, candidates: @candidates)
           render Components::Members::List.new(
             move: @move, memberships: @memberships, current_user_id: @current_user_id

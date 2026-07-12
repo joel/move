@@ -126,6 +126,12 @@ Rails.application.routes.draw do
     resources :members, only: %i[index create destroy] do
       member { patch :update_role }
     end
+    # D14 (#608) — email invitations to this Move (admin-only). Pending
+    # invitations are managed from the Members page; acceptance happens on the
+    # APEX (see the top-level invitations/:token routes).
+    resources :invitations, only: %i[create destroy] do
+      member { post :resend }
+    end
     # F2 — Volume & weight summary. Read-only aggregate for any Move member; the
     # unit-system toggle persists Move#unit_system (editors only, never archived).
     get "summary", to: "summaries#show", as: :summary

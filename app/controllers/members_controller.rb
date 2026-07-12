@@ -13,7 +13,8 @@ class MembersController < MoveScopedController
   #: () -> untyped
   def index
     render Views::Members::Index.new(
-      move: @move, memberships: memberships, candidates: candidates, current_user_id: current_user.id
+      move: @move, memberships: memberships, candidates: candidates,
+      pending_invitations: pending_invitations, current_user_id: current_user.id
     )
   end
 
@@ -152,18 +153,23 @@ class MembersController < MoveScopedController
     )
   end
 
-  # Everything that tracks the candidate pool, refreshed together when it changes
-  # (a member added leaves it; a member removed rejoins it): the add-member form
-  # AND the header Invite CTA both hide when none remain / reappear when one does.
+  # The add-member form tracks the candidate pool (a member added leaves it; a
+  # member removed rejoins it). The header Invite CTA no longer rides along —
+  # it anchors the always-rendered invite-by-email form (D14 #608).
 
   #: () -> Array[untyped]
   def candidate_pool_streams
-    pool = candidates
     [
       turbo_stream.replace(Components::Members::AddForm::ID,
-                           view_context.render(Components::Members::AddForm.new(move: @move, candidates: pool))),
-      turbo_stream.replace(Components::Members::Header::ID,
-                           view_context.render(Components::Members::Header.new(move: @move, candidates: pool)))
+                           view_context.render(Components::Members::AddForm.new(move: @move, candidates: candidates)))
     ]
+  end
+
+  # Pending email invitations for this Move, newest first (D14 #608) — rendered
+  # by Views::Members::Index; the InvitationsController streams updates.
+
+  #: () -> untyped
+  def pending_invitations
+    MoveInvitation.pending.where(move_id: @move.id).order(created_at: :desc)
   end
 end

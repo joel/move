@@ -2,17 +2,16 @@
 
 module Components
   module Members
-    # F1 — the Members page header (title + the "Invite" CTA). Stable id so the
-    # controller can re-stream it whenever the candidate pool changes: the Invite
-    # button only earns its place while there's someone left to add, so it must
-    # appear/disappear in lockstep with the add-member form (UX rule #3).
+    # F1 — the Members page header (title + the "Invite" CTA). The CTA anchors
+    # to the always-rendered invite-by-email form (D14 #608) and is therefore
+    # unconditional — previously it was gated on the org-candidate pool, which
+    # left a real org with no spare users showing NO invite affordance at all.
     class Header < Components::Base
       ID = "members-header"
 
-      #: (move: untyped, candidates: untyped) -> void
-      def initialize(move:, candidates:)
+      #: (move: untyped) -> void
+      def initialize(move:)
         @move = move
-        @candidates = candidates.to_a
       end
 
       #: () -> void
@@ -23,13 +22,11 @@ module Components
             title: I18n.t("members.index.title"),
             subtitle: I18n.t("members.index.subtitle")
           ) do
-            if @candidates.any?
-              render Components::Ui::Button.new(
-                label: I18n.t("members.index.invite"),
-                icon: Components::Icons::Plus,
-                href: "##{Components::Members::AddForm::ID}"
-              )
-            end
+            render Components::Ui::Button.new(
+              label: I18n.t("members.index.invite"),
+              icon: Components::Icons::Plus,
+              href: "##{Components::Members::InviteForm::ID}"
+            )
           end
         end
       end
