@@ -5,6 +5,20 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.86.0] — 2026-07-12
+
+### Added
+- **Invite anyone to a move by email.** A move admin can now invite people
+  who don't yet have an account — not just existing teammates. Enter an email
+  and a role on the Members screen and they get a personal link; accepting it
+  walks them through creating an account (or signing in), joins them to your
+  organisation and the move, and drops them straight onto it. Pending
+  invitations are listed with resend and revoke, expired ones can be revived,
+  and the "Invite" button is always available (previously it disappeared when
+  there was no one left to add). Links are single-use, expire in 7 days, and
+  an invitation to an archived move is declined rather than sending a dead
+  link (#602 follow-up, #608).
+
 ## [v0.85.0] — 2026-07-12
 
 ### Changed
