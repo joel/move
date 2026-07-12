@@ -86,4 +86,42 @@ RSpec.describe "Gallery lightbox (JS)", :js do
     click_button(I18n.t("galleries.index.lightbox.prev"))
     expect(page).to have_css(".pswp__move-caption", text: /Box 2/i)
   end
+
+  # Touch / coarse-pointer devices get the Swiper "effect-cards" deck instead of
+  # PhotoSwipe (#604). Headless Chrome reports a fine pointer, so force the deck
+  # with the `?viewer=deck` override the controller honours for exactly this. As
+  # with the PhotoSwipe examples, we assert OUR wiring — the deck opens with a
+  # card per photo, the caption/counter/box-link chrome reflects the opened
+  # (most-recent) card, and the close control dismisses it — not Swiper's own
+  # swipe/zoom engine, which is live-verified via /product-review.
+  context "when on a touch device (effect-cards deck)" do
+    it "opens the card deck with chrome that reflects the active photo" do
+      move = seed_two_photos
+      login_as(user: user)
+      visit "#{move_gallery_path(move)}?viewer=deck"
+
+      expect(page).to have_css("button[data-lightbox-target='tile']", minimum: 2)
+      first("button[data-lightbox-target='tile']").click
+
+      expect(page).to have_css(".move-deck[role='dialog']")
+      # One card per photo; the opened card is the most-recent (Box 2), first.
+      expect(page).to have_css(".move-deck__slide", count: 2)
+      expect(page).to have_css(".move-deck__caption", text: /Box 2/i)
+      expect(page).to have_css(".move-deck__counter", text: "1 of 2")
+
+      box_two = Apartment::Tenant.switch(slug) { move.boxes.find_by(number: "2") }
+      expect(page).to have_css("a.move-deck__view-box[href='#{move_box_path(move, box_two)}']")
+    end
+
+    it "dismisses the deck on close" do
+      move = seed_two_photos
+      login_as(user: user)
+      visit "#{move_gallery_path(move)}?viewer=deck"
+      first("button[data-lightbox-target='tile']").click
+      expect(page).to have_css(".move-deck")
+
+      click_button(I18n.t("galleries.index.lightbox.close"))
+      expect(page).to have_no_css(".move-deck")
+    end
+  end
 end
