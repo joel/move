@@ -32,6 +32,13 @@ the `dark` class on the preview iframe — dark first, matching the brand defaul
 
 ## Writing a preview
 
+**CI-enforced (#606):** every renderable `Ui::*` component (a class descending
+from `Components::Base`) must have a `spec/components/previews/ui/<name>_preview.rb`
+— the `spec/architecture/conventions_spec.rb` fitness test fails the `test` job
+naming any component that lacks one. Non-renderable helpers under
+`app/components/ui/` (e.g. the `NavDestinations` data module) are exempt by
+construction.
+
 One preview class per component, one scenario method per meaningful state (the
 UX conventions' "cover every state deliberately" applies to previews too):
 
