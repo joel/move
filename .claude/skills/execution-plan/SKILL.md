@@ -103,7 +103,13 @@ Run the design agents in proportion to the work — don't over-process a one-lin
   waive the passes with their own mandates — the customer-facing UI pass (step 3,
   `frontend-design`/Stitch), the UX/interaction pass (step 4), and the
   concurrency/failure-mode pre-mortem (step 4b) still apply when the work triggers
-  them, unless the prior session's pass already covered them explicitly.
+  them. "Already covered" means the prior plan **shows the pass itself** — the
+  ux-conventions checklist walked per touched journey (including on-screen
+  copy/instructions), the pre-mortem questions answered — not merely that design
+  decisions were made. A plan-mode pass that settled the approach but never walked
+  the copy is how #602 shipped a subtitle promising "Tap to remove" on a surface
+  that had become swipe-only; when in doubt, run the pass — it is minutes, and the
+  misses it catches are otherwise review-round currency.
 - **Feature / multi-file / architectural** (touches multiple files, adds a surface,
   or needs a design decision): **run the full design pass before writing the issue**,
   so the issue's plan (Step 1) is grounded in real code, not guesses:
@@ -155,13 +161,16 @@ Run the design agents in proportion to the work — don't over-process a one-lin
      focused UX-critic agent run (`ux-conventions.md` as the rubric).
   4b. **Concurrency & failure-mode pre-mortem — REQUIRED for any feature that is
      async / job-backed, broadcasts over ActionCable, makes an external or *paid*
-     call, or mutates shared state under concurrency.** This is the cheapest place
-     to catch the bugs the Codex loop otherwise surfaces one-at-a-time over many
-     rounds (the items/photos image-generation feature took **10 rounds**, almost
-     all of them this class: double-spend ×2, claim staleness, transport-error
-     handling, stale broadcasts, viewer-visible mutating controls). Answer these
-     **before coding**, and make the answers requirements the architect blueprint
-     must encode:
+     call, mutates shared state under concurrency, or adds stateful client-side
+     interaction machinery (pointer/gesture tracking, drag/swipe, an optimistic-UI
+     state machine).** This is the cheapest place to catch the bugs the Codex loop
+     otherwise surfaces one-at-a-time over many rounds (the items/photos
+     image-generation feature took **10 rounds**, almost all of them this class:
+     double-spend ×2, claim staleness, transport-error handling, stale broadcasts,
+     viewer-visible mutating controls; every correctness bug the #602 swipe-rows
+     internal review found was a gesture interleaving this pre-mortem would have
+     tabled). Answer these **before coding**, and make the answers requirements the
+     architect blueprint must encode:
      - **Double-submit / re-entrancy** — two tabs, a double-click, a Turbo retry: is
        there an atomic claim/guard *before* any expensive or paid side effect (not
        just before the DB write)? Where is it taken — the synchronous entry point,
@@ -179,6 +188,18 @@ Run the design agents in proportion to the work — don't over-process a one-lin
        is the TTL comfortably > max job runtime, and what happens at the boundary
        (claim goes stale *mid-run*)? Decide explicitly what's fixed vs. an accepted,
        documented limitation.
+     - **Client-side gesture / interaction state machine** — enumerate the
+       interleavings, not just the happy path: the gesture's state closed/reset
+       *externally* mid-flight (another instance claiming exclusivity, a tap-away
+       dismisser, a Turbo Stream replacing the element); a pointer lost without a
+       terminal up/cancel event; time-derived values (velocity, distance) read
+       after a pause going stale; the post-gesture ghost click activating what's
+       underneath (and any suppression being time-bounded, never a latch);
+       keyboard/AT focus reaching a control the gesture normally reveals, and
+       focus moving on afterwards; the enabling breakpoint/media condition
+       flipping while the interaction is active; `turbo:before-cache` snapshotting
+       mid-state. Every terminal path (own release, external close, teardown) must
+       revoke the same tracking the gesture start claimed.
 
      Prefer **one principled model** (a state machine / a single atomic claim +
      token) over patching adjacent interleavings — that is what ends the
