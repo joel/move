@@ -59,13 +59,19 @@ module Views
         end
       end
 
+      # turbo: false — a successful accept ends in a cross-host redirect to the
+      # org subdomain's session handoff, which Turbo's form submission can't
+      # follow (it can't read a cross-origin 302), so the button would appear to
+      # do nothing. A full-page POST follows the redirect. Same rule as the
+      # account-deletion button (app/views/accounts/show.rb).
+
       #: () -> untyped
       def accept_button
         button_to(
           I18n.t("invitations.show.accept"),
           invitation_acceptance_path,
           method: :post, class: "ha-button ha-button-primary",
-          params: { token: @raw_token }
+          params: { token: @raw_token }, form: { data: { turbo: false } }
         )
       end
 
