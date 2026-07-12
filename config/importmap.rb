@@ -13,7 +13,7 @@ pin "@rails/activestorage", to: "activestorage.esm.js"
 pin_all_from "app/javascript/controllers", under: "controllers"
 # Gallery viewer strategy modules (#604), imported lazily by
 # controllers/lightbox_controller.js: photoswipe_viewer (desktop) and
-# card_deck_viewer (touch). Split out so each device downloads only the viewer
+# thumbs_viewer (touch). Split out so each device downloads only the viewer
 # it opens — hence `preload: false`: importmap-rails preloads pins by default,
 # which would modulepreload BOTH strategies (and their libraries) on every page
 # and defeat the split. The dispatcher fetches the right one on demand.
@@ -34,8 +34,8 @@ pin "photoswipe/lightbox", to: "photoswipe-lightbox.esm.min.js", preload: false
 
 # Mobile gallery viewer (#604) — vendored Swiper 11.2.10 as a self-contained
 # ESM bundle (MIT). Built with esbuild from the npm package with only the modules
-# the mobile "effect-cards" fullscreen viewer needs (EffectCards, Zoom, Keyboard,
-# A11y) → default export Swiper + those named exports, ~91 KB. On touch/coarse
+# the mobile thumbs-gallery viewer needs (Thumbs, FreeMode, Zoom, Keyboard,
+# A11y) → default export Swiper + those named exports, ~94 KB. On touch/coarse
 # pointers lightbox_controller.js dynamically imports this instead of PhotoSwipe;
 # desktop keeps PhotoSwipe. `preload: false` so desktop never downloads the 91 KB
 # bundle — it's fetched only when the deck is opened. Stylesheet rides the

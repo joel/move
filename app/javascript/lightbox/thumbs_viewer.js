@@ -1,30 +1,34 @@
 import Swiper from "swiper"
-import { EffectCards, Zoom, Keyboard, A11y } from "swiper"
+import { Thumbs, FreeMode, Zoom, Keyboard, A11y } from "swiper"
 
-// Mobile gallery viewer (#604) — a fullscreen "effect-cards" deck
-// (https://swiperjs.com/demos#effect-cards). On touch / coarse-pointer devices
+// Mobile gallery viewer (#604) — a fullscreen thumbs-gallery
+// (https://swiperjs.com/demos#thumbs-gallery). On touch / coarse-pointer devices
 // the lightbox controller lazily imports this instead of PhotoSwipe, so a phone
 // never downloads the desktop viewer (and desktop never downloads Swiper).
 //
-// The deck reads as a stack of photos you flick through one-handed. Swiper owns
-// the physics; this class owns the app shell around it: a fullscreen overlay
-// appended to <body>, the caption / counter / "view box" link / close chrome
-// that follows the active card, pinch/double-tap zoom (Swiper's Zoom module —
-// parity with PhotoSwipe), keyboard + a11y, a focus trap, ESC / backdrop close,
-// body-scroll lock and reduced-motion fallback. Like PhotoSwipe it lives outside
-// the Turbo-cached DOM, so the controller tears it down on turbo:before-cache.
+// A big main image you swipe through, with a bottom thumbnail strip to jump
+// across the set (a Move gallery can hold hundreds of photos — a strip beats
+// swiping one-by-one). Two synced Swipers: the main (pinch/double-tap zoom via
+// the Zoom module — parity with PhotoSwipe) and the thumbs (free-scrolling).
+// This class owns the app shell: a fullscreen overlay appended to <body>, the
+// caption / counter / "view box" link / close chrome that follows the active
+// image, keyboard + a11y, a focus trap, ESC / backdrop close, body-scroll lock
+// and reduced-motion fallback. Like PhotoSwipe it lives outside the Turbo-cached
+// DOM, so the controller tears it down on turbo:before-cache.
 //
 // slides: [{ src, thumb, caption, href, tile }] built by the controller from the
 // grid tiles — src is the :detail image, thumb the already-loaded grid thumb.
 
-// How near the active card an image is eagerly loaded; the rest stay lazy.
+// How near the active image a :detail source is hydrated; the rest stay deferred
+// (thumbnails are the already-loaded grid thumbs, so they all load cheaply).
 const EAGER_RADIUS = 1
 
-export class CardDeckViewer {
+export class ThumbsViewer {
   constructor(labels) {
     this.labels = labels
     this.overlay = null
-    this.swiper = null
+    this.mainSwiper = null
+    this.thumbsSwiper = null
     this.slides = []
     this.pendingIndex = 0
     this.lastFocus = null
@@ -37,15 +41,19 @@ export class CardDeckViewer {
     // rather than stacking overlays.
     if (this.overlay) this.destroy()
     this.slides = slides
-    // Stashed before buildOverlay so buildSlide (which runs before buildSwiper)
-    // can decide eager/lazy loading against the opened index.
+    // Stashed before buildOverlay so buildMainSlide (which runs before the
+    // Swipers) can decide which :detail sources to hydrate against the opened
+    // index.
     this.pendingIndex = index
     this.lastFocus = document.activeElement
     this.overlay = this.buildOverlay(slides)
     document.body.appendChild(this.overlay)
     this.lockScroll()
-    this.swiper = this.buildSwiper(index)
+    // The main Swiper references the thumbs Swiper, so build thumbs first.
+    this.thumbsSwiper = this.buildThumbsSwiper()
+    this.mainSwiper = this.buildMainSwiper(index)
     this.syncChrome()
+    this.hydrateNear()
     document.addEventListener("keydown", this.onKeydown)
     // Focus the close control so ESC/keyboard and the focus trap have an anchor
     // inside the dialog; guard for the rare null (element not yet laid out).
@@ -54,61 +62,53 @@ export class CardDeckViewer {
 
   buildOverlay(slides) {
     const overlay = el("div", {
-      class: "move-deck fixed inset-0 z-[1000] flex flex-col bg-page/95 backdrop-blur-sm",
+      class: "move-gallery fixed inset-0 z-[1000] flex flex-col bg-page/95 backdrop-blur-sm",
       role: "dialog",
       "aria-modal": "true",
       "aria-label": this.labels.dialog
     })
 
-    // Backdrop — a tap outside the card dismisses. It sits behind the deck and
-    // chrome (which stopPropagation is unnecessary for: they're siblings above).
-    const backdrop = el("div", { class: "move-deck__backdrop absolute inset-0", "aria-hidden": "true" })
+    // Backdrop — a tap outside the image dismisses. It sits behind the chrome,
+    // main image and thumbs (which come later in source and carry z-10/z-20).
+    const backdrop = el("div", { class: "move-gallery__backdrop absolute inset-0", "aria-hidden": "true" })
     backdrop.addEventListener("click", () => this.close())
     overlay.appendChild(backdrop)
 
     overlay.appendChild(this.buildChrome())
 
-    // EffectCards sizes each card to the container, so it needs an explicit
-    // height as well as width — without one the deck collapses to zero height.
-    const swiperEl = el("div", {
-      class: "move-deck__swiper swiper relative z-10 mx-auto my-auto w-[86vw] max-w-[480px] h-[68vh] max-h-[560px]"
+    // Main image swiper — fills the space between chrome and thumbs.
+    this.mainEl = el("div", { class: "move-gallery__main swiper relative z-10 min-h-0 w-full flex-1" })
+    const mainWrapper = el("div", { class: "swiper-wrapper" })
+    slides.forEach((slide, i) => mainWrapper.appendChild(this.buildMainSlide(slide, i)))
+    this.mainEl.appendChild(mainWrapper)
+    overlay.appendChild(this.mainEl)
+
+    // Thumbnail strip pinned at the bottom (above the home indicator).
+    this.thumbsEl = el("div", {
+      class: "move-gallery__thumbs swiper relative z-10 w-full shrink-0 px-3 pt-2 " +
+             "pb-[calc(env(safe-area-inset-bottom)_+_0.5rem)]"
     })
-    const wrapper = el("div", { class: "swiper-wrapper" })
-    slides.forEach((slide, i) => wrapper.appendChild(this.buildSlide(slide, i)))
-    swiperEl.appendChild(wrapper)
-    overlay.appendChild(swiperEl)
-    this.swiperEl = swiperEl
+    const thumbsWrapper = el("div", { class: "swiper-wrapper" })
+    slides.forEach((slide) => thumbsWrapper.appendChild(this.buildThumb(slide)))
+    this.thumbsEl.appendChild(thumbsWrapper)
+    overlay.appendChild(this.thumbsEl)
 
     return overlay
   }
 
-  buildSlide(slide, i) {
-    const slideEl = el("div", {
-      class: "move-deck__slide swiper-slide flex items-center justify-center overflow-hidden " +
-             "rounded-[18px] bg-surface-container-high"
-    })
-    const zoom = el("div", { class: "swiper-zoom-container h-full w-full" })
-    // Thumb as an instant backdrop so the card is never blank while :detail
-    // loads (the deck's thumb-first equivalent of PhotoSwipe's msrc placeholder).
-    if (slide.thumb) {
-      zoom.style.backgroundImage = `url("${cssUrl(slide.thumb)}")`
-      zoom.style.backgroundSize = "contain"
-      zoom.style.backgroundRepeat = "no-repeat"
-      zoom.style.backgroundPosition = "center"
-    }
+  buildMainSlide(slide, i) {
+    const slideEl = el("div", { class: "move-gallery__slide swiper-slide flex h-full items-center justify-center" })
+    const zoom = el("div", { class: "swiper-zoom-container flex h-full w-full items-center justify-center" })
     const img = el("img", {
-      class: "h-full w-full object-contain",
+      class: "max-h-full max-w-full object-contain",
       alt: slide.caption || "",
       draggable: "false"
     })
-    // Only the opened card and its immediate neighbours get a real `src`; the
+    // Only the opened image and its immediate neighbours get a real `src`; the
     // rest hold their URL in data-src and are hydrated by hydrateNear() as they
-    // approach the active index. A gallery can render up to 300 photos, and the
-    // whole deck is inserted into the DOM at once — setting every `src` here
-    // (even with loading="lazy", which the browser can start before the hint
-    // applies) would let opening ONE photo download the entire high-res set on
-    // mobile. The thumb backdrop (the already-loaded grid thumb) covers the
-    // not-yet-hydrated cards.
+    // approach the active index. A gallery can render hundreds of photos, and
+    // the whole set is inserted into the DOM at once — setting every `src` here
+    // would let opening ONE photo download every high-res :detail image.
     if (Math.abs(i - this.pendingIndex) <= EAGER_RADIUS) {
       img.src = slide.src
     } else {
@@ -116,21 +116,37 @@ export class CardDeckViewer {
     }
     // Parity with the desktop lightbox's errorMsg: if the :detail image fails
     // (e.g. an expired signed URL), show the localized error instead of a broken
-    // image. The thumb backdrop is cleared too — it's a same-expiry signed URL,
-    // so it has almost certainly failed as well.
+    // image.
     img.addEventListener("error", () => this.markSlideFailed(zoom), { once: true })
     zoom.appendChild(img)
     slideEl.appendChild(zoom)
     return slideEl
   }
 
-  // Give the active card and its immediate neighbours a real `src` (from
-  // data-src) as they come into range, so navigating the deck loads detail
-  // images just-in-time instead of all at once.
+  buildThumb(slide) {
+    // Thumbnails are the already-loaded grid thumbs, so they are cheap to show
+    // and need no lazy handling. Swiper adds `swiper-slide-thumb-active` to the
+    // active one; the opacity/ring styling lives in application.css.
+    const thumb = el("div", { class: "move-gallery__thumb swiper-slide !w-16" })
+    if (slide.thumb) {
+      const img = el("img", {
+        class: "h-16 w-16 rounded-lg object-cover",
+        src: slide.thumb,
+        alt: "",
+        draggable: "false"
+      })
+      thumb.appendChild(img)
+    }
+    return thumb
+  }
+
+  // Give the active image and its immediate neighbours a real `src` (from
+  // data-src) as they come into range, so navigating loads :detail images
+  // just-in-time instead of all at once.
   hydrateNear() {
-    if (!this.swiper) return
-    const active = this.swiper.activeIndex
-    this.swiper.slides.forEach((slideEl, i) => {
+    if (!this.mainSwiper) return
+    const active = this.mainSwiper.activeIndex
+    this.mainSwiper.slides.forEach((slideEl, i) => {
       if (Math.abs(i - active) > EAGER_RADIUS) return
       const img = slideEl.querySelector("img[data-src]")
       if (!img) return
@@ -141,9 +157,8 @@ export class CardDeckViewer {
 
   markSlideFailed(zoom) {
     zoom.replaceChildren()
-    zoom.style.backgroundImage = "none"
     const message = el("div", {
-      class: "move-deck__error grid h-full w-full place-items-center px-6 text-center text-muted"
+      class: "move-gallery__error grid h-full w-full place-items-center px-6 text-center text-muted"
     })
     message.textContent = this.labels.error
     zoom.appendChild(message)
@@ -151,17 +166,17 @@ export class CardDeckViewer {
 
   buildChrome() {
     const chrome = el("div", {
-      class: "move-deck__chrome relative z-20 flex items-center gap-3 px-4 pt-[calc(env(safe-area-inset-top)_+_0.75rem)] pb-3"
+      class: "move-gallery__chrome relative z-20 flex items-center gap-3 px-4 pt-[calc(env(safe-area-inset-top)_+_0.75rem)] pb-3"
     })
 
-    this.caption = el("span", { class: "move-deck__caption min-w-0 flex-1 truncate text-label-caps uppercase text-text-warm" })
+    this.caption = el("span", { class: "move-gallery__caption min-w-0 flex-1 truncate text-label-caps uppercase text-text-warm" })
     chrome.appendChild(this.caption)
 
-    this.counter = el("span", { class: "move-deck__counter shrink-0 text-label-caps uppercase text-muted tabular-nums" })
+    this.counter = el("span", { class: "move-gallery__counter shrink-0 text-label-caps uppercase text-muted tabular-nums" })
     chrome.appendChild(this.counter)
 
     this.viewBox = el("a", {
-      class: "move-deck__view-box shrink-0 rounded-full bg-card px-3 py-1.5 text-label-caps uppercase text-text-warm",
+      class: "move-gallery__view-box shrink-0 rounded-full bg-card px-3 py-1.5 text-label-caps uppercase text-text-warm",
       href: "#"
     })
     this.viewBox.textContent = this.labels.viewBox
@@ -169,7 +184,7 @@ export class CardDeckViewer {
 
     this.closeButton = el("button", {
       type: "button",
-      class: "move-deck__close grid h-10 w-10 shrink-0 place-items-center rounded-full bg-card text-text-warm",
+      class: "move-gallery__close grid h-10 w-10 shrink-0 place-items-center rounded-full bg-card text-text-warm",
       "aria-label": this.labels.close,
       title: this.labels.close
     })
@@ -180,21 +195,30 @@ export class CardDeckViewer {
     return chrome
   }
 
-  buildSwiper(index) {
+  buildThumbsSwiper() {
+    return new Swiper(this.thumbsEl, {
+      modules: [FreeMode, A11y],
+      spaceBetween: 8,
+      slidesPerView: "auto",
+      freeMode: true,
+      watchSlidesProgress: true,
+      // Keep the active thumb within the strip as the main image changes.
+      centeredSlides: true,
+      centeredSlidesBounds: true,
+      a11y: { enabled: true }
+    })
+  }
+
+  buildMainSwiper(index) {
     const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches
-    return new Swiper(this.swiperEl, {
-      modules: [EffectCards, Zoom, Keyboard, A11y],
-      // Reduced motion: drop the rotating-stack animation for a plain, instant
-      // slide so the interaction still works without the flourish.
-      effect: reducedMotion ? "slide" : "cards",
-      cardsEffect: { perSlideOffset: 8, perSlideRotate: 2, slideShadows: true },
-      speed: reducedMotion ? 0 : 300,
+    return new Swiper(this.mainEl, {
+      modules: [Thumbs, Zoom, Keyboard, A11y],
       initialSlide: index,
-      grabCursor: true,
-      // Loop is unnecessary for a deck and interacts badly with effect-cards'
-      // finite stack; the ends simply stop.
+      spaceBetween: 16,
+      speed: reducedMotion ? 0 : 300,
       zoom: { maxRatio: 3, toggle: true },
       keyboard: { enabled: true },
+      thumbs: { swiper: this.thumbsSwiper },
       a11y: {
         enabled: true,
         prevSlideMessage: this.labels.prev,
@@ -210,7 +234,7 @@ export class CardDeckViewer {
   }
 
   syncChrome() {
-    const i = this.swiper ? this.swiper.activeIndex : (this.pendingIndex || 0)
+    const i = this.mainSwiper ? this.mainSwiper.activeIndex : this.pendingIndex
     const slide = this.slides[i]
     if (!slide) return
     this.caption.textContent = slide.caption || ""
@@ -225,7 +249,7 @@ export class CardDeckViewer {
       return
     }
     if (event.key !== "Tab") return
-    // Focus trap — keep Tab within the dialog's controls (view-box link, close).
+    // Focus trap — keep Tab within the dialog's controls.
     const focusable = this.focusableElements()
     if (focusable.length === 0) return
     const first = focusable[0]
@@ -268,12 +292,14 @@ export class CardDeckViewer {
   destroy() {
     if (!this.overlay) return
     document.removeEventListener("keydown", this.onKeydown)
-    this.swiper?.destroy(true, true)
-    this.swiper = null
+    this.mainSwiper?.destroy(true, true)
+    this.thumbsSwiper?.destroy(true, true)
+    this.mainSwiper = null
+    this.thumbsSwiper = null
     this.overlay.remove()
     this.overlay = null
     this.unlockScroll()
-    // Restore focus to the tile that opened the deck (if it's still connected).
+    // Restore focus to the tile that opened the viewer (if it's still connected).
     if (this.lastFocus && document.contains(this.lastFocus)) this.lastFocus.focus()
     this.lastFocus = null
   }
@@ -288,13 +314,6 @@ function el(tag, attrs = {}) {
     else node.setAttribute(key, value)
   }
   return node
-}
-
-// Guard a URL for use inside a CSS url("…") — thumb URLs are app-signed R2 URLs
-// (no quotes/parens/newlines), but escape defensively so a stray character can't
-// break out of the declaration.
-function cssUrl(url) {
-  return String(url).replace(/["\\\n\r]/g, "\\$&")
 }
 
 // Minimal {key} interpolation for the localized counter template. Uses {key}

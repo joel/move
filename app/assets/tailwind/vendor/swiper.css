@@ -1,9 +1,10 @@
 /*
- * Vendored Swiper 11.2.10 stylesheet (mobile gallery effect-cards viewer).
+ * Vendored Swiper 11.2.10 stylesheet (mobile gallery thumbs viewer).
  * Concatenated from the npm package (MIT): swiper.css (core) + modules
- * effect-cards.css, zoom.css, a11y.css. Only the modules the mobile viewer
- * uses are included; mirror of the PhotoSwipe vendor CSS pattern. Imported
- * into the components layer by app/assets/tailwind/application.css.
+ * zoom.css, thumbs.css, free-mode.css, a11y.css. Only the modules the mobile
+ * thumbs-gallery viewer uses are included; mirror of the PhotoSwipe vendor CSS
+ * pattern. Imported into the components layer by
+ * app/assets/tailwind/application.css.
  */
 
 /* --- swiper.css (core) --- */
@@ -236,17 +237,6 @@
 }
 /* Slide styles end */
 
-/* --- modules/effect-cards.css --- */
-.swiper.swiper-cards {
-  overflow: visible;
-}
-.swiper-cards .swiper-slide {
-  transform-origin: center bottom;
-  -webkit-backface-visibility: hidden;
-          backface-visibility: hidden;
-  overflow: hidden;
-}
-
 /* --- modules/zoom.css --- */
 /* Zoom container styles start */
 .swiper-zoom-container {
@@ -268,6 +258,14 @@
 .swiper-slide-zoomed {
   cursor: move;
   touch-action: none;
+}
+
+/* --- modules/thumbs.css --- */
+
+/* --- modules/free-mode.css --- */
+.swiper-free-mode > .swiper-wrapper {
+  transition-timing-function: ease-out;
+  margin: 0 auto;
 }
 
 /* --- modules/a11y.css --- */

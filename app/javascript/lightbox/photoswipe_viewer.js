@@ -2,7 +2,7 @@ import PhotoSwipeLightbox from "photoswipe/lightbox"
 
 // Desktop gallery viewer — the PhotoSwipe 5 integration (#598/#599), extracted
 // verbatim from lightbox_controller.js into a strategy the controller lazily
-// imports on fine-pointer devices (#604). Touch devices get card_deck_viewer.js
+// imports on fine-pointer devices (#604). Touch devices get thumbs_viewer.js
 // instead and never download this module (or PhotoSwipe). PhotoSwipe owns the
 // hard parts: follow-finger swipe with real physics, pinch/double-tap zoom,
 // neighbour preloading, keyboard nav, focus trap and a11y.

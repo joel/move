@@ -7,8 +7,8 @@ import { Controller } from "@hotwired/stimulus"
 //
 //   • fine pointer (desktop/laptop) → PhotoSwipe (lightbox/photoswipe_viewer),
 //     the zoom-from-thumbnail lightbox with wheel-zoom and arrow keys.
-//   • coarse pointer (touch/mobile)  → a Swiper "effect-cards" deck
-//     (lightbox/card_deck_viewer) you flick through one-handed.
+//   • coarse pointer (touch/mobile)  → a Swiper thumbs-gallery
+//     (lightbox/thumbs_viewer): a swipeable main image with a bottom thumb strip.
 //
 // The viewer module is imported lazily on first open, so a phone never downloads
 // PhotoSwipe and a desktop never downloads Swiper. Both viewers append their DOM
@@ -28,9 +28,9 @@ export default class extends Controller {
     this.viewer = null
     this.viewerPromise = null
     // Warm the desktop viewer at connect (as the pre-#604 controller did, so the
-    // first open is instant). The touch deck is left lazy — its Swiper bundle is
-    // only fetched when a photo is actually opened.
-    if (!this.prefersDeck()) this.buildViewer()
+    // first open is instant). The touch thumbs-gallery is left lazy — its Swiper
+    // bundle is only fetched when a photo is actually opened.
+    if (!this.prefersThumbs()) this.buildViewer()
   }
 
   disconnect() {
@@ -74,20 +74,20 @@ export default class extends Controller {
   }
 
   async importViewer() {
-    if (this.prefersDeck()) {
-      const { CardDeckViewer } = await import("lightbox/card_deck_viewer")
-      return CardDeckViewer
+    if (this.prefersThumbs()) {
+      const { ThumbsViewer } = await import("lightbox/thumbs_viewer")
+      return ThumbsViewer
     }
     const { PhotoSwipeViewer } = await import("lightbox/photoswipe_viewer")
     return PhotoSwipeViewer
   }
 
-  // Touch / coarse-pointer devices get the card deck. A `?viewer=deck` /
+  // Touch / coarse-pointer devices get the thumbs-gallery. A `?viewer=thumbs` /
   // `?viewer=photoswipe` query param overrides the detection so either path is
   // reachable for QA and system specs on a desktop browser.
-  prefersDeck() {
+  prefersThumbs() {
     const forced = new URLSearchParams(window.location.search).get("viewer")
-    if (forced === "deck") return true
+    if (forced === "thumbs") return true
     if (forced === "photoswipe") return false
     return matchMedia("(pointer: coarse)").matches
   }
