@@ -1,0 +1,6 @@
+# packs/utility DigestedToken concern (#608): the shared single-use-token
+# scheme. The class methods it grafts onto includers are declared per-model in
+# sig/model_singletons.rbs (inline RBS can't express class_methods yet); this
+# empty module declaration makes `include DigestedToken` resolvable.
+module DigestedToken
+end

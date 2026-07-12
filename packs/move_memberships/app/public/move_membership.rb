@@ -10,6 +10,14 @@
 class MoveMembership < ApplicationRecord
   ROLES = %w[admin contributor viewer].freeze
 
+  # The role dropdown options, labelled through the members locale — one source
+  # for every select that offers Move roles (add form, invite form).
+
+  # @rbs skip
+  def self.role_options
+    ROLES.map { |role| [I18n.t("members.roles.#{role}"), role] }
+  end
+
   belongs_to :move
   belongs_to :user
 

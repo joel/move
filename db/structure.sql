@@ -1046,6 +1046,26 @@ CREATE TABLE public.move_integration_tokens (
 
 
 --
+-- Name: move_invitations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.move_invitations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    move_id uuid NOT NULL,
+    email public.citext NOT NULL,
+    role character varying DEFAULT 'contributor'::character varying NOT NULL,
+    invited_by_id uuid,
+    token_digest character varying NOT NULL,
+    expires_at timestamp(6) without time zone NOT NULL,
+    accepted_at timestamp(6) without time zone,
+    revoked_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: move_memberships; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1203,7 +1223,8 @@ CREATE TABLE public.session_handoff_tokens (
     expires_at timestamp(6) without time zone NOT NULL,
     consumed_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    return_path character varying
 );
 
 
@@ -1403,6 +1424,14 @@ ALTER TABLE ONLY public.media
 
 ALTER TABLE ONLY public.move_integration_tokens
     ADD CONSTRAINT move_integration_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: move_invitations move_invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.move_invitations
+    ADD CONSTRAINT move_invitations_pkey PRIMARY KEY (id);
 
 
 --
@@ -1808,6 +1837,41 @@ CREATE UNIQUE INDEX index_move_integration_tokens_on_token_digest ON public.move
 
 
 --
+-- Name: index_move_invitations_on_expires_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_move_invitations_on_expires_at ON public.move_invitations USING btree (expires_at);
+
+
+--
+-- Name: index_move_invitations_on_invited_by_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_move_invitations_on_invited_by_id ON public.move_invitations USING btree (invited_by_id);
+
+
+--
+-- Name: index_move_invitations_on_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_move_invitations_on_organization_id ON public.move_invitations USING btree (organization_id);
+
+
+--
+-- Name: index_move_invitations_on_token_digest; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_move_invitations_on_token_digest ON public.move_invitations USING btree (token_digest);
+
+
+--
+-- Name: index_move_invitations_pending_uniqueness; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_move_invitations_pending_uniqueness ON public.move_invitations USING btree (move_id, email) WHERE ((accepted_at IS NULL) AND (revoked_at IS NULL));
+
+
+--
 -- Name: index_move_memberships_on_move_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2102,6 +2166,14 @@ ALTER TABLE ONLY public.move_integration_tokens
 
 
 --
+-- Name: move_invitations fk_rails_300ae5e85d; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.move_invitations
+    ADD CONSTRAINT fk_rails_300ae5e85d FOREIGN KEY (invited_by_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: recognition_suggestions fk_rails_320e554aa8; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2203,6 +2275,14 @@ ALTER TABLE ONLY public.rooms
 
 ALTER TABLE ONLY public.boxes
     ADD CONSTRAINT fk_rails_809086bda1 FOREIGN KEY (move_id) REFERENCES public.moves(id);
+
+
+--
+-- Name: move_invitations fk_rails_82e2e1d44f; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.move_invitations
+    ADD CONSTRAINT fk_rails_82e2e1d44f FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -2324,6 +2404,9 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260712123000'),
+('20260712121000'),
+('20260712120000'),
 ('20260705170000'),
 ('20260704191306'),
 ('20260630120000'),

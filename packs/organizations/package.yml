@@ -18,5 +18,6 @@ visible_to:
   - "packs/accounts"
   - "packs/demo_data"
   - "packs/move_integration_tokens"
+  - "packs/move_invitations"
   - "packs/move_memberships"
   - "packs/session_handoffs"

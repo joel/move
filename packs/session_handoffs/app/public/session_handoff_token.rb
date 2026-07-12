@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "digest"
-
 # A single-use, short-lived token that hands an authenticated identity from the
 # apex host to an org subdomain (#280). Cookies are host-only, so the apex
 # session does not travel to `<slug>.<zone>`; instead the apex mints one of these
@@ -16,6 +14,8 @@ require "digest"
 # Minting/consuming/validation live in app/actions/session_handoffs; this model
 # stays persistence-focused (digesting, scopes, the lookup finder).
 class SessionHandoffToken < ApplicationRecord
+  include DigestedToken
+
   # How long a freshly minted token stays valid. Deliberately tiny: the legit
   # flow consumes it within milliseconds of the post-auth redirect, so a short
   # window minimises the replay/login-CSRF surface.
@@ -31,21 +31,6 @@ class SessionHandoffToken < ApplicationRecord
   # Spent rows the daily sweep (PurgeStaleSessionHandoffTokensJob) reaps: expired
   # (TTL is 60s, so almost immediately) or already consumed.
   scope :purgeable, -> { where("expires_at <= ? OR consumed_at IS NOT NULL", Time.current) }
-
-  # Generate a fresh raw token. Returned to the caller once; never stored.
-
-  # @rbs skip
-  def self.generate_raw_token
-    SecureRandom.urlsafe_base64(32)
-  end
-
-  # SHA-256 hex digest of a raw token — persisted on mint, recomputed on consume
-  # for a single indexed lookup (not a per-row compare).
-
-  # @rbs skip
-  def self.digest(raw_token)
-    Digest::SHA256.hexdigest(raw_token.to_s)
-  end
 
   #: () -> bool
   def expired?

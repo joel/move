@@ -20,8 +20,8 @@ RSpec.describe "GET /session/handoff" do
     Terms::Accept.new.call(user:)
   end
 
-  def mint_for(slug = "acme", as: user)
-    SessionHandoffs::Mint.new.call(user: as, organization_slug: slug).value!
+  def mint_for(slug = "acme", as: user, return_path: nil)
+    SessionHandoffs::Mint.new.call(user: as, organization_slug: slug, return_path:).value!
   end
 
   context "with a valid token for the current tenant" do
@@ -30,6 +30,23 @@ RSpec.describe "GET /session/handoff" do
 
       get session_handoff_path(token: token)
 
+      expect(response).to redirect_to("/")
+    end
+
+    it "honors a minted internal return_path (D14: land on the joined Move)" do
+      get session_handoff_path(token: mint_for(return_path: "/moves/abc/boxes"))
+
+      expect(response).to redirect_to("/moves/abc/boxes")
+    end
+
+    it "refuses protocol-relative and external return_path escapes" do
+      get session_handoff_path(token: mint_for(return_path: "//evil.example"))
+      expect(response).to redirect_to("/")
+
+      get session_handoff_path(token: mint_for(return_path: "/\\evil.example"))
+      expect(response).to redirect_to("/")
+
+      get session_handoff_path(token: mint_for(return_path: "https://evil.example/x"))
       expect(response).to redirect_to("/")
     end
 

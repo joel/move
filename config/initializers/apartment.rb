@@ -27,6 +27,7 @@ Apartment.configure do |config|
   # subdomain, so it is excluded (pinned to public + kept out of every clone).
   config.excluded_models = %w[
     User Organization OrganizationMembership SessionHandoffToken TermsAcceptance
+    MoveInvitation
     ActiveStorage::Blob ActiveStorage::Attachment ActiveStorage::VariantRecord
   ]
 

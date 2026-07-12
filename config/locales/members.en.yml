@@ -15,6 +15,20 @@ en:
       admin: "Full control over the move, its members, and the complete inventory."
       contributor: "Can add and edit boxes and items, but cannot manage other members."
       viewer: "Read-only access to the inventory catalogue and the move summary."
+    invite_form:
+      title: "Invite by email"
+      subtitle: "Anyone — they'll get a link to join this move, even without an account yet."
+      email: "Email address"
+      email_placeholder: "name@example.com"
+      role: "Role"
+      submit: "Send invite"
+    pending:
+      title: "Pending invitations"
+      expires_in: "Expires in %{time}"
+      expired: "Expired"
+      resend: "Resend"
+      revoke: "Revoke"
+      revoke_confirm: "Revoke the invitation for %{email}? Their link will stop working."
     add:
       title: "Add a member"
       user: "Organization member"

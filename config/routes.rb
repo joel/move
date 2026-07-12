@@ -6,6 +6,15 @@ Rails.application.routes.draw do
   # and redirects here, where the subdomain exchanges it for its own session.
   # Lives on the tenant subdomain (the controller validates against the tenant).
   get "session/handoff", to: "session_handoffs#show", as: :session_handoff
+  # D14 (#608) — Move invitation acceptance. Lives on the APEX host (the
+  # recipient has no tenant access until they accept); the raw token rides the
+  # QUERY string (never the path) so config.filter_parameters' `token` rule
+  # redacts it from request logs — the digest-only storage guarantee would be
+  # hollow if every landing hit logged the raw value. GET = landing (anonymous
+  # or authenticated), POST = accept (requires the authenticated invited email;
+  # the token arrives as a filtered form param).
+  get "invitations", to: "invitation_acceptances#show", as: :invitation_acceptance
+  post "invitations", to: "invitation_acceptances#create"
   # #369 — terms-agreement gate. Authenticated accounts must accept the current
   # terms version before any tenant surface; TenantController redirects here until
   # they do. Lives on the tenant subdomain (the controller is tenant-resolved).
@@ -117,6 +126,12 @@ Rails.application.routes.draw do
     # a member's role, or remove them. Role changes go through a member action.
     resources :members, only: %i[index create destroy] do
       member { patch :update_role }
+    end
+    # D14 (#608) — email invitations to this Move (admin-only). Pending
+    # invitations are managed from the Members page; acceptance happens on the
+    # APEX (see the top-level invitations/:token routes).
+    resources :invitations, only: %i[create destroy] do
+      member { post :resend }
     end
     # F2 — Volume & weight summary. Read-only aggregate for any Move member; the
     # unit-system toggle persists Move#unit_system (editors only, never archived).

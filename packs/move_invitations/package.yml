@@ -1,0 +1,21 @@
+# packs/move_invitations — email invitations to a Move (Phase D14, #608).
+#   PUBLIC (app/public): MoveInvitation (public-schema model, apartment excluded).
+#   PUBLIC (sigil): MoveInvitations::Create / Revoke / Resend / Accept — called by
+#     the tenant InvitationsController (create/revoke/resend), the apex
+#     InvitationAcceptancesController (accept), and Rodauth (app/misc: the
+#     personal-org skip checks for a pending invite).
+# Accept orchestrates the two joins in order (org membership BEFORE move
+# membership — Design Spec F1), so this pack depends on both membership packs;
+# living inside packs/move_memberships instead would create a cycle.
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+layer: domain
+dependencies:
+  - "."
+  - "packs/utility"
+  - "packs/organizations"
+  - "packs/move_memberships"
+visible_to:
+  - "."

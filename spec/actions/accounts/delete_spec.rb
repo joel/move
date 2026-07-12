@@ -36,6 +36,13 @@ RSpec.describe Accounts::Delete do
       expect(Apartment::Tenant).to have_received(:drop).with("acme")
     end
 
+    it "cascades a lingering Move invitation so the org destroy doesn't FK-fail (#608)" do
+      invite = create(:move_invitation, organization: organization)
+
+      expect(result).to be_success
+      expect(MoveInvitation.exists?(invite.id)).to be(false)
+    end
+
     it "emits account.deleted with the dropped organization slug" do
       result
       expect(Rails.event).to have_received(:notify).with(

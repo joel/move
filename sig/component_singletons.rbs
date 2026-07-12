@@ -23,6 +23,10 @@ module Components
     class Row
       def self.dom_id: (untyped membership) -> String
     end
+
+    class PendingRow
+      def self.dom_id: (untyped invitation) -> String
+    end
   end
 
   module Vocabularies

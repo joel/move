@@ -10,6 +10,6 @@ export default class extends Controller {
   reset(event) {
     if (event.detail && event.detail.success === false) return
     this.element.reset()
-    this.element.querySelector("input[type=text]")?.focus()
+    this.element.querySelector("input[type=text], input[type=email]")?.focus()
   }
 }
