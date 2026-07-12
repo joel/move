@@ -25,6 +25,10 @@
    layer: unlayered CSS would beat every @layer rule, so the "PhotoSwipe
    theming" overrides below (same layer, later in source) could never win. */
 @import "./vendor/photoswipe.css" layer(components);
+/* Vendored Swiper 11.2.10 stylesheet (mobile effect-cards gallery viewer) —
+   same rationale as PhotoSwipe above: imported into the components layer so the
+   viewer's own theming overrides (later in source, same layer) can win. */
+@import "./vendor/swiper.css" layer(components);
 
 @source "../../views";
 @source "../../components";

@@ -24,3 +24,12 @@ pin "jsqr", to: "jsqr.js"
 # (app/assets/tailwind/vendor/photoswipe.css).
 pin "photoswipe", to: "photoswipe.esm.min.js"
 pin "photoswipe/lightbox", to: "photoswipe-lightbox.esm.min.js"
+
+# Mobile gallery viewer (#604) — vendored Swiper 11.2.10 as a self-contained
+# ESM bundle (MIT). Built with esbuild from the npm package with only the modules
+# the mobile "effect-cards" fullscreen viewer needs (EffectCards, Zoom, Keyboard,
+# A11y) → default export Swiper + those named exports, ~91 KB. On touch/coarse
+# pointers lightbox_controller.js dynamically imports this instead of PhotoSwipe;
+# desktop keeps PhotoSwipe. Stylesheet rides the Tailwind build
+# (app/assets/tailwind/vendor/swiper.css).
+pin "swiper", to: "swiper.esm.min.js"
