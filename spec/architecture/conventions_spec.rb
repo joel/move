@@ -94,6 +94,26 @@ RSpec.describe "Architecture conventions" do
     end
   end
 
+  describe "the Ui component kit is browsable in Lookbook (AGENTS.md §7)" do
+    it "every renderable Ui component has a Lookbook preview" do
+      Rails.application.eager_load! # populate Components::Ui constants (idempotent)
+      renderable = Components::Ui.constants
+                                 .map { |name| Components::Ui.const_get(name) }
+                                 .select { |const| const.is_a?(Class) && const < Components::Base }
+      missing = renderable.reject do |klass|
+        Rails.root.join("spec/components/previews/ui",
+                        "#{klass.name.demodulize.underscore}_preview.rb").exist?
+      end
+
+      # Non-renderable helpers (e.g. the NavDestinations data module) are exempt
+      # by construction — only Phlex renderables need a browsable preview.
+      expect(missing).to be_empty,
+                         "Ui components without a Lookbook preview " \
+                         "(spec/components/previews/ui/<name>_preview.rb — AGENTS.md §7): " \
+                         "#{missing.map(&:name).join(", ")}"
+    end
+  end
+
   describe "soft-deleted data is retention-bounded (#582)" do
     it "the purge sweep covers every Discardable model" do
       Rails.application.eager_load! # populate ApplicationRecord.descendants (idempotent)
