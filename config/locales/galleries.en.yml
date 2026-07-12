@@ -24,6 +24,12 @@ en:
         close: "Close"
         zoom: "Zoom photo"
         error: "The photo could not be loaded."
+        # Mobile thumbs-gallery (#604): the dialog's accessible name and the
+        # "n of total" position counter. The counter is filled in on the client
+        # (index/total are per-slide), so it uses {index}/{total} — NOT I18n's
+        # %{...} — so I18n never tries to interpolate it here.
+        dialog: "Photo viewer"
+        counter: "{index} of {total}"
       empty:
         title: "No photos yet"
         description: "Photos you capture while packing boxes will appear here."

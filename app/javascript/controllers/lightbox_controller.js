@@ -1,176 +1,101 @@
 import { Controller } from "@hotwired/stimulus"
-import PhotoSwipeLightbox from "photoswipe/lightbox"
 
-// Gallery lightbox — a thin wrapper around vendored PhotoSwipe 5 (#598), which
-// owns the hard parts: follow-finger swipe with real physics, pinch/double-tap
-// zoom, neighbour preloading, keyboard nav, focus trap and a11y. Each grid tile
-// is a target carrying the photo's :thumb/:detail srcs, caption and box href as
-// data-*; open() builds the slide list from the rendered tiles.
+// Gallery lightbox dispatcher (#598/#599/#604). Each grid tile is a target
+// carrying the photo's :thumb/:detail srcs, caption and box href as data-*.
+// Tapping a tile opens a fullscreen viewer — but WHICH viewer depends on the
+// device:
 //
-// PhotoSwipe requires per-slide pixel dimensions up front, which the app can't
-// reliably supply (blobs may be unanalyzed). Strategy: estimate from the tile's
-// already-loaded grid thumb (exact aspect ratio) scaled into the :detail
-// bounds, then correct to the real naturalWidth/Height once the full image
-// loads (loadComplete), persisting the exact size back onto the tile for
-// subsequent opens.
+//   • fine pointer (desktop/laptop) → PhotoSwipe (lightbox/photoswipe_viewer),
+//     the zoom-from-thumbnail lightbox with wheel-zoom and arrow keys.
+//   • coarse pointer (touch/mobile)  → a Swiper thumbs-gallery
+//     (lightbox/thumbs_viewer): a swipeable main image with a bottom thumb strip.
+//
+// The viewer module is imported lazily on first open, so a phone never downloads
+// PhotoSwipe and a desktop never downloads Swiper. Both viewers append their DOM
+// to <body> (outside Turbo's cached snapshot), so teardown() strips them on
+// turbo:before-cache.
 //
 //   div(data: { controller: "lightbox", lightbox_labels_value: {…}.to_json,
 //               action: "turbo:before-cache@document->lightbox#teardown" })
 //     button(data: { lightbox_target: "tile", action: "click->lightbox#open",
 //                    src/thumb/caption/href }) > img (grid thumb)
 
-// MediaVariants::TransformUrl::SIZES[:detail] — the served image's bounding box.
-const DETAIL_BOX = 1600
-
 export default class extends Controller {
   static targets = ["tile"]
   static values = { labels: Object }
 
   connect() {
-    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches
-    this.lightbox = new PhotoSwipeLightbox({
-      pswpModule: () => import("photoswipe"),
-      showHideAnimationType: reducedMotion ? "none" : "zoom",
-      bgOpacity: 0.85,
-      wheelToZoom: true,
-      counter: false, // the location caption is the context; a counter would sit under it
-      arrowPrevTitle: this.labelsValue.prev,
-      arrowNextTitle: this.labelsValue.next,
-      closeTitle: this.labelsValue.close,
-      zoomTitle: this.labelsValue.zoom,
-      errorMsg: this.labelsValue.error
-    })
-    this.seedThumbPlaceholders()
-    this.registerChrome()
-    this.correctSizesOnLoad()
-    this.lightbox.init()
-  }
-
-  // Show each slide's grid thumb as its placeholder while :detail loads.
-  // PhotoSwipe's default only does this for the first-opened slide
-  // (isFirstSlide), so without this filter, swiping/clicking to an as-yet-
-  // unloaded slide flashes a blank frame until the full image arrives — undoing
-  // the thumb-first feedback for the very navigation case this viewer targets.
-  seedThumbPlaceholders() {
-    this.lightbox.addFilter("placeholderSrc", (placeholderSrc, content) =>
-      content?.data?.msrc || placeholderSrc)
+    this.viewer = null
+    this.viewerPromise = null
+    // Warm the desktop viewer at connect (as the pre-#604 controller did, so the
+    // first open is instant). The touch thumbs-gallery is left lazy — its Swiper
+    // bundle is only fetched when a photo is actually opened.
+    if (!this.prefersThumbs()) this.buildViewer()
   }
 
   disconnect() {
     this.teardown()
-    this.lightbox?.destroy()
-    this.lightbox = null
   }
 
-  open(event) {
-    if (!this.lightbox) return
+  // turbo:before-cache — Turbo must never snapshot an open viewer.
+  teardown() {
+    this.viewer?.destroy()
+    this.viewer = null
+    this.viewerPromise = null
+  }
+
+  async open(event) {
     const index = this.tileTargets.indexOf(event.currentTarget)
     if (index < 0) return
-    // Align `loop` with PhotoSwipe's own `canLoop()` (which requires > 2 items):
-    // otherwise a 2-photo gallery keeps `loop: true`, so the end arrows never get
-    // the disabled treatment (that branch is gated on `!options.loop`) yet
-    // navigation can't wrap — leaving enabled-but-dead arrows. With loop off for
-    // ≤ 2 photos the arrows disable cleanly at the ends (Codex #599).
-    this.lightbox.options.loop = this.tileTargets.length > 2
-    this.lightbox.options.dataSource = this.tileTargets.map((tile) => this.slideFor(tile))
-    this.lightbox.loadAndOpen(index)
+    const viewer = await this.buildViewer()
+    // A turbo:before-cache during the async import can tear us down mid-open;
+    // bail if we were torn down (buildViewer resolves to null then).
+    if (!viewer || viewer !== this.viewer) return
+    viewer.open(this.slides(), index)
   }
 
-  // turbo:before-cache — Turbo must never snapshot an open viewer (PhotoSwipe
-  // appends its DOM to <body>), and clones the document synchronously right
-  // after this event. `destroy()` fully tears down a fully-open viewer, but if
-  // it fires during the OPEN animation its close() bails (opener not yet open),
-  // so it neither removes the `.pswp` root nor its global listeners. Do both
-  // ourselves — strip the element so no stale overlay is cached, and remove the
-  // listeners so nothing lingers into the next page (Codex #599). Both are
-  // no-ops when destroy() already handled them.
-  teardown() {
-    const pswp = this.lightbox?.pswp
-    if (!pswp) return
-    pswp.destroy()
-    pswp.element?.remove()
-    pswp.events?.removeAll?.()
-    // PhotoSwipe sets `window.pswp` on open and clears it only in its own
-    // destroy-event handler — which the mid-open bail skips. A stale global
-    // makes loadAndOpen() short-circuit (`if (window.pswp) return`), so the
-    // viewer would never open again after this race until a full reload. Clear
-    // the global we know points at this instance (Codex #599).
-    if (window.pswp === pswp) delete window.pswp
-  }
-
-  slideFor(tile) {
-    const { src, thumb, caption, href } = tile.dataset
-    const [width, height] = this.dimensionsFor(tile)
-    // element: the tile anchors PhotoSwipe's zoom-from-thumbnail open/close
-    // animation; caption/href/tile ride along for the custom chrome below.
-    return { src, msrc: thumb, alt: caption || "", width, height, element: tile, caption, href, tile }
-  }
-
-  // Exact size once a previous view corrected it; otherwise the grid thumb's
-  // natural size (its ratio is the photo's) scaled into the :detail box; a
-  // square placeholder when the thumb hasn't loaded yet (lazy, off-screen).
-  dimensionsFor(tile) {
-    if (tile.dataset.pswpWidth) return [Number(tile.dataset.pswpWidth), Number(tile.dataset.pswpHeight)]
-    const thumb = tile.querySelector("img")
-    const w = thumb?.naturalWidth
-    const h = thumb?.naturalHeight
-    if (!w || !h) return [DETAIL_BOX, DETAIL_BOX]
-    const scale = Math.min(DETAIL_BOX / w, DETAIL_BOX / h)
-    return [Math.round(w * scale), Math.round(h * scale)]
-  }
-
-  // The served image is authoritative: replace the estimate with its real
-  // pixel size (re-rendering the slide when they differ) and persist it on the
-  // tile so the next open needs no correction.
-  correctSizesOnLoad() {
-    this.lightbox.on("loadComplete", ({ content }) => {
-      const data = content.data
-      const img = content.element
-      if (!img?.naturalWidth) return
-      data.tile?.setAttribute("data-pswp-width", img.naturalWidth)
-      data.tile?.setAttribute("data-pswp-height", img.naturalHeight)
-      if (data.width === img.naturalWidth && data.height === img.naturalHeight) return
-      data.width = img.naturalWidth
-      data.height = img.naturalHeight
-      content.slide?.pswp?.refreshSlideContent(content.slide.index)
-    })
-  }
-
-  // Custom chrome: the location caption (top-left) and the "view box" link
-  // (top-right, before the close button) — both follow the current slide.
-  registerChrome() {
-    this.lightbox.on("uiRegister", () => {
-      const pswp = this.lightbox.pswp
-      // Read the slide by index, not `pswp.currSlide` — during a `change` the
-      // current slide can momentarily be a placeholder whose `.data` isn't
-      // populated yet, which would blank the caption/link mid-turn.
-      const dataFor = () => pswp.options.dataSource?.[pswp.currIndex] || {}
-
-      pswp.ui.registerElement({
-        name: "move-caption",
-        appendTo: "root",
-        onInit: (el) => {
-          const update = () => { el.textContent = dataFor().caption || "" }
-          pswp.on("change", update)
-          update()
-        }
+  // Lazily import + construct the device-appropriate viewer, memoizing the
+  // in-flight promise so concurrent opens share one construction.
+  buildViewer() {
+    if (this.viewer) return Promise.resolve(this.viewer)
+    if (!this.viewerPromise) {
+      // Capture the promise so the resolver can prove it's still the current
+      // one: a teardown (viewerPromise → null) or a teardown-then-reopen
+      // (viewerPromise → a new promise) mid-import must NOT construct a stray,
+      // never-destroyed viewer.
+      const promise = this.importViewer().then((Viewer) => {
+        if (this.viewerPromise !== promise) return null
+        this.viewer = new Viewer(this.labelsValue)
+        return this.viewer
       })
+      this.viewerPromise = promise
+    }
+    return this.viewerPromise
+  }
 
-      pswp.ui.registerElement({
-        name: "move-view-box",
-        tagName: "a",
-        isButton: true,
-        appendTo: "root",
-        html: this.labelsValue.viewBox,
-        onInit: (el) => {
-          const update = () => {
-            const href = dataFor().href
-            if (href) el.setAttribute("href", href)
-          }
-          pswp.on("change", update)
-          update()
-        }
-      })
+  async importViewer() {
+    if (this.prefersThumbs()) {
+      const { ThumbsViewer } = await import("lightbox/thumbs_viewer")
+      return ThumbsViewer
+    }
+    const { PhotoSwipeViewer } = await import("lightbox/photoswipe_viewer")
+    return PhotoSwipeViewer
+  }
+
+  // Touch / coarse-pointer devices get the thumbs-gallery. A `?viewer=thumbs` /
+  // `?viewer=photoswipe` query param overrides the detection so either path is
+  // reachable for QA and system specs on a desktop browser.
+  prefersThumbs() {
+    const forced = new URLSearchParams(window.location.search).get("viewer")
+    if (forced === "thumbs") return true
+    if (forced === "photoswipe") return false
+    return matchMedia("(pointer: coarse)").matches
+  }
+
+  slides() {
+    return this.tileTargets.map((tile) => {
+      const { src, thumb, caption, href } = tile.dataset
+      return { src, thumb, caption: caption || "", href, tile }
     })
   }
 }

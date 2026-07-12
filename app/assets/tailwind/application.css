@@ -25,6 +25,29 @@
    layer: unlayered CSS would beat every @layer rule, so the "PhotoSwipe
    theming" overrides below (same layer, later in source) could never win. */
 @import "./vendor/photoswipe.css" layer(components);
+/* Vendored Swiper 11.2.10 stylesheet (mobile thumbs-gallery viewer) — same
+   rationale as PhotoSwipe above: imported into the components layer so the
+   viewer's own theming overrides (later in source, same layer) can win. */
+@import "./vendor/swiper.css" layer(components);
+
+/* Mobile thumbs-gallery active-thumb state (#604). Swiper ships no thumb
+   styling (thumbs.css is empty); it only toggles `swiper-slide-thumb-active` on
+   the active thumb, so the dim/highlight is ours. Kept here (not in the vendored
+   sheet) so the vendored file stays a verbatim mirror of the npm package. */
+@layer components {
+  .move-gallery__thumb {
+    opacity: 0.45;
+    transition: opacity 0.15s ease;
+    cursor: pointer;
+  }
+  .move-gallery__thumb.swiper-slide-thumb-active {
+    opacity: 1;
+  }
+  .move-gallery__thumb.swiper-slide-thumb-active img {
+    outline: 2px solid var(--c-accent-sage);
+    outline-offset: 1px;
+  }
+}
 
 @source "../../views";
 @source "../../components";

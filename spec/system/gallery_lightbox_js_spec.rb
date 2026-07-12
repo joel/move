@@ -86,4 +86,45 @@ RSpec.describe "Gallery lightbox (JS)", :js do
     click_button(I18n.t("galleries.index.lightbox.prev"))
     expect(page).to have_css(".pswp__move-caption", text: /Box 2/i)
   end
+
+  # Touch / coarse-pointer devices get the Swiper thumbs-gallery instead of
+  # PhotoSwipe (#604). Headless Chrome reports a fine pointer, so force it with
+  # the `?viewer=thumbs` override the controller honours for exactly this. As
+  # with the PhotoSwipe examples, we assert OUR wiring — the viewer opens with a
+  # main image + thumb per photo, the caption/counter/box-link chrome reflects
+  # the opened (most-recent) photo, and the close control dismisses it — not
+  # Swiper's own swipe/zoom engine, which is live-verified via /product-review.
+  context "when on a touch device (thumbs-gallery)" do
+    it "opens the thumbs-gallery with chrome that reflects the active photo" do
+      move = seed_two_photos
+      login_as(user: user)
+      visit "#{move_gallery_path(move)}?viewer=thumbs"
+
+      first("button[data-lightbox-target='tile']").click
+
+      expect(page).to have_css(".move-gallery[role='dialog']")
+      # A main image and a thumbnail per photo; opened on the most-recent (Box 2).
+      # Swiper keeps only the active main slide on-screen (the rest are translated
+      # off), so count the main slides regardless of visibility.
+      expect(page).to have_css(".move-gallery__slide", count: 2, visible: :all)
+      expect(page).to have_css(".move-gallery__thumb", count: 2, visible: :all)
+      expect(page).to have_css(".move-gallery__caption", text: /Box 2/i)
+      # Counter text is CSS-uppercased ("1 OF 2"), so match case-insensitively.
+      expect(page).to have_css(".move-gallery__counter", text: /1 of 2/i)
+
+      box_two = Apartment::Tenant.switch(slug) { move.boxes.find_by(number: "2") }
+      expect(page).to have_css("a.move-gallery__view-box[href='#{move_box_path(move, box_two)}']")
+    end
+
+    it "dismisses the viewer on close" do
+      move = seed_two_photos
+      login_as(user: user)
+      visit "#{move_gallery_path(move)}?viewer=thumbs"
+      first("button[data-lightbox-target='tile']").click
+      expect(page).to have_css(".move-gallery")
+
+      click_button(I18n.t("galleries.index.lightbox.close"))
+      expect(page).to have_no_css(".move-gallery")
+    end
+  end
 end

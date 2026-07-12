@@ -11,16 +11,33 @@ pin "@hotwired/stimulus-loading", to: "stimulus-loading.js"
 # + app restart; prod precompiles at image build.
 pin "@rails/activestorage", to: "activestorage.esm.js"
 pin_all_from "app/javascript/controllers", under: "controllers"
+# Gallery viewer strategy modules (#604), imported lazily by
+# controllers/lightbox_controller.js: photoswipe_viewer (desktop) and
+# thumbs_viewer (touch). Split out so each device downloads only the viewer
+# it opens — hence `preload: false`: importmap-rails preloads pins by default,
+# which would modulepreload BOTH strategies (and their libraries) on every page
+# and defeat the split. The dispatcher fetches the right one on demand.
+pin_all_from "app/javascript/lightbox", under: "lightbox", preload: false
 
 # D9 — QR decode for the in-app scanner (E2). Vendored ESM build of jsQR
 # (vendor/javascript/jsqr.js); driven by controllers/qr_scanner_controller.js.
 pin "jsqr", to: "jsqr.js"
 
 # Gallery lightbox (#598) — vendored PhotoSwipe 5.4.4 ESM builds (MIT,
-# dependency-free, self-contained). The lightbox shell is imported by
-# controllers/lightbox_controller.js; the core loads on demand via the shell's
-# `pswpModule` dynamic import, so its weight is only paid when a photo is
-# actually opened. The stylesheet rides the Tailwind build
+# dependency-free, self-contained). Since #604 these are reached ONLY through
+# lightbox/photoswipe_viewer.js, which the dispatcher dynamically imports on
+# fine-pointer devices — so `preload: false` keeps a phone (which uses the deck)
+# from ever downloading them. The stylesheet rides the Tailwind build
 # (app/assets/tailwind/vendor/photoswipe.css).
-pin "photoswipe", to: "photoswipe.esm.min.js"
-pin "photoswipe/lightbox", to: "photoswipe-lightbox.esm.min.js"
+pin "photoswipe", to: "photoswipe.esm.min.js", preload: false
+pin "photoswipe/lightbox", to: "photoswipe-lightbox.esm.min.js", preload: false
+
+# Mobile gallery viewer (#604) — vendored Swiper 11.2.10 as a self-contained
+# ESM bundle (MIT). Built with esbuild from the npm package with only the modules
+# the mobile thumbs-gallery viewer needs (Thumbs, FreeMode, Zoom, Keyboard,
+# A11y) → default export Swiper + those named exports, ~94 KB. On touch/coarse
+# pointers lightbox_controller.js dynamically imports this instead of PhotoSwipe;
+# desktop keeps PhotoSwipe. `preload: false` so desktop never downloads the 91 KB
+# bundle — it's fetched only when the deck is opened. Stylesheet rides the
+# Tailwind build (app/assets/tailwind/vendor/swiper.css).
+pin "swiper", to: "swiper.esm.min.js", preload: false
