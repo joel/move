@@ -1,0 +1,11 @@
+# D14 — Move invitations (#608). Mailer copy; the F1 management strings live in
+# members.en.yml and the apex landing strings in invitations.en.yml.
+en:
+  move_invitation_mailer:
+    invite:
+      subject: "You're invited to %{move} on Move"
+      greeting: "Hello,"
+      body_named: "%{inviter} invited you to join the move \"%{move}\" at %{organization} as a %{role}."
+      body_anonymous: "You've been invited to join the move \"%{move}\" at %{organization} as a %{role}."
+      cta: "Accept the invitation"
+      expiry_note: "This link is personal to you and expires in %{days} days."

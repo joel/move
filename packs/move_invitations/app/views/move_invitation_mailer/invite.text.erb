@@ -1,0 +1,18 @@
+<%= t("move_invitation_mailer.invite.greeting") %>
+
+<% if @inviter_name -%>
+<%= t("move_invitation_mailer.invite.body_named",
+      inviter: @inviter_name,
+      move: @move_name || @invitation.organization.name,
+      organization: @invitation.organization.name,
+      role: @invitation.role) %>
+<% else -%>
+<%= t("move_invitation_mailer.invite.body_anonymous",
+      move: @move_name || @invitation.organization.name,
+      organization: @invitation.organization.name,
+      role: @invitation.role) %>
+<% end -%>
+
+<%= t("move_invitation_mailer.invite.cta") %>: <%= @accept_url %>
+
+<%= t("move_invitation_mailer.invite.expiry_note", days: (MoveInvitation::TTL / 1.day).to_i) %>

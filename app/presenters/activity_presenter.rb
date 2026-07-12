@@ -67,6 +67,7 @@ class ActivityPresenter
       role: activity.metadata["role"], unit_system: activity.metadata["unit_system"],
       token_name: activity.metadata["token_name"], kind: kind_label,
       provider: activity.metadata["provider"], model: activity.metadata["model"],
+      email: activity.metadata["email"],
       labels_per_box: activity.metadata["labels_per_box"]
     }
   end

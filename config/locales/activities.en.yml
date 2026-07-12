@@ -75,6 +75,11 @@ en:
         embedding_provider_changed: "switched semantic search to %{provider}"
         labels_per_box_changed: "set labels per box to %{labels_per_box}"
         summary_viewed: "viewed the summary"
+      move_invitation:
+        created: "invited %{email} as %{role}"
+        revoked: "revoked the invitation for %{email}"
+        resent: "re-sent the invitation to %{email}"
+        accepted: "accepted the invitation for %{email}"
       move_membership:
         added: "added %{subject}"
         role_changed: "changed %{subject}'s role to %{role}"

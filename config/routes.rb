@@ -6,6 +6,14 @@ Rails.application.routes.draw do
   # and redirects here, where the subdomain exchanges it for its own session.
   # Lives on the tenant subdomain (the controller validates against the tenant).
   get "session/handoff", to: "session_handoffs#show", as: :session_handoff
+  # D14 (#608) — Move invitation acceptance. Lives on the APEX host (the
+  # recipient has no tenant access until they accept); the raw token rides the
+  # path, resolved by digest. GET = landing (anonymous or authenticated),
+  # POST = accept (requires the authenticated invited email).
+  get "invitations/:token", to: "invitation_acceptances#show",
+                            as: :invitation_acceptance, constraints: { token: /[A-Za-z0-9_-]+/ }
+  post "invitations/:token", to: "invitation_acceptances#create",
+                             constraints: { token: /[A-Za-z0-9_-]+/ }
   # #369 — terms-agreement gate. Authenticated accounts must accept the current
   # terms version before any tenant surface; TenantController redirects here until
   # they do. Lives on the tenant subdomain (the controller is tenant-resolved).
