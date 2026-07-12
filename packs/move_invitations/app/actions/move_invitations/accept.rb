@@ -25,7 +25,7 @@ module MoveInvitations
       invitation = yield find(raw_token)
       yield ensure_email_match(invitation, user)
       organization = invitation.organization
-      yield ensure_move_exists(organization, invitation)
+      yield ensure_move_writable(organization, invitation)
       yield claim_or_resume(invitation)
       yield join_organization(organization, user)
       yield join_move_and_record(organization, invitation, user)
@@ -51,12 +51,19 @@ module MoveInvitations
       Success()
     end
 
+    # Validate the Move BEFORE any join (so a dead/archived Move never creates
+    # an org membership). Archived is folded in with gone: an archived Move is
+    # read-only (AGENTS.md §2 "archived-Move guard" — a mutating action must not
+    # write to it), and adding a member is a mutation. The invitation stays
+    # unclaimed, so the link revives if the Move is un-archived; both collapse
+    # to the one generic unavailable page.
+
     #: (untyped organization, untyped invitation) -> Dry::Monads::Result[untyped, untyped]
-    def ensure_move_exists(organization, invitation)
-      exists = Apartment::Tenant.switch(organization.slug) do
-        Move.exists?(id: invitation.move_id)
+    def ensure_move_writable(organization, invitation)
+      writable = Apartment::Tenant.switch(organization.slug) do
+        Move.find_by(id: invitation.move_id)&.writable?
       end
-      exists ? Success() : Failure(:gone)
+      writable ? Success() : Failure(:gone)
     rescue Apartment::TenantNotFound
       Failure(:gone)
     end

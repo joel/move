@@ -97,4 +97,14 @@ RSpec.describe MoveInvitations::Accept do
     expect(invitation.reload).not_to be_accepted
     expect(OrganizationMembership.exists?(organization:, user: invitee)).to be(false)
   end
+
+  it "refuses to accept onto an archived (read-only) Move, leaving the invite unclaimed" do
+    move.update!(status: "archived")
+
+    result = accept
+
+    expect(result.failure).to eq(:gone)
+    expect(invitation.reload).not_to be_accepted # revivable if the Move is un-archived
+    expect(OrganizationMembership.exists?(organization:, user: invitee)).to be(false)
+  end
 end

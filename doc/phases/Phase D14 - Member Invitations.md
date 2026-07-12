@@ -62,8 +62,9 @@ org has no spare users (`app/components/members/header.rb` L26 `if @candidates.a
   an invited teammate) when the request carries a valid pending invite for that
   email; falls back to provisioning otherwise. Product decision — record in Steps.
 - Inviter demoted/removed later: invitation honored (revoke covers regret). Move
-  archived: accept succeeds (membership ≠ write access). Move deleted: generic
-  failure, **no org-join**. Org membership is never rolled back on move-join
+  archived: accept is REFUSED (read-only Move per AGENTS.md §2; invite stays
+  unclaimed, revives on un-archive). Move deleted: generic failure, **no
+  org-join**. Org membership is never rolled back on move-join
   failure (durable prerequisite; documented).
 
 ## 5. Domain & actions required
@@ -195,7 +196,7 @@ _Fill on execution:_ Issue: · PR: · Verification: · Release:
 | Already move member at accept | `MoveMemberships::Add` `:already_member` → success (existing race-safe path) |
 | Crash between claim and joins | Re-click resumes (accepted + matching email ⇒ idempotent joins re-run); org membership never rolled back (documented) |
 | Inviter demoted/removed | Invitation honored; `invited_by_id` nullifies on user deletion; copy degrades gracefully |
-| Move archived | Accept succeeds; write-access enforcement stays in policies |
+| Move archived | Accept refused (Move#writable? guard); invite unclaimed, revives on un-archive |
 | Move deleted | Validated (tenant switch) BEFORE any join → generic failure, no org-join |
 | Re-invite while pending | Partial unique index → "already invited — Resend"; resend rotates in place |
 | Case-variant email | citext throughout (create, uniqueness, accept binding) |
