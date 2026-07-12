@@ -38,7 +38,7 @@ RSpec.describe MoveInvitations::Create do
     expect(invitation.token_digest).to match(/\A\h{64}\z/)
     # The mailed link carries the raw token whose digest is the persisted one.
     body = ActionMailer::Base.deliveries.last.text_part.body.to_s
-    raw = body[%r{/invitations/([A-Za-z0-9_-]+)}, 1]
+    raw = body[/invitations\?token=([A-Za-z0-9_-]+)/, 1]
     expect(MoveInvitation.digest(raw)).to eq(invitation.token_digest)
   end
 

@@ -57,7 +57,7 @@ RSpec.describe "Invitation token carry through auth (D14)" do
     get verify_path
     follow_redirect!
 
-    expect(response).to redirect_to("/invitations/#{raw_token}")
+    expect(response).to redirect_to("/invitations?token=#{raw_token}")
     user = User.find_by(email: "newbie@example.com")
     expect(user.status).to eq(2) # verified
     # Invited signup: no stray personal Organization was provisioned.
@@ -81,7 +81,7 @@ RSpec.describe "Invitation token carry through auth (D14)" do
     key = Rack::Utils.parse_query(URI.parse(auth_link).query)["key"]
     post "/email-auth", params: { key: key, invite_token: raw_token }
 
-    expect(response).to redirect_to("/invitations/#{raw_token}")
+    expect(response).to redirect_to("/invitations?token=#{raw_token}")
   end
 
   it "provisions the personal org as usual when the carried invite is stale" do

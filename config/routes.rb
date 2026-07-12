@@ -8,12 +8,13 @@ Rails.application.routes.draw do
   get "session/handoff", to: "session_handoffs#show", as: :session_handoff
   # D14 (#608) — Move invitation acceptance. Lives on the APEX host (the
   # recipient has no tenant access until they accept); the raw token rides the
-  # path, resolved by digest. GET = landing (anonymous or authenticated),
-  # POST = accept (requires the authenticated invited email).
-  get "invitations/:token", to: "invitation_acceptances#show",
-                            as: :invitation_acceptance, constraints: { token: /[A-Za-z0-9_-]+/ }
-  post "invitations/:token", to: "invitation_acceptances#create",
-                             constraints: { token: /[A-Za-z0-9_-]+/ }
+  # QUERY string (never the path) so config.filter_parameters' `token` rule
+  # redacts it from request logs — the digest-only storage guarantee would be
+  # hollow if every landing hit logged the raw value. GET = landing (anonymous
+  # or authenticated), POST = accept (requires the authenticated invited email;
+  # the token arrives as a filtered form param).
+  get "invitations", to: "invitation_acceptances#show", as: :invitation_acceptance
+  post "invitations", to: "invitation_acceptances#create"
   # #369 — terms-agreement gate. Authenticated accounts must accept the current
   # terms version before any tenant surface; TenantController redirects here until
   # they do. Lives on the tenant subdomain (the controller is tenant-resolved).

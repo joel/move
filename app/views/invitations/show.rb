@@ -63,8 +63,9 @@ module Views
       def accept_button
         button_to(
           I18n.t("invitations.show.accept"),
-          invitation_acceptance_path(token: @raw_token),
-          method: :post, class: "ha-button ha-button-primary"
+          invitation_acceptance_path,
+          method: :post, class: "ha-button ha-button-primary",
+          params: { token: @raw_token }
         )
       end
 

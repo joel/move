@@ -34,6 +34,8 @@ target :actions do
   check "app/controllers/box_steps_controller.rb", inline: true
   check "app/controllers/boxes_controller.rb", inline: true
   check "app/controllers/captures_controller.rb", inline: true
+  check "app/controllers/invitation_acceptances_controller.rb", inline: true
+  check "app/controllers/invitations_controller.rb", inline: true
   check "app/controllers/csp_reports_controller.rb", inline: true
   check "app/controllers/galleries_controller.rb", inline: true
   check "app/controllers/google_one_tap_sessions_controller.rb", inline: true
@@ -73,6 +75,7 @@ target :actions do
   check "app/views/activities", inline: true
   check "app/views/agreements", inline: true
   check "app/views/base.rb", inline: true
+  check "app/views/invitations", inline: true
   check "app/views/box_steps", inline: true
   check "app/views/boxes", inline: true
   check "app/views/captures", inline: true

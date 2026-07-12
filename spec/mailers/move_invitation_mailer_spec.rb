@@ -20,8 +20,8 @@ RSpec.describe MoveInvitationMailer do
 
     expect(mail.to).to eq(["pat@example.com"])
     expect(mail.subject).to include("Seattle Relocation")
-    expect(mail.text_part.body.to_s).to include("/invitations/RAW-TOKEN")
-    expect(mail.html_part.body.to_s).to include("/invitations/RAW-TOKEN")
+    expect(mail.text_part.body.to_s).to include("/invitations?token=RAW-TOKEN")
+    expect(mail.html_part.body.to_s).to include("/invitations?token=RAW-TOKEN")
     expect(mail.text_part.body.to_s).to include("Alex Admin")
   end
 

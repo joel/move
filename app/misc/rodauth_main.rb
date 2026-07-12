@@ -216,7 +216,7 @@ class RodauthMain < Rodauth::Rails::Auth
       # @onboarding_slug stays nil and this branch is what routes them.
       login_redirect do
         if (invite = carried_invite_token)
-          "/invitations/#{invite}"
+          "/invitations?token=#{invite}"
         else
           (slug = handoff_target_slug) ? tenant_handoff_url(slug) : "/"
         end

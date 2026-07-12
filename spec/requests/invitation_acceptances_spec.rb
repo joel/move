@@ -26,7 +26,7 @@ RSpec.describe "Invitation acceptance (apex)" do
 
   describe "GET /invitations/:token (landing)" do
     it "shows the landing with a create-account CTA for an unknown email" do
-      get "/invitations/#{raw_token}"
+      get "/invitations", params: { token: raw_token }
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(ERB::Util.html_escape(I18n.t("invitations.show.title")))
@@ -39,7 +39,7 @@ RSpec.describe "Invitation acceptance (apex)" do
     it "shows a sign-in CTA when the invited email already has an account" do
       create(:user, email: "pat@example.com")
 
-      get "/invitations/#{raw_token}"
+      get "/invitations", params: { token: raw_token }
 
       expect(response.body).to include(I18n.t("invitations.show.sign_in"))
     end
@@ -47,27 +47,27 @@ RSpec.describe "Invitation acceptance (apex)" do
     it "shows the accept button for the signed-in invited email (case-insensitive)" do
       stub_current_user(create(:user, email: "PAT@example.com"))
 
-      get "/invitations/#{raw_token}"
+      get "/invitations", params: { token: raw_token }
 
       expect(response.body).to include(I18n.t("invitations.show.accept"))
     end
 
     it "renders the one generic page for unknown, revoked, expired, and mismatched cases" do
       stub_current_user(create(:user, email: "other@example.com"))
-      get "/invitations/#{raw_token}"
+      get "/invitations", params: { token: raw_token }
       expect(response).to have_http_status(:not_found)
       expect(response.body).to include(ERB::Util.html_escape(I18n.t("invitations.unavailable.title")))
 
       stub_current_user(nil)
-      get "/invitations/unknown-token"
+      get "/invitations", params: { token: "unknown-token" }
       expect(response).to have_http_status(:not_found)
 
       invitation.update!(revoked_at: Time.current)
-      get "/invitations/#{raw_token}"
+      get "/invitations", params: { token: raw_token }
       expect(response).to have_http_status(:not_found)
 
       invitation.update!(revoked_at: nil, expires_at: 1.minute.ago)
-      get "/invitations/#{raw_token}"
+      get "/invitations", params: { token: raw_token }
       expect(response).to have_http_status(:not_found)
     end
 
@@ -75,11 +75,11 @@ RSpec.describe "Invitation acceptance (apex)" do
       invitee = create(:user, email: "pat@example.com")
       invitation.update!(accepted_at: Time.current)
 
-      get "/invitations/#{raw_token}"
+      get "/invitations", params: { token: raw_token }
       expect(response).to have_http_status(:not_found) # anonymous: consumed = unknown
 
       stub_current_user(invitee)
-      get "/invitations/#{raw_token}"
+      get "/invitations", params: { token: raw_token }
       expect(response).to have_http_status(:ok)
     end
 
@@ -87,9 +87,9 @@ RSpec.describe "Invitation acceptance (apex)" do
       host! "acme-test.example.com"
       stub_current_tenant("acme-test")
 
-      get "/invitations/#{raw_token}"
+      get "/invitations", params: { token: raw_token }
 
-      expect(response).to redirect_to("https://example.com/invitations/#{raw_token}")
+      expect(response).to redirect_to("https://example.com/invitations?token=#{raw_token}")
     end
   end
 
@@ -99,7 +99,7 @@ RSpec.describe "Invitation acceptance (apex)" do
     it "joins org then move and hands the session off to the subdomain, landing on the Move" do
       stub_current_user(invitee)
 
-      post "/invitations/#{raw_token}"
+      post "/invitations", params: { token: raw_token }
 
       expect(response).to have_http_status(:redirect)
       location = response.headers["Location"]
@@ -114,21 +114,21 @@ RSpec.describe "Invitation acceptance (apex)" do
 
     it "re-accepting resumes and hands off again (two tabs / crash recovery)" do
       stub_current_user(invitee)
-      post "/invitations/#{raw_token}"
+      post "/invitations", params: { token: raw_token }
       move.move_memberships.find_by(user: invitee).destroy!
 
-      post "/invitations/#{raw_token}"
+      post "/invitations", params: { token: raw_token }
 
       expect(response).to have_http_status(:redirect)
       expect(move.move_memberships.find_by(user: invitee)&.role).to eq("contributor")
     end
 
     it "renders the generic page for anonymous and mismatched accepts" do
-      post "/invitations/#{raw_token}"
+      post "/invitations", params: { token: raw_token }
       expect(response).to have_http_status(:not_found)
 
       stub_current_user(create(:user, email: "other@example.com"))
-      post "/invitations/#{raw_token}"
+      post "/invitations", params: { token: raw_token }
       expect(response).to have_http_status(:not_found)
       expect(OrganizationMembership.where(organization:).count).to eq(0)
     end

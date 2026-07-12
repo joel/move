@@ -43,7 +43,7 @@ DemoData.auto_provision = false
 #   invitee@example.com  — org member, addable to the Move via F1
 #   pending@example.com  — D14: a pending email invitation on the Move; walk the
 #                          accept journey without mail at
-#                          https://move.move-easy.docker/invitations/move_invite_demo_pending_dev_token
+#                          https://move.move-easy.docker/invitations?token=move_invite_demo_pending_dev_token
 #
 # D13 — the demo Move's "Main Assistant" MCP token is the fixed dev value below,
 # so you can call the assistant endpoint immediately:
