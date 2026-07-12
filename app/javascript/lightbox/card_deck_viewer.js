@@ -253,9 +253,11 @@ function cssUrl(url) {
   return String(url).replace(/["\\\n\r]/g, "\\$&")
 }
 
-// Minimal %{key} interpolation for the localized counter template.
+// Minimal {key} interpolation for the localized counter template. Uses {key}
+// (not I18n's %{key}) so the server-side I18n.t never tries to interpolate the
+// template it hands to the client.
 function format(template, values) {
-  return String(template).replace(/%\{(\w+)\}/g, (_, key) => (key in values ? values[key] : `%{${key}}`))
+  return String(template).replace(/\{(\w+)\}/g, (_, key) => (key in values ? values[key] : `{${key}}`))
 }
 
 const closeIcon =
