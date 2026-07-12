@@ -107,7 +107,8 @@ RSpec.describe "Gallery lightbox (JS)", :js do
       # One card per photo; the opened card is the most-recent (Box 2), first.
       expect(page).to have_css(".move-deck__slide", count: 2)
       expect(page).to have_css(".move-deck__caption", text: /Box 2/i)
-      expect(page).to have_css(".move-deck__counter", text: "1 of 2")
+      # Counter text is CSS-uppercased ("1 OF 2"), so match case-insensitively.
+      expect(page).to have_css(".move-deck__counter", text: /1 of 2/i)
 
       box_two = Apartment::Tenant.switch(slug) { move.boxes.find_by(number: "2") }
       expect(page).to have_css("a.move-deck__view-box[href='#{move_box_path(move, box_two)}']")

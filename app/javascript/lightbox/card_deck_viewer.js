@@ -131,7 +131,8 @@ export class CardDeckViewer {
     this.closeButton = el("button", {
       type: "button",
       class: "move-deck__close grid h-10 w-10 shrink-0 place-items-center rounded-full bg-card text-text-warm",
-      "aria-label": this.labels.close
+      "aria-label": this.labels.close,
+      title: this.labels.close
     })
     this.closeButton.innerHTML = closeIcon
     this.closeButton.addEventListener("click", () => this.close())
