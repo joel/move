@@ -5,6 +5,17 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.85.0] — 2026-07-12
+
+### Changed
+- **Flick through gallery photos as a deck on your phone.** On a phone or
+  tablet, tapping a photo in the Move gallery now opens it as a fullscreen
+  stack of cards you swipe through one-handed — a more tactile way to browse
+  than the desktop lightbox. Pinch and double-tap still zoom in to inspect a
+  photo, the box each photo belongs to stays one tap away, and the position
+  ("2 of 14") is always shown. On a computer the existing lightbox is
+  unchanged, and each device only downloads the viewer it uses (#604).
+
 ## [v0.84.0] — 2026-07-11
 
 ### Changed
