@@ -35,9 +35,11 @@ module Components
                  "sm:flex-row sm:items-center sm:justify-between"
         ) do
           identity
-          # pl-[4.5rem] on mobile lines the control up under the name, clearing
-          # the 3.5rem avatar + 1rem gap; reset at sm where the row is horizontal.
-          div(class: "flex shrink-0 items-center gap-3 pl-[4.5rem] sm:pl-0") do
+          # No mobile indent: on a 320px screen the role select + remove button
+          # already fill the row's content width, so reserving avatar width would
+          # push them back over the edge. Left-aligned below the identity, as in
+          # Members::PendingRow.
+          div(class: "flex shrink-0 items-center gap-3") do
             if own?
               locked_role
             else
