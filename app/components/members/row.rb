@@ -27,11 +27,17 @@ module Components
       def view_template
         article(
           id: self.class.dom_id(@membership), data: row_data,
-          class: "flex items-center justify-between gap-4 rounded-card border " \
-                 "border-card-border bg-card p-4 transition hover:bg-surface-container-high"
+          # Stack on a phone (the role control drops below the identity) and go
+          # side-by-side at sm+ — otherwise the role pill/select overflows the
+          # card on narrow screens. Mirrors Members::PendingRow.
+          class: "flex flex-col gap-3 rounded-card border border-card-border bg-card p-4 " \
+                 "transition hover:bg-surface-container-high " \
+                 "sm:flex-row sm:items-center sm:justify-between"
         ) do
           identity
-          div(class: "flex items-center gap-3") do
+          # pl-[4.5rem] on mobile lines the control up under the name, clearing
+          # the 3.5rem avatar + 1rem gap; reset at sm where the row is horizontal.
+          div(class: "flex shrink-0 items-center gap-3 pl-[4.5rem] sm:pl-0") do
             if own?
               locked_role
             else
