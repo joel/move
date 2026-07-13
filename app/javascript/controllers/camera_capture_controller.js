@@ -4,14 +4,22 @@ import { Controller } from "@hotwired/stimulus"
 // for viewfinder frames (one encode per shot, here).
 const MAX_EDGE = 2048
 const JPEG_QUALITY = 0.85
-// Bounds only the PRE-submit window — the case where capture-upload bails
-// before requestSubmit (empty selection, stale guard) and no terminal event
-// will ever come. Generous versus that window's own worst-case timeouts
-// (2.5s downscale + 15s direct upload). Once turbo:submit-start fires, a
-// turbo:submit-end is guaranteed (success or failure), so the failsafe is
-// cancelled and the lock holds to the genuine terminal event — a slow POST
-// must never unlock the single-slot input mid-flight (#620).
+// Two-tier failsafe for the upload lock — together the tiers guarantee both
+// "never lose a photo" (#620) and "never lock forever" (#622):
+//
+// Pre-submit tier: bounds the window where capture-upload can bail before
+// requestSubmit (empty selection, stale guard) and no terminal event will
+// ever come. Generous versus that window's own worst-case timeouts
+// (2.5s downscale + 15s direct upload).
 const SETTLE_FAILSAFE_MS = 30000
+// In-flight tier: once turbo:submit-start fires, a turbo:submit-end normally
+// follows (success, failure, or network error), so the lock holds through
+// arbitrarily slow submissions — but a fetch CAN stall without ever erroring,
+// and an eternal lock is the one thing worse than the overwrite this lock
+// prevents. After this long a still-pending submission is effectively dead
+// (browsers surface real stalls as errors well before), so unlocking is the
+// deliberate, accepted trade (#622).
+const INFLIGHT_RECOVERY_MS = 120000
 
 // #616 — in-app camera viewfinder for the capture screen. The native camera app
 // (file input + `capture` attr) rotates to landscape with the device and cannot
@@ -147,15 +155,17 @@ export default class extends Controller {
   uploadStarted() {
     if (!this.inputTarget.files?.length) return
     this.uploadPending = true
-    this.#armSettleFailsafe()
+    this.#armSettleTimer(SETTLE_FAILSAFE_MS)
     this.#setState(this.state)
   }
 
-  // turbo:submit-start — the form is genuinely in flight, so turbo:submit-end
-  // is now guaranteed; drop the failsafe rather than let it expire under a
-  // slow POST and unlock a busy pipeline (#620).
+  // turbo:submit-start — the form is genuinely in flight: swap the pre-submit
+  // failsafe for the much longer in-flight recovery tier, so a slow POST never
+  // unlocks a busy pipeline (#620) while a hung one can't lock it forever
+  // (#622).
   uploadInFlight() {
-    this.#clearSettleTimer()
+    if (!this.uploadPending) return
+    this.#armSettleTimer(INFLIGHT_RECOVERY_MS)
   }
 
   // turbo:submit-end — the pipeline is free again (capture-upload#reset has the
@@ -320,9 +330,9 @@ export default class extends Controller {
 
   // One failsafe at a time — re-arming without clearing would orphan a timer
   // that later fires uploadSettled in the middle of a subsequent upload.
-  #armSettleFailsafe() {
+  #armSettleTimer(ms) {
     this.#clearSettleTimer()
-    this.settleTimer = setTimeout(() => this.uploadSettled(), SETTLE_FAILSAFE_MS)
+    this.settleTimer = setTimeout(() => this.uploadSettled(), ms)
   }
 
   #clearSettleTimer() {

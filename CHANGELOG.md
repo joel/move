@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.88.2] — 2026-07-13
+
+### Fixed
+- **The camera can no longer stay locked after a dead connection.** If an
+  upload hung on a completely stalled connection (one that never reports an
+  error), the shutter and photo picker stayed disabled until the page was
+  reloaded. Capture now frees itself after two minutes in that state — long
+  past the point where the upload could still succeed — while keeping the
+  v0.88.1 guarantee that a merely slow upload never loses a photo (#622).
+
 ## [v0.88.1] — 2026-07-13
 
 ### Fixed

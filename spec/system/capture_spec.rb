@@ -60,10 +60,10 @@ RSpec.describe "Capture image" do
     )
   end
 
-  # The upload lock's lifecycle wiring (#620): `change` raises it,
-  # turbo:submit-start cancels the pre-submit failsafe (a submit-end is then
-  # guaranteed, so the lock holds through arbitrarily slow submissions), and
-  # turbo:submit-end releases it.
+  # The upload lock's lifecycle wiring (#620/#622): `change` raises it,
+  # turbo:submit-start swaps the pre-submit failsafe for the in-flight
+  # recovery tier (the lock holds through slow submissions but a hung one
+  # can't lock capture forever), and turbo:submit-end releases it.
   it "wires the upload lock to the full submission lifecycle" do
     visit move_box_capture_path(move, box)
 
