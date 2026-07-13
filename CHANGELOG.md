@@ -5,6 +5,15 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.87.0] — 2026-07-13
+
+### Changed
+- **Marking a box fragile is now front and centre.** The "fragile" control used
+  to be tucked inside the box's ⋮ menu, so it was easy to miss. It now sits
+  right on the box page as a tap-to-toggle chip — "Mark as fragile", which fills
+  in to a "Fragile" pill once set (and prints FRAGILE on the box label). People
+  with view-only access still see the fragile marker but can't change it (#610).
+
 ## [v0.86.0] — 2026-07-12
 
 ### Added
