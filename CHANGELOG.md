@@ -5,6 +5,15 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.87.1] — 2026-07-13
+
+### Fixed
+- **Member roles no longer overflow the card on a phone.** On the Members
+  screen, each member's permission level (the Admin badge or the role
+  dropdown) was pinned beside the name and got clipped on narrow screens. It
+  now sits neatly below the name on a phone and stays alongside it on wider
+  screens (#613).
+
 ## [v0.87.0] — 2026-07-13
 
 ### Changed
