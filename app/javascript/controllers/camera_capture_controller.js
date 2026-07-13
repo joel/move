@@ -168,12 +168,23 @@ export default class extends Controller {
     this.#armSettleTimer(INFLIGHT_RECOVERY_MS)
   }
 
-  // turbo:submit-end — the pipeline is free again (capture-upload#reset has the
-  // same trigger), or the pre-submit failsafe fired.
+  // turbo:submit-end — the pipeline is free again (capture-upload#reset has
+  // the same trigger).
   uploadSettled() {
     this.#clearSettleTimer()
     this.uploadPending = false
     this.#setState(this.state)
+  }
+
+  // A failsafe tier expired — no terminal event came. The pipeline may be
+  // wedged mid-flight with its input disabled and a stale signed_id
+  // (direct-upload mode), so ask capture-upload to reset before unlocking:
+  // recovered controls must actually work, and clearing the input also makes
+  // any zombie submit() bail on its own staleness guards. The recover event
+  // bubbles from the input to the form, where capture-upload listens.
+  #recoverFromHang() {
+    this.inputTarget.dispatchEvent(new CustomEvent("camera-capture:recover", { bubbles: true }))
+    this.uploadSettled()
   }
 
   // "Choose from library" — the same input the tile wraps; the existing
@@ -329,10 +340,10 @@ export default class extends Controller {
   }
 
   // One failsafe at a time — re-arming without clearing would orphan a timer
-  // that later fires uploadSettled in the middle of a subsequent upload.
+  // that later fires recovery in the middle of a subsequent upload.
   #armSettleTimer(ms) {
     this.#clearSettleTimer()
-    this.settleTimer = setTimeout(() => this.uploadSettled(), ms)
+    this.settleTimer = setTimeout(() => this.#recoverFromHang(), ms)
   }
 
   #clearSettleTimer() {
