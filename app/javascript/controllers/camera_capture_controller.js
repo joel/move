@@ -4,9 +4,13 @@ import { Controller } from "@hotwired/stimulus"
 // for viewfinder frames (one encode per shot, here).
 const MAX_EDGE = 2048
 const JPEG_QUALITY = 0.85
-// If the pipeline never settles (a submit that dies before turbo:submit-end),
-// re-arm the shutter anyway — generous, past the pipeline's own worst-case
-// timeouts (2.5s downscale + 15s direct upload + the POST).
+// Bounds only the PRE-submit window — the case where capture-upload bails
+// before requestSubmit (empty selection, stale guard) and no terminal event
+// will ever come. Generous versus that window's own worst-case timeouts
+// (2.5s downscale + 15s direct upload). Once turbo:submit-start fires, a
+// turbo:submit-end is guaranteed (success or failure), so the failsafe is
+// cancelled and the lock holds to the genuine terminal event — a slow POST
+// must never unlock the single-slot input mid-flight (#620).
 const SETTLE_FAILSAFE_MS = 30000
 
 // #616 — in-app camera viewfinder for the capture screen. The native camera app
@@ -147,8 +151,15 @@ export default class extends Controller {
     this.#setState(this.state)
   }
 
+  // turbo:submit-start — the form is genuinely in flight, so turbo:submit-end
+  // is now guaranteed; drop the failsafe rather than let it expire under a
+  // slow POST and unlock a busy pipeline (#620).
+  uploadInFlight() {
+    this.#clearSettleTimer()
+  }
+
   // turbo:submit-end — the pipeline is free again (capture-upload#reset has the
-  // same trigger), or the failsafe fired.
+  // same trigger), or the pre-submit failsafe fired.
   uploadSettled() {
     this.#clearSettleTimer()
     this.uploadPending = false

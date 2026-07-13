@@ -59,4 +59,18 @@ RSpec.describe "Capture image" do
       visible: :all
     )
   end
+
+  # The upload lock's lifecycle wiring (#620): `change` raises it,
+  # turbo:submit-start cancels the pre-submit failsafe (a submit-end is then
+  # guaranteed, so the lock holds through arbitrarily slow submissions), and
+  # turbo:submit-end releases it.
+  it "wires the upload lock to the full submission lifecycle" do
+    visit move_box_capture_path(move, box)
+
+    expect(page).to have_css(
+      "[data-controller='camera-capture'][data-action*='change->camera-capture#uploadStarted']" \
+      "[data-action*='turbo:submit-start->camera-capture#uploadInFlight']" \
+      "[data-action*='turbo:submit-end->camera-capture#uploadSettled']"
+    )
+  end
 end
