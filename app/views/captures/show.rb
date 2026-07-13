@@ -145,10 +145,14 @@ module Views
             end
             span(class: "text-headline-md text-text-warm") { I18n.t("captures.tap_to_capture") }
             span(class: "text-body-md text-muted") { I18n.t("captures.capture_hint") }
+            # click->guardPick: a file input's click is cancelable before the
+            # dialog opens — the choke point that blocks any pick while an
+            # upload is pending (the input is single-slot).
             form.file_field :file, accept: "image/*",
                                    required: true, class: "sr-only",
                                    data: { "capture-upload-target": "file",
-                                           "camera-capture-target": "input" }
+                                           "camera-capture-target": "input",
+                                           action: "click->camera-capture#guardPick" }
           end
           # Carries the R2 signed_id when the browser direct-uploads (#572); empty
           # on the server-proxied path. StartIngest prefers it over :file.

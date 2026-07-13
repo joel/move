@@ -163,6 +163,15 @@ export default class extends Controller {
     this.inputTarget.click()
   }
 
+  // The one choke point every picker path funnels through (tile label tap,
+  // keyboard activation of the input, openLibrary's click()): a file input's
+  // click is cancelable before the dialog opens, so this makes the upload lock
+  // airtight — a pick during a pending upload would overwrite the single-slot
+  // input and abort the in-flight photo.
+  guardPick(event) {
+    if (this.uploadPending) event.preventDefault()
+  }
+
   // The camera died mid-session (OS reclaimed it, permission revoked) — in any
   // live state, including the requesting/play() window (an unhandled death
   // there would leave "streaming" armed over a corpse). Hidden → resume on
@@ -270,6 +279,11 @@ export default class extends Controller {
     this.viewfinderTarget.classList.toggle("hidden", !live)
     this.statusTarget.classList.toggle("hidden", state !== "requesting")
     this.fallbackTarget.classList.toggle("hidden", live)
+    // The tile can be on show while an upload is pending (camera interruption
+    // mid-upload lands back in idle/unavailable) — render it inert; guardPick
+    // is the functional block.
+    this.fallbackTarget.classList.toggle("pointer-events-none", this.uploadPending)
+    this.fallbackTarget.classList.toggle("opacity-50", this.uploadPending)
     this.libraryTarget.classList.toggle("hidden", !streaming || this.uploadPending)
     this.noteTarget.classList.toggle("hidden", state !== "unavailable")
     this.startTarget.classList.toggle("hidden", !this.#offerStart(state))
