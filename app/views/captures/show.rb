@@ -197,12 +197,13 @@ module Views
 
       #: () -> Hash[Symbol, untyped]
       def capture_form_data
-        # camera-capture:recover — a failsafe expiry (#622): reset the pipeline
-        # exactly as turbo:submit-end would, so recovered controls aren't left
-        # with a disabled input / stale signed_id from the hung submission.
+        # Reset rides camera-capture:settle, NOT raw turbo:submit-end: the
+        # camera-capture controller demuxes terminal events by live-submission
+        # identity (#622), so a recovery-abandoned submission's late
+        # submit-end can't reset a newer capture's input mid-flight.
         data = { controller: "capture-upload",
-                 action: "change->capture-upload#submit turbo:submit-end->capture-upload#reset " \
-                         "camera-capture:recover->capture-upload#reset" }
+                 action: "change->capture-upload#submit " \
+                         "camera-capture:settle->capture-upload#reset" }
         if Rails.application.config.x.direct_upload_enabled
           data[:"capture-upload-direct-upload-url-value"] =
             view_context.move_box_capture_direct_upload_path(@move, @box)

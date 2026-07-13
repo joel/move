@@ -72,10 +72,14 @@ RSpec.describe "Capture image" do
       "[data-action*='turbo:submit-start->camera-capture#uploadInFlight']" \
       "[data-action*='turbo:submit-end->camera-capture#uploadSettled']"
     )
-    # Failsafe recovery must reset the pipeline (disabled input / stale
-    # signed_id), not just unlock the controls (#622).
+    # capture-upload's reset must ride the demuxed settle event, not raw
+    # turbo:submit-end — a recovery-abandoned submission's late terminal event
+    # must not reset a newer capture's input mid-flight (#622).
     expect(page).to have_css(
-      "form[data-action*='camera-capture:recover->capture-upload#reset']", visible: :all
+      "form[data-action*='camera-capture:settle->capture-upload#reset']", visible: :all
+    )
+    expect(page).to have_no_css(
+      "form[data-action*='turbo:submit-end->capture-upload#reset']", visible: :all
     )
   end
 end

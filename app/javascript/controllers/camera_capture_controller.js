@@ -66,6 +66,8 @@ export default class extends Controller {
     // pipeline — the input is single-slot, and a second submission while one
     // is in flight makes Turbo abort the first (silent photo loss).
     this.uploadPending = false
+    this.liveSubmission = null
+    this.abandonedSubmission = null
     this.supported = !!navigator.mediaDevices?.getUserMedia
     this.onVisibility = () => this.#visibilityChanged()
     document.addEventListener("visibilitychange", this.onVisibility)
@@ -159,32 +161,58 @@ export default class extends Controller {
     this.#setState(this.state)
   }
 
-  // turbo:submit-start — the form is genuinely in flight: swap the pre-submit
-  // failsafe for the much longer in-flight recovery tier, so a slow POST never
-  // unlocks a busy pipeline (#620) while a hung one can't lock it forever
-  // (#622).
-  uploadInFlight() {
+  // turbo:submit-start — the form is genuinely in flight: remember WHICH
+  // submission is live (a recovery-abandoned one can still emit its terminal
+  // event later, and only the live one may settle the lock), and swap the
+  // pre-submit failsafe for the much longer in-flight recovery tier, so a
+  // slow POST never unlocks a busy pipeline (#620) while a hung one can't
+  // lock it forever (#622).
+  uploadInFlight(event) {
     if (!this.uploadPending) return
+    this.liveSubmission = event.detail?.formSubmission || null
     this.#armSettleTimer(INFLIGHT_RECOVERY_MS)
   }
 
-  // turbo:submit-end — the pipeline is free again (capture-upload#reset has
-  // the same trigger).
-  uploadSettled() {
-    this.#clearSettleTimer()
-    this.uploadPending = false
-    this.#setState(this.state)
+  // turbo:submit-end — but a zombie's late terminal event (its submission was
+  // abandoned by the recovery tier) must never settle a NEWER capture's lock
+  // nor reset its input, whether that capture is already in flight (the
+  // liveSubmission check) or still pre-submit (the abandonedSubmission
+  // check) — either would recreate the photo loss #620 closed. An event
+  // without a formSubmission detail settles normally — never worse than
+  // before this demux existed.
+  uploadSettled(event) {
+    const submission = event?.detail?.formSubmission
+    if (submission && submission === this.abandonedSubmission) {
+      this.abandonedSubmission = null
+      return
+    }
+    if (this.liveSubmission && submission && submission !== this.liveSubmission) return
+    this.#settle()
   }
 
-  // A failsafe tier expired — no terminal event came. The pipeline may be
-  // wedged mid-flight with its input disabled and a stale signed_id
-  // (direct-upload mode), so ask capture-upload to reset before unlocking:
-  // recovered controls must actually work, and clearing the input also makes
-  // any zombie submit() bail on its own staleness guards. The recover event
-  // bubbles from the input to the form, where capture-upload listens.
+  // A failsafe tier expired — no terminal event came. Remember the abandoned
+  // submission (one slot suffices: a second overlapping hang is bounded by
+  // the liveSubmission check) so its late terminal event is ignored, then
+  // settle so capture can recover.
   #recoverFromHang() {
-    this.inputTarget.dispatchEvent(new CustomEvent("camera-capture:recover", { bubbles: true }))
-    this.uploadSettled()
+    this.abandonedSubmission = this.liveSubmission
+    this.#settle()
+  }
+
+  // The single settle path: release the lock and ask capture-upload to reset
+  // (re-enable input, clear value + signed_id). The reset ride-along matters
+  // on BOTH paths — after a genuine settle it is the normal post-submit
+  // cleanup; after a recovery the pipeline may be wedged mid-flight with its
+  // input disabled and a stale signed_id (direct-upload mode), and clearing
+  // the input also makes any zombie submit() bail on its own staleness
+  // guards. The event bubbles from the input to the form, where
+  // capture-upload listens.
+  #settle() {
+    this.liveSubmission = null
+    this.#clearSettleTimer()
+    this.uploadPending = false
+    this.inputTarget.dispatchEvent(new CustomEvent("camera-capture:settle", { bubbles: true }))
+    this.#setState(this.state)
   }
 
   // "Choose from library" — the same input the tile wraps; the existing
