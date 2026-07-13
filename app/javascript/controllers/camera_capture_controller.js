@@ -187,14 +187,25 @@ export default class extends Controller {
     this.#settle()
   }
 
-  // A failsafe tier expired — no terminal event came. Remember every
-  // abandoned submission (a Set: a later pre-submit recovery carries no live
-  // submission and must not erase an earlier zombie's identity) so its late
-  // terminal event is ignored, then settle so capture can recover. Entries
-  // are removed as their terminal events arrive; each costs a 120s hang, so
-  // the set stays tiny for any real page life.
+  // A failsafe tier expired — no terminal event came. Abort the abandoned
+  // submission outright (FormSubmission#stop cancels its fetch, so a
+  // late-completing response can never be rendered and navigate the page out
+  // from under a replacement capture), and remember it in a Set as
+  // defense-in-depth for the terminal event the abort itself emits — or for
+  // a Turbo version where stop() is unavailable. A Set, not a slot: a later
+  // pre-submit recovery carries no live submission and must not erase an
+  // earlier zombie's identity. Entries are consumed as terminal events
+  // arrive; each costs a 120s hang, so the set stays tiny.
   #recoverFromHang() {
-    if (this.liveSubmission) this.abandonedSubmissions.add(this.liveSubmission)
+    if (this.liveSubmission) {
+      this.abandonedSubmissions.add(this.liveSubmission)
+      try {
+        this.liveSubmission.stop?.()
+      } catch (_error) {
+        // The demux still ignores its terminal event; worst case is the old
+        // pre-abort behavior.
+      }
+    }
     this.#settle()
   }
 
