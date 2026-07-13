@@ -556,6 +556,65 @@ RSpec.describe "Boxes" do
     end
   end
 
+  describe "GET /moves/:move_id/boxes/:id — fragile mark on the header (#610)" do
+    it "shows an editor a 'Mark as fragile' toggle when the box isn't fragile" do
+      box = create(:box, :with_room, move:, number: "1", fragile: false)
+
+      get move_box_path(move, box)
+
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("boxes.actions.mark_fragile"))
+        expect(response.body).to include(fragile_move_box_path(move, box))
+      end
+    end
+
+    it "shows the current 'Fragile' state with a remove-mark action when fragile" do
+      box = create(:box, :with_room, move:, number: "1", fragile: true)
+
+      get move_box_path(move, box)
+
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("boxes.fragile_badge"))          # visible state
+        expect(response.body).to include(I18n.t("boxes.actions.unmark_fragile")) # aria action
+        expect(response.body).to include(fragile_move_box_path(move, box))
+      end
+    end
+
+    it "shows a viewer the read-only badge but no toggle when the box is fragile" do
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+      box = create(:box, :with_room, move:, number: "1", fragile: true)
+
+      get move_box_path(move, box)
+
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("boxes.fragile_badge"))
+        expect(response.body).not_to include(fragile_move_box_path(move, box)) # no toggle form
+      end
+    end
+
+    it "shows a viewer nothing fragile when the box isn't fragile" do
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+      box = create(:box, :with_room, move:, number: "1", fragile: false)
+
+      get move_box_path(move, box)
+
+      expect(response.body).not_to include(fragile_move_box_path(move, box))
+    end
+
+    it "shows no toggle on an archived (read-only) move" do
+      archived = create(:move, :archived, created_by: user)
+      box = create(:box, :with_room, move: archived, number: "1", fragile: false)
+
+      get move_box_path(archived, box)
+
+      expect(response.body).not_to include(fragile_move_box_path(archived, box))
+    end
+  end
+
   describe "PATCH /moves/:move_id/boxes/:id/transition" do
     it "seals a box that has a room" do
       box = create(:box, :with_room, move:, number: "1", status: "packing")

@@ -56,6 +56,7 @@ module Components
             div(class: "flex flex-wrap gap-2") { chips }
             h2(class: "text-headline-lg text-text-warm") { box_title }
             subtitle
+            fragile_control
           end
           header_actions
         end
@@ -105,9 +106,45 @@ module Components
           span(class: "h-2 w-2 rounded-full bg-accent-sage")
           plain I18n.t("boxes.status.#{@box.status}")
         end
-        # Manual fragile mark (Phase A) — terracotta, the design system's Fragile
-        # tint (DESIGN.md), matching the FRAGILE mark printed on the box label.
+      end
+
+      # The manual fragile mark, surfaced directly on the header (#610) instead of
+      # buried in the ⋮ Manage sheet. An editor gets a terracotta toggle — outline
+      # "Mark as fragile" when off, a filled "Fragile" pill when on (matching the
+      # FRAGILE mark printed on the box label). A viewer / archived Move keeps the
+      # read-only badge, and only when the box is actually fragile (no dead control).
+
+      #: () -> untyped
+      def fragile_control
+        return fragile_toggle if @editable
+
         render Components::Ui::Chip.new(label: I18n.t("boxes.fragile_badge"), kind: :tag) if @box.fragile?
+      end
+
+      # Idempotent set of the opposite state (like the old sheet row) so a stale page
+      # can't double-flip. The visible label states the current state ("Fragile") while
+      # the aria-label names the action ("Remove fragile mark"). On success the
+      # controller re-streams the whole #box-detail, so the pill flips + a toast fires.
+
+      #: () -> untyped
+      def fragile_toggle
+        on = @box.fragile?
+        # Filled terracotta when on (matching Ui::Button's `terracotta` variant and the
+        # FRAGILE label band); a low-emphasis terracotta outline invitation when off.
+        state = if on
+                  "bg-secondary text-on-secondary hover:opacity-90"
+                else
+                  "border border-secondary/40 text-secondary hover:bg-secondary/10"
+                end
+        button_to(
+          fragile_move_box_path(@move, @box),
+          method: :patch, params: { fragile: !on }, form_class: "inline-flex",
+          class: "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-label-caps uppercase transition #{state}",
+          aria: { label: I18n.t(on ? "boxes.actions.unmark_fragile" : "boxes.actions.mark_fragile") }
+        ) do
+          render Components::Icons::Alert.new(css: "h-4 w-4")
+          span { I18n.t(on ? "boxes.fragile_badge" : "boxes.actions.mark_fragile") }
+        end
       end
 
       #: () -> untyped
