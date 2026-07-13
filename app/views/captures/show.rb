@@ -83,6 +83,7 @@ module Views
           div(class: "flex flex-col gap-4",
               data: { controller: "camera-capture",
                       action: "change->camera-capture#uploadStarted " \
+                              "turbo:submit-start->camera-capture#uploadInFlight " \
                               "turbo:submit-end->camera-capture#uploadSettled" }) do
             viewfinder
             capture_form

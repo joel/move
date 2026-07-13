@@ -5,6 +5,15 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.88.1] — 2026-07-13
+
+### Fixed
+- **A slow connection can no longer lose a photo taken right after another.**
+  The new in-app camera briefly re-enabled its shutter if an upload took
+  longer than 30 seconds (possible on slow cellular), and a second shot in
+  that window could cancel the first upload unnoticed. The shutter now stays
+  locked until the upload genuinely finishes, however slow the network (#620).
+
 ## [v0.88.0] — 2026-07-13
 
 ### Changed
