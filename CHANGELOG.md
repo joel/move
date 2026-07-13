@@ -5,6 +5,19 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.88.0] — 2026-07-13
+
+### Changed
+- **The Capture screen now shoots photos inside the app, in portrait.** It
+  used to hand off to your phone's camera app, which rotates to landscape
+  with the device and can't be locked. Capture now opens a live viewfinder
+  right on the page with a proper shutter button — so on an installed app it
+  stays fixed to portrait, what you frame is exactly what recognition sees,
+  and each shot flows straight in without switching apps. If the camera is
+  unavailable or you deny access, the familiar tap-to-capture tile still
+  works (and can pick from your gallery); on a computer, a "Use camera" link
+  turns the webcam on only when you ask (#616).
+
 ## [v0.87.1] — 2026-07-13
 
 ### Fixed

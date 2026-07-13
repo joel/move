@@ -6,6 +6,14 @@ en:
     online: "Online"
     tap_to_capture: "Tap to capture"
     capture_hint: "Ensure items are well lit and clearly visible"
+    # In-app viewfinder (#616) — the camera renders inside the portrait-locked
+    # app window instead of the native camera app.
+    viewfinder:
+      allow: "Allow camera access to start capturing"
+      shutter: "Take photo"
+      library: "Choose from library"
+      use_camera: "Use camera"
+      unavailable: "Camera unavailable — tap above to choose a photo."
     finish: "Finish box"
     add_item: "Add item manually"
     sealed: "This box is sealed — unseal it before capturing."
