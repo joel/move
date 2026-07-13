@@ -67,7 +67,7 @@ export default class extends Controller {
     // is in flight makes Turbo abort the first (silent photo loss).
     this.uploadPending = false
     this.liveSubmission = null
-    this.abandonedSubmission = null
+    this.abandonedSubmissions = new Set()
     this.supported = !!navigator.mediaDevices?.getUserMedia
     this.onVisibility = () => this.#visibilityChanged()
     document.addEventListener("visibilitychange", this.onVisibility)
@@ -182,20 +182,19 @@ export default class extends Controller {
   // before this demux existed.
   uploadSettled(event) {
     const submission = event?.detail?.formSubmission
-    if (submission && submission === this.abandonedSubmission) {
-      this.abandonedSubmission = null
-      return
-    }
+    if (submission && this.abandonedSubmissions.delete(submission)) return
     if (this.liveSubmission && submission && submission !== this.liveSubmission) return
     this.#settle()
   }
 
-  // A failsafe tier expired — no terminal event came. Remember the abandoned
-  // submission (one slot suffices: a second overlapping hang is bounded by
-  // the liveSubmission check) so its late terminal event is ignored, then
-  // settle so capture can recover.
+  // A failsafe tier expired — no terminal event came. Remember every
+  // abandoned submission (a Set: a later pre-submit recovery carries no live
+  // submission and must not erase an earlier zombie's identity) so its late
+  // terminal event is ignored, then settle so capture can recover. Entries
+  // are removed as their terminal events arrive; each costs a 120s hang, so
+  // the set stays tiny for any real page life.
   #recoverFromHang() {
-    this.abandonedSubmission = this.liveSubmission
+    if (this.liveSubmission) this.abandonedSubmissions.add(this.liveSubmission)
     this.#settle()
   }
 
