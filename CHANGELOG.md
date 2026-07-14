@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.91.0] — 2026-07-14
+
+### Added
+- **Groundwork: item families now stay current on their own.** The grouping
+  engine from v0.90.0 is wired to everything that changes your inventory —
+  adding, renaming, moving or removing items, unpacking or deleting a whole
+  box — so the families quietly recompute moments after you stop making
+  changes. Still not visible on any screen; the gallery "Groups" view that
+  shows them ships next (#631, part of #625).
+
 ## [v0.90.0] — 2026-07-14
 
 ### Added
