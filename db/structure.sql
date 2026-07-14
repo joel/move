@@ -921,6 +921,36 @@ CREATE TABLE public.boxes (
 
 
 --
+-- Name: cluster_name_embeddings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.cluster_name_embeddings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    key_text character varying NOT NULL,
+    embedding_model character varying NOT NULL,
+    embedding public.vector(1536) NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: cluster_states; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.cluster_states (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    refresh_pending boolean DEFAULT false NOT NULL,
+    requested_at timestamp(6) without time zone,
+    computed_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: indexing_runs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -934,6 +964,36 @@ CREATE TABLE public.indexing_runs (
     failed_count integer DEFAULT 0 NOT NULL,
     started_at timestamp(6) without time zone,
     finished_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: item_cluster_memberships; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.item_cluster_memberships (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    item_cluster_id uuid NOT NULL,
+    item_id uuid NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: item_clusters; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.item_clusters (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    leader_key character varying NOT NULL,
+    label character varying NOT NULL,
+    items_count integer DEFAULT 0 NOT NULL,
+    boxes_count integer DEFAULT 0 NOT NULL,
+    embedding_model character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
@@ -1380,11 +1440,43 @@ ALTER TABLE ONLY public.boxes
 
 
 --
+-- Name: cluster_name_embeddings cluster_name_embeddings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cluster_name_embeddings
+    ADD CONSTRAINT cluster_name_embeddings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: cluster_states cluster_states_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cluster_states
+    ADD CONSTRAINT cluster_states_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: indexing_runs indexing_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.indexing_runs
     ADD CONSTRAINT indexing_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: item_cluster_memberships item_cluster_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_cluster_memberships
+    ADD CONSTRAINT item_cluster_memberships_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: item_clusters item_clusters_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_clusters
+    ADD CONSTRAINT item_clusters_pkey PRIMARY KEY (id);
 
 
 --
@@ -1677,6 +1769,27 @@ CREATE INDEX index_boxes_on_status ON public.boxes USING btree (status);
 
 
 --
+-- Name: index_cluster_name_embeddings_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_cluster_name_embeddings_on_move_id ON public.cluster_name_embeddings USING btree (move_id);
+
+
+--
+-- Name: index_cluster_name_embeddings_on_move_model_text; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_cluster_name_embeddings_on_move_model_text ON public.cluster_name_embeddings USING btree (move_id, embedding_model, key_text);
+
+
+--
+-- Name: index_cluster_states_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_cluster_states_on_move_id ON public.cluster_states USING btree (move_id);
+
+
+--
 -- Name: index_indexing_runs_on_move_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1688,6 +1801,41 @@ CREATE INDEX index_indexing_runs_on_move_id ON public.indexing_runs USING btree 
 --
 
 CREATE INDEX index_indexing_runs_on_move_id_and_status ON public.indexing_runs USING btree (move_id, status);
+
+
+--
+-- Name: index_item_cluster_memberships_on_item_cluster_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_item_cluster_memberships_on_item_cluster_id ON public.item_cluster_memberships USING btree (item_cluster_id);
+
+
+--
+-- Name: index_item_cluster_memberships_on_item_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_item_cluster_memberships_on_item_id ON public.item_cluster_memberships USING btree (item_id);
+
+
+--
+-- Name: index_item_clusters_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_item_clusters_on_move_id ON public.item_clusters USING btree (move_id);
+
+
+--
+-- Name: index_item_clusters_on_move_id_and_boxes_count_and_items_count; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_item_clusters_on_move_id_and_boxes_count_and_items_count ON public.item_clusters USING btree (move_id, boxes_count, items_count);
+
+
+--
+-- Name: index_item_clusters_on_move_id_and_leader_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_item_clusters_on_move_id_and_leader_key ON public.item_clusters USING btree (move_id, leader_key);
 
 
 --
@@ -2151,6 +2299,14 @@ ALTER TABLE ONLY public.recognition_suggestions
 
 
 --
+-- Name: cluster_name_embeddings fk_rails_1d70077445; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cluster_name_embeddings
+    ADD CONSTRAINT fk_rails_1d70077445 FOREIGN KEY (move_id) REFERENCES public.moves(id) ON DELETE CASCADE;
+
+
+--
 -- Name: items fk_rails_26cde3138d; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2271,6 +2427,14 @@ ALTER TABLE ONLY public.rooms
 
 
 --
+-- Name: cluster_states fk_rails_7a694225aa; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cluster_states
+    ADD CONSTRAINT fk_rails_7a694225aa FOREIGN KEY (move_id) REFERENCES public.moves(id) ON DELETE CASCADE;
+
+
+--
 -- Name: boxes fk_rails_809086bda1; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2287,6 +2451,14 @@ ALTER TABLE ONLY public.move_invitations
 
 
 --
+-- Name: item_cluster_memberships fk_rails_83c9b121dd; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_cluster_memberships
+    ADD CONSTRAINT fk_rails_83c9b121dd FOREIGN KEY (item_id) REFERENCES public.items(id) ON DELETE CASCADE;
+
+
+--
 -- Name: user_omniauth_identities fk_rails_8643d06e22; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2295,11 +2467,27 @@ ALTER TABLE ONLY public.user_omniauth_identities
 
 
 --
+-- Name: item_clusters fk_rails_8a72f3526e; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_clusters
+    ADD CONSTRAINT fk_rails_8a72f3526e FOREIGN KEY (move_id) REFERENCES public.moves(id) ON DELETE CASCADE;
+
+
+--
 -- Name: active_storage_variant_records fk_rails_993965df05; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.active_storage_variant_records
     ADD CONSTRAINT fk_rails_993965df05 FOREIGN KEY (blob_id) REFERENCES public.active_storage_blobs(id);
+
+
+--
+-- Name: item_cluster_memberships fk_rails_a458285b32; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_cluster_memberships
+    ADD CONSTRAINT fk_rails_a458285b32 FOREIGN KEY (item_cluster_id) REFERENCES public.item_clusters(id) ON DELETE CASCADE;
 
 
 --
@@ -2405,6 +2593,10 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260714120003'),
+('20260714120002'),
+('20260714120001'),
+('20260714120000'),
 ('20260713090000'),
 ('20260712123000'),
 ('20260712121000'),

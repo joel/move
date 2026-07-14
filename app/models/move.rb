@@ -53,6 +53,10 @@ class Move < ApplicationRecord
   has_many :recognition_suggestions, dependent: :destroy
   # G-search — whole-Move re-embedding passes, for live indexing progress (#239).
   has_many :indexing_runs, dependent: :destroy
+  # Item families computed by Clusters::Recompute (#629) — read by the gallery
+  # Groups view. The private cluster internals (name-vector cache, state
+  # singleton) have no Move association on purpose: their FKs cascade at the DB.
+  has_many :item_clusters, dependent: :destroy
   has_many :items, dependent: :destroy
   has_many :integration_tokens, class_name: "MoveIntegrationToken", dependent: :destroy
   # G1 — append-only activity feed entries (Technical Foundation §8.2).

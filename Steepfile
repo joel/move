@@ -116,6 +116,7 @@ target :actions do
   check "packs/move_invitations/app/public", inline: true
   check "packs/move_memberships/app/public", inline: true
   check "packs/organizations/app/public", inline: true
+  check "packs/search/app/models", inline: true
   check "packs/search/app/public", inline: true
   check "packs/session_handoffs/app/public", inline: true
   check "packs/terms/app/public", inline: true

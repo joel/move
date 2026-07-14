@@ -1,0 +1,305 @@
+# resolve-type-names: false
+
+class ::ItemClusterMembership < ::ApplicationRecord
+  extend ::ActiveRecord::Base::ClassMethods[::ItemClusterMembership, ::ItemClusterMembership::ActiveRecord_Relation, ::String]
+
+  module ::ItemClusterMembership::GeneratedAttributeMethods
+    def id: () -> ::String
+
+    def id=: (::String) -> ::String
+
+    def id?: () -> bool
+
+    def id_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def id_change: () -> [ ::String?, ::String? ]
+
+    def id_will_change!: () -> void
+
+    def id_was: () -> ::String?
+
+    def id_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def id_previous_change: () -> ::Array[::String?]?
+
+    def id_previously_was: () -> ::String?
+
+    def id_before_last_save: () -> ::String?
+
+    def id_change_to_be_saved: () -> ::Array[::String?]?
+
+    def id_in_database: () -> ::String?
+
+    def saved_change_to_id: () -> ::Array[::String?]?
+
+    def saved_change_to_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_id!: () -> void
+
+    def clear_id_change: () -> void
+
+    def id_before_type_cast: () -> ::String
+
+    def id_for_database: () -> ::String
+
+    def item_cluster_id: () -> ::String
+
+    def item_cluster_id=: (::String) -> ::String
+
+    def item_cluster_id?: () -> bool
+
+    def item_cluster_id_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def item_cluster_id_change: () -> [ ::String?, ::String? ]
+
+    def item_cluster_id_will_change!: () -> void
+
+    def item_cluster_id_was: () -> ::String?
+
+    def item_cluster_id_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def item_cluster_id_previous_change: () -> ::Array[::String?]?
+
+    def item_cluster_id_previously_was: () -> ::String?
+
+    def item_cluster_id_before_last_save: () -> ::String?
+
+    def item_cluster_id_change_to_be_saved: () -> ::Array[::String?]?
+
+    def item_cluster_id_in_database: () -> ::String?
+
+    def saved_change_to_item_cluster_id: () -> ::Array[::String?]?
+
+    def saved_change_to_item_cluster_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_item_cluster_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_item_cluster_id!: () -> void
+
+    def clear_item_cluster_id_change: () -> void
+
+    def item_cluster_id_before_type_cast: () -> ::String
+
+    def item_cluster_id_for_database: () -> ::String
+
+    def item_id: () -> ::String
+
+    def item_id=: (::String) -> ::String
+
+    def item_id?: () -> bool
+
+    def item_id_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def item_id_change: () -> [ ::String?, ::String? ]
+
+    def item_id_will_change!: () -> void
+
+    def item_id_was: () -> ::String?
+
+    def item_id_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def item_id_previous_change: () -> ::Array[::String?]?
+
+    def item_id_previously_was: () -> ::String?
+
+    def item_id_before_last_save: () -> ::String?
+
+    def item_id_change_to_be_saved: () -> ::Array[::String?]?
+
+    def item_id_in_database: () -> ::String?
+
+    def saved_change_to_item_id: () -> ::Array[::String?]?
+
+    def saved_change_to_item_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_item_id?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_item_id!: () -> void
+
+    def clear_item_id_change: () -> void
+
+    def item_id_before_type_cast: () -> ::String
+
+    def item_id_for_database: () -> ::String
+
+    def created_at: () -> ::ActiveSupport::TimeWithZone
+
+    def created_at=: (::ActiveSupport::TimeWithZone) -> ::ActiveSupport::TimeWithZone
+
+    def created_at?: () -> bool
+
+    def created_at_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def created_at_change: () -> [ ::ActiveSupport::TimeWithZone?, ::ActiveSupport::TimeWithZone? ]
+
+    def created_at_will_change!: () -> void
+
+    def created_at_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def created_at_previously_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def created_at_previous_change: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def created_at_previously_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def created_at_before_last_save: () -> ::ActiveSupport::TimeWithZone?
+
+    def created_at_change_to_be_saved: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def created_at_in_database: () -> ::ActiveSupport::TimeWithZone?
+
+    def saved_change_to_created_at: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def saved_change_to_created_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def will_save_change_to_created_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def restore_created_at!: () -> void
+
+    def clear_created_at_change: () -> void
+
+    def created_at_before_type_cast: () -> ::Time
+
+    def created_at_for_database: () -> ::Time
+
+    def updated_at: () -> ::ActiveSupport::TimeWithZone
+
+    def updated_at=: (::ActiveSupport::TimeWithZone) -> ::ActiveSupport::TimeWithZone
+
+    def updated_at?: () -> bool
+
+    def updated_at_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def updated_at_change: () -> [ ::ActiveSupport::TimeWithZone?, ::ActiveSupport::TimeWithZone? ]
+
+    def updated_at_will_change!: () -> void
+
+    def updated_at_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def updated_at_previously_changed?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def updated_at_previous_change: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def updated_at_previously_was: () -> ::ActiveSupport::TimeWithZone?
+
+    def updated_at_before_last_save: () -> ::ActiveSupport::TimeWithZone?
+
+    def updated_at_change_to_be_saved: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def updated_at_in_database: () -> ::ActiveSupport::TimeWithZone?
+
+    def saved_change_to_updated_at: () -> ::Array[::ActiveSupport::TimeWithZone?]?
+
+    def saved_change_to_updated_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def will_save_change_to_updated_at?: (?from: ::ActiveSupport::TimeWithZone?, ?to: ::ActiveSupport::TimeWithZone?) -> bool
+
+    def restore_updated_at!: () -> void
+
+    def clear_updated_at_change: () -> void
+
+    def updated_at_before_type_cast: () -> ::Time
+
+    def updated_at_for_database: () -> ::Time
+  end
+  include ::ItemClusterMembership::GeneratedAttributeMethods
+  module ::ItemClusterMembership::GeneratedAliasAttributeMethods
+    include ::ItemClusterMembership::GeneratedAttributeMethods
+
+    alias id_value id
+
+    alias id_value= id=
+
+    alias id_value? id?
+
+    alias id_value_changed? id_changed?
+
+    alias id_value_change id_change
+
+    alias id_value_will_change! id_will_change!
+
+    alias id_value_was id_was
+
+    alias id_value_previously_changed? id_previously_changed?
+
+    alias id_value_previous_change id_previous_change
+
+    alias id_value_previously_was id_previously_was
+
+    alias id_value_before_last_save id_before_last_save
+
+    alias id_value_change_to_be_saved id_change_to_be_saved
+
+    alias id_value_in_database id_in_database
+
+    alias saved_change_to_id_value saved_change_to_id
+
+    alias saved_change_to_id_value? saved_change_to_id?
+
+    alias will_save_change_to_id_value? will_save_change_to_id?
+
+    alias restore_id_value! restore_id!
+
+    alias clear_id_value_change clear_id_change
+
+    alias id_value_before_type_cast id_before_type_cast
+
+    alias id_value_for_database id_for_database
+  end
+  include ::ItemClusterMembership::GeneratedAliasAttributeMethods
+
+  def item_cluster: () -> ::ItemCluster
+  def item_cluster=: (::ItemCluster?) -> ::ItemCluster?
+  def reload_item_cluster: () -> ::ItemCluster?
+  def build_item_cluster: (?untyped) -> ::ItemCluster
+  def create_item_cluster: (?untyped) -> ::ItemCluster
+  def create_item_cluster!: (?untyped) -> ::ItemCluster
+  def item: () -> ::Item
+  def item=: (::Item?) -> ::Item?
+  def reload_item: () -> ::Item?
+  def build_item: (?untyped) -> ::Item
+  def create_item: (?untyped) -> ::Item
+  def create_item!: (?untyped) -> ::Item
+
+  module ::ItemClusterMembership::GeneratedAssociationMethods
+  end
+  include ::ItemClusterMembership::GeneratedAssociationMethods
+
+  module ::ItemClusterMembership::GeneratedRelationMethods
+  end
+
+  class ::ItemClusterMembership::ActiveRecord_Relation < ::ActiveRecord::Relation
+    include ::Enumerable[::ItemClusterMembership]
+    include ::ItemClusterMembership::GeneratedRelationMethods
+    include ::ActiveRecord::Relation::Methods[::ItemClusterMembership, ::String]
+  end
+
+  class ::ItemClusterMembership::ActiveRecord_Associations_CollectionProxy < ::ActiveRecord::Associations::CollectionProxy
+    include ::Enumerable[::ItemClusterMembership]
+    include ::ItemClusterMembership::GeneratedRelationMethods
+    include ::ActiveRecord::Relation::Methods[::ItemClusterMembership, ::String]
+
+    def build: (?::ActiveRecord::Associations::CollectionProxy::_EachPair attributes) ?{ () -> untyped } -> ::ItemClusterMembership
+             | (::Array[::ActiveRecord::Associations::CollectionProxy::_EachPair] attributes) ?{ () -> untyped } -> ::Array[::ItemClusterMembership]
+    def create: (?::ActiveRecord::Associations::CollectionProxy::_EachPair attributes) ?{ () -> untyped } -> ::ItemClusterMembership
+              | (::Array[::ActiveRecord::Associations::CollectionProxy::_EachPair] attributes) ?{ () -> untyped } -> ::Array[::ItemClusterMembership]
+    def create!: (?::ActiveRecord::Associations::CollectionProxy::_EachPair attributes) ?{ () -> untyped } -> ::ItemClusterMembership
+               | (::Array[::ActiveRecord::Associations::CollectionProxy::_EachPair] attributes) ?{ () -> untyped } -> ::Array[::ItemClusterMembership]
+    def reload: () -> ::Array[::ItemClusterMembership]
+
+    def replace: (::Array[::ItemClusterMembership]) -> void
+    def delete: (*::ItemClusterMembership | ::String) -> ::Array[::ItemClusterMembership]
+    def destroy: (*::ItemClusterMembership | ::String) -> ::Array[::ItemClusterMembership]
+    def <<: (*::ItemClusterMembership | ::Array[::ItemClusterMembership]) -> self
+    def prepend: (*::ItemClusterMembership | ::Array[::ItemClusterMembership]) -> self
+  end
+end
+
+class ::ApplicationRecord < ::ActiveRecord::Base
+end
+class ::ItemCluster < ::ApplicationRecord
+end
+class ::Item < ::ApplicationRecord
+end
