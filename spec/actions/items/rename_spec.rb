@@ -35,6 +35,27 @@ RSpec.describe Items::Rename do
     expect(item.reload.name).to eq("Cofee machine")
   end
 
+  it "clears the hidden family on a rename, keeps it on a same-name confirm (#626)" do
+    renamed = create(:item, :auto_confirmed, move:, name: "Black box", family: "electronics")
+    confirmed = create(:item, :auto_confirmed, move:, name: "Power bank", family: "batteries & power")
+
+    described_class.new.call(item: renamed, name: "Board game", editor:)
+    described_class.new.call(item: confirmed, name: "Power bank", editor:)
+
+    expect(renamed.reload.family).to be_nil
+    expect(confirmed.reload.family).to eq("batteries & power")
+  end
+
+  it "keeps the hidden family when a blur-time resubmit only adds whitespace or changes case" do
+    # The C2 field auto-saves on blur — a stray trailing space must not cost the
+    # item its facet (clearing is permanent; family is never re-derived).
+    recognized = create(:item, :auto_confirmed, move:, name: "Power bank", family: "batteries & power")
+
+    described_class.new.call(item: recognized, name: "power bank ", editor:)
+
+    expect(recognized.reload.family).to eq("batteries & power")
+  end
+
   it "refuses to mutate an archived Move" do
     archived = create(:move, :archived, created_by: editor)
     archived_item = create(:item, move: archived, name: "Lamp")
