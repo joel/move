@@ -138,8 +138,8 @@ module DemoData
         )
         item = box.items.create!(
           move: @move, source_media: media, source_recognition_suggestion_id: suggestion.id,
-          name: attrs[:name], confidence_score: attrs[:confidence], created_via: "recognition",
-          review_state: attrs[:review], presence_state: presence
+          name: attrs[:name], confidence_score: attrs[:confidence], family: attrs[:family],
+          created_via: "recognition", review_state: attrs[:review], presence_state: presence
         )
         suggestion.update!(item: item)
       end

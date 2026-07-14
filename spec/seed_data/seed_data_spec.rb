@@ -106,14 +106,29 @@ RSpec.describe SeedData do
       expect(detections.pluck(:review)).to eq(photo[:items].pluck(:review))
     end
 
-    it "uses the recorded objects when present" do
+    it "threads an authored hidden family through the fallback shape (#626)" do
+      photo = { slug: "synthetic", items: [
+        { name: "AA batteries", confidence: 0.9, review: "auto_confirmed", family: "batteries & power" },
+        { name: "Notebook", confidence: 0.9, review: "auto_confirmed" }
+      ] }
+      allow(described_class).to receive(:recorded_recognition).with("synthetic").and_return(nil)
+
+      detections = described_class.detections_for(photo, threshold: 0.8)
+      expect(detections.pluck(:family)).to eq(["batteries & power", nil])
+    end
+
+    it "uses the recorded objects when present, threading family (nil for pre-#626 recordings)" do
       photo = SeedData::PHOTOS.find { |p| p[:slug] == "kitchen-counter" }
       allow(described_class).to receive(:recorded_recognition).with("kitchen-counter").and_return(
-        "objects" => [{ "label" => "Kettle", "confidence" => 0.9 }]
+        "objects" => [
+          { "label" => "Kettle", "confidence" => 0.9, "family" => " kitchenware " },
+          { "label" => "Old radio", "confidence" => 0.7 }
+        ]
       )
 
       detections = described_class.detections_for(photo, threshold: 0.8)
-      expect(detections.pluck(:name)).to eq(["Kettle"])
+      expect(detections.pluck(:name)).to eq(["Kettle", "Old radio"])
+      expect(detections.pluck(:family)).to eq(["kitchenware", nil])
     end
   end
 
