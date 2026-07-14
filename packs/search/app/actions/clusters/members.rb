@@ -18,8 +18,12 @@ module Clusters
       cluster = ItemCluster.find_by(id: cluster_id, move_id: move.id)
       return Failure(:not_found) unless cluster
 
+      # Preload the source photo's Active Storage attachment + blob: the detail
+      # page's thumb calls image_displayable? and TransformUrl per member, which
+      # touch both — without the nested preload the page degrades linearly with
+      # member count.
       items = cluster.items.merge(Item.searchable)
-                     .includes(:source_media, box: :room)
+                     .includes(box: :room, source_media: { image_attachment: :blob })
                      .joins(:box)
                      .order(Arel.sql("boxes.number::bigint"), :name)
                      .to_a

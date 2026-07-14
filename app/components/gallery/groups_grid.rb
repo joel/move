@@ -52,12 +52,16 @@ module Components
       # Resolve the preview photo ids Clusters::Overview returned into Media.
       # Media is packs/captures' public model; loading it here in the root
       # gallery layer keeps packs/search free of the cross-domain reference
-      # (one query for every card's candidates).
+      # (one query for every card's candidates). Preloads the Active Storage
+      # attachment + blob — image_displayable? and TransformUrl touch both per
+      # photo, so without it a full page (≤100 cards × candidates) or a
+      # broadcast render would fan out to hundreds of queries (the gallery
+      # grid's idiom).
 
       #: () -> Hash[untyped, untyped]
       def preview_media
         ids = @overview.preview_media_ids.values.flatten.uniq
-        Media.where(id: ids).index_by(&:id)
+        Media.where(id: ids).includes(image_attachment: :blob).index_by(&:id)
       end
 
       # A card's ≤PREVIEWS displayable photos, in the quilt order Overview
