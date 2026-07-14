@@ -33,6 +33,23 @@ RSpec.describe Moves::Destroy do
     expect(Room.unscoped.where(move_id: move_id)).to be_empty
   end
 
+  it "cascades every cluster table (#629 — no DELETE_ORDER entries needed)" do
+    move = create(:move, :sample)
+    box = create(:box, move: move)
+    create_list(:item, 2, :auto_confirmed, move: move, box: box, name: "AA battery")
+    Clusters::Recompute.new.call(move: move)
+    move_id = move.id
+    expect(ItemCluster.where(move_id: move_id)).to be_any # engine really wrote rows
+
+    result = described_class.new.call(move: move)
+
+    expect(result).to be_success
+    expect(ItemCluster.where(move_id: move_id)).to be_empty
+    expect(ItemClusterMembership.joins(:item_cluster).where(item_clusters: { move_id: move_id })).to be_empty
+    expect(ClusterNameEmbedding.where(move_id: move_id)).to be_empty
+    expect(ClusterState.where(move_id: move_id)).to be_empty
+  end
+
   it "fully tears down a real recognition-built sample (FK order, readonly, blobs)" do
     # The realistic shape: recognition items linked via source_media_id, suggestions,
     # runs, an append-only Activity, and Active Storage blobs — none of which the
