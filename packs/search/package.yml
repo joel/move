@@ -13,6 +13,7 @@
 #                              computes synchronously; all else via RequestRefresh)
 #     Clusters::Overview       gallery Groups read: state + cards + previews (#633)
 #     Clusters::Members        group-detail read: live member rows (#633)
+#     Clusters::Siblings       item-detail "same group" rail read (#642)
 #   PUBLIC (app/public):
 #     IndexingRun              run record (named in Moves::Destroy::DELETE_ORDER)
 #     ItemSearchDocument       projection model — Item's `has_one :search_document,
