@@ -110,6 +110,30 @@ RSpec.describe "Items" do
 
       expect(response.body).not_to include("in this photo")
     end
+
+    it "shows the same-group rail with the family's other members and their boxes (#642)" do
+      office = create(:box, move:, number: "7", room: create(:room, move:, name: "Office"))
+      item = create(:item, :auto_confirmed, move:, box:, name: "AA battery")
+      create(:item, :auto_confirmed, move:, box: office, name: "AAA battery")
+      Clusters::Recompute.new.call(move:)
+
+      get move_item_path(move, item)
+
+      expect(response.body).to include(I18n.t("items.show.same_group"))
+      expect(response.body).to include("AAA battery") # the sibling
+      expect(response.body).to include("Box #007").and include("Office") # its locator
+      expect(response.body).to include(move_gallery_group_path(move, move.item_clusters.sole))
+      expect(response.body).to include(move_item_path(move, move.items.find_by(name: "AAA battery")))
+    end
+
+    it "omits the same-group rail when the item is in no cluster" do
+      item = create(:item, :auto_confirmed, move:, box:, name: "Unique heirloom clock")
+      Clusters::Recompute.new.call(move:)
+
+      get move_item_path(move, item)
+
+      expect(response.body).not_to include(I18n.t("items.show.same_group"))
+    end
   end
 
   describe "phase-aware remove control (C3)" do
