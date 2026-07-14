@@ -44,10 +44,14 @@ module Clusters
     LOCK_NAMESPACE = 625
     # Minimum cosine similarity (1 - distance) for a group to join a leader,
     # keyed by embedding model — vector spaces are never mixed. The fake
-    # embedder's similarity is token overlap, so 0.4 ≈ "shares the dominant
-    # word"; 0.62 is a conservative starting point for real semantic models,
-    # calibrated against a real key in PR 4. Tuneable constants, not policy.
-    MIN_SIMILARITY = Hash.new(0.62).merge("fake-embed-1" => 0.4).freeze
+    # embedder's similarity is token overlap: two 2-token names sharing one
+    # word score 0.5, so 0.45 keeps those merges while sitting ABOVE 0.408 —
+    # the score a single 1536-bucket hash collision produces between unrelated
+    # 2- and 3-token names ("battery"/"wooden" really collide, which put a
+    # wooden coffee table in the demo's battery family at θ=0.4). 0.62 is a
+    # conservative starting point for real semantic models, calibrated against
+    # a real key in PR 4. Tuneable constants, not policy.
+    MIN_SIMILARITY = Hash.new(0.62).merge("fake-embed-1" => 0.45).freeze
 
     # A family of one is noise — only clusters with at least this many member
     # items are persisted (no zero-value rows for the gallery to filter).
