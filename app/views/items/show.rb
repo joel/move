@@ -6,8 +6,8 @@ module Views
     # never cropped) on the left; the edit form plus Move and Remove/Restore
     # controls on the right. Review and presence are shown as independent axes.
     class Show < Views::Base
-      #: (move: untyped, item: untyped, boxes: untyped, ?editable: untyped, ?photo_siblings: untyped, ?group_siblings: untyped) -> void
-      def initialize(move:, item:, boxes:, editable: false, photo_siblings: 0, group_siblings: nil)
+      #: (move: untyped, item: untyped, boxes: untyped, ?editable: untyped, ?photo_siblings: untyped) -> void
+      def initialize(move:, item:, boxes:, editable: false, photo_siblings: 0)
         @move = move
         @item = item
         @boxes = boxes
@@ -15,9 +15,6 @@ module Views
         # Count of *other* in-box items detected in this item's source photo (0 for
         # manual items) — surfaces the one-photo → many-items relationship on C3.
         @photo_siblings = photo_siblings
-        # The item's cluster family (#642), or nil when it's in no group —
-        # surfaces the cross-box relationship the one-photo note can't.
-        @group_siblings = group_siblings
       end
 
       #: () -> void
@@ -28,7 +25,9 @@ module Views
           media_panel
           edit_panel
         end
-        group_rail if @group_siblings
+        # The cross-box family (#642) — a stable Turbo target that presence
+        # changes replace, empty when the item is in no live group.
+        render Components::Items::GroupRail.new(move: @move, item: @item)
       end
 
       private
@@ -167,66 +166,6 @@ module Views
         number = Kernel.format("%03d", box.number.to_i)
         room = box.room&.name
         room ? "#{I18n.t("items.box", number:)} · #{room}" : I18n.t("items.box", number:)
-      end
-
-      # --- "In the same group" rail (#642) -----------------------------------
-
-      # The item's cluster family — the other members, scattered across boxes.
-      # Surfaces the cross-box relationship (batteries in the kitchen box AND
-      # the office box) that the one-photo sibling note above can't; the header
-      # links to the full group, each row to that member's own detail page.
-
-      #: () -> untyped
-      def group_rail
-        section(class: "mt-section-gap flex flex-col gap-3") do
-          rail_header
-          ul(class: "flex flex-col gap-2") do
-            @group_siblings.items.each { |sibling| sibling_row(sibling) }
-          end
-        end
-      end
-
-      #: () -> untyped
-      def rail_header
-        a(
-          href: move_gallery_group_path(@move, @group_siblings.cluster),
-          class: "flex items-baseline justify-between gap-3 transition hover:text-accent-sage"
-        ) do
-          span(class: "text-label-caps uppercase text-muted") { I18n.t("items.show.same_group") }
-          span(class: "text-body-md text-accent-sage") { I18n.t("items.show.view_group") }
-        end
-      end
-
-      #: (untyped sibling) -> untyped
-      def sibling_row(sibling)
-        li do
-          a(
-            href: move_item_path(@move, sibling),
-            class: "flex items-center gap-3 rounded-card border border-card-border bg-card p-3 " \
-                   "transition hover:border-accent-sage focus:outline-none " \
-                   "focus:ring-2 focus:ring-accent-sage/40"
-          ) do
-            sibling_thumb(sibling)
-            span(class: "min-w-0 flex-1 truncate text-body-md text-text-warm") { sibling.name }
-            render Components::Ui::Chip.new(label: box_context(sibling.box), kind: :category)
-          end
-        end
-      end
-
-      #: (untyped sibling) -> untyped
-      def sibling_thumb(sibling)
-        div(class: "flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden " \
-                   "rounded-lg bg-surface-container-high text-muted") do
-          media = sibling.source_media
-          if media&.image_displayable?
-            img(
-              src: MediaVariants::TransformUrl.for(media, :thumb),
-              alt: "", loading: "lazy", class: "h-full w-full object-cover"
-            )
-          else
-            render Components::Icons::Camera.new(css: "h-5 w-5 opacity-40")
-          end
-        end
       end
     end
   end

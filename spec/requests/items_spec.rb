@@ -358,6 +358,22 @@ RSpec.describe "Items" do
       expect(item.reload.presence_state).to eq("in_box")
     end
 
+    it "refreshes the same-group rail so it follows presence (#643)" do
+      # A grouped item unpacked mid-session must not keep claiming it's "in the
+      # same group" — the presence stream replaces the rail target, and its
+      # content vanishes because the item is no longer searchable.
+      box = create(:box, move:, status: "unpacking", number: "2")
+      other = create(:box, move:, number: "7")
+      item = create(:item, :auto_confirmed, move:, box:, name: "AA battery")
+      create(:item, :auto_confirmed, move:, box: other, name: "AAA battery")
+      Clusters::Recompute.new.call(move:)
+
+      patch mark_removed_move_item_path(move, item), as: :turbo_stream
+
+      expect(response.body).to include(%(action="replace" target="#{Components::Items::GroupRail::ID}"))
+      expect(response.body).not_to include(I18n.t("items.show.same_group")) # rail emptied
+    end
+
     it "streams an alert toast (no DOM change) when mark_removed hits the wrong phase" do
       item = create(:item, :manual, move:, box: create(:box, move:, status: "packing"))
 

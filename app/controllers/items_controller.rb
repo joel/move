@@ -16,8 +16,7 @@ class ItemsController < MoveScopedController
   def show
     render Views::Items::Show.new(
       move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-      editable: editable_move?, photo_siblings: photo_siblings(@item),
-      group_siblings: Clusters::Siblings.new.call(item: @item)
+      editable: editable_move?, photo_siblings: photo_siblings(@item)
     )
   end
 
@@ -102,8 +101,7 @@ class ItemsController < MoveScopedController
         format.html do
           render Views::Items::Show.new(
             move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-            editable: true, photo_siblings: photo_siblings(@item),
-            group_siblings: Clusters::Siblings.new.call(item: @item)
+            editable: true, photo_siblings: photo_siblings(@item)
           ), status: :unprocessable_content
         end
       end
@@ -255,7 +253,12 @@ class ItemsController < MoveScopedController
                            view_context.render(Components::Items::PresenceControls.new(
                                                  move: @move, item: @item, boxes: presence_boxes,
                                                  editable: editable_move?
-                                               )))
+                                               ))),
+      # A presence flip changes the item's own searchability, so the "same
+      # group" rail must follow (#642/#643): unpacking hides it, restoring
+      # brings it back — the rail self-loads the live siblings on re-render.
+      turbo_stream.replace(Components::Items::GroupRail::ID,
+                           view_context.render(Components::Items::GroupRail.new(move: @move, item: @item)))
     ]
   end
 
