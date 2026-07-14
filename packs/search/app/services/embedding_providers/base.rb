@@ -27,6 +27,14 @@ module EmbeddingProviders
       raise NotImplementedError, "#{self.class} must implement #embed"
     end
 
+    # The model tag this embedder pins its vectors to (what Result#model and
+    # item_search_documents.embedding_model carry). Public so a caller can key a
+    # cache by vector space before embedding anything — the cluster name-vector
+    # cache (#629) needs the space up front to know which rows are hits.
+    def model
+      model_name
+    end
+
     protected
 
     # The Move's key, or a typed failure (never a shared/ENV key).

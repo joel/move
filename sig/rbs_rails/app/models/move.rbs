@@ -1201,6 +1201,10 @@ class ::Move < ::ApplicationRecord
   def indexing_runs=: (::IndexingRun::ActiveRecord_Associations_CollectionProxy | ::Array[::IndexingRun]) -> (::IndexingRun::ActiveRecord_Associations_CollectionProxy | ::Array[::IndexingRun])
   def indexing_run_ids: () -> ::Array[::String]
   def indexing_run_ids=: (::Array[::String]) -> ::Array[::String]
+  def item_clusters: () -> ::ItemCluster::ActiveRecord_Associations_CollectionProxy
+  def item_clusters=: (::ItemCluster::ActiveRecord_Associations_CollectionProxy | ::Array[::ItemCluster]) -> (::ItemCluster::ActiveRecord_Associations_CollectionProxy | ::Array[::ItemCluster])
+  def item_cluster_ids: () -> ::Array[::String]
+  def item_cluster_ids=: (::Array[::String]) -> ::Array[::String]
   def items: () -> ::Item::ActiveRecord_Associations_CollectionProxy
   def items=: (::Item::ActiveRecord_Associations_CollectionProxy | ::Array[::Item]) -> (::Item::ActiveRecord_Associations_CollectionProxy | ::Array[::Item])
   def item_ids: () -> ::Array[::String]
@@ -1292,6 +1296,10 @@ end
 class ::IndexingRun < ::ApplicationRecord
 end
 class ::IndexingRun::ActiveRecord_Associations_CollectionProxy < ::ActiveRecord::Associations::CollectionProxy
+end
+class ::ItemCluster < ::ApplicationRecord
+end
+class ::ItemCluster::ActiveRecord_Associations_CollectionProxy < ::ActiveRecord::Associations::CollectionProxy
 end
 class ::Item < ::ApplicationRecord
 end

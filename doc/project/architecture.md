@@ -585,6 +585,45 @@ are added to Apartment's `pg_excluded_names` so tenant clones don't rewrite them
 to `<tenant>.X`. See `new-app-recipe.md` for the image swap + accessory cutover +
 glibc-collation gotcha.
 
+> ⚠ Corollary of that exclusion: a **tenant table name must not contain any
+> `pg_excluded_names` entry as a substring** — the clone rewrite skips every
+> `public.X` match containing one, so e.g. a table named `…_vectors` stays
+> `public.`-qualified in the clone SQL and every tenant creation fails with
+> `PG::DuplicateTable` (bitten in #629; hence `cluster_name_embeddings`).
+
+### 6b. Item clusters (#625/#629)
+
+Sibling subsystem in `packs/search`: `Clusters::Recompute` groups a Move's
+searchable items into families ("AA batteries — 9 items · 4 boxes") for the
+gallery Groups surface (PR 4). It deliberately does **not** reuse
+`item_search_documents.embedding` (those vectors embed `name + box + room`,
+whose box/room tokens pull same-box items together — the opposite of finding
+things scattered across boxes). Instead each **distinct normalized name** (+
+the #626 hidden family) is embedded once per vector space into the
+`cluster_name_embeddings` cache; pairwise cosine runs as one exact self-join
+(no ANN), and a greedy leader pass merges groups with a **direct** edge to a
+leader (anti-chaining) at a per-model threshold (`fake` 0.4 ≈ token overlap,
+real models 0.62 starting point). Clusters with ≥2 items persist to
+`item_clusters` (upserted by `(move_id, leader_key)` so ids survive
+recomputes) + `item_cluster_memberships` (one cluster per item, DB-unique);
+`cluster_states` stamps completion and backs the PR 3 refresh debounce.
+Recomputes serialize per Move on a **session-level** advisory lock
+(`pg_advisory_lock`/`unlock`) held for the whole run — read → embed → persist —
+so a waiting run always snapshots after the winner's commit (a transaction-
+scoped lock would release before the embed/read sequence is serialized and let
+a stale reader be the last writer). Keyless Moves get word-share families via
+the Fake embedder (exact name-grouping is the floor).
+
+```mermaid
+flowchart LR
+  I[items searchable] --> S1[Stage 1: group by normalized name]
+  S1 --> KT["key_text = name + modal family (#626)"]
+  KT --> C[(cluster_name_embeddings cache)]
+  C --> SJ[exact cosine self-join] --> LP[greedy leader pass, anti-chaining]
+  LP --> IC[(item_clusters + memberships + counts)]
+  IC --> ST[(cluster_states.computed_at)]
+```
+
 ## 7. MCP assistant surface (D13)
 
 An AI assistant reaches a single Move through the **official `mcp` gem** at
