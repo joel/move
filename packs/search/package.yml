@@ -7,6 +7,8 @@
 #     Search::Reindexing       mixin included by Boxes::Update + Vocabularies actions
 #     IndexingRuns::Start      start a reindex run (Moves::Set*ProviderKey actions)
 #     Searches::RecentSearches recent-search history (SearchesController)
+#     Clusters::RequestRefresh claim-debounced cluster recompute (#631 — the
+#                              in-pack subscriber + PR 4's gallery lazy-trigger)
 #   PUBLIC (app/public):
 #     IndexingRun              run record (named in Moves::Destroy::DELETE_ORDER)
 #     ItemSearchDocument       projection model — Item's `has_one :search_document,
@@ -21,6 +23,7 @@
 #     Search::RefreshDocumentJob, Search::IndexSubscriber (config-wired),
 #     IndexingRuns::{RecordProgress, Broadcasting},
 #     Clusters::Recompute (the cluster engine, #629),
+#     Clusters::RefreshJob, Clusters::RefreshSubscriber (config-wired, #631),
 #     ClusterNameEmbedding, ClusterState (cluster cache + state singleton)
 #
 # dependencies: ['.', 'packs/utility'] — search subclasses BaseAction and references
