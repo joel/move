@@ -9,6 +9,8 @@ module Components
     # same chip vocabulary locates each member on the detail page.
     class GroupCard < Components::Base
       CHIP_CAP = 3
+      # Photos in the 2×2 quilt (the grid resolves + filters them to displayable).
+      PREVIEWS = 4
 
       #: (move: untyped, cluster: untyped, previews: untyped, box_numbers: untyped) -> void
       def initialize(move:, cluster:, previews:, box_numbers:)

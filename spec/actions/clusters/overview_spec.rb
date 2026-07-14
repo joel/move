@@ -43,17 +43,18 @@ RSpec.describe Clusters::Overview do
     # "2" before "10" — numeric, not lexical.
     expect(result.box_numbers.fetch(battery.id)).to eq(%w[2 10])
     expect(result.capped).to be(false)
+    expect(result.preview_media_ids).to be_a(Hash)
   end
 
-  it "collects at most #{described_class::PREVIEWS_PER_CLUSTER} distinct displayable preview photos" do
+  it "collects distinct preview photo ids per cluster (duplicates collapsed by DISTINCT ON)" do
     media = create(:media, move:, box: box_a, status: "ready")
     other = create(:media, move:, box: box_b, status: "ready")
     3.times { create(:item, :auto_confirmed, move:, box: box_a, name: "AA battery", source_media: media) }
     create(:item, :auto_confirmed, move:, box: box_b, name: "AAA battery", source_media: other)
     Clusters::Recompute.new.call(move:)
 
-    previews = overview.previews.values.first
-    # Duplicated source photos collapse — two distinct media, not four slots.
-    expect(previews.map(&:id)).to contain_exactly(media.id, other.id)
+    ids = overview.preview_media_ids.values.first
+    # One photo recognized 3 items → one id, not three slots.
+    expect(ids).to contain_exactly(media.id, other.id)
   end
 end

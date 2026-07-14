@@ -12,15 +12,18 @@ module Clusters
   class Overview < BaseAction
     # Safety valve for a pathological Move, mirroring the photo grid's CAP.
     CAP = 100
-    # Thumbnails shown per card. The member window is wider so dedupe (several
-    # items from one photo) and non-displayable images still leave enough.
-    PREVIEWS_PER_CLUSTER = 4
+    # Candidate preview photos fetched per card. Wider than the 4 the card
+    # shows (Components::Gallery::GroupCard::PREVIEWS) so the view can drop any
+    # that turned non-displayable and still fill the 2×2 quilt.
     MEMBER_WINDOW = 8
 
     # status: :no_items (nothing searchable yet) · :organizing (never computed —
     # caller should request a refresh) · :none (computed, no family qualified) ·
-    # :ready. previews/box_numbers are keyed by cluster id.
-    Result = Data.define(:status, :clusters, :previews, :box_numbers, :capped)
+    # :ready. preview_media_ids/box_numbers are keyed by cluster id. Preview
+    # ids (not Media) on purpose: Media is packs/captures' public model, so the
+    # presentation layer (the root gallery components) resolves them to photos
+    # and thumbnails — packs/search stays free of a cross-domain reference.
+    Result = Data.define(:status, :clusters, :preview_media_ids, :box_numbers, :capped)
 
     #: (move: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:)
@@ -35,7 +38,7 @@ module Clusters
       ids = rows.map(&:id)
       Success(Result.new(
                 status: :ready, clusters: rows, capped: capped,
-                previews: previews_for(ids), box_numbers: box_numbers_for(ids)
+                preview_media_ids: preview_media_ids_for(ids), box_numbers: box_numbers_for(ids)
               ))
     end
 
@@ -43,7 +46,7 @@ module Clusters
 
     #: (Symbol status) -> untyped
     def empty(status)
-      Result.new(status: status, clusters: [], previews: {}, box_numbers: {}, capped: false)
+      Result.new(status: status, clusters: [], preview_media_ids: {}, box_numbers: {}, capped: false)
     end
 
     #: (untyped move) -> bool
@@ -51,18 +54,19 @@ module Clusters
       ClusterState.where(move_id: move.id).where.not(computed_at: nil).exists?
     end
 
-    # ≤PREVIEWS_PER_CLUSTER distinct displayable member photos per card, found
-    # with ONE window query (never all memberships of all clusters) and one
-    # Media load. DISTINCT ON collapses duplicate source photos BEFORE the
+    # Up to MEMBER_WINDOW candidate source-photo ids per cluster, in quilt
+    # order, found with ONE window query (never all memberships of all
+    # clusters). DISTINCT ON collapses duplicate source photos BEFORE the
     # window ranks them, so the window counts distinct photos — a box whose one
     # photo recognized a dozen members can't starve the quilt of the other
-    # boxes' photos. The searchable guards are explicit because raw SQL
-    # bypasses the default_scope and the scope; a photo that became
-    # non-displayable since the recompute yields a shorter strip (bounded
-    # staleness, self-heals next recompute).
+    # boxes' photos. The window is wider than the 4 shown so the view can drop
+    # any that turned non-displayable and still fill the strip. The searchable
+    # guards are explicit because raw SQL bypasses the default_scope and the
+    # scope. Returns ids, not Media (see Result) — the root gallery layer loads
+    # the photos, keeping packs/search free of the packs/captures Media model.
 
     #: (untyped ids) -> Hash[untyped, untyped]
-    def previews_for(ids)
+    def preview_media_ids_for(ids)
       sql = ActiveRecord::Base.sanitize_sql_array([<<~SQL.squish, { ids: ids, window: MEMBER_WINDOW }])
         SELECT ranked.item_cluster_id, ranked.source_media_id
         FROM (
@@ -85,12 +89,9 @@ module Clusters
         ) ranked
         WHERE ranked.rn <= :window
       SQL
-      pairs = ActiveRecord::Base.connection.select_rows(sql)
-      media = Media.where(id: pairs.map(&:last).uniq).index_by(&:id)
-      pairs.group_by(&:first).transform_values do |rows|
-        rows.filter_map { |(_, media_id)| media[media_id] }
-            .select(&:image_displayable?).first(PREVIEWS_PER_CLUSTER)
-      end
+      ActiveRecord::Base.connection.select_rows(sql)
+                        .group_by(&:first)
+                        .transform_values { |rows| rows.map(&:last) }
     end
 
     # The chip payload: every member box number per cluster, numerically

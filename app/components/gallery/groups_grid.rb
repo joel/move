@@ -37,15 +37,39 @@ module Components
 
       #: () -> untyped
       def grid
+        media = preview_media
         div(class: "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3") do
           @overview.clusters.each do |cluster|
             render Components::Gallery::GroupCard.new(
               move: @move, cluster: cluster,
-              previews: @overview.previews.fetch(cluster.id, []),
+              previews: displayable_previews(cluster, media),
               box_numbers: @overview.box_numbers.fetch(cluster.id, [])
             )
           end
         end
+      end
+
+      # Resolve the preview photo ids Clusters::Overview returned into Media.
+      # Media is packs/captures' public model; loading it here in the root
+      # gallery layer keeps packs/search free of the cross-domain reference
+      # (one query for every card's candidates).
+
+      #: () -> Hash[untyped, untyped]
+      def preview_media
+        ids = @overview.preview_media_ids.values.flatten.uniq
+        Media.where(id: ids).index_by(&:id)
+      end
+
+      # A card's ≤PREVIEWS displayable photos, in the quilt order Overview
+      # ranked them — dropping any that turned non-displayable since (bounded
+      # staleness, self-heals next recompute).
+
+      #: (untyped cluster, untyped media) -> Array[untyped]
+      def displayable_previews(cluster, media)
+        @overview.preview_media_ids.fetch(cluster.id, [])
+                 .filter_map { |id| media[id] }
+                 .select(&:image_displayable?)
+                 .first(Components::Gallery::GroupCard::PREVIEWS)
       end
 
       #: () -> untyped

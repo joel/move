@@ -170,8 +170,9 @@ RSpec.describe "Galleries" do
     let(:box_two) { create(:box, move:, number: "2") }
     let(:box_ten) { create(:box, move:, number: "10") }
 
-    it "renders family cards with counts and box chips, widest spread first" do
-      create(:item, :auto_confirmed, move:, box: box_two, name: "AA battery")
+    it "renders family cards with counts, box chips and a member photo, widest spread first" do
+      photo = create(:media, move:, box: box_two, status: "ready")
+      create(:item, :auto_confirmed, move:, box: box_two, name: "AA battery", source_media: photo)
       create(:item, :auto_confirmed, move:, box: box_ten, name: "AAA battery")
       Clusters::Recompute.new.call(move:)
 
@@ -182,6 +183,8 @@ RSpec.describe "Galleries" do
       expect(response.body).to include("2 items").and include("2 boxes")
       expect(response.body).to include("Box 2").and include("Box 10")
       expect(response.body).to include(move_gallery_group_path(move, move.item_clusters.sole))
+      # The member photo resolves through the root gallery layer into the quilt.
+      expect(response.body).to include("<img")
     end
 
     it "shows the no-items state without requesting a refresh" do
