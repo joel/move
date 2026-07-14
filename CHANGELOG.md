@@ -5,6 +5,17 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.93.0] — 2026-07-14
+
+### Added
+- **Every item now shows the rest of its group.** Open any item and, if it
+  belongs to a group, an "In the same group" list shows its relatives and which
+  boxes they're in — so from one AA battery you can see the others are in boxes
+  5, 7 and 11, and jump straight to any of them or to the whole group. It keeps
+  up as you unpack: mark something removed and it drops out on the spot. This
+  completes the grouping feature that helps you find everything you packed,
+  wherever it ended up (#642).
+
 ## [v0.92.0] — 2026-07-14
 
 ### Added
