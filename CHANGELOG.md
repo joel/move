@@ -5,6 +5,18 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.89.0] — 2026-07-14
+
+### Added
+- **Search now understands what things are, not just what they're called.**
+  When recognition catalogues a photo, it also privately notes each item's
+  family — "batteries & power", "kitchenware" — and search uses that hidden
+  hint, so searching "kitchenware" can surface a coffee maker whose name
+  never says so. Nothing changes on screen: items stay just a name, and
+  renaming an item drops the old hint so it can't mislead search. This is
+  the first piece of the upcoming gallery Groups view, which will cluster
+  related items scattered across boxes (#626, part of #625).
+
 ## [v0.88.2] — 2026-07-13
 
 ### Fixed
