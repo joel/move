@@ -37,6 +37,8 @@ en:
       from_same_photo:
         one: "Detected with 1 other item in this photo."
         other: "Detected with %{count} other items in this photo."
+      same_group: "In the same group"
+      view_group: "View group →"
     form:
       name: "Item name"
       name_placeholder: "e.g. Espresso Machine"

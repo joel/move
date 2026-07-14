@@ -110,6 +110,30 @@ RSpec.describe "Items" do
 
       expect(response.body).not_to include("in this photo")
     end
+
+    it "shows the same-group rail with the family's other members and their boxes (#642)" do
+      office = create(:box, move:, number: "7", room: create(:room, move:, name: "Office"))
+      item = create(:item, :auto_confirmed, move:, box:, name: "AA battery")
+      create(:item, :auto_confirmed, move:, box: office, name: "AAA battery")
+      Clusters::Recompute.new.call(move:)
+
+      get move_item_path(move, item)
+
+      expect(response.body).to include(I18n.t("items.show.same_group"))
+      expect(response.body).to include("AAA battery") # the sibling
+      expect(response.body).to include("Box #007").and include("Office") # its locator
+      expect(response.body).to include(move_gallery_group_path(move, move.item_clusters.sole))
+      expect(response.body).to include(move_item_path(move, move.items.find_by(name: "AAA battery")))
+    end
+
+    it "omits the same-group rail when the item is in no cluster" do
+      item = create(:item, :auto_confirmed, move:, box:, name: "Unique heirloom clock")
+      Clusters::Recompute.new.call(move:)
+
+      get move_item_path(move, item)
+
+      expect(response.body).not_to include(I18n.t("items.show.same_group"))
+    end
   end
 
   describe "phase-aware remove control (C3)" do
@@ -332,6 +356,22 @@ RSpec.describe "Items" do
         .and include(I18n.t("items.show.mark_unpacked")) # in-box on an unpacking box
         .and include(I18n.t("items.restore.restored"))
       expect(item.reload.presence_state).to eq("in_box")
+    end
+
+    it "refreshes the same-group rail so it follows presence (#643)" do
+      # A grouped item unpacked mid-session must not keep claiming it's "in the
+      # same group" — the presence stream replaces the rail target, and its
+      # content vanishes because the item is no longer searchable.
+      box = create(:box, move:, status: "unpacking", number: "2")
+      other = create(:box, move:, number: "7")
+      item = create(:item, :auto_confirmed, move:, box:, name: "AA battery")
+      create(:item, :auto_confirmed, move:, box: other, name: "AAA battery")
+      Clusters::Recompute.new.call(move:)
+
+      patch mark_removed_move_item_path(move, item), as: :turbo_stream
+
+      expect(response.body).to include(%(action="replace" target="#{Components::Items::GroupRail::ID}"))
+      expect(response.body).not_to include(I18n.t("items.show.same_group")) # rail emptied
     end
 
     it "streams an alert toast (no DOM change) when mark_removed hits the wrong phase" do

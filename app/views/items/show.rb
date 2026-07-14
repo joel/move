@@ -25,6 +25,9 @@ module Views
           media_panel
           edit_panel
         end
+        # The cross-box family (#642) — a stable Turbo target that presence
+        # changes replace, empty when the item is in no live group.
+        render Components::Items::GroupRail.new(move: @move, item: @item)
       end
 
       private
