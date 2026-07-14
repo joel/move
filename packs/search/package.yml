@@ -12,11 +12,16 @@
 #     ItemSearchDocument       projection model — Item's `has_one :search_document,
 #                              class_name: "ItemSearchDocument"` IS a reference
 #                              Packwerk resolves (it understands AR associations)
+#     ItemCluster              item family (#629) — Move's `has_many :item_clusters`;
+#                              read by the gallery Groups surface (PR 4 of #625)
+#     ItemClusterMembership    item↔cluster join (gallery + item-detail rail)
 #   PRIVATE (internal to search):
 #     EmbeddingProviders + adapters (Base/Fake/Gemini/Openai/Result/Voyage) — reached
 #                              only via EmbeddingProviders.for_move inside search
 #     Search::RefreshDocumentJob, Search::IndexSubscriber (config-wired),
-#     IndexingRuns::{RecordProgress, Broadcasting}
+#     IndexingRuns::{RecordProgress, Broadcasting},
+#     Clusters::Recompute (the cluster engine, #629),
+#     ClusterNameEmbedding, ClusterState (cluster cache + state singleton)
 #
 # dependencies: ['.', 'packs/utility'] — search subclasses BaseAction and references
 #   Item/Box/Room/Move (root), and ApplicationRecord (models) + ProviderHttp
