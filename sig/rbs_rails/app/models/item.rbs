@@ -723,6 +723,46 @@ class ::Item < ::ApplicationRecord
     def image_generating_at_before_type_cast: () -> ::Time?
 
     def image_generating_at_for_database: () -> ::Time?
+
+    def family: () -> ::String?
+
+    def family=: (::String?) -> ::String?
+
+    def family?: () -> bool
+
+    def family_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def family_change: () -> [ ::String?, ::String? ]
+
+    def family_will_change!: () -> void
+
+    def family_was: () -> ::String?
+
+    def family_previously_changed?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def family_previous_change: () -> ::Array[::String?]?
+
+    def family_previously_was: () -> ::String?
+
+    def family_before_last_save: () -> ::String?
+
+    def family_change_to_be_saved: () -> ::Array[::String?]?
+
+    def family_in_database: () -> ::String?
+
+    def saved_change_to_family: () -> ::Array[::String?]?
+
+    def saved_change_to_family?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def will_save_change_to_family?: (?from: ::String?, ?to: ::String?) -> bool
+
+    def restore_family!: () -> void
+
+    def clear_family_change: () -> void
+
+    def family_before_type_cast: () -> ::String?
+
+    def family_for_database: () -> ::String?
   end
   include ::Item::GeneratedAttributeMethods
   module ::Item::GeneratedAliasAttributeMethods

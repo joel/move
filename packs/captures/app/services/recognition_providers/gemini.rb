@@ -28,12 +28,13 @@ module RecognitionProviders
           type: "ARRAY",
           items: {
             type: "OBJECT",
-            required: %w[label confidence],
+            required: %w[label confidence family],
             properties: {
               label: { type: "STRING" },
-              confidence: { type: "NUMBER" }
+              confidence: { type: "NUMBER" },
+              family: { type: "STRING" }
             },
-            propertyOrdering: %w[label confidence]
+            propertyOrdering: %w[label confidence family]
           }
         }
       }

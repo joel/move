@@ -35,6 +35,14 @@ RSpec.describe RecognitionProviders::Base do
       expect(text).to include("floor").and include("box")
       expect(text).to match(/packing materials/i)
     end
+
+    it "asks for a hidden family with consistent wording, empty when unsure (#626)" do
+      text = provider.send(:prompt, { room: "Kitchen" })
+
+      expect(text).to include("also give a family")
+      expect(text).to include("same family wording")
+      expect(text).to match(/leave family empty/i)
+    end
   end
 
   describe "#normalize" do
@@ -46,6 +54,16 @@ RSpec.describe RecognitionProviders::Base do
 
       expect(detected.size).to eq(1)
       expect(detected.first).to have_attributes(label: "Mug", confidence: 1.0)
+    end
+
+    it "keeps a stripped family and maps a blank one (unsure model) to nil" do
+      detected = provider.send(:normalize, [
+                                 { "label" => "AA batteries", "family" => " batteries & power " },
+                                 { "label" => "Mystery object", "family" => "" },
+                                 { "label" => "Old radio" }
+                               ])
+
+      expect(detected.map(&:family)).to eq(["batteries & power", nil, nil])
     end
   end
 

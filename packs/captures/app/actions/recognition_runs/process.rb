@@ -85,7 +85,7 @@ module RecognitionRuns
       )
       item = run.box.items.create!(
         move: run.move, source_media: run.media, source_recognition_suggestion_id: suggestion.id,
-        name: object.label, confidence_score: object.confidence,
+        name: object.label, confidence_score: object.confidence, family: object.family,
         created_via: "recognition", review_state: auto ? "auto_confirmed" : "pending_review"
       )
       suggestion.update!(item: item)

@@ -35,8 +35,9 @@ module RecognitionProviders
     # its own copy. Root is an object because OpenAI strict mode forbids a
     # top-level array, so every provider returns {"objects" => [...]}. Strict
     # mode also requires every property to be listed in `required`, so the model
-    # always returns its best category guess, a fragility call, and a tag list
-    # (an empty array when nothing applies).
+    # always returns a family (an empty string when unsure — normalize maps it
+    # to nil). `family` is the hidden classification facet (#626): stored on the
+    # item but never rendered, feeding only the search text/embedding.
     OBJECTS_SCHEMA = {
       type: "object",
       additionalProperties: false,
@@ -47,10 +48,11 @@ module RecognitionProviders
           items: {
             type: "object",
             additionalProperties: false,
-            required: %w[label confidence],
+            required: %w[label confidence family],
             properties: {
               label: { type: "string" },
-              confidence: { type: "number" }
+              confidence: { type: "number" },
+              family: { type: "string" }
             }
           }
         }
@@ -133,10 +135,9 @@ module RecognitionProviders
 
     # Coerce provider hashes into DetectedObjects, dropping anything without a
     # label and clamping confidence into range (the schemas pin types, not
-    # numeric bounds). Accepts string or symbol keys. The model also classifies
-    # each item (category), flags fragility, and proposes tags; a blank category
-    # becomes nil so materialization leaves the item uncategorised rather than
-    # inventing one, and tag names are stripped, blank-dropped and deduped.
+    # numeric bounds). Accepts string or symbol keys. A blank family becomes nil
+    # so an unsure model leaves the hidden facet absent rather than storing an
+    # empty string (#626).
     def normalize(raw_objects)
       Array(raw_objects).filter_map do |obj|
         label = fetch(obj, :label).to_s
@@ -144,7 +145,8 @@ module RecognitionProviders
 
         DetectedObject.new(
           label: label,
-          confidence: fetch(obj, :confidence)&.to_f&.clamp(0.0, 1.0)
+          confidence: fetch(obj, :confidence)&.to_f&.clamp(0.0, 1.0),
+          family: fetch(obj, :family).to_s.strip.presence
         )
       end
     end
@@ -176,6 +178,10 @@ module RecognitionProviders
       lines << "Skip whatever is too occluded or blurry to identify rather than guessing. " \
                "Give each item a short, specific name (for example \"ceramic dinner plate\" or " \
                "\"cordless drill\"). Treat confidence as your rough certainty from 0 to 1."
+      lines << "For each item also give a family: a short, generic phrase for the kind of " \
+               "thing it is (for example \"batteries & power\", \"kitchenware\" or " \
+               "\"cables & adapters\"). Use the same family wording for related items so " \
+               "they group together, and leave family empty when you are unsure."
       lines.join(" ")
     end
 

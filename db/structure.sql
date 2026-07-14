@@ -979,7 +979,8 @@ CREATE TABLE public.items (
     discarded_by_parent_type character varying,
     discarded_by_parent_id uuid,
     log_data jsonb,
-    image_generating_at timestamp(6) without time zone
+    image_generating_at timestamp(6) without time zone,
+    family character varying
 );
 
 
@@ -2404,6 +2405,7 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260713090000'),
 ('20260712123000'),
 ('20260712121000'),
 ('20260712120000'),

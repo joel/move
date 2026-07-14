@@ -29,6 +29,14 @@ RSpec.describe RecognitionRuns::Process do
     expect(suggestion.attributes.keys).not_to include("bounding_box", "crop")
   end
 
+  it "persists the hidden family on materialized items, nil when the model was unsure (#626)" do
+    described_class.new.call(run:)
+
+    # Fake provider families: kitchenware / nil / kitchenware.
+    expect(box.items.find_by(name: "Coffee maker").family).to eq("kitchenware")
+    expect(box.items.find_by(name: "Stack of books").family).to be_nil
+  end
+
   it "ends failed (not stuck) when the provider raises, and stores a sanitized error" do
     provider = instance_double(RecognitionProviders::Fake)
     allow(provider).to receive(:identify).and_raise(StandardError, "boom")
@@ -79,8 +87,8 @@ RSpec.describe RecognitionRuns::Process do
     # Second detection's confidence overflows decimal(4,3) → create! raises
     # midway. The transaction must roll back the first item too.
     objects = [
-      RecognitionProviders::DetectedObject.new(label: "Lamp", confidence: 0.97),
-      RecognitionProviders::DetectedObject.new(label: "Rug", confidence: 99.0)
+      RecognitionProviders::DetectedObject.new(label: "Lamp", confidence: 0.97, family: "lighting"),
+      RecognitionProviders::DetectedObject.new(label: "Rug", confidence: 99.0, family: nil)
     ]
     provider = instance_double(RecognitionProviders::Fake)
     allow(provider).to receive(:identify).and_return(
