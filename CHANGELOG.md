@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.90.0] — 2026-07-14
+
+### Added
+- **Groundwork: the app can now group related items into families.** The
+  engine that powers the upcoming gallery "Groups" view landed: it clusters
+  things that belong together — all the AA batteries, chargers and power
+  banks scattered across different boxes — using the same quiet hints that
+  power search, with nothing to configure. Not visible on any screen yet;
+  the Groups view ships next (#629, part of #625).
+
 ## [v0.89.0] — 2026-07-14
 
 ### Added
