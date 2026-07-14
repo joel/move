@@ -13,8 +13,13 @@ RSpec.describe RecognitionProviders::Fake do
     expect(result.objects.map(&:confidence)).to include(a_value > 0.8, a_value < 0.8)
   end
 
-  it "carries only label + confidence, and no bounding-box data" do
+  it "carries only label + confidence + hidden family, and no bounding-box data" do
     object = described_class.new.identify(image: nil, context: {}).objects.first
-    expect(object.members).to contain_exactly(:label, :confidence)
+    expect(object.members).to contain_exactly(:label, :confidence, :family)
+  end
+
+  it "exercises both hidden-family paths: a shared family and an unsure (nil) one" do
+    objects = described_class.new.identify(image: nil, context: {}).objects
+    expect(objects.map(&:family)).to eq(["kitchenware", nil, "kitchenware"])
   end
 end

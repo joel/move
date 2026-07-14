@@ -75,8 +75,8 @@ RSpec.describe RecognitionProviders::Openai do
       expect(fmt["type"]).to eq("json_schema")
       expect(fmt.dig("json_schema", "strict")).to be(true)
       items = fmt.dig("json_schema", "schema", "properties", "objects", "items")
-      expect(items["required"]).to contain_exactly("label", "confidence")
-      expect(items["properties"].keys).to contain_exactly("label", "confidence")
+      expect(items["required"]).to contain_exactly("label", "confidence", "family")
+      expect(items["properties"].keys).to contain_exactly("label", "confidence", "family")
       content = body.dig("messages", 0, "content")
       expect(content.dig(0, "text")).to include("belongings").and include("floor")
       expect(content.dig(1, "image_url", "url"))
@@ -108,15 +108,15 @@ RSpec.describe RecognitionProviders::Openai do
     end
   end
 
-  it "normalizes a structured-output objects payload" do
-    content = { objects: [{ label: "lamp", confidence: 0.9 }] }.to_json
+  it "normalizes a structured-output objects payload, carrying the hidden family through" do
+    content = { objects: [{ label: "lamp", confidence: 0.9, family: "lighting" }] }.to_json
     stub_http(code: "200", body: content_response(content))
 
     result = provider.identify(image: image, context: context)
     object = result.objects.first
 
     expect(result.provider).to eq("openai")
-    expect(object).to have_attributes(label: "lamp", confidence: 0.9)
+    expect(object).to have_attributes(label: "lamp", confidence: 0.9, family: "lighting")
   end
 
   it "recovers a fenced JSON object via the backstop" do

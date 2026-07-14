@@ -45,16 +45,16 @@ RSpec.describe RecognitionProviders::Anthropic do
       tool = sent["tools"].first
       expect(tool["name"]).to eq("record_objects")
       required = tool.dig("input_schema", "properties", "objects", "items", "required")
-      expect(required).to contain_exactly("label", "confidence")
+      expect(required).to contain_exactly("label", "confidence", "family")
       expect(sent.dig("messages", 0, "content", 1, "source"))
         .to eq("type" => "base64", "media_type" => "image/jpeg", "data" => Base64.strict_encode64("bytes"))
     end
   end
 
-  it "normalizes detections from the forced tool_use input" do
+  it "normalizes detections from the forced tool_use input, carrying the hidden family through" do
     body = { content: [{
       type: "tool_use", name: "record_objects",
-      input: { objects: [{ label: "chair", confidence: 0.7 }] }
+      input: { objects: [{ label: "chair", confidence: 0.7, family: "furniture" }] }
     }] }.to_json
     stub_http(code: "200", body: body)
 
@@ -62,7 +62,7 @@ RSpec.describe RecognitionProviders::Anthropic do
     object = result.objects.first
 
     expect(result.provider).to eq("anthropic")
-    expect(object).to have_attributes(label: "chair", confidence: 0.7)
+    expect(object).to have_attributes(label: "chair", confidence: 0.7, family: "furniture")
   end
 
   it "treats an empty objects array as a legitimate zero-detection result" do

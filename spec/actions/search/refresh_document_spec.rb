@@ -10,6 +10,20 @@ RSpec.describe Search::RefreshDocument do
     expect(doc.embedding).to be_present
   end
 
+  it "folds the hidden family into search_text so lexical + semantic search carry it (#626)" do
+    item.update!(family: "cookware & pans")
+
+    doc = described_class.new.call(item: item).value!
+
+    expect(doc.search_text).to include("cookware & pans")
+  end
+
+  it "composes without the family when the item has none" do
+    doc = described_class.new.call(item: item).value!
+
+    expect(doc.search_text).to eq("Cast iron skillet Box 1")
+  end
+
   it "converges when a concurrent refresh already created the row (no RecordNotUnique)" do
     create(:item_search_document, item:, search_text: "stale") # row already exists
     # Force the build-new path so save! collides on the unique item_id index.

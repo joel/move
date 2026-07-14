@@ -63,3 +63,12 @@ end
 class BaseAction
   include Dry::Monads::_ResultConstructors
 end
+
+# Action mixins whose methods build results outside a BaseAction subclass body:
+# the constructors come from the including action at runtime, so the signature
+# grants them to the module directly (same additive-reopen trick as BaseAction).
+module Items
+  module ConfirmedEdit
+    include Dry::Monads::_ResultConstructors
+  end
+end

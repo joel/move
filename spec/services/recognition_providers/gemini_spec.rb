@@ -64,8 +64,8 @@ RSpec.describe RecognitionProviders::Gemini do
       expect(gen["responseMimeType"]).to eq("application/json")
       expect(gen.dig("thinkingConfig", "thinkingLevel")).to eq("medium")
       items = gen.dig("responseSchema", "properties", "objects", "items")
-      expect(items["required"]).to contain_exactly("label", "confidence")
-      expect(items["properties"].keys).to contain_exactly("label", "confidence")
+      expect(items["required"]).to contain_exactly("label", "confidence", "family")
+      expect(items["properties"].keys).to contain_exactly("label", "confidence", "family")
       # Canonical camelCase proto json_name for the inline image part.
       inline = body.dig("contents", 0, "parts", 1, "inlineData")
       expect(inline).to include("mimeType" => "image/jpeg", "data" => Base64.strict_encode64("bytes"))
@@ -84,15 +84,15 @@ RSpec.describe RecognitionProviders::Gemini do
     end
   end
 
-  it "normalizes a responseSchema objects payload" do
-    content = { objects: [{ label: "drill", confidence: 0.95 }] }.to_json
+  it "normalizes a responseSchema objects payload, carrying the hidden family through" do
+    content = { objects: [{ label: "drill", confidence: 0.95, family: "power tools" }] }.to_json
     stub_http(code: "200", body: content_response(content))
 
     result = provider.identify(image: image, context: context)
     object = result.objects.first
 
     expect(result.provider).to eq("gemini")
-    expect(object).to have_attributes(label: "drill", confidence: 0.95)
+    expect(object).to have_attributes(label: "drill", confidence: 0.95, family: "power tools")
   end
 
   it "treats an empty objects array as a legitimate zero-detection result" do

@@ -5,10 +5,13 @@ module RecognitionProviders
   # detections spanning above- and below-threshold confidence so the auto-confirm
   # vs pending-review split is exercised without any external call.
   class Fake < Base
+    # Families exercise the hidden facet (#626): two share one ("kitchenware")
+    # so search/cluster enrichment is demonstrable, one has none (an unsure
+    # model returns blank → nil) so the absent path stays covered.
     SAMPLE = [
-      { label: "Coffee maker",   confidence: 0.97 },
-      { label: "Stack of books", confidence: 0.88 },
-      { label: "Set of mugs",    confidence: 0.62 }
+      { label: "Coffee maker",   confidence: 0.97, family: "kitchenware" },
+      { label: "Stack of books", confidence: 0.88, family: nil },
+      { label: "Set of mugs",    confidence: 0.62, family: "kitchenware" }
     ].freeze
 
     def identify(image:, context:) # rubocop:disable Lint/UnusedMethodArgument

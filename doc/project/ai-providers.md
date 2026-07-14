@@ -136,19 +136,24 @@ returning `{"objects": [...]}`, where each object is:
 |---|---|---|
 | `label` | string | the item name |
 | `confidence` | number 0–1 | the model's rough certainty |
-| `count` | integer | identical duplicates collapsed into one entry |
-| `category` | string | the model's classification — best-effort onto the Move's category vocabulary (an existing name when one fits, else a new concise one) |
-| `fragile` | boolean | whether the item can break/scratch easily |
+| `family` | string | **hidden facet (#626):** a short generic phrase for the kind of thing it is ("batteries & power", "kitchenware"); the prompt asks for consistent wording across related items, empty when unsure |
 
-`RecognitionRuns::Process` feeds the Move's **category** names into the prompt as
-candidates (only categories — the output has a single `category` field that maps
-to a `Category`, so tags are not offered), then on materialization resolves
-`category` onto the Move's categories (reuse-or-create, case-insensitive) and sets
-`fragile` directly on the `Item`; both also ride on the `RecognitionSuggestion`
-(`proposed_category_id`, `proposed_fragile`) for the review queue. Before encoding, phone photos are
-EXIF-auto-oriented and down-scaled to ≤1536px (libvips) to cut image tokens and
-latency. Each adapter pins a cost-matched `DEFAULT_MODEL` constant (per-Move model
-choice is intentionally not exposed — YAGNI).
+(`count`, `category` and `fragile` were removed across the items/photos
+simplification epic — fragility moved to the box in Phase A, quantity dropped in
+Phase B, category/tags dropped in Phase C/#411. An item is just a name.)
+
+`RecognitionRuns::Process` feeds only the box's **room** name into the prompt as
+context, then on materialization stores `family` on the `Item` (normalized
+blank→nil). The family is **never rendered anywhere** — its only consumers are
+the search projection (`Search::RefreshDocument` folds it into `search_text`, so
+both the tsvector and the embedding carry it) and the cluster engine (#625). A
+genuine user rename clears it (`Items::ConfirmedEdit` — the facet described what
+the model saw, not what the user now says the item is); cosmetic case/whitespace
+edits keep it. Manual/MCP items and items created before the facet simply have
+none. Before encoding, phone photos are EXIF-auto-oriented and down-scaled to
+≤1536px (libvips) to cut image tokens and latency. Each adapter pins a
+cost-matched `DEFAULT_MODEL` constant (a Move may override the model per
+provider; blank uses the default).
 
 Both vendor adapters POST JSON over HTTPS through the shared
 [`app/services/provider_http.rb`](../../app/services/provider_http.rb), which

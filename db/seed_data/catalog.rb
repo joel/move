@@ -282,7 +282,9 @@ module SeedData
   # objects when present (review_state derived from confidence vs `threshold`,
   # mirroring RecognitionRuns::Process), else the authored catalog items
   # (explicit review_state) as the offline fallback. Uniform hash shape either
-  # way: { name:, confidence:, review: }.
+  # way: { name:, confidence:, review:, family: } — family is the hidden facet
+  # (#626), nil for recordings made before it existed and for authored items
+  # that don't declare one.
   def self.detections_for(photo, threshold:)
     recorded = recorded_recognition(photo[:slug])
     return normalize_recorded(recorded["objects"], threshold: threshold) if recorded
@@ -305,12 +307,13 @@ module SeedData
     {
       name: label,
       confidence: confidence,
-      review: confidence && confidence >= threshold ? "auto_confirmed" : "pending_review"
+      review: confidence && confidence >= threshold ? "auto_confirmed" : "pending_review",
+      family: object["family"].to_s.strip.presence
     }
   end
 
   def self.authored_detection(item)
-    { name: item[:name], confidence: item[:confidence], review: item[:review] }
+    { name: item[:name], confidence: item[:confidence], review: item[:review], family: item[:family] }
   end
 
   # Active Storage attachable for a photo slug: the committed db/seed_images/<slug>.jpg
