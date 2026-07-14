@@ -8,7 +8,11 @@
 #     IndexingRuns::Start      start a reindex run (Moves::Set*ProviderKey actions)
 #     Searches::RecentSearches recent-search history (SearchesController)
 #     Clusters::RequestRefresh claim-debounced cluster recompute (#631 — the
-#                              in-pack subscriber + PR 4's gallery lazy-trigger)
+#                              in-pack subscriber + the gallery's lazy trigger)
+#     Clusters::Recompute      the cluster engine (#629 — demo provisioning
+#                              computes synchronously; all else via RequestRefresh)
+#     Clusters::Overview       gallery Groups read: state + cards + previews (#633)
+#     Clusters::Members        group-detail read: live member rows (#633)
 #   PUBLIC (app/public):
 #     IndexingRun              run record (named in Moves::Destroy::DELETE_ORDER)
 #     ItemSearchDocument       projection model — Item's `has_one :search_document,
@@ -22,8 +26,8 @@
 #                              only via EmbeddingProviders.for_move inside search
 #     Search::RefreshDocumentJob, Search::IndexSubscriber (config-wired),
 #     IndexingRuns::{RecordProgress, Broadcasting},
-#     Clusters::Recompute (the cluster engine, #629),
 #     Clusters::RefreshJob, Clusters::RefreshSubscriber (config-wired, #631),
+#     Clusters::BroadcastSubscriber (config-wired, #633),
 #     ClusterNameEmbedding, ClusterState (cluster cache + state singleton)
 #
 # dependencies: ['.', 'packs/utility'] — search subclasses BaseAction and references

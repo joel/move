@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/search: the cluster engine (demo
+# provisioning computes families synchronously; everything else goes through
+# RequestRefresh + the job). See packwerk-boundaries.md for the sigil convention.
+
 module Clusters
   # Recomputes a Move's item clusters (#629, PR 2 of #625): groups the
   # searchable items into families ("AA batteries — 9 items · 4 boxes") over
