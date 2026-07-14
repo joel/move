@@ -24,6 +24,7 @@ module Views
       def view_template
         div(class: "flex flex-col gap-section-gap") do
           header
+          render Components::Gallery::ViewToggle.new(move: @move, active: "photos")
           controls
           cap_notice if @over_cap
           @media.any? ? grid : empty_state

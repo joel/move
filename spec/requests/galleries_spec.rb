@@ -166,6 +166,62 @@ RSpec.describe "Galleries" do
     end
   end
 
+  describe "GET /moves/:move_id/gallery?view=groups (#633)" do
+    let(:box_two) { create(:box, move:, number: "2") }
+    let(:box_ten) { create(:box, move:, number: "10") }
+
+    it "renders family cards with counts, box chips and a member photo, widest spread first" do
+      photo = create(:media, move:, box: box_two, status: "ready")
+      create(:item, :auto_confirmed, move:, box: box_two, name: "AA battery", source_media: photo)
+      create(:item, :auto_confirmed, move:, box: box_ten, name: "AAA battery")
+      Clusters::Recompute.new.call(move:)
+
+      get move_gallery_path(move, view: "groups")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(I18n.t("galleries.groups.subtitle"))
+      expect(response.body).to include("2 items").and include("2 boxes")
+      expect(response.body).to include("Box 2").and include("Box 10")
+      expect(response.body).to include(move_gallery_group_path(move, move.item_clusters.sole))
+      # The member photo resolves through the root gallery layer into the quilt.
+      expect(response.body).to include("<img")
+    end
+
+    it "shows the no-items state without requesting a refresh" do
+      get move_gallery_path(move, view: "groups")
+
+      expect(response.body).to include(I18n.t("galleries.groups.no_items.title"))
+      expect(ClusterState.where(move_id: move.id)).to be_empty
+    end
+
+    it "shows the organizing state and lazily claims the first refresh, idempotently" do
+      create(:item, :auto_confirmed, move:, box: box_two, name: "AA battery")
+      configured = instance_double(ActiveJob::ConfiguredJob, perform_later: nil)
+      allow(Clusters::RefreshJob).to receive(:set).and_return(configured)
+
+      2.times { get move_gallery_path(move, view: "groups") }
+
+      expect(response.body).to include(I18n.t("galleries.groups.organizing.title"))
+      expect(configured).to have_received(:perform_later).once # claim held across GETs
+    end
+
+    it "shows the explanatory empty state when computed but nothing grouped" do
+      create(:item, :auto_confirmed, move:, box: box_two, name: "Wine decanter")
+      Clusters::Recompute.new.call(move:)
+
+      get move_gallery_path(move, view: "groups")
+
+      expect(response.body).to include(I18n.t("galleries.groups.none.title"))
+    end
+
+    it "treats an unknown view as photos (whitelist)" do
+      get move_gallery_path(move, view: "evil")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(I18n.t("galleries.index.subtitle"))
+    end
+  end
+
   describe "GET /moves/:move_id/menu" do
     it "links the Gallery from the Menu hub" do
       get move_menu_path(move)

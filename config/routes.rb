@@ -122,6 +122,9 @@ Rails.application.routes.draw do
     # Move in one recent-first grid, filterable by room. Read-only; reached from
     # the Menu hub. A tile opens a client-side lightbox (the :detail variant).
     get "gallery", to: "galleries#index", as: :gallery
+    # #633 — one item family in full (the gallery Groups drill-down): members
+    # ordered by box for unpacking, each locating itself with a box/room chip.
+    get "gallery/groups/:id", to: "gallery_groups#show", as: :gallery_group
     # F1 — Members & roles (admin-only). Add an existing Organization user, change
     # a member's role, or remove them. Role changes go through a member action.
     resources :members, only: %i[index create destroy] do

@@ -35,3 +35,29 @@ en:
         description: "Photos you capture while packing boxes will appear here."
         filtered_title: "No photos in this room"
         filtered_description: "Try another room, or clear the filter to see every photo."
+    toggle:
+      label: "Gallery view"
+      photos: "Photos"
+      groups: "Groups"
+    groups:
+      title: "Groups"
+      subtitle: "Related things, grouped — even when they ended up in different boxes."
+      capped: "Showing the %{count} most spread-out groups."
+      card:
+        items:
+          one: "%{count} item"
+          other: "%{count} items"
+        boxes:
+          one: "%{count} box"
+          other: "%{count} boxes"
+        box_chip: "Box %{number}"
+        more_boxes: "+%{count}"
+      no_items:
+        title: "Nothing to group yet"
+        description: "Capture a few boxes and your things will start grouping themselves."
+      organizing:
+        title: "Organizing your items…"
+        description: "Related things — batteries, chargers, cables — are being grouped. This takes a few seconds and updates on its own."
+      none:
+        title: "No groups yet"
+        description: "Groups appear when related things end up in different boxes — like batteries in the kitchen box and the office box."

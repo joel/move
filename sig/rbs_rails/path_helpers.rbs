@@ -51,6 +51,7 @@ interface ::_RbsRailsPathHelpers
   def move_vocabulary_path: (*untyped) -> ::String
   def move_search_path: (*untyped) -> ::String
   def move_gallery_path: (*untyped) -> ::String
+  def move_gallery_group_path: (*untyped) -> ::String
   def update_role_move_member_path: (*untyped) -> ::String
   def move_members_path: (*untyped) -> ::String
   def move_member_path: (*untyped) -> ::String
@@ -166,6 +167,7 @@ interface ::_RbsRailsPathHelpers
   def move_vocabulary_url: (*untyped) -> ::String
   def move_search_url: (*untyped) -> ::String
   def move_gallery_url: (*untyped) -> ::String
+  def move_gallery_group_url: (*untyped) -> ::String
   def update_role_move_member_url: (*untyped) -> ::String
   def move_members_url: (*untyped) -> ::String
   def move_member_url: (*untyped) -> ::String

@@ -38,6 +38,7 @@ target :actions do
   check "app/controllers/invitations_controller.rb", inline: true
   check "app/controllers/csp_reports_controller.rb", inline: true
   check "app/controllers/galleries_controller.rb", inline: true
+  check "app/controllers/gallery_groups_controller.rb", inline: true
   check "app/controllers/google_one_tap_sessions_controller.rb", inline: true
   check "app/controllers/integration_tokens_controller.rb", inline: true
   check "app/controllers/items_controller.rb", inline: true
@@ -80,6 +81,7 @@ target :actions do
   check "app/views/boxes", inline: true
   check "app/views/captures", inline: true
   check "app/views/galleries", inline: true
+  check "app/views/gallery_groups", inline: true
   check "app/views/items", inline: true
   check "app/views/label_print_runs", inline: true
   check "app/views/label_prints", inline: true
