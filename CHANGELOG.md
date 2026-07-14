@@ -5,6 +5,17 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.92.0] — 2026-07-14
+
+### Added
+- **The gallery can now show you groups of related things.** A new Groups view
+  gathers items that belong together — all your batteries, chargers and cables
+  — even when a rushed pack scattered them across different boxes, and each
+  group card tells you exactly which boxes to open. Tap a group for a tidy,
+  box-by-box checklist so you can gather everything in one sweep. It fills in on
+  its own as you add and organize items, with nothing to set up. This is the
+  payoff of the "pack in a rush, find anything later" promise (#633).
+
 ## [v0.91.0] — 2026-07-14
 
 ### Added
