@@ -139,11 +139,17 @@ module Clusters
       end
     end
 
+    # The log line carries a digest fingerprint, never the text itself — the
+    # key is customer inventory content (item name + hidden family) and must
+    # not be retained in logs/error collectors on a provider outage. The
+    # fingerprint still correlates a repeatedly-failing name across runs.
+
     #: (untyped embedder, String text) -> untyped
     def safe_embed(embedder, text)
       embedder.embed(text)
     rescue StandardError => e # rubocop:disable Move/BroadRescue -- degrade to Stage-1-only for this group, never fail the recompute
-      Rails.logger.warn("[clusters] name embedding failed for #{text.inspect}: #{e.class}: #{e.message}")
+      fingerprint = Digest::SHA256.hexdigest(text)[0, 8]
+      Rails.logger.warn("[clusters] name embedding failed (key sha=#{fingerprint}): #{e.class}: #{e.message}")
       nil
     end
 

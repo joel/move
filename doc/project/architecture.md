@@ -607,8 +607,12 @@ real models 0.62 starting point). Clusters with ≥2 items persist to
 `item_clusters` (upserted by `(move_id, leader_key)` so ids survive
 recomputes) + `item_cluster_memberships` (one cluster per item, DB-unique);
 `cluster_states` stamps completion and backs the PR 3 refresh debounce.
-Recomputes serialize per Move on a `pg_advisory_xact_lock`; keyless Moves get
-word-share families via the Fake embedder (exact name-grouping is the floor).
+Recomputes serialize per Move on a **session-level** advisory lock
+(`pg_advisory_lock`/`unlock`) held for the whole run — read → embed → persist —
+so a waiting run always snapshots after the winner's commit (a transaction-
+scoped lock would release before the embed/read sequence is serialized and let
+a stale reader be the last writer). Keyless Moves get word-share families via
+the Fake embedder (exact name-grouping is the floor).
 
 ```mermaid
 flowchart LR
