@@ -1,0 +1,9 @@
+en:
+  gallery_groups:
+    show:
+      back: "← All groups"
+      box_label: "Box %{number}"
+      gone: "That group was reorganized — here are the latest groups."
+      empty:
+        title: "These items have moved on"
+        description: "Everything in this group was unpacked or removed. The group updates itself shortly."

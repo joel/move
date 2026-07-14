@@ -14,12 +14,15 @@ class GalleriesController < MoveScopedController
 
   SORTS = %w[recent oldest].freeze
   DEFAULT_SORT = "recent"
+  VIEWS = %w[photos groups].freeze
 
-  # GET /moves/:move_id/gallery?room_id=&sort=
+  # GET /moves/:move_id/gallery?view=&room_id=&sort=
 
   #: () -> untyped
   def index
     authorize! @move, to: :show?, with: MovePolicy
+
+    return groups_view if view_key == "groups"
 
     # Scope to media in *kept* boxes (box soft-delete does not cascade to media,
     # and a discarded box's detail page 404s) and fold in the optional room filter
@@ -49,6 +52,24 @@ class GalleriesController < MoveScopedController
   end
 
   private
+
+  # The Groups half (#633): item families over the #629 engine. A Move that has
+  # never been clustered lazily requests its first refresh here — an idempotent,
+  # claim-guarded write on a GET (a deliberate, documented exception: the claim
+  # protocol makes double-GETs no-ops and the TTL self-heals a stranded claim);
+  # the page's stream then replaces the "organizing" state when the job lands.
+
+  #: () -> untyped
+  def groups_view
+    overview = Clusters::Overview.new.call(move: @move).value!
+    Clusters::RequestRefresh.new.call(move_id: @move.id) if overview.status == :organizing
+    render Views::Galleries::Groups.new(move: @move, overview: overview)
+  end
+
+  #: () -> String
+  def view_key
+    VIEWS.include?(params[:view]) ? params[:view] : "photos"
+  end
 
   # Only rooms that actually own at least one photo (in a kept box) earn a filter
   # chip — a read-only surface must not offer a zero-result facet (UX rule 3). All

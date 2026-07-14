@@ -9,4 +9,9 @@ Rails.application.config.after_initialize do
   Rails.event.subscribe(Clusters::RefreshSubscriber.new) do |event|
     event[:name].start_with?("item.", "box.", "move.")
   end
+  # Live gallery Groups grid (#633): a finished recompute replaces the grid for
+  # every connected viewer over the Move's :gallery_groups stream.
+  Rails.event.subscribe(Clusters::BroadcastSubscriber.new) do |event|
+    event[:name] == "clusters.recomputed"
+  end
 end
