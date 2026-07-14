@@ -258,7 +258,17 @@ module SeedData
     { box: "7", name: "Throw Pillows",
       review: "confirmed", presence: "removed" },
     { box: "7", name: "Reading Glasses",
-      review: "confirmed", presence: "removed" }
+      review: "confirmed", presence: "removed" },
+    # The gallery Groups showcase (#633): a battery family deliberately
+    # scattered across three boxes — the epic's headline scenario ("packed
+    # in a rush, found anyway"). Word-share similarity clusters them under
+    # any provider, so the demo shows Groups with no AI key configured.
+    { box: "2", name: "AA batteries",
+      review: "confirmed", presence: "in_box" },
+    { box: "5", name: "AAA batteries",
+      review: "confirmed", presence: "in_box" },
+    { box: "7", name: "Battery charger",
+      review: "confirmed", presence: "in_box" }
   ].freeze
 
   # --- Recognition record/replay --------------------------------------------

@@ -33,6 +33,7 @@ module DemoData
       build_photos_and_items
       build_manual_items
       index_items
+      cluster_items
       @move
     end
 
@@ -170,6 +171,14 @@ module DemoData
       @move.items.includes(box: :room).find_each do |item|
         Search::RefreshDocument.new.call(item: item)
       end
+    end
+
+    # Same reasoning for the gallery Groups (#633): compute the item families
+    # synchronously so the demo shows groups — the scattered battery family —
+    # the moment the sample appears, instead of an "organizing" state waiting
+    # on a background worker that isn't running during provisioning.
+    def cluster_items
+      Clusters::Recompute.new.call(move: @move)
     end
   end
 end
