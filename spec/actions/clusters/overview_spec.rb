@@ -46,6 +46,20 @@ RSpec.describe Clusters::Overview do
     expect(result.preview_media_ids).to be_a(Hash)
   end
 
+  it "drops a box from the chips once its only member leaves the searchable set" do
+    2.times { create(:item, :auto_confirmed, move:, box: box_a, name: "AA battery") }
+    leaving = create(:item, :auto_confirmed, move:, box: box_b, name: "AAA battery")
+    Clusters::Recompute.new.call(move:)
+    battery = ItemCluster.where(move_id: move.id).find_by!(leader_key: "aa battery")
+    expect(overview.box_numbers.fetch(battery.id)).to eq(%w[2 10]) # both boxes before
+
+    leaving.update!(presence_state: "removed") # unpacked, not discarded
+
+    # The chip must not send the user to box 10 — no searchable member is there,
+    # matching the detail page's live Item.searchable filter.
+    expect(overview.box_numbers.fetch(battery.id)).to eq(%w[2])
+  end
+
   it "collects distinct preview photo ids per cluster (duplicates collapsed by DISTINCT ON)" do
     media = create(:media, move:, box: box_a, status: "ready")
     other = create(:media, move:, box: box_b, status: "ready")

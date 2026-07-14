@@ -96,7 +96,12 @@ module Clusters
 
     # The chip payload: every member box number per cluster, numerically
     # ordered in SQL (numbers are strings — a lexical sort puts "9" after
-    # "10"). Bounded by the clusters on the page; the card truncates.
+    # "10"). Bounded by the clusters on the page; the card truncates. The
+    # searchable predicates match the detail page's Item.searchable AND the
+    # preview query above: the chips ARE the retrieval answer, so a member
+    # removed/unpacked since the recompute must not send the user to a box no
+    # current member occupies (bounded staleness in the debounce window
+    # otherwise — the chips would out-list the checklist).
 
     #: (untyped ids) -> Hash[untyped, untyped]
     def box_numbers_for(ids)
@@ -105,7 +110,10 @@ module Clusters
         FROM item_cluster_memberships m
         JOIN items i ON i.id = m.item_id
         JOIN boxes b ON b.id = i.box_id
-        WHERE m.item_cluster_id IN (:ids) AND i.discarded_at IS NULL
+        WHERE m.item_cluster_id IN (:ids)
+          AND i.discarded_at IS NULL
+          AND i.presence_state = 'in_box'
+          AND i.review_state IN ('confirmed', 'auto_confirmed')
         ORDER BY b.number::bigint
       SQL
       ActiveRecord::Base.connection.select_rows(sql)
