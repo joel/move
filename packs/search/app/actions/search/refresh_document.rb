@@ -69,13 +69,17 @@ module Search
       doc.embedded_at = nil
     end
 
-    # Textual metadata only: name + box number + room.
+    # Textual metadata only: name + hidden family + box number + room. The family
+    # (#626) is the recognition model's photo-derived classification — invisible
+    # in the UI, but folded in here so both the tsvector and the embedding carry
+    # it (searching "batteries" finds a power bank whose label never says so).
 
     #: (untyped item) -> String
     def compose_text(item)
       box = item.box
       [
         item.name,
+        item.family,
         ("Box #{box.number}" if box),
         box&.room&.name
       ].compact_blank.join(" ")
