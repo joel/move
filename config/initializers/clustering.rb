@@ -7,6 +7,6 @@
 # the two prefixes to keep dispatch cheap.
 Rails.application.config.after_initialize do
   Rails.event.subscribe(Clusters::RefreshSubscriber.new) do |event|
-    event[:name].start_with?("item.", "move.")
+    event[:name].start_with?("item.", "box.", "move.")
   end
 end

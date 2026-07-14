@@ -17,10 +17,17 @@ module Clusters
       item.created item.updated item.moved item.deleted
       item.removed item.restored item.undeleted
     ].freeze
+    # Box-level cascades change the searchable set WITHOUT item events (Codex
+    # P2 on #632): marking a box unpacked bulk-updates its items to removed via
+    # update_all, and box delete/restore cascade discard/undiscard the children.
+    # status_changed is subscribed for every transition rather than decoding
+    # `to:` here — a spare debounced recompute on seal is cheaper than coupling
+    # this subscriber to which transitions happen to cascade.
+    BOX_EVENTS = %w[box.status_changed box.deleted box.restored].freeze
     MOVE_EVENTS = %w[
       move.embedding_provider_changed move.provider_key_set move.provider_key_removed
     ].freeze
-    EVENTS = (ITEM_EVENTS + MOVE_EVENTS).freeze
+    EVENTS = (ITEM_EVENTS + BOX_EVENTS + MOVE_EVENTS).freeze
 
     def emit(event)
       return unless EVENTS.include?(event[:name])

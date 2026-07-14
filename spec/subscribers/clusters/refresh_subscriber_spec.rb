@@ -22,10 +22,11 @@ RSpec.describe Clusters::RefreshSubscriber do
       .with(move_id: "move-1").exactly(described_class::EVENTS.size).times
   end
 
-  it "covers the item lifecycle and embedding-space events" do
+  it "covers the item lifecycle, box cascades, and embedding-space events" do
     expect(described_class::EVENTS).to contain_exactly(
       "item.created", "item.updated", "item.moved", "item.deleted",
       "item.removed", "item.restored", "item.undeleted",
+      "box.status_changed", "box.deleted", "box.restored",
       "move.embedding_provider_changed", "move.provider_key_set", "move.provider_key_removed"
     )
   end
@@ -34,6 +35,7 @@ RSpec.describe Clusters::RefreshSubscriber do
     subscriber.emit(event("item.image_generated", { move_id: "move-1" }))
     subscriber.emit(event("move.created", { move_id: "move-1" }))
     subscriber.emit(event("box.created", { move_id: "move-1" }))
+    subscriber.emit(event("box.updated", { move_id: "move-1" }))
 
     expect(refresh).not_to have_received(:call)
   end
