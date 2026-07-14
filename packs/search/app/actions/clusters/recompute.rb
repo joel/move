@@ -26,17 +26,21 @@ module Clusters
   # Clustering never reads item_search_documents.embedding, so a whole-Move
   # re-embed (IndexingRuns' null-then-refill window) cannot corrupt it.
   #
-  # Concurrency: recomputes for one Move serialize on a per-Move advisory lock
-  # taken at the top of the persist transaction — a racing run (rake vs the
-  # debounced job) waits, then recomputes over the winner's committed rows
-  # instead of colliding on the unique indexes. A Move hard-deleted mid-run
-  # surfaces as Failure(:move_deleted), never a raw FK raise. On a cold Move
-  # with a real provider the name-cache fill is one serial embed call per
-  # distinct name (no batch API yet); partial progress commits per name, so an
-  # interrupted run resumes from the misses.
+  # Concurrency: the WHOLE run holds a per-Move session-level advisory lock —
+  # taken before the working set is read, released after persist commits. A
+  # racing run (rake vs the debounced job) therefore waits and then reads a
+  # snapshot that already includes the winner's world: a stale earlier reader
+  # can never overwrite fresher clusters (write-write collisions on the unique
+  # indexes are prevented by the same serialization). The lock spans the
+  # embed calls deliberately — no DB transaction is open during them, only the
+  # lock, and serializing the cache fill per Move is desirable anyway. A Move
+  # hard-deleted mid-run surfaces as Failure(:move_deleted), never a raw FK
+  # raise. On a cold Move with a real provider the name-cache fill is one
+  # serial embed call per distinct name (no batch API yet); partial progress
+  # commits per name, so an interrupted run resumes from the misses.
   class Recompute < BaseAction
-    # Advisory-lock namespace for cluster recomputes (pg_advisory_xact_lock's
-    # two-int form) — app-unique so other features' locks can't collide.
+    # Advisory-lock namespace for cluster recomputes (the two-int
+    # pg_advisory_lock form) — app-unique so other features' locks can't collide.
     LOCK_NAMESPACE = 625
     # Minimum cosine similarity (1 - distance) for a group to join a leader,
     # keyed by embedding model — vector spaces are never mixed. The fake
@@ -54,12 +58,14 @@ module Clusters
       embedder ||= EmbeddingProviders.for_move(move)
       model = embedder.model
 
-      groups = stage_one(move)
-      ensure_vectors(move, groups, embedder, model)
-      sims = similarity_lookup(move, groups, model)
-      clusters = persist(move, leader_pass(groups, sims, model), model)
-      emit_event(move, clusters)
-      Success(clusters)
+      with_move_lock(move) do
+        groups = stage_one(move)
+        ensure_vectors(move, groups, embedder, model)
+        sims = similarity_lookup(move, groups, model)
+        clusters = persist(move, leader_pass(groups, sims, model), model)
+        emit_event(move, clusters)
+        Success(clusters)
+      end
     rescue ActiveRecord::InvalidForeignKey
       # The Move (or its items) was hard-deleted mid-run (Moves::Destroy
       # cascades every cluster table); nothing to recompute — the cascade
@@ -209,13 +215,12 @@ module Clusters
     # gallery detail URLs — survive recomputes, delete vanished leaders (FKs
     # cascade their memberships), replace memberships wholesale, write the
     # denormalized counts from the same working set, and stamp completion — all
-    # in ONE transaction, serialized per Move by an advisory lock (racing runs
-    # would otherwise collide on the leader_key/item_id unique indexes or
-    # deadlock on row-lock order; the loser now just waits and re-persists over
-    # the winner's committed rows). Everything queries ItemCluster explicitly,
-    # never move.item_clusters: the association proxy would cache a
-    # pre-deletion load on the CALLER's move, leaving it reading retired
-    # clusters after the recompute.
+    # in ONE transaction. Cross-run collisions (leader_key/item_id unique
+    # indexes, row-lock deadlocks, stale-reader-overwrites-fresh) are prevented
+    # upstream by the whole-run session lock in #call. Everything queries
+    # ItemCluster explicitly, never move.item_clusters: the association proxy
+    # would cache a pre-deletion load on the CALLER's move, leaving it reading
+    # retired clusters after the recompute.
 
     #: (untyped move, untyped assignments, String model) -> untyped
     def persist(move, assignments, model)
@@ -225,7 +230,6 @@ module Clusters
       end
 
       ActiveRecord::Base.transaction do
-        acquire_move_lock(move)
         pairs = upsert_clusters(move, kept, model)
         ItemCluster.where(move_id: move.id).where.not(leader_key: kept.pluck(:leader_key)).delete_all
         replace_memberships(move, pairs)
@@ -234,16 +238,29 @@ module Clusters
       end
     end
 
-    # Transaction-scoped (auto-released at commit/rollback), keyed on the Move.
-    # hashtext folds the uuid to int4; LOCK_NAMESPACE disambiguates from any
-    # other feature's advisory locks.
+    # Session-level per-Move lock held for the WHOLE recompute (read → embed →
+    # persist), so a waiting run's snapshot is always taken after the winner's
+    # commit — a stale reader can never be the last writer (Codex P1 on #630).
+    # Session (not xact) scope because the embed calls must not run inside a
+    # DB transaction; the ensure releases on the same leased connection, and a
+    # crashed session drops the lock automatically. hashtext folds the uuid to
+    # int4; LOCK_NAMESPACE disambiguates from other features' advisory locks.
 
-    #: (untyped move) -> void
-    def acquire_move_lock(move)
-      ActiveRecord::Base.connection.execute(
-        ActiveRecord::Base.sanitize_sql_array(
-          ["SELECT pg_advisory_xact_lock(:ns, hashtext(:move_id))", { ns: LOCK_NAMESPACE, move_id: move.id }]
-        )
+    #: (untyped move) { () -> untyped } -> untyped
+    def with_move_lock(move)
+      connection = ActiveRecord::Base.connection
+      connection.execute(lock_sql("pg_advisory_lock", move))
+      begin
+        yield
+      ensure
+        connection.execute(lock_sql("pg_advisory_unlock", move))
+      end
+    end
+
+    #: (String function, untyped move) -> String
+    def lock_sql(function, move)
+      ActiveRecord::Base.sanitize_sql_array(
+        ["SELECT #{function}(:ns, hashtext(:move_id))", { ns: LOCK_NAMESPACE, move_id: move.id }]
       )
     end
 
