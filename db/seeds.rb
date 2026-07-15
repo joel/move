@@ -366,7 +366,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   Rails.logger.info(
     "[seeds] #{organization.slug}: #{move.boxes.count} boxes, #{move.rooms.count} rooms, " \
     "#{move.items.count} items, #{move.media.count} media, " \
-    "#{move.items.in_box.where(review_state: %w[pending_review needs_correction]).count} to review, " \
+    "#{move.items.unreviewed.count} to review, " \
     "#{ItemSearchDocument.count} search docs"
   )
 end

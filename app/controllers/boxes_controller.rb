@@ -225,7 +225,7 @@ class BoxesController < MoveScopedController
 
   #: (untyped items) -> Integer
   def unreviewed_count(items)
-    items.where(review_state: %w[pending_review needs_correction]).count
+    items.unreviewed.count
   end
 
   # Orphaned photos whose latest recognition attempt is settled: a terminal run
@@ -384,7 +384,7 @@ class BoxesController < MoveScopedController
       missing_dimensions: boxes.where(
         "length_cm IS NULL OR width_cm IS NULL OR height_cm IS NULL"
       ).count,
-      pending_review: @move.items.pending_review.count
+      pending_review: @move.items.unreviewed.count
     }
   end
 

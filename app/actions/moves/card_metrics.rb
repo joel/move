@@ -18,7 +18,7 @@ module Moves
     def call(move_ids:)
       totals = Box.where(move_id: move_ids).group(:move_id).count
       packed = Box.where(move_id: move_ids).where.not(status: "packing").group(:move_id).count
-      pending = Item.pending_review.where(move_id: move_ids).group(:move_id).count
+      pending = Item.unreviewed.where(move_id: move_ids).group(:move_id).count
 
       Success(move_ids.index_with do |id|
         Metrics.new(packed: packed.fetch(id, 0), total: totals.fetch(id, 0),

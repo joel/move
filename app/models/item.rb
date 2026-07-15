@@ -34,9 +34,11 @@ class Item < ApplicationRecord
   scope :in_box, -> { where(presence_state: "in_box") }
   # Items unpacked / removed from their box (D10 unpacking "Unpacked" section).
   scope :removed, -> { where(presence_state: "removed") }
-  # "Pending review" implies the item is still in the box — a removed item (e.g. a
-  # false-positive) must not linger in pending counts.
-  scope :pending_review, -> { in_box.where(review_state: "pending_review") }
+  # Items still awaiting review, in either unreviewed state (needs_correction has
+  # no write path today but is a live read path). in_box: a removed item (e.g. a
+  # false-positive) must not linger in pending counts. The ONE definition shared
+  # by the box badge, the boxes-home summary, the move cards and the review queue.
+  scope :unreviewed, -> { in_box.where(review_state: %w[pending_review needs_correction]) }
   scope :ordered, -> { order(created_at: :asc) }
   # Confirmed/auto-confirmed items still in their box — the default searchable set
   # (excludes needs_correction and removed; Domain §7.4).

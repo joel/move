@@ -841,7 +841,7 @@ class ::Item < ::ApplicationRecord
 
   def self.in_box: () -> ::Item::ActiveRecord_Relation
   def self.removed: () -> ::Item::ActiveRecord_Relation
-  def self.pending_review: () -> ::Item::ActiveRecord_Relation
+  def self.unreviewed: () -> ::Item::ActiveRecord_Relation
   def self.ordered: () -> ::Item::ActiveRecord_Relation
   def self.searchable: () -> ::Item::ActiveRecord_Relation
 
@@ -850,7 +850,7 @@ class ::Item < ::ApplicationRecord
 
     def removed: () -> ::Item::ActiveRecord_Relation
 
-    def pending_review: () -> ::Item::ActiveRecord_Relation
+    def unreviewed: () -> ::Item::ActiveRecord_Relation
 
     def ordered: () -> ::Item::ActiveRecord_Relation
 

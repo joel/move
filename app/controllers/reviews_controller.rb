@@ -220,7 +220,7 @@ class ReviewsController < MoveScopedController
 
   #: () -> untyped
   def first_unreviewed_media
-    ids = @box.items.in_box.where(review_state: %w[pending_review needs_correction])
+    ids = @box.items.unreviewed
               .where.not(source_media_id: nil).distinct.pluck(:source_media_id)
     return nil if ids.empty?
 
