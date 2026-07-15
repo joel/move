@@ -317,4 +317,116 @@ RSpec.describe "Per-photo review" do
       expect(flash[:alert]).to eq(I18n.t("reviews.flash.retake_errors.no_file"))
     end
   end
+
+  describe "queue mode (?queue=move) — the Move-wide walk (#654)" do
+    def pending_photo(box:, captured_at:)
+      photo = create(:media, move:, box:, captured_at:)
+      create(:item, move:, box:, source_media: photo, review_state: "pending_review")
+      photo
+    end
+
+    it "advances across box boundaries to the oldest remaining pending photo" do
+      detected(name: "Lamp") # in `box`, on `media` (captured now)
+      other_box = create(:box, move:, number: "42")
+      newer = pending_photo(box: other_box, captured_at: 1.hour.from_now)
+
+      get move_box_review_photo_path(move, box, media, queue: "move")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(move_box_review_photo_path(move, other_box, newer, queue: "move"))
+      expect(response.body).to include(I18n.t("reviews.photo.queue_progress", count: 1))
+    end
+
+    it "locates the photo with a Box badge and finishes to the queue on the last photo" do
+      detected(name: "Lamp")
+
+      get move_box_review_photo_path(move, box, media, queue: "move")
+
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("reviews.photo.queue_badge", number: box.number))
+        expect(response.body).to include(I18n.t("reviews.photo.queue_progress.zero"))
+        expect(response.body).to include(I18n.t("reviews.photo.finish"))
+        expect(response.body).to include(move_review_path(move))
+      end
+    end
+
+    it "still confirms the opened photo's items (same GET-side effect as box mode)" do
+      item = detected(name: "Lamp")
+
+      get move_box_review_photo_path(move, box, media, queue: "move")
+
+      expect(item.reload.review_state).to eq("confirmed")
+    end
+
+    it "does not activate on any other queue value" do
+      detected(name: "Lamp")
+
+      get move_box_review_photo_path(move, box, media, queue: "bogus")
+
+      expect(response.body).to include(I18n.t("reviews.photo.progress", position: 1, total: 1))
+    end
+
+    it "advances strictly forward on a read-only Move (no ping-pong, and it terminates)" do
+      archived = create(:move, :archived, created_by: user)
+      archived_box = create(:box, move: archived)
+      photos = [2.hours.ago, 1.hour.ago, Time.current].map do |at|
+        photo = create(:media, move: archived, box: archived_box, captured_at: at)
+        create(:item, move: archived, box: archived_box, source_media: photo, review_state: "pending_review")
+        photo
+      end
+
+      # Nothing is confirmed on a read-only Move, so from the middle photo the
+      # walk must offer the NEXT one (never back to the oldest)...
+      get move_box_review_photo_path(archived, archived_box, photos[1], queue: "move")
+      expect(response.body).to include(move_box_review_photo_path(archived, archived_box, photos[2], queue: "move"))
+      expect(response.body).not_to include(">#{move_box_review_photo_path(archived, archived_box, photos[0])}?queue")
+
+      # ...and from the newest, finish back to the queue.
+      get move_box_review_photo_path(archived, archived_box, photos[2], queue: "move")
+      expect(response.body).to include(I18n.t("reviews.photo.finish"))
+      expect(response.body).to include(move_review_path(archived))
+    end
+
+    it "threads the queue through the add-item HTML fallback" do
+      detected(name: "Lamp")
+
+      post move_box_review_add_item_path(move, box, media, queue: "move"), params: { item: { name: "Mug" } }
+
+      expect(response).to redirect_to(move_box_review_photo_path(move, box, media, queue: "move"))
+    end
+
+    it "threads the queue through the remove-item HTML fallback" do
+      item = detected(name: "Lamp")
+
+      patch move_box_review_remove_item_path(move, box, media, item, queue: "move")
+
+      expect(response).to redirect_to(move_box_review_photo_path(move, box, media, queue: "move"))
+    end
+
+    it "stays in the walk after moving the photo to another box" do
+      detected(name: "Lamp")
+      target = create(:box, move:, number: "9")
+
+      patch move_box_review_move_photo_path(move, box, media, queue: "move"),
+            params: { target_box_id: target.id }
+
+      expect(response).to redirect_to(move_box_review_photo_path(move, target, media, queue: "move"))
+    end
+
+    it "returns to the queue after deleting the photo" do
+      detected(name: "Lamp")
+
+      delete move_box_review_photo_path(move, box, media, queue: "move")
+
+      expect(response).to redirect_to(move_review_path(move))
+    end
+
+    it "threads the queue through the retake redirect" do
+      file = Rack::Test::UploadedFile.new(Rails.root.join("spec/fixtures/files/sample_image.png"), "image/png")
+
+      post move_box_review_retake_photo_path(move, box, media, queue: "move"), params: { file: }
+
+      expect(response).to redirect_to(move_box_review_photo_path(move, box, media, queue: "move"))
+    end
+  end
 end

@@ -19,8 +19,11 @@ module Views
       # @rbs next_media: untyped
       # @rbs editable: untyped
       # @rbs move_boxes: untyped
+      # @rbs queue: untyped
+      # @rbs queue_remaining: untyped
       # @rbs return: void
-      def initialize(move:, box:, media:, items:, position:, total:, next_media:, editable: false, move_boxes: [])
+      def initialize(move:, box:, media:, items:, position:, total:, next_media:, editable: false, move_boxes: [],
+                     queue: false, queue_remaining: nil)
         @move = move
         @box = box
         @media = media
@@ -32,6 +35,12 @@ module Views
         # Other boxes in this Move the photo can be moved to (#317); empty when this
         # is the only box (the control is then hidden).
         @move_boxes = move_boxes
+        # Queue mode (#654): the Move-wide review-queue walk. position/total are nil
+        # (the pending set shrinks as photos are confirmed — there is no stable
+        # total), next_media may live in ANOTHER box, and back/Finish target the
+        # queue page. queue_remaining = pending photos left after this one.
+        @queue = queue
+        @queue_remaining = queue_remaining
       end
 
       #: () -> void
@@ -45,21 +54,34 @@ module Views
 
       private
 
+      # In queue mode the percentage fill is omitted: the pending set shrinks as
+      # photos are confirmed, so a bar over a moving total would be dishonest —
+      # the "N more after this" count is the real progress.
+
       #: () -> untyped
       def progress_bar
         div(class: "flex items-center gap-4") do
-          a(href: move_box_path(@move, @box),
+          a(href: @queue ? move_review_path(@move) : move_box_path(@move, @box),
             class: "flex h-10 w-10 items-center justify-center rounded-full bg-card text-muted hover:text-text-warm") do
             render Components::Icons::ChevronRight.new(css: "h-5 w-5 rotate-180")
           end
           div(class: "flex flex-1 flex-col gap-1") do
-            span(class: "text-label-caps uppercase text-muted") do
-              I18n.t("reviews.photo.progress", position: @position, total: @total)
-            end
-            div(class: "h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high") do
-              div(class: "h-full rounded-full bg-accent-sage", style: "width: #{progress_pct}%")
+            span(class: "text-label-caps uppercase text-muted") { progress_label }
+            unless @queue
+              div(class: "h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high") do
+                div(class: "h-full rounded-full bg-accent-sage", style: "width: #{progress_pct}%")
+              end
             end
           end
+        end
+      end
+
+      #: () -> String
+      def progress_label
+        if @queue
+          I18n.t("reviews.photo.queue_progress", count: @queue_remaining)
+        else
+          I18n.t("reviews.photo.progress", position: @position, total: @total)
         end
       end
 
@@ -85,13 +107,25 @@ module Views
         end
       end
 
+      # In queue mode Next crosses boxes, so the overlay names the photo's
+      # location ("Box 3 · Kitchen") instead of a within-box position.
+
       #: () -> untyped
       def badge
         div(class: "absolute left-3 top-3 z-10 inline-flex items-center gap-2 rounded-full " \
                    "bg-surface-container-high/80 px-3 py-1 text-label-caps uppercase text-on-surface-variant " \
                    "backdrop-blur") do
           render Components::Icons::Camera.new(css: "h-3.5 w-3.5 text-accent-sage")
-          plain I18n.t("reviews.photo.badge", position: @position, total: @total)
+          plain badge_text
+        end
+      end
+
+      #: () -> String
+      def badge_text
+        if @queue
+          [I18n.t("reviews.photo.queue_badge", number: @box.number), @box.room&.name].compact.join(" · ")
+        else
+          I18n.t("reviews.photo.badge", position: @position, total: @total)
         end
       end
 
@@ -129,7 +163,7 @@ module Views
       #: () -> untyped
       def list
         render Components::Reviews::ItemList.new(
-          move: @move, box: @box, media: @media, items: @items, editable: @editable
+          move: @move, box: @box, media: @media, items: @items, editable: @editable, queue: @queue
         )
       end
 
@@ -138,7 +172,7 @@ module Views
 
       #: () -> untyped
       def add_form
-        form_with(url: move_box_review_add_item_path(@move, @box, @media), method: :post,
+        form_with(url: move_box_review_add_item_path(@move, @box, @media, **queue_params), method: :post,
                   data: { controller: "reset-form", action: "turbo:submit-end->reset-form#reset" },
                   class: "mt-stack-gap flex items-center gap-2 rounded-card border border-dashed " \
                          "border-card-border bg-card p-2 focus-within:border-accent-sage") do
@@ -160,7 +194,7 @@ module Views
       def move_photo_control
         div(class: "mt-stack-gap border-t border-card-border pt-stack-gap") do
           span(class: "text-label-caps uppercase text-muted") { I18n.t("reviews.photo.move_heading") }
-          form_with(url: move_box_review_move_photo_path(@move, @box, @media), method: :patch,
+          form_with(url: move_box_review_move_photo_path(@move, @box, @media, **queue_params), method: :patch,
                     class: "mt-2 flex items-center gap-2") do
             select(
               name: "target_box_id", aria_label: I18n.t("reviews.photo.move_heading"),
@@ -188,7 +222,7 @@ module Views
       def retake_control
         div(class: "mt-stack-gap border-t border-card-border pt-stack-gap") do
           span(class: "text-label-caps uppercase text-muted") { I18n.t("reviews.photo.retake_heading") }
-          form_with(url: move_box_review_retake_photo_path(@move, @box, @media), method: :post,
+          form_with(url: move_box_review_retake_photo_path(@move, @box, @media, **queue_params), method: :post,
                     data: { controller: "capture-upload" }, class: "mt-2 flex flex-col gap-3") do |form|
             # Re-scan adds items, so it's only offered while the box can capture
             # (packing) — the action rejects it otherwise. A plain image swap stays
@@ -221,9 +255,9 @@ module Views
           span(class: "text-label-caps uppercase text-muted") { I18n.t("reviews.photo.delete_heading") }
           danger_classes = "inline-flex w-full items-center justify-center gap-2 rounded-full bg-error " \
                            "px-5 py-2 text-sm font-bold text-on-error transition hover:opacity-90 active:scale-[0.98]"
-          button_to(move_box_review_photo_path(@move, @box, @media), method: :delete, form_class: "mt-2",
-                                                                     class: danger_classes,
-                                                                     data: { turbo_confirm: I18n.t("reviews.photo.delete_confirm") }) do
+          button_to(move_box_review_photo_path(@move, @box, @media, **queue_params), method: :delete, form_class: "mt-2",
+                                                                                     class: danger_classes,
+                                                                                     data: { turbo_confirm: I18n.t("reviews.photo.delete_confirm") }) do
             render Components::Icons::Trash.new(css: "h-5 w-5")
             plain I18n.t("reviews.photo.delete_submit")
           end
@@ -234,11 +268,23 @@ module Views
       def footer
         div(class: "mt-6") do
           if @next_media
-            advance_link("reviews.photo.next", move_box_review_photo_path(@move, @box, @next_media))
+            advance_link("reviews.photo.next", next_photo_href)
           else
-            advance_link("reviews.photo.finish", move_box_path(@move, @box))
+            advance_link("reviews.photo.finish", @queue ? move_review_path(@move) : move_box_path(@move, @box))
           end
         end
+      end
+
+      # Queue mode crosses boxes: the next photo's OWN box, never @box.
+
+      #: () -> String
+      def next_photo_href
+        move_box_review_photo_path(@move, @queue ? @next_media.box : @box, @next_media, **queue_params)
+      end
+
+      #: () -> Hash[Symbol, String]
+      def queue_params
+        @queue ? { queue: ReviewsController::QUEUE_PARAM } : {}
       end
 
       # Turbo prefetch is disabled: opening the next photo marks its items reviewed

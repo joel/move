@@ -12,15 +12,18 @@ module Components
 
       # highlight_id: when the list is re-rendered after adding the first item to a
       # previously-empty photo, flag that one row so it scrolls into view + rings.
+      # queue: the Move-wide walk (#654) — row mutation URLs carry ?queue=move so
+      # the no-JS fallbacks redirect back into the walk, not box mode.
 
-      #: (move: untyped, box: untyped, media: untyped, items: untyped, editable: untyped, ?highlight_id: untyped) -> void
-      def initialize(move:, box:, media:, items:, editable:, highlight_id: nil)
+      #: (move: untyped, box: untyped, media: untyped, items: untyped, editable: untyped, ?highlight_id: untyped, ?queue: untyped) -> void
+      def initialize(move:, box:, media:, items:, editable:, highlight_id: nil, queue: false)
         @move = move
         @box = box
         @media = media
         @items = items.to_a
         @editable = editable
         @highlight_id = highlight_id
+        @queue = queue
       end
 
       #: () -> void
@@ -33,7 +36,7 @@ module Components
               @items.each do |item|
                 render Components::Reviews::ItemRow.new(
                   move: @move, box: @box, media: @media, item:,
-                  editable: @editable, highlight: item.id == @highlight_id
+                  editable: @editable, highlight: item.id == @highlight_id, queue: @queue
                 )
               end
             end
