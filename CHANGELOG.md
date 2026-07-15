@@ -5,6 +5,18 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.94.1] — 2026-07-15
+
+### Fixed
+- **A photo recognition that hiccups at the finish line can no longer double your
+  items.** Previously, if something went wrong in the split second after a
+  photo's items were saved but before the run was marked done, the app could
+  label the run "failed" even though the items were already in your box — and
+  tapping Retry would then add every one of them again. The run's outcome is now
+  recorded in the same stroke as its items (a failed run truly saved nothing),
+  Retry politely refuses when the photo's items already exist, and a photo stuck
+  on a spinner after a crash now gets its "done" signal re-sent (#649).
+
 ## [v0.94.0] — 2026-07-15
 
 ### Added
