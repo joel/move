@@ -93,6 +93,20 @@ RSpec.describe "ReviewQueues" do
       )
     end
 
+    it "surfaces leftover pending items even on a Move with no reviewable photo at all" do
+      box = create(:box, move:, number: "1")
+      # The badges count this photo-less pending item, so even the never-had-
+      # photos branch must not say "nothing to review" (Codex review, PR #655).
+      create(:item, move:, box:, review_state: "pending_review")
+
+      get move_review_path(move)
+
+      expect(response.body).to include(
+        I18n.t("review_queues.show.empty.caught_up_leftover", count: 1)
+      )
+      expect(response.body).not_to include(I18n.t("review_queues.show.empty.title"))
+    end
+
     it "shows the nothing-to-review empty state when no photo ever produced an item" do
       get move_review_path(move)
 

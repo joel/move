@@ -82,11 +82,14 @@ module Views
 
       # Caught-up (the Move has review-walkable photos, none pending) vs
       # never-had-photos — a queue that empties by being worked deserves a
-      # different message than one that never filled.
+      # different message than one that never filled. Leftover pending items
+      # win over the photo-history branch: even a Move with NO reviewable
+      # photo must not say "nothing to review" while the entry badges count
+      # photo-less pending items (Codex review, PR #655).
 
       #: () -> untyped
       def empty_state
-        if @had_reviewable
+        if @had_reviewable || @leftover_unreviewed.to_i.positive?
           render Components::Ui::EmptyState.new(
             icon: Components::Icons::Check,
             title: I18n.t("review_queues.show.empty.caught_up_title"),
