@@ -4,10 +4,15 @@
 # additively here. Re-audit when the collection's rails sigs catch up.
 
 # Rails 8.1 structured events (`Rails.event.notify` — AGENTS.md §1 rule 4's
-# emission mechanism, used by every action's emit_event). Untyped on purpose —
-# the reporter's surface isn't worth modelling until community sigs catch up.
+# emission mechanism, used by every action's emit_event) and the error
+# reporter (`Rails.error.report` — Sentry-visible handled-error channel, used
+# by RecognitionRuns::Process's isolated announcement, #649). Untyped on
+# purpose — the reporters' surfaces aren't worth modelling until community
+# sigs catch up.
 module Rails
   def self.event: () -> untyped
+
+  def self.error: () -> untyped
 end
 
 # action_policy has no community RBS. The mixin the controllers include; its

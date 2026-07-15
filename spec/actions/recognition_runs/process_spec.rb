@@ -156,6 +156,79 @@ RSpec.describe RecognitionRuns::Process do
     end
   end
 
+  describe "atomic completion (#649)" do
+    it "rolls back the whole run — items included — when the terminal status write fails" do
+      # A recoverable write failure (constraint/timeout) — the connection
+      # survives, so fail_run's own write lands. A DEAD connection instead
+      # fails fail_run too and the run stays `processing`; that path is
+      # recovered by the queue re-running the job (the rollback left zero
+      # inventory, so the re-run recreates the set exactly once).
+      allow(run).to receive(:update!).and_call_original
+      allow(run).to receive(:update!)
+        .with(hash_including(status: "succeeded"))
+        .and_raise(ActiveRecord::StatementInvalid, "simulated terminal-status write failure")
+
+      result = described_class.new.call(run:)
+
+      expect(result).to be_failure
+      expect(run.reload.status).to eq("failed")
+      # The rollback took the inventory with it: a failed run NEVER holds
+      # items, so Retry (a new run, failed-only) cannot duplicate anything.
+      expect(box.items.count).to eq(0)
+      expect(run.recognition_suggestions.count).to eq(0)
+    end
+
+    it "keeps a committed run succeeded when a post-commit announcement raises (§1#4)" do
+      allow(Rails.event).to receive(:notify).and_call_original
+      allow(Rails.event).to receive(:notify)
+        .with("recognition_run.succeeded", anything)
+        .and_raise(ActiveRecord::ConnectionNotEstablished, "cable down")
+      allow(Rails.logger).to receive(:warn)
+
+      result = described_class.new.call(run:)
+
+      expect(result).to be_success
+      expect(run.reload.status).to eq("succeeded")
+      expect(box.items.count).to eq(3)
+      expect(Rails.logger).to have_received(:warn).with(/recognition_run.succeeded announcement failed/)
+    end
+
+    it "keeps the backfill and the succeeded run when the backfill announcement raises" do
+      existing = create(:item, :confirmed, move:, box:, name: "Coffee maker", family: nil)
+      allow(Rails.event).to receive(:notify).and_call_original
+      allow(Rails.event).to receive(:notify)
+        .with("item.family_backfilled", anything).and_raise(StandardError, "boom")
+      allow(Rails.logger).to receive(:warn)
+
+      result = described_class.new.call(run:)
+
+      expect(result).to be_success
+      expect(run.reload.status).to eq("succeeded")
+      expect(existing.reload.family).to eq("kitchenware")
+      expect(Rails.logger).to have_received(:warn).with(/item.family_backfilled announcement failed/)
+    end
+
+    it "re-processing the same media after a failed run creates no duplicates" do
+      objects = [
+        RecognitionProviders::DetectedObject.new(label: "Lamp", confidence: 0.97, family: "lighting"),
+        RecognitionProviders::DetectedObject.new(label: "Rug", confidence: 99.0, family: nil) # overflows decimal(4,3)
+      ]
+      failing = instance_double(RecognitionProviders::Fake)
+      allow(failing).to receive(:identify).and_return(
+        RecognitionProviders::Result.new(provider: "fake", provider_model: "x", objects:)
+      )
+
+      expect(described_class.new.call(run:, provider: failing)).to be_failure
+      expect(box.items.count).to eq(0)
+
+      # What RecognitionRuns::Retry does: a NEW run for the same media (the
+      # failed one is kept for the record).
+      retry_run = create(:recognition_run, move:, box:, media:, status: "queued")
+      expect(described_class.new.call(run: retry_run)).to be_success
+      expect(box.items.count).to eq(3) # the Fake detection set, exactly once
+    end
+  end
+
   it "emits item.created per materialized item, none for conflicts" do
     create(:item, :confirmed, move:, box:, name: "Coffee maker")
     allow(Rails.event).to receive(:notify)
