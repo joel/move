@@ -44,4 +44,12 @@ RSpec.describe Clusters::RefreshSubscriber do
     subscriber.emit(event("item.updated", {}))
     expect(refresh).not_to have_received(:call)
   end
+
+  it "swallows a refresh failure so it can't break the emitter (§1#4)" do
+    allow(refresh).to receive(:call).and_raise(ActiveRecord::StatementInvalid, "PG::QueryCanceled")
+    allow(Rails.logger).to receive(:warn)
+
+    expect { subscriber.emit(event("item.created", { move_id: "move-1" })) }.not_to raise_error
+    expect(Rails.logger).to have_received(:warn).with(/refresh request failed/)
+  end
 end

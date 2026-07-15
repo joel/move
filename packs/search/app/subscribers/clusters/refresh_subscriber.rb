@@ -10,8 +10,8 @@ module Clusters
   # coordination, clustering never reads the search vectors). Image-generation
   # events are deliberately absent: an attached image changes no clustering
   # input. Runs synchronously in the emitting request, so Apartment tenant
-  # context is still live; RequestRefresh returns Failure rather than raising,
-  # so the emitting action can't be broken from here.
+  # context is still live — which means a failure here would break the emitting
+  # item/box action, so the dispatch is isolated (AGENTS.md §1#4).
   class RefreshSubscriber
     ITEM_EVENTS = %w[
       item.created item.updated item.moved item.deleted
@@ -35,7 +35,16 @@ module Clusters
       move_id = event[:payload]&.dig(:move_id)
       return if move_id.blank?
 
+      # This runs synchronously inside the emitting action (Items::CreateManual,
+      # Boxes::TransitionStatus, …). RequestRefresh does real DB work (the
+      # cluster_states upsert + guarded claim), so a StatementTimeout /
+      # connection error during that SQL must NOT propagate up and fail the
+      # user's edit — a stale cluster is recoverable (next event / the TTL),
+      # a failed item add is not. Degrade to a logged warning (§1#4; mirrors
+      # the sibling BroadcastSubscriber's isolated rescue).
       Clusters::RequestRefresh.new.call(move_id: move_id)
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- §1#4 a side effect must not break its emitter
+      Rails.logger.warn("[clusters] refresh request failed for move=#{move_id}: #{e.class}: #{e.message}")
     end
   end
 end
