@@ -22,7 +22,10 @@ class MenuController < MoveScopedController
       # viewers (and the controller still enforces it) — no dead-end 403. An
       # editor on an archived Move still sees it and gets the friendly read-only
       # redirect, consistent with the other editor surfaces.
-      editor: allowed_to?(:edit_contents?, @move, with: MovePolicy)
+      editor: allowed_to?(:edit_contents?, @move, with: MovePolicy),
+      # Badge on the Review row (#654) — the same definition as every other
+      # pending-review number (box badge, boxes-home summary, move card).
+      pending_review: @move.items.unreviewed.count
     )
   end
 end

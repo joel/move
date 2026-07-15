@@ -30,6 +30,19 @@ RSpec.describe "Boxes" do
       expect(response.body).to include(I18n.t("boxes.empty.title"))
     end
 
+    it "counts needs_correction in the pending-review stat and links it to the review queue (#654)" do
+      box = create(:box, move:, number: "1")
+      media = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: media, review_state: "pending_review")
+      create(:item, move:, box:, source_media: media, review_state: "needs_correction")
+
+      get move_boxes_path(move)
+
+      expect(response.body).to include(move_review_path(move))
+      # Both unreviewed states count — the box badge's definition, now shared.
+      expect(response.body).to include(">2</span>")
+    end
+
     it "filters boxes by room" do
       kitchen = create(:room, move:, name: "Kitchen")
       bedroom = create(:room, move:, name: "Bedroom")

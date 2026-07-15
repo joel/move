@@ -53,5 +53,24 @@ RSpec.describe "Menu hub" do
 
       expect(response).to have_http_status(:not_found)
     end
+
+    it "shows the Review row with a pending-item count badge (#654)" do
+      box = create(:box, move:)
+      media = create(:media, move:, box:)
+      create_list(:item, 2, move:, box:, source_media: media, review_state: "pending_review")
+
+      get move_menu_path(move)
+
+      expect(response.body).to include(I18n.t("menu.show.review"))
+      expect(response.body).to include(move_review_path(move))
+      expect(response.body).to include(">2</span>")
+    end
+
+    it "keeps the Review row quiet (no badge) when nothing is pending" do
+      get move_menu_path(move)
+
+      expect(response.body).to include(move_review_path(move))
+      expect(response.body).not_to include(">0</span>")
+    end
   end
 end

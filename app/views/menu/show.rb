@@ -12,11 +12,13 @@ module Views
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::Routes
 
-      #: (move: untyped, admin: untyped, editor: untyped) -> void
-      def initialize(move:, admin:, editor:)
+      #: (move: untyped, admin: untyped, editor: untyped, ?pending_review: untyped) -> void
+      def initialize(move:, admin:, editor:, pending_review: 0)
         @move = move
         @admin = admin
         @editor = editor
+        # Count badge on the Review row (#654) — hidden at zero.
+        @pending_review = pending_review
       end
 
       #: () -> void
@@ -39,6 +41,8 @@ module Views
       def organize_links
         links = [
           [I18n.t("menu.show.gallery"), Components::Icons::Camera, move_gallery_path(@move)],
+          # The Move-wide review queue (#654), wearing the pending-item count.
+          [I18n.t("menu.show.review"), Components::Icons::Eye, move_review_path(@move), @pending_review],
           [I18n.t("menu.show.activity"), Components::Icons::Clock, move_activity_path(@move)],
           [I18n.t("menu.show.rooms"), Components::Icons::Boxes,
            move_vocabularies_path(@move, "rooms")]
@@ -63,12 +67,15 @@ module Views
       def group(title, links)
         section(aria_label: title, class: "flex flex-col gap-stack-gap") do
           h2(class: "text-label-caps uppercase text-muted") { title }
-          div(class: "flex flex-col gap-3") { links.each { |label, icon, href| row(label, icon, href) } }
+          div(class: "flex flex-col gap-3") { links.each { |label, icon, href, badge| row(label, icon, href, badge) } }
         end
       end
 
-      #: (untyped label, untyped icon, untyped href) -> untyped
-      def row(label, icon, href)
+      # badge: an optional count pill (pending-review tint) before the chevron —
+      # zero/nil renders nothing, so quiet rows stay quiet.
+
+      #: (untyped label, untyped icon, untyped href, ?untyped badge) -> untyped
+      def row(label, icon, href, badge = nil)
         a(
           href: href,
           class: "flex items-center gap-4 rounded-card border border-card-border bg-card p-4 " \
@@ -79,6 +86,11 @@ module Views
                    "bg-surface-container-high text-accent-sage"
           ) { render icon.new(css: "h-5 w-5") }
           span(class: "flex-1 text-headline-md text-text-warm") { label }
+          if badge.to_i.positive?
+            span(class: "rounded-full bg-tertiary/15 px-2.5 py-0.5 text-label-caps text-tertiary") do
+              badge.to_s
+            end
+          end
           render Components::Icons::ChevronRight.new(css: "h-5 w-5 text-on-surface-variant")
         end
       end
