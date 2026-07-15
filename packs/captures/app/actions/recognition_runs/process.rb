@@ -45,8 +45,13 @@ module RecognitionRuns
       # between commit and announce leaves a succeeded run: ProcessJob skips
       # the re-released execution and re-announces; only lost backfill events
       # stay lost (the search refresh waits for the item's next event). The
-      # item.created events still fire inside the transaction (#648); the
-      # backfill payloads are collected and emitted post-commit (#650 — a
+      # item.created events fire inside the transaction: their app-DB
+      # subscriber effects are txn-covered, the search-refresh enqueue defers
+      # itself to commit and discards on rollback (IndexSubscriber, #648), and
+      # the one remaining cross-DB escape — the debounce-scheduled cluster
+      # recompute job — is tolerated by design (it runs minutes later against
+      # committed rows and is an idempotent no-op for a rolled-back burst).
+      # The backfill payloads are collected and emitted post-commit (#650 — a
       # backfill has no later event to correct a stale pre-commit read).
       backfilled = ActiveRecord::Base.transaction do
         payloads = materialize(run, result)

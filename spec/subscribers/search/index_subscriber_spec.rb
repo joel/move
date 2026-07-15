@@ -36,4 +36,42 @@ RSpec.describe Search::IndexSubscriber do
     expect { subscriber.emit(event("item.created", { item_id: "abc-123" })) }.not_to raise_error
     expect(Rails.logger).to have_received(:warn).with(/refresh enqueue failed/)
   end
+
+  describe "transactional deferral (#648)" do
+    before { allow(Search::RefreshDocumentJob).to receive(:perform_later) }
+
+    it "holds the enqueue until the surrounding transaction commits" do
+      ActiveRecord::Base.transaction do
+        subscriber.emit(event("item.created", { item_id: "abc-123" }))
+        # Still deferred: the queue DB escapes this transaction, so enqueueing
+        # now would let a worker read pre-commit state.
+        expect(Search::RefreshDocumentJob).not_to have_received(:perform_later)
+      end
+
+      expect(Search::RefreshDocumentJob).to have_received(:perform_later)
+        .with("abc-123", hash_including(:tenant)).once
+    end
+
+    it "discards the enqueue when the transaction rolls back" do
+      ActiveRecord::Base.transaction do
+        subscriber.emit(event("item.created", { item_id: "abc-123" }))
+        raise ActiveRecord::Rollback
+      end
+
+      expect(Search::RefreshDocumentJob).not_to have_received(:perform_later)
+    end
+
+    it "swallows a commit-time enqueue failure — it must not poison the just-committed action" do
+      allow(Search::RefreshDocumentJob).to receive(:perform_later)
+        .and_raise(ActiveRecord::ConnectionNotEstablished, "queue db down")
+      allow(Rails.logger).to receive(:warn)
+
+      expect do
+        ActiveRecord::Base.transaction do
+          subscriber.emit(event("item.created", { item_id: "abc-123" }))
+        end
+      end.not_to raise_error
+      expect(Rails.logger).to have_received(:warn).with(/refresh enqueue failed/)
+    end
+  end
 end
