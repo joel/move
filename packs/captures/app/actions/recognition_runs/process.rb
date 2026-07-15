@@ -35,8 +35,17 @@ module RecognitionRuns
       mark_processing(run)
       result = provider.identify(image: run.media.image, context: context(run))
       # Materialize atomically: if any detection fails to persist, roll back all
-      # of them so a failed run never leaves partial inventory behind.
-      ActiveRecord::Base.transaction { materialize(run, result) }
+      # of them so a failed run never leaves partial inventory behind. The
+      # item.created events fire inside the transaction (their pre-commit-read
+      # race on the separate queue DB is tracked in #648, where a wholesale
+      # post-commit emission variant was reverted); the backfill events are the
+      # exception and MUST emit after commit — the refresh they trigger rewrites
+      # the search document from the item row, and a pre-commit read would bake
+      # in the old nil family with no later event to correct it (a created
+      # item's document is corrected by its later lifecycle events; a backfill
+      # has no successor). A rollback discards them unemitted.
+      backfilled = ActiveRecord::Base.transaction { materialize(run, result) }
+      backfilled.each { |payload| Rails.event.notify("item.family_backfilled", **payload) }
       finish(run, result)
       Success(run)
     rescue StandardError => e # rubocop:disable Move/BroadRescue -- any failure marks the run failed (Failure)
@@ -60,10 +69,12 @@ module RecognitionRuns
       { room: run.box.room&.name }
     end
 
-    #: (untyped run, untyped result) -> untyped
+    # Returns the item.family_backfilled payloads to emit after commit.
+
+    #: (untyped run, untyped result) -> Array[Hash[Symbol, untyped]]
     def materialize(run, result)
       threshold = run.move.auto_confirm_threshold.to_f
-      result.objects.each { |object| materialize_one(run, object, threshold) }
+      result.objects.filter_map { |object| materialize_one(run, object, threshold) }
     end
 
     # Suggestion + Item per detection, cross-linked. Above threshold → auto-confirmed.
@@ -72,12 +83,12 @@ module RecognitionRuns
     # duplicate — record the detection as a `conflict` suggestion linked to the
     # existing item and leave it for human resolution in the review queue (D6).
 
-    #: (untyped run, untyped object, Float threshold) -> untyped
+    #: (untyped run, untyped object, Float threshold) -> Hash[Symbol, untyped]?
     def materialize_one(run, object, threshold)
       existing = confirmed_match(run.box, object.label)
-      return conflict_suggestion(run, object, existing) if existing
+      return conflict_suggestion(run, object, existing, threshold) if existing
 
-      auto = object.confidence.present? && object.confidence >= threshold
+      auto = confident?(object, threshold)
       suggestion = run.recognition_suggestions.create!(
         move: run.move, box: run.box, media: run.media,
         proposed_name: object.label,
@@ -93,26 +104,74 @@ module RecognitionRuns
       Rails.event.notify(
         "item.created", item_id: item.id, box_id: run.box_id, move_id: run.move_id, created_via: "recognition"
       )
+      nil
+    end
+
+    # The auto-confirm bar doubles as the trust bar for facet enrichment.
+
+    #: (untyped object, Float threshold) -> bool
+    def confident?(object, threshold)
+      object.confidence.present? && object.confidence >= threshold
     end
 
     # A user-confirmed item with the same name already lives in this box.
 
     #: (untyped box, untyped label) -> untyped
     def confirmed_match(box, label)
-      box.items.where(review_state: "confirmed")
-         .where("LOWER(name) = ?", label.to_s.strip.downcase).first
+      named(box.items.where(review_state: "confirmed"), label).first
+    end
+
+    # Case-insensitive current-name match — one predicate shared by conflict
+    # detection and the backfill's write-time re-check, so the two can't drift.
+
+    #: (untyped items, untyped label) -> untyped
+    def named(items, label)
+      items.where("LOWER(name) = ?", label.to_s.strip.downcase)
     end
 
     # Record the duplicate detection as a conflict without touching the existing
-    # item or adding a second inventory row, for the reviewer to resolve.
+    # item's user-authored fields or adding a second inventory row, for the
+    # reviewer to resolve. The one sanctioned write is the hidden-family
+    # backfill below (#627).
 
-    #: (untyped run, untyped object, untyped existing) -> untyped
-    def conflict_suggestion(run, object, existing)
+    #: (untyped run, untyped object, untyped existing, Float threshold) -> Hash[Symbol, untyped]?
+    def conflict_suggestion(run, object, existing, threshold)
       run.recognition_suggestions.create!(
         move: run.move, box: run.box, media: run.media, item: existing,
         proposed_name: object.label,
         confidence_score: object.confidence, state: "conflict"
       )
+      backfill_family(run, object, existing, threshold)
+    end
+
+    # Opportunistic enrichment (#627): a confirmed item with no hidden family
+    # (manual/MCP-created, or pre-#626) adopts the family of a detection whose
+    # label matches its *current* name — the facet describes exactly the name
+    # the item has now. Only a detection the Move would trust to auto-confirm
+    # may enrich (confident?): the family is permanent once set and steers the
+    # search/cluster embeddings, so a low-confidence guess must not stick. A
+    # single guarded UPDATE re-checks `family IS NULL` and the name match at
+    # write time, so it can never overwrite a non-nil family (Domain §6.4) and
+    # a concurrent rename — which deliberately drops the family
+    # (Items::ConfirmedEdit) — can't be undercut by this stale read.
+    # updated_at is bumped so item cache keys (the C3 family rail) invalidate.
+
+    #: (untyped run, untyped object, untyped existing, Float threshold) -> Hash[Symbol, untyped]?
+    def backfill_family(run, object, existing, threshold)
+      return nil if object.family.blank? || existing.family.present?
+      return nil unless confident?(object, threshold)
+
+      backfilled = named(run.box.items.where(id: existing.id, family: nil), object.label)
+                   .update_all(family: object.family, updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+      return nil if backfilled.zero?
+
+      # The payload for an item.family_backfilled event, emitted by #call after
+      # the transaction commits (the refresh it triggers must read the committed
+      # family — see #call). Refreshes the item's search document and requests a
+      # cluster recompute (both subscribers whitelist the event); deliberately
+      # absent from the activity feed — a hidden machine facet with no actor is
+      # not a user story.
+      { item_id: existing.id, box_id: run.box_id, move_id: run.move_id }
     end
 
     #: (untyped run, untyped result) -> untyped

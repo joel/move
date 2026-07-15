@@ -9,13 +9,13 @@ RSpec.describe Search::IndexSubscriber do
     { name: name, payload: payload }
   end
 
-  it "enqueues a reindex job for item.created/updated/moved" do
-    %w[item.created item.updated item.moved].each do |name|
+  it "enqueues a reindex job for item.created/updated/moved/family_backfilled" do
+    %w[item.created item.updated item.moved item.family_backfilled].each do |name|
       subscriber.emit(event(name, { item_id: "abc-123" }))
     end
 
     expect(Search::RefreshDocumentJob).to have_received(:perform_later)
-      .with("abc-123", hash_including(:tenant)).exactly(3).times
+      .with("abc-123", hash_including(:tenant)).exactly(4).times
   end
 
   it "ignores unrelated events" do
@@ -26,5 +26,14 @@ RSpec.describe Search::IndexSubscriber do
   it "ignores item events without an item_id" do
     subscriber.emit(event("item.updated", {}))
     expect(Search::RefreshDocumentJob).not_to have_received(:perform_later)
+  end
+
+  it "swallows an enqueue failure so it can't break the emitter (§1#4)" do
+    allow(Search::RefreshDocumentJob).to receive(:perform_later)
+      .and_raise(ActiveRecord::ConnectionNotEstablished, "queue db down")
+    allow(Rails.logger).to receive(:warn)
+
+    expect { subscriber.emit(event("item.created", { item_id: "abc-123" })) }.not_to raise_error
+    expect(Rails.logger).to have_received(:warn).with(/refresh enqueue failed/)
   end
 end

@@ -25,7 +25,7 @@ RSpec.describe Clusters::RefreshSubscriber do
   it "covers the item lifecycle, box cascades, and embedding-space events" do
     expect(described_class::EVENTS).to contain_exactly(
       "item.created", "item.updated", "item.moved", "item.deleted",
-      "item.removed", "item.restored", "item.undeleted",
+      "item.removed", "item.restored", "item.undeleted", "item.family_backfilled",
       "box.status_changed", "box.deleted", "box.restored",
       "move.embedding_provider_changed", "move.provider_key_set", "move.provider_key_removed"
     )
