@@ -34,19 +34,26 @@ module RecognitionRuns
 
       mark_processing(run)
       result = provider.identify(image: run.media.image, context: context(run))
-      # Materialize atomically: if any detection fails to persist, roll back all
-      # of them so a failed run never leaves partial inventory behind. The
-      # item.created events fire inside the transaction (their pre-commit-read
-      # race on the separate queue DB is tracked in #648, where a wholesale
-      # post-commit emission variant was reverted); the backfill events are the
-      # exception and MUST emit after commit — the refresh they trigger rewrites
-      # the search document from the item row, and a pre-commit read would bake
-      # in the old nil family with no later event to correct it (a created
-      # item's document is corrected by its later lifecycle events; a backfill
-      # has no successor). A rollback discards them unemitted.
-      backfilled = ActiveRecord::Base.transaction { materialize(run, result) }
-      backfilled.each { |payload| Rails.event.notify("item.family_backfilled", **payload) }
-      finish(run, result)
+      # Materialize AND complete atomically (#649): one commit covers the
+      # items, suggestions, family backfills and the run's terminal
+      # `succeeded` status. A failure anywhere before the commit — a
+      # detection failing to persist, or the status write itself — rolls the
+      # whole run back, so the rescue below records a failed run with ZERO
+      # inventory, unconditionally: Retry (a new run, failed-only) can never
+      # meet a failed run holding committed items. After the commit the
+      # remaining work is announcement only (#announce, isolated). A crash
+      # between commit and announce leaves a succeeded run: ProcessJob skips
+      # the re-released execution and re-announces; only lost backfill events
+      # stay lost (the search refresh waits for the item's next event). The
+      # item.created events still fire inside the transaction (#648); the
+      # backfill payloads are collected and emitted post-commit (#650 — a
+      # backfill has no later event to correct a stale pre-commit read).
+      backfilled = ActiveRecord::Base.transaction do
+        payloads = materialize(run, result)
+        complete(run, result)
+        payloads
+      end
+      announce(run, result, backfilled)
       Success(run)
     rescue StandardError => e # rubocop:disable Move/BroadRescue -- any failure marks the run failed (Failure)
       fail_run(run, e)
@@ -58,7 +65,7 @@ module RecognitionRuns
     #: (untyped run) -> untyped
     def mark_processing(run)
       run.update!(status: "processing", started_at: Time.current)
-      Rails.event.notify("recognition_run.processing", recognition_run_id: run.id)
+      notify_isolated(run, "recognition_run.processing", { recognition_run_id: run.id })
     end
 
     # The room is the only vocabulary the model is given as context — it nudges the
@@ -174,14 +181,45 @@ module RecognitionRuns
       { item_id: existing.id, box_id: run.box_id, move_id: run.move_id }
     end
 
+    # The terminal transition rides the materialize transaction (#649): a run
+    # reads `succeeded` if and only if its inventory committed with it.
+
     #: (untyped run, untyped result) -> untyped
-    def finish(run, result)
+    def complete(run, result)
       run.update!(
         status: "succeeded", completed_at: Time.current,
         provider_model: result.provider_model,
         metadata: run.metadata.merge("item_count" => result.objects.size, "provider" => result.provider)
       )
-      Rails.event.notify("recognition_run.succeeded", recognition_run_id: run.id, item_count: result.objects.size)
+    end
+
+    # Post-commit announcement: the inventory and the succeeded status are
+    # already committed, so a dispatch failure must not reach the broad rescue
+    # in #call — it would record a contradictory failed run and arm Retry to
+    # duplicate the committed items (#649).
+
+    #: (untyped run, untyped result, Array[Hash[Symbol, untyped]] backfilled) -> untyped
+    def announce(run, result, backfilled)
+      backfilled.each { |payload| notify_isolated(run, "item.family_backfilled", payload) }
+      notify_isolated(run, "recognition_run.succeeded",
+                      { recognition_run_id: run.id, item_count: result.objects.size })
+    end
+
+    # Every event this action emits goes through here so no subscriber can
+    # fail the run over a side effect (§1#4). Subscribers self-isolate and the
+    # production reporter swallows their errors anyway — this guards the
+    # dev/test raise path (raise_on_error) and reporter-internal failures,
+    # where an escape would be catastrophic: on the success path it would flip
+    # a committed run to failed and arm Retry to duplicate its items; from the
+    # rescue path it would leak the raise past the class contract. Failures
+    # are Sentry-visible (error_reporter) and logged.
+
+    #: (untyped run, String name, Hash[Symbol, untyped] payload) -> untyped
+    def notify_isolated(run, name, payload)
+      Rails.event.notify(name, payload)
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- §1#4: an event dispatch failure must not change the run's committed fate
+      Rails.logger.warn("[recognition] #{name} announcement failed for run=#{run.id}: #{e.class}: #{e.message}")
+      Rails.error.report(e, handled: true)
     end
 
     #: (untyped run, untyped error) -> untyped
@@ -190,7 +228,8 @@ module RecognitionRuns
         status: "failed", completed_at: Time.current,
         error_code: error.class.name, error_message: error.message.to_s.truncate(500)
       )
-      Rails.event.notify("recognition_run.failed", recognition_run_id: run.id, error_code: error.class.name)
+      notify_isolated(run, "recognition_run.failed",
+                      { recognition_run_id: run.id, error_code: error.class.name })
     end
   end
 end

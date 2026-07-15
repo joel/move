@@ -17,6 +17,8 @@ end
 class Item
   def self.with_discarded: () -> untyped
 
+  def self.kept: () -> untyped
+
   class ActiveRecord_Associations_CollectionProxy
     def with_discarded: () -> untyped
   end
