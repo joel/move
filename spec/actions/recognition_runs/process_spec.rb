@@ -131,6 +131,29 @@ RSpec.describe RecognitionRuns::Process do
       expect(existing.reload.family).to be_nil
       expect(Rails.event).not_to have_received(:notify).with("item.family_backfilled", anything)
     end
+
+    it "rolls the backfill back — and emits no event — when a later detection fails" do
+      # The event fires only after the transaction commits: a pre-commit emit
+      # would let the search refresh (separate queue DB) bake in the old nil
+      # family with no later event to correct it, and a rolled-back run must
+      # not announce a backfill that never happened.
+      existing = create(:item, :confirmed, move:, box:, name: "Coffee maker", family: nil)
+      objects = [
+        RecognitionProviders::DetectedObject.new(label: "Coffee maker", confidence: 0.97, family: "kitchenware"),
+        RecognitionProviders::DetectedObject.new(label: "Rug", confidence: 99.0, family: nil) # overflows decimal(4,3)
+      ]
+      provider = instance_double(RecognitionProviders::Fake)
+      allow(provider).to receive(:identify).and_return(
+        RecognitionProviders::Result.new(provider: "fake", provider_model: "x", objects:)
+      )
+      allow(Rails.event).to receive(:notify)
+
+      result = described_class.new.call(run:, provider:)
+
+      expect(result).to be_failure
+      expect(existing.reload.family).to be_nil
+      expect(Rails.event).not_to have_received(:notify).with("item.family_backfilled", anything)
+    end
   end
 
   it "emits item.created per materialized item, none for conflicts" do

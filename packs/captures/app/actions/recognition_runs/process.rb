@@ -35,12 +35,17 @@ module RecognitionRuns
       mark_processing(run)
       result = provider.identify(image: run.media.image, context: context(run))
       # Materialize atomically: if any detection fails to persist, roll back all
-      # of them so a failed run never leaves partial inventory behind. Domain
-      # events fire inside the transaction (subscribers' persistent effects are
-      # txn-covered or internally isolated); the enqueue-on-the-separate-queue-DB
-      # pre-commit-read race this implies is a known, tracked limitation — see
-      # #648 for why a post-commit emission variant was reverted.
-      ActiveRecord::Base.transaction { materialize(run, result) }
+      # of them so a failed run never leaves partial inventory behind. The
+      # item.created events fire inside the transaction (their pre-commit-read
+      # race on the separate queue DB is tracked in #648, where a wholesale
+      # post-commit emission variant was reverted); the backfill events are the
+      # exception and MUST emit after commit — the refresh they trigger rewrites
+      # the search document from the item row, and a pre-commit read would bake
+      # in the old nil family with no later event to correct it (a created
+      # item's document is corrected by its later lifecycle events; a backfill
+      # has no successor). A rollback discards them unemitted.
+      backfilled = ActiveRecord::Base.transaction { materialize(run, result) }
+      backfilled.each { |payload| Rails.event.notify("item.family_backfilled", **payload) }
       finish(run, result)
       Success(run)
     rescue StandardError => e # rubocop:disable Move/BroadRescue -- any failure marks the run failed (Failure)
@@ -64,10 +69,12 @@ module RecognitionRuns
       { room: run.box.room&.name }
     end
 
-    #: (untyped run, untyped result) -> untyped
+    # Returns the item.family_backfilled payloads to emit after commit.
+
+    #: (untyped run, untyped result) -> Array[Hash[Symbol, untyped]]
     def materialize(run, result)
       threshold = run.move.auto_confirm_threshold.to_f
-      result.objects.each { |object| materialize_one(run, object, threshold) }
+      result.objects.filter_map { |object| materialize_one(run, object, threshold) }
     end
 
     # Suggestion + Item per detection, cross-linked. Above threshold → auto-confirmed.
@@ -76,7 +83,7 @@ module RecognitionRuns
     # duplicate — record the detection as a `conflict` suggestion linked to the
     # existing item and leave it for human resolution in the review queue (D6).
 
-    #: (untyped run, untyped object, Float threshold) -> untyped
+    #: (untyped run, untyped object, Float threshold) -> Hash[Symbol, untyped]?
     def materialize_one(run, object, threshold)
       existing = confirmed_match(run.box, object.label)
       return conflict_suggestion(run, object, existing, threshold) if existing
@@ -97,6 +104,7 @@ module RecognitionRuns
       Rails.event.notify(
         "item.created", item_id: item.id, box_id: run.box_id, move_id: run.move_id, created_via: "recognition"
       )
+      nil
     end
 
     # The auto-confirm bar doubles as the trust bar for facet enrichment.
@@ -126,7 +134,7 @@ module RecognitionRuns
     # reviewer to resolve. The one sanctioned write is the hidden-family
     # backfill below (#627).
 
-    #: (untyped run, untyped object, untyped existing, Float threshold) -> untyped
+    #: (untyped run, untyped object, untyped existing, Float threshold) -> Hash[Symbol, untyped]?
     def conflict_suggestion(run, object, existing, threshold)
       run.recognition_suggestions.create!(
         move: run.move, box: run.box, media: run.media, item: existing,
@@ -148,21 +156,22 @@ module RecognitionRuns
     # (Items::ConfirmedEdit) — can't be undercut by this stale read.
     # updated_at is bumped so item cache keys (the C3 family rail) invalidate.
 
-    #: (untyped run, untyped object, untyped existing, Float threshold) -> untyped
+    #: (untyped run, untyped object, untyped existing, Float threshold) -> Hash[Symbol, untyped]?
     def backfill_family(run, object, existing, threshold)
-      return if object.family.blank? || existing.family.present?
-      return unless confident?(object, threshold)
+      return nil if object.family.blank? || existing.family.present?
+      return nil unless confident?(object, threshold)
 
       backfilled = named(run.box.items.where(id: existing.id, family: nil), object.label)
                    .update_all(family: object.family, updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
-      return if backfilled.zero?
+      return nil if backfilled.zero?
 
-      # Refreshes the item's search document and requests a cluster recompute
-      # (both subscribers whitelist this event); deliberately absent from the
-      # activity feed — a hidden machine facet with no actor is not a user story.
-      Rails.event.notify(
-        "item.family_backfilled", item_id: existing.id, box_id: run.box_id, move_id: run.move_id
-      )
+      # The payload for an item.family_backfilled event, emitted by #call after
+      # the transaction commits (the refresh it triggers must read the committed
+      # family — see #call). Refreshes the item's search document and requests a
+      # cluster recompute (both subscribers whitelist the event); deliberately
+      # absent from the activity feed — a hidden machine facet with no actor is
+      # not a user story.
+      { item_id: existing.id, box_id: run.box_id, move_id: run.move_id }
     end
 
     #: (untyped run, untyped result) -> untyped
