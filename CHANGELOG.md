@@ -5,6 +5,15 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.93.1] — 2026-07-15
+
+### Fixed
+- **A hiccup in the background grouping can no longer interrupt an edit.** Adding,
+  renaming, or moving an item quietly asks the app to refresh its groups; if that
+  request hit a momentary database timeout it could take the edit down with it.
+  The refresh now fails quietly on its own — your change always goes through, and
+  the groups catch up on the next update (#645).
+
 ## [v0.93.0] — 2026-07-14
 
 ### Added
