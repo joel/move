@@ -7,13 +7,17 @@ module Views
     # walk. Sibling of the Gallery (shared ViewToggle); renders inside the
     # AppLayout sidebar shell.
     class Show < Views::Base
-      #: (move: untyped, media: untyped, pending_counts: untyped, ?over_cap: untyped, ?had_reviewable: untyped) -> void
-      def initialize(move:, media:, pending_counts:, over_cap: false, had_reviewable: false)
+      #: (move: untyped, media: untyped, pending_counts: untyped, ?over_cap: untyped, ?had_reviewable: untyped, ?leftover_unreviewed: untyped) -> void
+      def initialize(move:, media:, pending_counts:, over_cap: false, had_reviewable: false,
+                     leftover_unreviewed: 0)
         @move = move
         @media = media
         @pending_counts = pending_counts
         @over_cap = over_cap
         @had_reviewable = had_reviewable
+        # Unreviewed items with no walkable photo (resolved on the item page) —
+        # keeps the caught-up copy honest while the entry badges count them.
+        @leftover_unreviewed = leftover_unreviewed
       end
 
       #: () -> void
@@ -86,7 +90,7 @@ module Views
           render Components::Ui::EmptyState.new(
             icon: Components::Icons::Check,
             title: I18n.t("review_queues.show.empty.caught_up_title"),
-            description: I18n.t("review_queues.show.empty.caught_up_description")
+            description: caught_up_description
           ) do
             render Components::Ui::Button.new(
               label: I18n.t("review_queues.show.empty.browse_gallery"),
@@ -100,6 +104,19 @@ module Views
             title: I18n.t("review_queues.show.empty.title"),
             description: I18n.t("review_queues.show.empty.description")
           )
+        end
+      end
+
+      # "Every detected item has been reviewed" would lie while photo-less /
+      # moved-away pending items still count in the entry badges — those are
+      # resolved from their item pages (#146), so say so.
+
+      #: () -> String
+      def caught_up_description
+        if @leftover_unreviewed.to_i.positive?
+          I18n.t("review_queues.show.empty.caught_up_leftover", count: @leftover_unreviewed)
+        else
+          I18n.t("review_queues.show.empty.caught_up_description")
         end
       end
     end

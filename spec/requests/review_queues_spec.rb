@@ -73,7 +73,24 @@ RSpec.describe "ReviewQueues" do
       get move_review_path(move)
 
       expect(response.body).to include(I18n.t("review_queues.show.empty.caught_up_title"))
+      expect(response.body).to include(I18n.t("review_queues.show.empty.caught_up_description"))
       expect(response.body).to include(move_gallery_path(move))
+    end
+
+    it "does not claim everything is reviewed while a photo-less pending item remains" do
+      box = create(:box, move:, number: "1")
+      media = create(:media, move:, box:)
+      create(:item, :confirmed, move:, box:, source_media: media)
+      # An unreviewed item the photo walk cannot resolve (no photo) — the entry
+      # badges count it, so the caught-up copy must point at the item page.
+      create(:item, move:, box:, review_state: "needs_correction")
+
+      get move_review_path(move)
+
+      expect(response.body).to include(I18n.t("review_queues.show.empty.caught_up_title"))
+      expect(response.body).to include(
+        I18n.t("review_queues.show.empty.caught_up_leftover", count: 1)
+      )
     end
 
     it "shows the nothing-to-review empty state when no photo ever produced an item" do

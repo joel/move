@@ -15,6 +15,9 @@ en:
       empty:
         caught_up_title: "All caught up"
         caught_up_description: "Every detected item has been reviewed."
+        caught_up_leftover:
+          one: "No photos left to review. 1 item still pending has no photo to walk — resolve it from its item page."
+          other: "No photos left to review. %{count} items still pending have no photo to walk — resolve them from their item pages."
         browse_gallery: "Browse the gallery"
         title: "Nothing to review yet"
         description: "Photos you capture while packing will queue here for a quick check."

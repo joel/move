@@ -32,7 +32,12 @@ class ReviewQueuesController < MoveScopedController
       pending_counts: queue.items.where(source_media_id: rows.map(&:id))
                            .group(:source_media_id).count,
       over_cap: over_cap,
-      had_reviewable: rows.any? || reviewable_photos_exist?
+      had_reviewable: rows.any? || reviewable_photos_exist?,
+      # Unreviewed items the photo walk can NOT resolve (photo-less, or moved
+      # away from their photo's box — resolved on the item page instead, #146).
+      # The caught-up empty state must not claim "everything reviewed" while
+      # the entry-point badges still count them.
+      leftover_unreviewed: rows.any? ? 0 : @move.items.unreviewed.count
     )
   end
 
