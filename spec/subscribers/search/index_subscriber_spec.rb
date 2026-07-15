@@ -9,13 +9,13 @@ RSpec.describe Search::IndexSubscriber do
     { name: name, payload: payload }
   end
 
-  it "enqueues a reindex job for item.created/updated/moved" do
-    %w[item.created item.updated item.moved].each do |name|
+  it "enqueues a reindex job for item.created/updated/moved/family_backfilled" do
+    %w[item.created item.updated item.moved item.family_backfilled].each do |name|
       subscriber.emit(event(name, { item_id: "abc-123" }))
     end
 
     expect(Search::RefreshDocumentJob).to have_received(:perform_later)
-      .with("abc-123", hash_including(:tenant)).exactly(3).times
+      .with("abc-123", hash_including(:tenant)).exactly(4).times
   end
 
   it "ignores unrelated events" do

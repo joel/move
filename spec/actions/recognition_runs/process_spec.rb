@@ -78,9 +78,70 @@ RSpec.describe RecognitionRuns::Process do
     conflict = run.recognition_suggestions.find_by(proposed_name: "Coffee maker")
     expect(conflict.state).to eq("conflict")
     expect(conflict.item).to eq(existing)
-    # The confirmed item is untouched and not duplicated.
-    expect(existing.reload).to have_attributes(review_state: "confirmed")
+    # The confirmed item's user-authored fields are untouched and it is not
+    # duplicated (the hidden family may backfill — covered below, #627).
+    expect(existing.reload).to have_attributes(name: "Coffee maker", review_state: "confirmed")
     expect(box.items.where("LOWER(name) = ?", "coffee maker").count).to eq(1)
+  end
+
+  describe "hidden-family backfill on conflict (#627)" do
+    it "fills a nil family from the detection and announces it for reindexing" do
+      existing = create(:item, :confirmed, move:, box:, name: "Coffee maker", family: nil)
+      allow(Rails.event).to receive(:notify)
+
+      described_class.new.call(run:)
+
+      expect(existing.reload.family).to eq("kitchenware")
+      expect(Rails.event).to have_received(:notify).with(
+        "item.family_backfilled",
+        hash_including(item_id: existing.id, box_id: box.id, move_id: move.id)
+      ).once
+    end
+
+    it "never overwrites a non-nil family (Domain §6.4)" do
+      existing = create(:item, :confirmed, move:, box:, name: "Coffee maker", family: "appliances")
+      allow(Rails.event).to receive(:notify)
+
+      described_class.new.call(run:)
+
+      expect(existing.reload.family).to eq("appliances")
+      expect(Rails.event).not_to have_received(:notify).with("item.family_backfilled", anything)
+    end
+
+    it "leaves the family nil (no event) when the detection carries none" do
+      # Fake's "Stack of books" detection has family: nil.
+      existing = create(:item, :confirmed, move:, box:, name: "Stack of books", family: nil)
+      allow(Rails.event).to receive(:notify)
+
+      described_class.new.call(run:)
+
+      expect(existing.reload.family).to be_nil
+      expect(Rails.event).not_to have_received(:notify).with("item.family_backfilled", anything)
+    end
+
+    it "does not backfill from a below-threshold detection (confidence gates enrichment)" do
+      # Fake's "Set of mugs" carries family "kitchenware" at 0.62 < 0.8: a
+      # detection the Move wouldn't trust to auto-confirm must not stamp a
+      # permanent facet onto a confirmed item.
+      existing = create(:item, :confirmed, move:, box:, name: "Set of mugs", family: nil)
+      allow(Rails.event).to receive(:notify)
+
+      described_class.new.call(run:)
+
+      expect(existing.reload.family).to be_nil
+      expect(Rails.event).not_to have_received(:notify).with("item.family_backfilled", anything)
+    end
+  end
+
+  it "emits item.created per materialized item, none for conflicts" do
+    create(:item, :confirmed, move:, box:, name: "Coffee maker")
+    allow(Rails.event).to receive(:notify)
+
+    described_class.new.call(run:)
+
+    # 3 detections, one conflicts → 2 new items.
+    expect(Rails.event).to have_received(:notify)
+      .with("item.created", hash_including(created_via: "recognition")).twice
   end
 
   it "rolls back all items when a later detection fails to persist" do

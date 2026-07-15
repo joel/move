@@ -4,11 +4,13 @@ module Search
   # Rails.event subscriber that keeps the D8 search projection fresh by reacting
   # to item domain events — the convention-aligned alternative to a model
   # callback (AGENTS.md §2: side effects via actions/events, not models). Actions
-  # emit `item.created|updated|moved`; this enqueues a tenant-restoring background
-  # refresh for the affected item. Runs synchronously in the emitting request, so
-  # Apartment::Tenant.current is still the tenant.
+  # emit `item.created|updated|moved` (and recognition emits
+  # `item.family_backfilled`, #627 — the family is part of the indexed text);
+  # this enqueues a tenant-restoring background refresh for the affected item.
+  # Runs synchronously in the emitting request, so Apartment::Tenant.current is
+  # still the tenant.
   class IndexSubscriber
-    ITEM_EVENTS = %w[item.created item.updated item.moved].freeze
+    ITEM_EVENTS = %w[item.created item.updated item.moved item.family_backfilled].freeze
 
     def emit(event)
       return unless ITEM_EVENTS.include?(event[:name])

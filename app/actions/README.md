@@ -152,7 +152,7 @@ A business-rule failure is a symbol the controller maps to a message:
 
 ## Events & side effects
 
-Actions emit ~40 `domain.verb` events. Five subscribers (wired in
+Actions emit ~40 `domain.verb` events. Subscribers (wired in
 `config/initializers/`) consume them by filter and do the cross-cutting work. The
 action emits and returns; it **never** calls a subscriber directly.
 
@@ -161,7 +161,8 @@ action emits and returns; it **never** calls a subscriber directly.
 | Subscriber | Wired in | Filter | Does |
 |---|---|---|---|
 | `Activity::RecordSubscriber` | `activity_log.rb` | `Activity::Builder.records?` | Appends the activity-feed row (sync, in-request) |
-| `Search::IndexSubscriber` | `search_indexing.rb` | `item.*` (`created`/`updated`/`moved`) | Enqueues `Search::RefreshDocumentJob` (async) |
+| `Search::IndexSubscriber` | `search_indexing.rb` | `item.*` (`created`/`updated`/`moved`/`family_backfilled`) | Enqueues `Search::RefreshDocumentJob` (async) |
+| `Clusters::RefreshSubscriber` | `clustering.rb` | item lifecycle (incl. `family_backfilled`) + box cascades + embedding-space `move.*` | Debounced cluster recompute request (#631) |
 | `Manifests::AuditSubscriber` | `manifest_audit.rb` | `manifest.*` | Logs the authenticated sensitive read |
 | `MoveMcp::AuditSubscriber` | `mcp_audit.rb` | `integration_token.` / `mcp.` | MCP / token audit trail |
 | `DemoData::ProvisionSubscriber` | `demo_data.rb` | `organization.created` | Enqueues `DemoData::ProvisionJob` to build + live-reveal the onboarding sample Move (async, #432) |
@@ -172,7 +173,7 @@ action emits and returns; it **never** calls a subscriber directly.
 |---|---|---|---|
 | `box` | `created` `updated` `status_changed` `deleted` `restored` | `box_id, move_id, actor/editor/creator_id` (+ `to`, `discard_batch_id`) | A |
 | `box` | `description_suggested` | `box_id, source` | — (advisory) |
-| `item` | `created` `updated` `moved` `removed` `deleted` `restored` `undeleted` | `item_id, box_id, move_id` (+ `created_via`, `to_box_id`, `batch_id`) | A; **S** for `created`/`updated`/`moved` |
+| `item` | `created` `updated` `moved` `removed` `deleted` `restored` `undeleted` `family_backfilled` | `item_id, box_id, move_id` (+ `created_via`, `to_box_id`, `batch_id`) | A (except `family_backfilled` — a hidden machine facet, deliberately no feed row, #627); **S** for `created`/`updated`/`moved`/`family_backfilled` |
 | `media` | `captured` `moved` | `media_id, box_id, move_id` (+ `to_box_id` for `moved`) | A; (`moved` also emits an `item.moved` per co-located item → **S**) |
 | `move` | `created` `destroyed` `unit_system_changed` `auto_confirm_threshold_changed` `recognition_provider_changed` `recognition_model_changed` `provider_key_set` `provider_key_removed` `embedding_provider_changed` `summary_viewed` | `move_id` (+ changed value / `provider`) | A (`summary_viewed` low-signal; `destroyed` advisory — #432) |
 | `move_membership` | `added` `role_changed` `removed` | `move_id, user_id, role` | A |

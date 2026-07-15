@@ -13,9 +13,11 @@ module Clusters
   # context is still live — which means a failure here would break the emitting
   # item/box action, so the dispatch is isolated (AGENTS.md §1#4).
   class RefreshSubscriber
+    # family_backfilled (#627): the hidden family is part of the embedded text
+    # (normalized name + modal family), so a backfill changes clustering inputs.
     ITEM_EVENTS = %w[
       item.created item.updated item.moved item.deleted
-      item.removed item.restored item.undeleted
+      item.removed item.restored item.undeleted item.family_backfilled
     ].freeze
     # Box-level cascades change the searchable set WITHOUT item events (Codex
     # P2 on #632): marking a box unpacked bulk-updates its items to removed via
