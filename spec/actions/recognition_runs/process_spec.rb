@@ -229,6 +229,43 @@ RSpec.describe RecognitionRuns::Process do
     end
   end
 
+  describe "search-refresh enqueue defers to commit (#648)" do
+    it "runs the refresh only after the materialize transaction has committed" do
+      depths = [] #: Array[Integer]
+      allow(Search::RefreshDocument).to receive(:new).and_wrap_original do |original, *args|
+        depths << ActiveRecord::Base.connection.open_transactions
+        original.call(*args)
+      end
+
+      described_class.new.call(run:)
+
+      # Under the inline test adapter the deferred enqueue performs the job at
+      # the savepoint's release: only the (non-joinable) fixture wrapper is
+      # open then (depth 1). An in-txn enqueue would run inside materialize's
+      # savepoint (depth 2) — the pre-commit read the queue worker would hit
+      # in production, where the queue DB escapes the app transaction.
+      expect(depths.size).to eq(RecognitionProviders::Fake::SAMPLE.size)
+      expect(depths).to all(eq(1))
+    end
+
+    it "discards the refresh when the run rolls back (no job for records that never existed)" do
+      objects = [
+        RecognitionProviders::DetectedObject.new(label: "Lamp", confidence: 0.97, family: "lighting"),
+        RecognitionProviders::DetectedObject.new(label: "Rug", confidence: 99.0, family: nil) # overflows decimal(4,3)
+      ]
+      provider = instance_double(RecognitionProviders::Fake)
+      allow(provider).to receive(:identify).and_return(
+        RecognitionProviders::Result.new(provider: "fake", provider_model: "x", objects:)
+      )
+      allow(Search::RefreshDocument).to receive(:new)
+
+      result = described_class.new.call(run:, provider:)
+
+      expect(result).to be_failure
+      expect(Search::RefreshDocument).not_to have_received(:new)
+    end
+  end
+
   it "emits item.created per materialized item, none for conflicts" do
     create(:item, :confirmed, move:, box:, name: "Coffee maker")
     allow(Rails.event).to receive(:notify)
