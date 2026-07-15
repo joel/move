@@ -5,6 +5,17 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.94.0] — 2026-07-15
+
+### Added
+- **Items you typed in by hand now pick up their group hints from photos.** When
+  a photo captures something you'd already added manually — say a "Power bank"
+  you typed in before photographing the box — the app quietly attaches the
+  photo's grouping hint to your item, but only when the recognition is confident
+  and never over a hint the item already has. Your name and its confirmed status
+  stay exactly as you set them; the item simply starts showing up with its
+  relatives in Groups and search, like photo-added items always did (#627).
+
 ## [v0.93.1] — 2026-07-15
 
 ### Fixed
