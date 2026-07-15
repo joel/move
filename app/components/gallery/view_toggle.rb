@@ -2,9 +2,11 @@
 
 module Components
   module Gallery
-    # Photos | Groups segmented toggle (#633) — two pill links in the gallery's
-    # chip vocabulary, GET-param driven (?view=groups) so the choice is
-    # bookmarkable and survives navigation. Rendered by both gallery views.
+    # Photos | Groups | To review segmented toggle (#633, #654) — pill links in
+    # the gallery's chip vocabulary. Photos/Groups are GET-param driven
+    # (?view=groups); To review is its own surface (the Move-wide review queue).
+    # All bookmarkable. Rendered by both gallery views and the review queue,
+    # each declaring which pill is active.
     class ViewToggle < Components::Base
       #: (move: untyped, active: untyped) -> void
       def initialize(move:, active:)
@@ -21,6 +23,7 @@ module Components
             move_gallery_path(@move, view: "groups"),
             @active == "groups"
           )
+          toggle_link(I18n.t("galleries.toggle.to_review"), move_review_path(@move), @active == "review")
         end
       end
 

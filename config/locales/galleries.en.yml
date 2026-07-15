@@ -39,6 +39,7 @@ en:
       label: "Gallery view"
       photos: "Photos"
       groups: "Groups"
+      to_review: "To review"
     groups:
       title: "Groups"
       subtitle: "Related things, grouped — even when they ended up in different boxes."

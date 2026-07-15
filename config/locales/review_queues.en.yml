@@ -1,0 +1,20 @@
+# Move-wide review queue (#654) — photos still holding unreviewed items, plus
+# the "Review all" cross-box walk entry. No customer-facing copy is hard-coded
+# in the Phlex views; everything renders through review_queues.*.
+en:
+  review_queues:
+    show:
+      title: "Review"
+      subtitle: "Photos with items still to check, oldest first."
+      review_all: "Review all"
+      box_label: "Box %{number}"
+      pending_badge:
+        one: "1 item"
+        other: "%{count} items"
+      capped: "Showing the oldest %{count} photos."
+      empty:
+        caught_up_title: "All caught up"
+        caught_up_description: "Every detected item has been reviewed."
+        browse_gallery: "Browse the gallery"
+        title: "Nothing to review yet"
+        description: "Photos you capture while packing will queue here for a quick check."
