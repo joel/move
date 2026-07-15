@@ -29,6 +29,21 @@ RSpec.describe Items::CreateManual do
     expect(result.failure[:name]).to be_present
   end
 
+  it "still succeeds when the cluster-refresh side effect fails (#645, §1#4)" do
+    # The item.created event fans out to Clusters::RefreshSubscriber synchronously;
+    # a DB error in its claim must not take down the user's item creation.
+    allow(Clusters::RequestRefresh).to receive(:new)
+      .and_raise(ActiveRecord::StatementInvalid, "PG::QueryCanceled: canceling statement due to statement timeout")
+    allow(Rails.logger).to receive(:warn).and_call_original
+
+    result = call(name: "Lamp")
+
+    expect(result).to be_success
+    expect(box.items.reload.pluck(:name)).to include("Lamp")
+    # Proves the subscriber actually ran and swallowed the failure (not a vacuous pass).
+    expect(Rails.logger).to have_received(:warn).with(/\[clusters\] refresh request failed/)
+  end
+
   context "with require_open (pure manual add / MCP)" do
     it "rejects an add to a sealed (non-packing) box" do
       sealed = create(:box, :with_room, move:, status: "sealed")
