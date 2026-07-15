@@ -27,4 +27,13 @@ RSpec.describe Search::IndexSubscriber do
     subscriber.emit(event("item.updated", {}))
     expect(Search::RefreshDocumentJob).not_to have_received(:perform_later)
   end
+
+  it "swallows an enqueue failure so it can't break the emitter (§1#4)" do
+    allow(Search::RefreshDocumentJob).to receive(:perform_later)
+      .and_raise(ActiveRecord::ConnectionNotEstablished, "queue db down")
+    allow(Rails.logger).to receive(:warn)
+
+    expect { subscriber.emit(event("item.created", { item_id: "abc-123" })) }.not_to raise_error
+    expect(Rails.logger).to have_received(:warn).with(/refresh enqueue failed/)
+  end
 end

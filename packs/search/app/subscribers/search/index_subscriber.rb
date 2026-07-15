@@ -17,6 +17,12 @@ module Search
       return if item_id.blank?
 
       Search::RefreshDocumentJob.perform_later(item_id, tenant: Apartment::Tenant.current)
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- §1#4 a side effect must not break its emitter
+      # The enqueue writes to the separate queue DB, so it can fail
+      # independently of the emitting action's own (already-committed) work — a
+      # missed refresh is recoverable (the next item event or a full reindex),
+      # a failed user action is not. Mirrors the sibling RefreshSubscriber.
+      Rails.logger.warn("[search] refresh enqueue failed for item=#{item_id}: #{e.class}: #{e.message}")
     end
   end
 end
