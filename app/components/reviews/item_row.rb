@@ -17,15 +17,18 @@ module Components
 
       # highlight: the row just streamed in from an add — scroll it into view and
       # flash a ring (UX rule #1) via the shared `highlight` Stimulus controller.
+      # queue: the Move-wide walk (#654) — the remove URL carries ?queue=move so
+      # its no-JS fallback redirects back into the walk (rename never navigates).
 
-      #: (move: untyped, box: untyped, media: untyped, item: untyped, editable: untyped, ?highlight: untyped) -> void
-      def initialize(move:, box:, media:, item:, editable:, highlight: false)
+      #: (move: untyped, box: untyped, media: untyped, item: untyped, editable: untyped, ?highlight: untyped, ?queue: untyped) -> void
+      def initialize(move:, box:, media:, item:, editable:, highlight: false, queue: false)
         @move = move
         @box = box
         @media = media
         @item = item
         @editable = editable
         @highlight = highlight
+        @queue = queue
       end
 
       # Below lg the pencil/× are swipe-revealed (Ui::SwipeActions layers);
@@ -102,7 +105,7 @@ module Components
             span(class: "sr-only") { I18n.t("reviews.photo.edit") }
           end
           button_to(
-            move_box_review_remove_item_path(@move, @box, @media, @item),
+            remove_path,
             method: :patch, class: icon_button(:error), form_class: "shrink-0"
           ) do
             render Components::Icons::Close.new(css: "h-5 w-5")
@@ -137,7 +140,7 @@ module Components
       def remove_action
         lambda do |_c|
           button_to(
-            move_box_review_remove_item_path(@move, @box, @media, @item),
+            remove_path,
             method: :patch, form_class: "contents",
             aria: { label: I18n.t("reviews.photo.remove_named", name: @item.name) },
             class: "#{Components::Ui::SwipeActions::OPTION_CLASSES} bg-error text-on-error"
@@ -164,6 +167,12 @@ module Components
       #: () -> untyped
       def rename_path
         move_box_review_rename_item_path(@move, @box, @media, @item)
+      end
+
+      #: () -> untyped
+      def remove_path
+        queue = @queue ? { queue: ReviewsController::QUEUE_PARAM } : {}
+        move_box_review_remove_item_path(@move, @box, @media, @item, **queue)
       end
     end
   end

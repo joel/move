@@ -10,6 +10,8 @@ RSpec.describe Moves::CardMetrics do
     create(:box, move:, number: "2", status: "in_transit")
     packing = create(:box, move:, number: "3", status: "packing")
     create(:item, move:, box: packing, review_state: "pending_review")
+    # unreviewed counts BOTH pending states — the box badge's definition (#654).
+    create(:item, move:, box: packing, review_state: "needs_correction")
 
     result = described_class.new.call(move_ids: [move.id])
 
@@ -17,7 +19,7 @@ RSpec.describe Moves::CardMetrics do
     metrics = result.value!.fetch(move.id)
     expect(metrics.packed).to eq(2)
     expect(metrics.total).to eq(3)
-    expect(metrics.pending_review).to eq(1)
+    expect(metrics.pending_review).to eq(2)
   end
 
   it "returns explicit zeros for a move with no boxes (never a missing key)" do

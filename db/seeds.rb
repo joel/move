@@ -5,6 +5,8 @@
 # GOAL: after `bin/rails db:seed` a developer can sign in and immediately play
 # with every surface shipped so far (Moves, Boxes Home, …), with records in a
 # spread of states (sealed/packing, with/without dimensions, multiple rooms).
+# The catalog leaves pending_review/needs_correction items across several boxes,
+# so the Move-wide review queue (/moves/<id>/review, #654) is showcase-ready.
 #
 # Each phase MUST extend this file with comprehensive, idempotent seed data for
 # the surfaces it adds (see AGENTS.md §8). Use find_or_create_by so re-running
@@ -366,7 +368,7 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   Rails.logger.info(
     "[seeds] #{organization.slug}: #{move.boxes.count} boxes, #{move.rooms.count} rooms, " \
     "#{move.items.count} items, #{move.media.count} media, " \
-    "#{move.items.in_box.where(review_state: %w[pending_review needs_correction]).count} to review, " \
+    "#{move.items.unreviewed.count} to review, " \
     "#{ItemSearchDocument.count} search docs"
   )
 end

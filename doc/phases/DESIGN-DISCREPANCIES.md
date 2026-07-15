@@ -22,6 +22,28 @@
 
 ---
 
+## ⚠️ §C1-MOVE-QUEUE — Move-wide review queue has no Stitch screen — non-blocking, decided (#654)
+
+- **Context:** the original per-box C1 "Review queue" was retired in #143 (the box badge enters
+  the per-photo walk directly). #654 reintroduces the *concept* at **Move level**: with review
+  otherwise reachable only box-by-box, there was no place to see — or clear — everything pending
+  across a Move.
+- **What shipped (product decision, user-confirmed):** a gallery-style **queue page**
+  (`/moves/:id/review`, `ReviewQueuesController`) — a flat FIFO grid (oldest capture first) of
+  every photo still holding an unreviewed co-located item, each tile wearing a pending-item count
+  badge and a "Box N · Room" caption — plus a **"Review all"** walk: the C2 photo screen in
+  `?queue=move` mode, where Next crosses box boundaries and Finish returns to the queue. Entry
+  points: a Menu-hub "Review" row (count-badged), the boxes-home pending-review stat (now a
+  link), and a third "To review" pill on the Gallery's ViewToggle.
+- **Design status:** no dedicated Stitch screen exists. The surface is **composed entirely from
+  existing, designed patterns** — the Gallery grid tile (B1-derived), the Gallery ViewToggle, the
+  C2 review screen, `Ui::SectionHeader`/`Ui::EmptyState`, and the `bg-tertiary/15 text-tertiary`
+  pending tint from `BoxReviewBadge` — so no token or `Ui::*` addition and no DESIGN.md change.
+- **Remediation:** optional — generate a Stitch screen for the queue page if/when the surface
+  grows bespoke layout (filters, grouping). Not design-blocked; recorded in `README.md` §2 (C1′).
+
+---
+
 ## ✅ §A2-REUSE-DIMS — "Add box" form had no way to reuse dimensions — RESOLVED
 
 - **Need:** Packing a stack of identical cardboard boxes means re-typing the same

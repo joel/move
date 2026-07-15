@@ -53,6 +53,7 @@ target :actions do
   check "app/controllers/move_scoped_controller.rb", inline: true
   check "app/controllers/moves_controller.rb", inline: true
   check "app/controllers/recoveries_controller.rb", inline: true
+  check "app/controllers/review_queues_controller.rb", inline: true
   check "app/controllers/reviews_controller.rb", inline: true
   check "app/controllers/rodauth_controller.rb", inline: true
   check "app/controllers/scans_controller.rb", inline: true
@@ -92,6 +93,7 @@ target :actions do
   check "app/views/moves", inline: true
   check "app/views/pwa", inline: true
   check "app/views/recoveries", inline: true
+  check "app/views/review_queues", inline: true
   check "app/views/reviews", inline: true
   check "app/views/rodauth", inline: true
   check "app/views/rodauth_mailer", inline: true

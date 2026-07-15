@@ -7,6 +7,13 @@
 # "Next Photo" only navigates. Runs inside an Organization tenant schema. Thin:
 # authorize, call the action, render/redirect.
 class ReviewsController < MoveScopedController
+  # ?queue=move flips the photo screen into the Move-wide review-queue walk
+  # (#654): Next crosses box boundaries to the oldest photo still holding an
+  # unreviewed co-located item, and Finish returns to the queue page. Only this
+  # exact value activates it; every mutation redirect threads it through so the
+  # walk survives the no-JS HTML fallbacks.
+  QUEUE_PARAM = "move"
+
   before_action :set_box
   before_action :set_media, only: %i[photo rename_item remove_item add_item move_photo delete_photo retake_photo]
   before_action :set_item, only: %i[rename_item remove_item]
@@ -36,6 +43,8 @@ class ReviewsController < MoveScopedController
     # (`data-turbo-prefetch="false"` on the box pending badge and the "Next Photo"
     # link) — otherwise hovering them would confirm a photo before it is opened.
     Reviews::MarkPhotoReviewed.new.call(media: @media, actor: current_user) if editable_move?
+
+    return render_queue_photo if queue_mode?
 
     walk = review_media
     render Views::Reviews::Photo.new(
@@ -74,7 +83,7 @@ class ReviewsController < MoveScopedController
     items = photo_items(@media).to_a
     streams = [turbo_stream.remove(Components::Reviews::ItemRow.dom_id(@item))]
     streams << review_list_stream(items) if items.empty?
-    respond_with_streams(streams, redirect: move_box_review_photo_path(@move, @box, @media))
+    respond_with_streams(streams, redirect: move_box_review_photo_path(@move, @box, @media, **queue_query))
   end
 
   # POST .../review/photo/:media_id/items — add a missed item to this photo. Streams
@@ -92,7 +101,7 @@ class ReviewsController < MoveScopedController
       add_item_success(item)
     in Dry::Monads::Failure(_)
       # Non-2xx so the reset-form controller leaves the typed name intact for a retry.
-      respond_with_streams([], redirect: move_box_review_photo_path(@move, @box, @media),
+      respond_with_streams([], redirect: move_box_review_photo_path(@move, @box, @media, **queue_query),
                                toast: true, status: :unprocessable_content) do
         [:alert, t("reviews.flash.add_failed")]
       end
@@ -109,9 +118,17 @@ class ReviewsController < MoveScopedController
 
     case Photos::Move.new.call(media: @media, target_box: target, mover: current_user)
     in Dry::Monads::Success(_media)
-      redirect_to move_box_path(@move, target), notice: t("reviews.flash.photo_moved", number: target.number)
+      # In queue mode stay in the walk: the photo now lives in the target box, so
+      # continue on its review URL there (re-opening is idempotent) instead of
+      # ejecting the reviewer to the target box page mid-queue.
+      if queue_mode?
+        redirect_to move_box_review_photo_path(@move, target, @media, queue: QUEUE_PARAM),
+                    notice: t("reviews.flash.photo_moved", number: target.number)
+      else
+        redirect_to move_box_path(@move, target), notice: t("reviews.flash.photo_moved", number: target.number)
+      end
     in Dry::Monads::Failure(reason)
-      redirect_to move_box_review_photo_path(@move, @box, @media), alert: move_photo_error(reason)
+      redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query), alert: move_photo_error(reason)
     end
   end
 
@@ -123,11 +140,15 @@ class ReviewsController < MoveScopedController
   def delete_photo
     case Photos::Delete.new.call(media: @media, actor: current_user)
     in Dry::Monads::Success(_media)
-      redirect_to move_box_path(@move, @box), notice: t("reviews.flash.photo_deleted")
+      # The page's subject is gone; in queue mode the queue page is "back".
+      redirect_to (queue_mode? ? move_review_path(@move) : move_box_path(@move, @box)),
+                  notice: t("reviews.flash.photo_deleted")
     in Dry::Monads::Failure(:wrong_phase)
-      redirect_to move_box_review_photo_path(@move, @box, @media), alert: t("reviews.flash.photo_delete_wrong_phase")
+      redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query),
+                  alert: t("reviews.flash.photo_delete_wrong_phase")
     in Dry::Monads::Failure(_)
-      redirect_to move_box_review_photo_path(@move, @box, @media), alert: t("reviews.flash.photo_delete_failed")
+      redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query),
+                  alert: t("reviews.flash.photo_delete_failed")
     end
   end
 
@@ -143,13 +164,55 @@ class ReviewsController < MoveScopedController
 
     case result
     in Dry::Monads::Success(_media)
-      redirect_to move_box_review_photo_path(@move, @box, @media), notice: t("reviews.flash.photo_retaken")
+      redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query),
+                  notice: t("reviews.flash.photo_retaken")
     in Dry::Monads::Failure(reason)
-      redirect_to move_box_review_photo_path(@move, @box, @media), alert: retake_error(reason)
+      redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query), alert: retake_error(reason)
     end
   end
 
   private
+
+  # Queue mode (?queue=move): the same screen, but the walk set is the Move-wide
+  # pending-photo queue. Computed AFTER MarkPhotoReviewed ran, so on an editable
+  # Move the current photo has already dropped out of the pending set; it is
+  # excluded explicitly anyway for the read-only case. Next = the oldest photo
+  # still pending — except on a read-only Move, where nothing gets confirmed and
+  # "oldest pending" would ping-pong between the two oldest photos forever, so
+  # the walk advances strictly FORWARD in capture order instead and terminates.
+
+  #: () -> untyped
+  def render_queue_photo
+    remaining = Reviews::PendingPhotos.new.call(move: @move).value!
+                                      .photos.where.not(id: @media.id)
+    render Views::Reviews::Photo.new(
+      move: @move, box: @box, media: @media, items: photo_items(@media),
+      position: nil, total: nil,
+      next_media: editable_move? ? remaining.first : forward_of(remaining),
+      editable: editable_move?, move_boxes: other_boxes,
+      queue: true, queue_remaining: remaining.count
+    )
+  end
+
+  # Row-value comparison so the tiebreak matches the queue's (captured_at, id)
+  # FIFO order exactly.
+
+  #: (untyped scope) -> untyped
+  def forward_of(scope)
+    scope.where("(media.captured_at, media.id) > (?, ?)", @media.captured_at, @media.id).first
+  end
+
+  #: () -> bool
+  def queue_mode?
+    params[:queue] == QUEUE_PARAM
+  end
+
+  # Splat into path helpers so box-mode URLs stay byte-identical (no ?queue=).
+
+  #: () -> Hash[Symbol, String]
+  def queue_query
+    queue_mode? ? { queue: QUEUE_PARAM } : {}
+  end
 
   #: (untyped reason) -> String
   def retake_error(reason)
@@ -169,7 +232,7 @@ class ReviewsController < MoveScopedController
   def add_item_success(item)
     items = photo_items(@media).to_a
     respond_with_streams([review_list_stream(items, highlight_id: item.id)],
-                         redirect: move_box_review_photo_path(@move, @box, @media), toast: true) do
+                         redirect: move_box_review_photo_path(@move, @box, @media, **queue_query), toast: true) do
       [:notice, t("reviews.flash.item_added", name: item.name)]
     end
   end
@@ -179,7 +242,8 @@ class ReviewsController < MoveScopedController
     turbo_stream.replace(
       Components::Reviews::ItemList::ID,
       view_context.render(Components::Reviews::ItemList.new(
-                            move: @move, box: @box, media: @media, items: items, editable: editable_move?, highlight_id: highlight_id
+                            move: @move, box: @box, media: @media, items: items, editable: editable_move?,
+                            highlight_id: highlight_id, queue: queue_mode?
                           ))
     )
   end
@@ -220,7 +284,7 @@ class ReviewsController < MoveScopedController
 
   #: () -> untyped
   def first_unreviewed_media
-    ids = @box.items.in_box.where(review_state: %w[pending_review needs_correction])
+    ids = @box.items.unreviewed
               .where.not(source_media_id: nil).distinct.pluck(:source_media_id)
     return nil if ids.empty?
 
@@ -270,10 +334,11 @@ class ReviewsController < MoveScopedController
     head :not_found
   end
 
-  # Archived-Move redirect target (require_writable_move!) — back to the box.
+  # Archived-Move redirect target (require_writable_move!) — back to the box,
+  # or to the queue page when the walk was entered from it.
 
   #: () -> String
   def read_only_redirect_path
-    move_box_path(@move, @box)
+    queue_mode? ? move_review_path(@move) : move_box_path(@move, @box)
   end
 end

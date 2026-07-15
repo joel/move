@@ -11,8 +11,6 @@ module Reviews
   # Items::MarkRemoved. Idempotent — already-confirmed/auto-confirmed items are
   # untouched. Caller owns the tenant context + writable-Move guard (controller).
   class MarkPhotoReviewed < BaseAction
-    UNREVIEWED = %w[pending_review needs_correction].freeze
-
     #: (media: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, actor:)
       yield ensure_writable(media.move)
@@ -51,9 +49,7 @@ module Reviews
 
     #: (untyped media) -> untyped
     def pending_items(media)
-      media.box.items.where(
-        source_media_id: media.id, presence_state: "in_box", review_state: UNREVIEWED
-      )
+      media.box.items.unreviewed.where(source_media_id: media.id)
     end
   end
 end

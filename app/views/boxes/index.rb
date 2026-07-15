@@ -77,18 +77,28 @@ module Views
               )
             end
             div(class: "flex gap-section-gap") do
-              stat(@summary[:pending_review], I18n.t("boxes.summary.pending_review"))
+              # Pending review links into the Move-wide review queue (#654) —
+              # the count's natural "act on it" destination.
+              stat(@summary[:pending_review], I18n.t("boxes.summary.pending_review"),
+                   href: move_review_path(@move))
               stat(@summary[:missing_dimensions], I18n.t("boxes.summary.missing_dimensions"))
             end
           end
         end
       end
 
-      #: (untyped value, untyped label) -> untyped
-      def stat(value, label)
-        div(class: "flex flex-col") do
+      # href: makes the stat a link (hover surface) without changing its anatomy.
+
+      #: (untyped value, untyped label, ?href: untyped) -> untyped
+      def stat(value, label, href: nil)
+        body = proc do
           span(class: "text-headline-md text-text-warm") { value.to_s }
           span(class: "text-label-caps uppercase text-muted") { label }
+        end
+        if href
+          a(href: href, class: "flex flex-col rounded-card px-1 transition hover:bg-surface-container-high", &body)
+        else
+          div(class: "flex flex-col", &body)
         end
       end
 

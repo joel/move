@@ -14,25 +14,26 @@ RSpec.describe Item do
   end
 
   describe "scopes" do
-    it "filters in-box and pending-review items" do
+    it "filters in-box and unreviewed items" do
       move = create(:move)
       box = create(:box, move:)
       create(:item, move:, box:, review_state: "pending_review")
+      create(:item, move:, box:, review_state: "needs_correction")
       create(:item, :auto_confirmed, move:, box:)
       create(:item, :confirmed, move:, box:, presence_state: "removed")
 
-      expect(box.items.in_box.count).to eq(2)
-      expect(box.items.pending_review.count).to eq(1)
-      expect(box.item_count).to eq(2)
-      expect(box.pending_review_count).to eq(1)
+      expect(box.items.in_box.count).to eq(3)
+      expect(box.items.unreviewed.count).to eq(2)
+      expect(box.item_count).to eq(3)
+      expect(box.pending_review_count).to eq(2)
     end
 
-    it "excludes removed items from pending_review (e.g. ignored false-positives)" do
+    it "excludes removed items from unreviewed (e.g. ignored false-positives)" do
       box = create(:box)
       kept = create(:item, move: box.move, box:, review_state: "pending_review")
       create(:item, move: box.move, box:, review_state: "pending_review", presence_state: "removed")
 
-      expect(box.items.pending_review).to contain_exactly(kept)
+      expect(box.items.unreviewed).to contain_exactly(kept)
     end
   end
 

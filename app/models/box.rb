@@ -174,7 +174,7 @@ class Box < ApplicationRecord
 
   #: () -> Integer
   def pending_review_count
-    items.pending_review.count
+    items.unreviewed.count
   end
 
   # Latest run status drives the recognition badge on the card / detail.

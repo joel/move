@@ -125,6 +125,10 @@ Rails.application.routes.draw do
     # #633 — one item family in full (the gallery Groups drill-down): members
     # ordered by box for unpacking, each locating itself with a box/room chip.
     get "gallery/groups/:id", to: "gallery_groups#show", as: :gallery_group
+    # #654 — Move-wide review queue: every photo still holding an unreviewed
+    # co-located item, oldest first. "Review all" walks the C2 photo screen
+    # across box boundaries (reviews#photo?queue=move).
+    get "review", to: "review_queues#show", as: :review
     # F1 — Members & roles (admin-only). Add an existing Organization user, change
     # a member's role, or remove them. Role changes go through a member action.
     resources :members, only: %i[index create destroy] do

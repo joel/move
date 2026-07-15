@@ -5,6 +5,13 @@ en:
     photo:
       progress: "Photo %{position} of %{total}"
       badge: "Photo %{position} of %{total}"
+      # Queue mode (#654) — the Move-wide walk: no stable total, so progress is
+      # the honest remaining count; the badge locates the photo instead ("Box 3").
+      queue_badge: "Box %{number}"
+      queue_progress:
+        zero: "Last photo to review"
+        one: "1 more photo after this"
+        other: "%{count} more photos after this"
       title: "Review Items"
       subtitle: "We spotted these items. Tap to edit or remove."
       subtitle_touch: "We spotted these items. Tap a name to edit — swipe left to remove."
