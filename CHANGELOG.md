@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.94.2] — 2026-07-15
+
+### Fixed
+- **Items from a fresh photo are now reliably searchable right away.** In a rare
+  timing window, the search index could ask for a photo's items before they were
+  fully saved and quietly give up — leaving them invisible to search until you
+  next edited them. The index now waits for the save to finish before doing its
+  work, and a capture that fails no longer queues ghost indexing work for items
+  that were never saved (#648).
+
 ## [v0.94.1] — 2026-07-15
 
 ### Fixed
