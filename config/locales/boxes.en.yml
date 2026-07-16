@@ -9,6 +9,7 @@ en:
       title: "My Boxes"
       add: "Add box"
       view_box: "View"
+      duplicate_box: "Duplicate box %{number} with the same dimensions"
       sort:
         label: "Sort"
         recent: "Recently added"
@@ -85,6 +86,9 @@ en:
       filtered_description: "Try another room, or clear the filter to see every box."
     create:
       created: "Box %{number} was added."
+    duplicate:
+      created: "Box %{number} was added with the same dimensions."
+      failed: "Could not duplicate the box."
     update:
       updated: "Box %{number} was updated."
     destroy:

@@ -44,6 +44,25 @@
 
 ---
 
+## ⚠️ §A2-DUPLICATE — Box-card duplicate control has no Stitch representation — non-blocking, decided (#658)
+
+- **Context:** the §A2-REUSE-DIMS chips (below) solved size reuse on the *form*, but the
+  "next box of the same size" case still costs a full form round-trip. #658 adds a one-tap
+  **duplicate icon button** on each A2 box card that immediately creates a new box copying
+  **only** the source's L/W/H (next free number, status `packing`, no room/description/
+  weight/fragile/items — user-confirmed scope), then lands back on the index with the
+  existing #336 highlight-ring + View-link toast.
+- **Design status:** the canonical A2 Boxes-Home Stitch screens show no per-card action
+  affordance. The control is **composed entirely from existing, designed patterns** — a
+  small circular ghost icon button (surface-container-high hover tint, `text-muted`) overlaid
+  on the card's top-right corner, a new `Icons::Duplicate` drawn to the existing icon
+  conventions (24-viewBox, 1.6 stroke) — so no token or `Ui::*` addition and no DESIGN.md
+  change. Rendered only when the Move is writable (same gate as the Add-box CTA).
+- **Remediation:** optional — regenerate the A2 card in Stitch with the corner action if/when
+  the card grows more per-card actions.
+
+---
+
 ## ✅ §A2-REUSE-DIMS — "Add box" form had no way to reuse dimensions — RESOLVED
 
 - **Need:** Packing a stack of identical cardboard boxes means re-typing the same
@@ -356,5 +375,6 @@ E1 (`ea5a8a69…` + mobile) and the four E2 state screens were implemented in D9
 | RELEASE-TAGS | ⚠️ | all | ✅ resolved | domain-named SemVer `vX.Y.Z-<slug>` (PR #20 review) |
 | RECOVERY | ⚠️ | post-D | ✅ decided | photo-recovery screen (orphaned/failed photo) ships as a state-variant of the designed C2 review/photo layout — same split (image left, action card right) + the shipped recognition-error caption; no new Stitch screen generated (#181) |
 | B1-CONTENTS | ⚠️ | post-D | ✅ decided | 5 Stitch screens created (`c3adef35…`, `dce2995c…`, `78ec0a5f…`, `0b3ebf18…`, `e5dcff39…`); detail panel labelled "Contents" not "AI Suggested Contents"; ✨ on edit form + seal modal only (#210) |
+| A2-DUPLICATE | ⚠️ | post-D | ✅ decided | box-card duplicate icon composed from existing patterns (ghost icon button + new `Icons::Duplicate`); Stitch A2 card backfill optional (#658) |
 
 *Update this file whenever a discrepancy is found or closed. A 🚫 row must be ✅ before its phase leaves "Ready".*

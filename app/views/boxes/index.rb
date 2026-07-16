@@ -184,7 +184,8 @@ module Views
           @boxes.each do |box|
             render Components::BoxCard.new(
               box: box, item_count: @item_counts[box.id].to_i,
-              highlight: box.id == @highlight_box_id
+              highlight: box.id == @highlight_box_id,
+              duplicatable: @editable
             )
           end
         end
