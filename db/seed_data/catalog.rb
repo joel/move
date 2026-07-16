@@ -62,10 +62,15 @@ module SeedData
   #                 `error_code`/`error_message`.
   # `captured_at`: seconds ago, so the per-photo review walk (box 1) visits photos
   #   in this listed order (larger = earlier = visited first).
+  # `pending_floor`: at least N of this photo's detections seed unreviewed, even
+  #   when a recorded recognition would auto-confirm everything (see
+  #   apply_pending_floor). Declared on photos in TWO boxes (1 and 11, distinct
+  #   captured_at) so the Move-wide review queue and its cross-box "Review all"
+  #   walk (#654) are demoable from a fresh seed (#656).
   # An item: name (required), confidence, review, presence (default "in_box").
   PHOTOS = [
     # --- Box 1: the review-walk showcase (3 scene photos + 2 recovery tiles) ----
-    { box: "1", slug: "kitchen-counter", status: "succeeded", captured_at: 300,
+    { box: "1", slug: "kitchen-counter", status: "succeeded", captured_at: 300, pending_floor: 2,
       provider: "fake", provider_model: "fake-1",
       prompt: "A realistic smartphone photo of a kitchen counter holding a " \
               "stainless-steel drip coffee maker, a short stack of hardcover " \
@@ -167,8 +172,10 @@ module SeedData
         { name: "Mixing Bowls",     confidence: 0.90, review: "confirmed" }
       ] },
 
-    # --- Box 11 (Office, packing): desk gear -----------------------------------
-    { box: "11", slug: "office-desk", status: "succeeded", captured_at: 500,
+    # --- Box 11 (Office, packing): desk gear. captured_at 560 (not the shared
+    # 500) so this is unambiguously the OLDEST pending photo — the queue's FIFO
+    # entry point — and the cross-box walk order is deterministic (#656). -------
+    { box: "11", slug: "office-desk", status: "succeeded", captured_at: 560, pending_floor: 2,
       provider: "fake", provider_model: "fake-1",
       prompt: "A realistic smartphone photo of an office desk with a closed " \
               "laptop, an external monitor, a mechanical keyboard, a desk lamp, " \
@@ -294,12 +301,37 @@ module SeedData
   # (explicit review_state) as the offline fallback. Uniform hash shape either
   # way: { name:, confidence:, review:, family: } — family is the hidden facet
   # (#626), nil for recordings made before it existed and for authored items
-  # that don't declare one.
+  # that don't declare one. The photo's `pending_floor` is applied last.
   def self.detections_for(photo, threshold:)
     recorded = recorded_recognition(photo[:slug])
-    return normalize_recorded(recorded["objects"], threshold: threshold) if recorded
+    detections =
+      if recorded
+        normalize_recorded(recorded["objects"], threshold: threshold)
+      else
+        Array(photo[:items]).map { |item| authored_detection(item) }
+      end
+    apply_pending_floor(detections, photo[:pending_floor])
+  end
 
-    Array(photo[:items]).map { |item| authored_detection(item) }
+  UNREVIEWED_STATES = %w[pending_review needs_correction].freeze
+
+  # Recorded confidences float with whatever the vision model returned, so a
+  # re-recording can auto-confirm every detection and silently empty the
+  # review-queue demo (#656) — exactly what happened when the committed
+  # recordings came back ≥ the 0.8 threshold almost everywhere. `pending_floor:
+  # N` pins the demo invariant: at least N of the photo's detections seed
+  # unreviewed, demoting the LOWEST-confidence auto-confirmed ones as needed
+  # (mirroring how borderline detections behave). A no-op when enough are
+  # already unreviewed — the floor never promotes a confirmed state upward.
+  def self.apply_pending_floor(detections, floor)
+    short = floor.to_i - detections.count { |d| UNREVIEWED_STATES.include?(d[:review]) }
+    return detections if short <= 0
+
+    detections.select { |d| d[:review] == "auto_confirmed" }
+              .sort_by { |d| d[:confidence].to_f }
+              .first(short)
+              .each { |d| d[:review] = "pending_review" }
+    detections
   end
 
   # Normalize recorded provider objects into the uniform detection shape, with

@@ -61,6 +61,17 @@ RSpec.describe SeedData do
       expect(photo_items).not_to be_empty
       photo_items.each { |item| expect_valid_item(item) }
     end
+
+    # #656 — the Move-wide review queue's cross-box "Review all" walk must be
+    # demoable from a fresh seed: pending photos pinned in at least two distinct
+    # boxes, with distinct capture times so the FIFO entry point is deterministic.
+    it "pins a pending_floor on photos in at least two boxes, at distinct capture times" do
+      pinned = SeedData::PHOTOS.select { |photo| photo[:pending_floor].to_i.positive? }
+
+      expect(pinned.pluck(:box).uniq.size).to be >= 2
+      captured = pinned.pluck(:captured_at)
+      expect(captured.uniq).to eq(captured)
+    end
   end
 
   describe "MANUAL_ITEMS" do
@@ -129,6 +140,40 @@ RSpec.describe SeedData do
       detections = described_class.detections_for(photo, threshold: 0.8)
       expect(detections.pluck(:name)).to eq(["Kettle", "Old radio"])
       expect(detections.pluck(:family)).to eq(["kitchenware", nil])
+    end
+
+    it "demotes the lowest-confidence auto-confirms to meet a recording that beats the floor (#656)" do
+      photo = { slug: "synthetic", pending_floor: 2 }
+      allow(described_class).to receive(:recorded_recognition).with("synthetic").and_return(
+        "objects" => [
+          { "label" => "Laptop",   "confidence" => 0.95 },
+          { "label" => "Monitor",  "confidence" => 0.90 },
+          { "label" => "Desk lamp", "confidence" => 0.85 }
+        ]
+      )
+
+      detections = described_class.detections_for(photo, threshold: 0.8)
+
+      # The two LOWEST confidences flip; the strongest detection stays auto.
+      expect(detections.pluck(:name, :review)).to contain_exactly(
+        %w[Laptop auto_confirmed], %w[Monitor pending_review], ["Desk lamp", "pending_review"]
+      )
+    end
+
+    it "leaves detections untouched when enough are already unreviewed (floor is a floor)" do
+      photo = { slug: "synthetic", pending_floor: 2, items: [
+        { name: "Vase", confidence: 0.5, review: "pending_review" },
+        { name: "Magazines", confidence: 0.6, review: "needs_correction" },
+        { name: "Books", confidence: 0.9, review: "auto_confirmed" },
+        { name: "Blanket", confidence: 0.7, review: "confirmed" }
+      ] }
+      allow(described_class).to receive(:recorded_recognition).with("synthetic").and_return(nil)
+
+      detections = described_class.detections_for(photo, threshold: 0.8)
+
+      # needs_correction counts toward the floor; confirmed is never demoted.
+      expect(detections.pluck(:review))
+        .to eq(%w[pending_review needs_correction auto_confirmed confirmed])
     end
   end
 
