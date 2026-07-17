@@ -132,12 +132,14 @@ module Components
         }.merge(pswp_dimensions(media))
       end
 
-      # Real slide dimensions when blob analysis has them: the master's size
-      # scaled into the :detail box, clamped at 1.0 to mirror the Worker's
-      # scale-down (never upscaled). The viewer reads data-pswp-* first
-      # (photoswipe_viewer.js#dimensionsFor), so the slide opens at the right
-      # aspect ratio with no guess-then-correct reflow; omitted while a blob is
-      # still unanalyzed — the JS falls back to its thumb-ratio estimate (#675).
+      # Real slide dimensions when blob analysis has them. The dataset contract
+      # is "the SERVED detail size" (the viewer reads data-pswp-* first —
+      # photoswipe_viewer.js#dimensionsFor — and corrects any mismatch with a
+      # slide refresh): behind the edge Worker that is the master scaled into
+      # the :detail box, clamped at 1.0 to mirror scale-down (never upscaled);
+      # the dev/test fallback proxies the UNRESIZED master, so emit the raw
+      # dimensions there or the correction reflow returns (#676 Codex). Omitted
+      # while a blob is unanalyzed — the JS falls back to its estimate (#675).
 
       #: (untyped media) -> Hash[Symbol, Integer]
       def pswp_dimensions(media)
@@ -145,9 +147,15 @@ module Components
         width = meta["width"].to_i
         height = meta["height"].to_i
         return {} unless width.positive? && height.positive?
+        return { pswp_width: width, pswp_height: height } unless edge_transforms?
 
         scale = [DETAIL_BOX.to_f / width, DETAIL_BOX.to_f / height, 1.0].min
         { pswp_width: (width * scale).round, pswp_height: (height * scale).round }
+      end
+
+      #: () -> bool
+      def edge_transforms?
+        Rails.application.config.x.media_transform_host.present?
       end
 
       # Memoized so the grid <img src> and data-thumb are byte-identical: every
