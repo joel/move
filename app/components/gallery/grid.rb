@@ -134,10 +134,11 @@ module Components
         }
       end
 
-      # Memoized so the grid <img src> and data-thumb are byte-identical: every
-      # TransformUrl call embeds a fresh signed expiry, so a second call can
-      # yield a different query string — and the lightbox's "already cached"
-      # instant thumb would silently become a fresh network fetch.
+      # Memoized so the grid <img src> and data-thumb are byte-identical even if
+      # TransformUrl's expiry bucket rolls over mid-render (#669 quantized the
+      # expiry, so calls normally repeat within a bucket) — a divergent query
+      # string would turn the lightbox's "already cached" instant thumb into a
+      # fresh network fetch. Also saves an HMAC per repeated call.
 
       #: (untyped media) -> String?
       def thumb_url(media)

@@ -104,8 +104,9 @@ module Components
         "#{@cluster.label} — #{counts}"
       end
 
-      # Memoized for byte-identical URLs within one render (TransformUrl embeds
-      # a fresh signed expiry per call — the gallery grid's idiom).
+      # Memoized for byte-identical URLs even across a mid-render expiry-bucket
+      # rollover (TransformUrl quantizes its signed expiry, #669 — the gallery
+      # grid's idiom).
 
       #: (untyped media) -> String?
       def thumb_url(media)
