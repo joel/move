@@ -14,17 +14,20 @@ module Components
         @pending_counts = pending_counts
       end
 
+      # Above-the-fold tiles load eagerly — one lg row / two mobile rows (#673).
+      EAGER_TILES = 4
+
       #: () -> void
       def view_template
         div(class: "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4") do
-          @media.each { |media| tile(media) }
+          @media.each_with_index { |media, index| tile(media, eager: index < EAGER_TILES) }
         end
       end
 
       private
 
-      #: (untyped media) -> untyped
-      def tile(media)
+      #: (untyped media, eager: bool) -> untyped
+      def tile(media, eager:)
         a(
           href: move_box_review_photo_path(@move, media.box, media, queue: "move"),
           aria_label: caption(media),
@@ -34,18 +37,19 @@ module Components
         ) do
           div(class: "relative flex aspect-square items-center justify-center overflow-hidden " \
                      "bg-surface-container-high text-muted") do
-            image(media)
+            image(media, eager:)
             count_badge(media)
           end
           caption_strip(media)
         end
       end
 
-      #: (untyped media) -> untyped
-      def image(media)
+      #: (untyped media, ?eager: bool) -> untyped
+      def image(media, eager: false)
         if media.image_displayable?
           img(
-            src: thumb_url(media), alt: "", loading: "lazy",
+            src: thumb_url(media), alt: "",
+            loading: eager ? "eager" : "lazy", decoding: "async",
             class: "h-full w-full object-cover transition group-hover:scale-105"
           )
         elsif media.image_unavailable?
