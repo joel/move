@@ -43,6 +43,26 @@ RSpec.describe "LCP image priorities" do
         expect(response.body.scan('loading="lazy"').size).to eq(1)
       end
     end
+
+    it "continues the eager window into image-backed standalone item cards (#673 Codex)" do
+      # One gallery photo + generated-image items: the items are "standalone"
+      # (ItemCard with its own thumbnail), and with < EAGER_TILES photos they
+      # fill the first visible row — they must not lazy-load.
+      create(:media, move:, box:)
+      4.times do |i|
+        generated = create(:media, move:, box:, captured_via: "generated")
+        create(:item, move:, box:, source_media: generated, name: "Gen #{i}")
+      end
+
+      get move_box_path(move, box)
+
+      expect(response).to have_http_status(:ok)
+      aggregate_failures do
+        # photo (index 0) + first 3 item cards (indices 1-3) eager; 4th card lazy.
+        expect(response.body.scan('loading="eager"').size).to eq(4)
+        expect(response.body.scan('loading="lazy"').size).to eq(1)
+      end
+    end
   end
 
   describe "review queue grid" do

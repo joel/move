@@ -82,9 +82,13 @@ module Components
         div(class: "grid grid-cols-2 gap-3 sm:grid-cols-3") do
           @media.each_with_index { |media, index| photo_card(media, eager: index < EAGER_TILES) }
           # Standalone items most-recent first (items arrive created-ascending).
-          @standalone_items.reverse_each do |item|
+          # The eager index CONTINUES across them: when the box has fewer than
+          # EAGER_TILES photos, image-backed item cards fill the first visible
+          # row and must not lazy-load the likely LCP (#673 Codex).
+          @standalone_items.reverse_each.with_index(@media.size) do |item, index|
             render Components::Boxes::ItemCard.new(
-              item: item, move: @move, image_ready: @move.image_generation_ready?
+              item: item, move: @move, image_ready: @move.image_generation_ready?,
+              eager: index < EAGER_TILES
             )
           end
         end
