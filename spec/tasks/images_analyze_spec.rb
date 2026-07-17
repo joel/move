@@ -39,6 +39,19 @@ RSpec.describe "images:analyze", type: :task do
     expect(blob.metadata["height"]).to be_present
   end
 
+  it "re-analyzes a blob marked analyzed but missing dimensions (#676 Codex)" do
+    media = create(:media)
+    blob = media.image.blob
+    # An earlier analyzer failure leaves analyzed: true with no dimensions.
+    blob.update!(metadata: { "analyzed" => true })
+
+    task.invoke
+
+    blob.reload
+    expect(blob.metadata["width"]).to be_present
+    expect(blob.metadata["height"]).to be_present
+  end
+
   it "leaves analyzed blobs untouched (idempotent re-run)" do
     media = create(:media)
     blob = media.image.blob

@@ -67,15 +67,18 @@ namespace :images do
   task analyze: :environment do
     total = 0
     # Media lives in each tenant schema; blobs are shared (public), so switch per
-    # tenant to find the rows, then analyze their blobs. `analyzed?` is the
-    # idempotency guard — a re-run (and every post-#675 upload, pre-stamped by
-    # ImageNormalizer) skips straight through.
+    # tenant to find the rows, then analyze their blobs. The idempotency guard is
+    # the presence of BOTH dimensions — not `analyzed?`, which can be true with
+    # no width/height after an earlier analyzer failure and would then skip the
+    # exact blobs this backfill exists for (#676 Codex). The flip side is that a
+    # permanently unanalyzable image is re-attempted on every run — acceptable
+    # for a manual, occasional task.
     Organization.pluck(:slug).each do |slug|
       Apartment::Tenant.switch(slug) do
         done = 0
         Media.with_discarded.joins(:image_attachment).find_each do |media|
           blob = media.image.blob
-          next if blob.analyzed?
+          next if blob.metadata["width"].to_i.positive? && blob.metadata["height"].to_i.positive?
 
           blob.analyze
           done += 1
