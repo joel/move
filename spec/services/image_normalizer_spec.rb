@@ -76,6 +76,19 @@ RSpec.describe ImageNormalizer do
     expect(out.bytesize).to be < bytes.bytesize
   end
 
+  it "records the output dimensions as pre-analyzed blob metadata (#675)" do
+    bytes = vips_jpeg(3000, 2000) || skip("libvips unavailable")
+    attachable = { io: StringIO.new(bytes), filename: "huge.jpg", content_type: "image/jpeg" }
+
+    result = described_class.call(attachable)
+    width, height = dims(result[:io].read)
+
+    # Metadata must match the ACTUAL encoded output (post-downscale), and carry
+    # analyzed: true so attaching skips the async AnalyzeJob round trip.
+    expect(width).to eq(2048)
+    expect(result[:metadata]).to eq(width:, height:, analyzed: true)
+  end
+
   it "does not up-scale an image already within the cap" do
     bytes = vips_jpeg(120, 90) || skip("libvips unavailable")
     attachable = { io: StringIO.new(bytes), filename: "small.jpg", content_type: "image/jpeg" }

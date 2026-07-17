@@ -10,6 +10,10 @@ module Components
     # caption and a "view box" href as data-*; PhotoSwipe injects its own DOM at
     # open, seeded thumb-first via msrc. Read-only — no mutating affordances.
     class Grid < Components::Base
+      # The lightbox slide box — mirrors the Worker's :detail geometry so the
+      # data-pswp-* contract stays "the served detail size".
+      DETAIL_BOX = MediaVariants::TransformUrl::SIZES.fetch(:detail).fetch(:width)
+
       #: (move: untyped, media: untyped) -> void
       def initialize(move:, media:)
         @move = move
@@ -125,7 +129,25 @@ module Components
           thumb: thumb_url(media),
           caption: caption(media),
           href: move_box_path(@move, media.box)
-        }
+        }.merge(pswp_dimensions(media))
+      end
+
+      # Real slide dimensions when blob analysis has them: the master's size
+      # scaled into the :detail box, clamped at 1.0 to mirror the Worker's
+      # scale-down (never upscaled). The viewer reads data-pswp-* first
+      # (photoswipe_viewer.js#dimensionsFor), so the slide opens at the right
+      # aspect ratio with no guess-then-correct reflow; omitted while a blob is
+      # still unanalyzed — the JS falls back to its thumb-ratio estimate (#675).
+
+      #: (untyped media) -> Hash[Symbol, Integer]
+      def pswp_dimensions(media)
+        meta = media.image.blob.metadata
+        width = meta["width"].to_i
+        height = meta["height"].to_i
+        return {} unless width.positive? && height.positive?
+
+        scale = [DETAIL_BOX.to_f / width, DETAIL_BOX.to_f / height, 1.0].min
+        { pswp_width: (width * scale).round, pswp_height: (height * scale).round }
       end
 
       # Memoized so the grid <img src> and data-thumb are byte-identical: every

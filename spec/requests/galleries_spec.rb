@@ -51,6 +51,31 @@ RSpec.describe "Galleries" do
       expect(response.body).not_to include("Box 2")
     end
 
+    it "emits real slide dimensions scaled into the detail box when the blob is analyzed (#675)" do
+      box = create(:box, move:, number: "4")
+      media = create(:media, move:, box:)
+      media.image.blob.update!(
+        metadata: media.image.blob.metadata.merge("width" => 2048, "height" => 1024)
+      )
+
+      get move_gallery_path(move)
+
+      # 2048x1024 scaled into the 1600 box -> 1600x800 (scale-down, never up).
+      expect(response.body).to include('data-pswp-width="1600"')
+      expect(response.body).to include('data-pswp-height="800"')
+    end
+
+    it "omits slide dimensions while the blob is unanalyzed (JS falls back to its estimate)" do
+      box = create(:box, move:, number: "4")
+      media = create(:media, move:, box:)
+      media.image.blob.update!(metadata: {})
+
+      get move_gallery_path(move)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("data-pswp-width")
+    end
+
     it "renders the lightbox controller and tiles that open it with a box link" do
       box = create(:box, move:, number: "7")
       create(:media, move:, box:)
