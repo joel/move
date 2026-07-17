@@ -6,13 +6,15 @@
 # authorize, call the action, pattern-match, render.
 class BoxesController < MoveScopedController
   before_action :set_box,
-                only: %i[show edit update transition set_fragile seal description_suggestion destroy]
+                only: %i[show edit update transition set_fragile seal description_suggestion
+                         destroy duplicate]
   # `seal` and `description_suggestion` can spend the Move's AI quota (they call
   # the configured vendor provider), so they need the same editing-role + writable
   # guard as the mutating actions — not just `set_box` — to keep viewers and
   # archived Moves out (defense in depth behind the already-hidden UI controls).
   before_action :require_writable_move!,
-                only: %i[new create edit update transition set_fragile seal description_suggestion destroy]
+                only: %i[new create edit update transition set_fragile seal description_suggestion
+                         destroy duplicate]
 
   # GET /moves/:move_id/boxes
 
@@ -75,19 +77,28 @@ class BoxesController < MoveScopedController
 
     case result
     in Dry::Monads::Success(box)
-      # Land back on the list (default recency order → the new box is at the top)
-      # and make it unmissable: a "View" link in the toast + a one-time highlight
-      # on its card (#336).
-      flash[:action_href] = move_box_path(@move, box)
-      flash[:action_label] = t("boxes.index.view_box")
-      flash[:highlight_box_id] = box.id
-      redirect_to move_boxes_path(@move), notice: t(".created", number: box.number)
+      redirect_to_index_showcasing(box, t(".created", number: box.number))
     in Dry::Monads::Failure(errors)
       box = @move.boxes.new(box_params)
       box.errors.merge!(errors) if errors.respond_to?(:each)
       render Views::Boxes::New.new(move: @move, box: box, rooms: @move.rooms.order(:name),
                                    dimension_presets: @move.boxes.dimension_presets),
              status: :unprocessable_content
+    end
+  end
+
+  # POST /moves/:move_id/boxes/:id/duplicate
+  # One-tap "next box of the same size" from the box card (#658): a fresh box
+  # copying only the source's dimensions. Same landing UX as create — back on
+  # the list with the View toast + the one-time card highlight.
+
+  #: () -> untyped
+  def duplicate
+    case Boxes::Duplicate.new.call(box: @box, creator: current_user)
+    in Dry::Monads::Success(box)
+      redirect_to_index_showcasing(box, t(".created", number: box.number))
+    in Dry::Monads::Failure
+      redirect_to move_boxes_path(@move), alert: t(".failed")
     end
   end
 
@@ -273,6 +284,18 @@ class BoxesController < MoveScopedController
          .group(:source_media_id)
          .having("COUNT(*) FILTER (WHERE presence_state = 'in_box') = 0")
          .pluck(:source_media_id)
+  end
+
+  # The #336 "make the new box unmissable" landing, shared by create and
+  # duplicate: back on the list (default recency order → the new box is at the
+  # top) with a "View" link in the toast + a one-time highlight on its card.
+
+  #: (untyped box, String notice) -> untyped
+  def redirect_to_index_showcasing(box, notice)
+    flash[:action_href] = move_box_path(@move, box)
+    flash[:action_label] = t("boxes.index.view_box")
+    flash[:highlight_box_id] = box.id
+    redirect_to move_boxes_path(@move), notice: notice
   end
 
   #: () -> untyped

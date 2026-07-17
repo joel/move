@@ -138,6 +138,43 @@ RSpec.describe "Boxes" do
       expect(response.body).to include("Kitchen").and include("Attic")
       expect(response.body).to include(I18n.t("boxes.empty.filtered_title"))
     end
+
+    it "offers the duplicate control on a dimensioned card to an editor (#658)" do
+      box = create(:box, :with_dimensions, move:, number: "1")
+
+      get move_boxes_path(move)
+
+      expect(response.body).to include(duplicate_move_box_path(move, box))
+    end
+
+    it "hides the duplicate control when the box has no dimensions to copy" do
+      box = create(:box, move:, number: "1")
+
+      get move_boxes_path(move)
+
+      expect(response.body).not_to include(duplicate_move_box_path(move, box))
+    end
+
+    it "hides the duplicate control from a viewer" do
+      box = create(:box, :with_dimensions, move:, number: "1")
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+
+      get move_boxes_path(move)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include(duplicate_move_box_path(move, box))
+    end
+
+    it "hides the duplicate control on an archived (read-only) move" do
+      archived = create(:move, :archived, created_by: user)
+      box = create(:box, :with_dimensions, move: archived, number: "1")
+
+      get move_boxes_path(archived)
+
+      expect(response.body).not_to include(duplicate_move_box_path(archived, box))
+    end
   end
 
   describe "GET /moves/:move_id/boxes/new" do
@@ -217,6 +254,77 @@ RSpec.describe "Boxes" do
       end.not_to change(Box, :count)
 
       expect(response).to redirect_to(move_boxes_path(archived))
+    end
+  end
+
+  # #658 — one-tap "next box of the same size" from the box card.
+  describe "POST /moves/:move_id/boxes/:id/duplicate" do
+    it "creates a new box with the source's dimensions and redirects to the index" do
+      source = create(:box, move:, number: "1",
+                            length_cm: 40, width_cm: 30, height_cm: 25,
+                            description: "Pots and pans",
+                            room: create(:room, move:, name: "Kitchen"))
+
+      expect do
+        post duplicate_move_box_path(move, source)
+      end.to change(move.boxes, :count).by(1)
+
+      box = move.boxes.order(:created_at).last
+      aggregate_failures do
+        expect(response).to redirect_to(move_boxes_path(move))
+        expect(box.number).to eq("2")
+        expect([box.length_cm, box.width_cm, box.height_cm]).to eq([40, 30, 25])
+        # Only the size carries over — the duplicate starts empty.
+        expect(box.room).to be_nil
+        expect(box.description).to be_nil
+      end
+    end
+
+    it "highlights the duplicate and offers a View link on the index (#336 UX)" do
+      source = create(:box, move:, number: "1", length_cm: 40, width_cm: 30, height_cm: 25)
+
+      post duplicate_move_box_path(move, source)
+      follow_redirect!
+
+      box = move.boxes.order(:created_at).last
+      expect(response.body).to include("box-added-highlight")
+      expect(response.body).to include(I18n.t("boxes.index.view_box"))
+      expect(response.body).to include(move_box_path(move, box))
+    end
+
+    it "refuses to duplicate on an archived move" do
+      archived = create(:move, :archived, created_by: user)
+      source = create(:box, move: archived, number: "1")
+
+      expect do
+        post duplicate_move_box_path(archived, source)
+      end.not_to change(Box, :count)
+
+      expect(response).to redirect_to(move_boxes_path(archived))
+    end
+
+    it "returns 404 for a box that belongs to another move" do
+      other_move = create(:move, created_by: user)
+      foreign = create(:box, move: other_move, number: "1")
+
+      expect do
+        post duplicate_move_box_path(move, foreign)
+      end.not_to change(Box, :count)
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "forbids a viewer from duplicating (403)" do
+      source = create(:box, move:, number: "1")
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+
+      expect do
+        post duplicate_move_box_path(move, source)
+      end.not_to change(move.boxes, :count)
+
+      expect(response).to have_http_status(:forbidden)
     end
   end
 

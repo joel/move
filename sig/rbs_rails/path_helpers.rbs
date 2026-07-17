@@ -11,6 +11,7 @@ interface ::_RbsRailsPathHelpers
   def mcp_path: (*untyped) -> ::String
   def mcp_uploads_path: (*untyped) -> ::String
   def transition_move_box_path: (*untyped) -> ::String
+  def duplicate_move_box_path: (*untyped) -> ::String
   def fragile_move_box_path: (*untyped) -> ::String
   def seal_move_box_path: (*untyped) -> ::String
   def description_suggestion_move_box_path: (*untyped) -> ::String
@@ -128,6 +129,7 @@ interface ::_RbsRailsPathHelpers
   def mcp_url: (*untyped) -> ::String
   def mcp_uploads_url: (*untyped) -> ::String
   def transition_move_box_url: (*untyped) -> ::String
+  def duplicate_move_box_url: (*untyped) -> ::String
   def fragile_move_box_url: (*untyped) -> ::String
   def seal_move_box_url: (*untyped) -> ::String
   def description_suggestion_move_box_url: (*untyped) -> ::String

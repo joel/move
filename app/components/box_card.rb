@@ -6,21 +6,30 @@ module Components
   # recognition runs arrive in later phases (D5/D4); `recognition_state` is the
   # integration point — passed nil until D4 supplies runs.
   class BoxCard < Components::Base
-    #: (box: untyped, ?item_count: untyped, ?recognition_state: untyped, ?highlight: untyped) -> void
-    def initialize(box:, item_count: 0, recognition_state: nil, highlight: false)
+    include Phlex::Rails::Helpers::ButtonTo
+
+    #: (box: untyped, ?item_count: untyped, ?recognition_state: untyped, ?highlight: untyped, ?duplicatable: untyped) -> void
+    def initialize(box:, item_count: 0, recognition_state: nil, highlight: false, duplicatable: false)
       @box = box
       @item_count = item_count
       @recognition_state = recognition_state
       @highlight = highlight
+      @duplicatable = duplicatable
     end
 
     #: () -> void
     def view_template
-      a(href: move_box_path(@box.move_id, @box), class: link_classes) do
-        render Components::Ui::Card.new(interactive: true, micro_bar: micro_bar) do
-          header_row
-          title_block
+      # button_to renders a <form>, which is invalid inside an <a> — so the
+      # duplicate control is an absolutely-positioned sibling of the card link
+      # (MoveCard's sibling rule, overlaid on the corner instead of stacked).
+      div(class: "relative") do
+        a(href: move_box_path(@box.move_id, @box), class: link_classes) do
+          render Components::Ui::Card.new(interactive: true, micro_bar: micro_bar) do
+            header_row
+            title_block
+          end
         end
+        duplicate_control if duplicatable?
       end
     end
 
@@ -29,10 +38,23 @@ module Components
     # `rounded-card` so the one-time highlight ring (a box-shadow) follows the
     # card's shape when this is the just-created box (#336).
 
+    # `h-full` keeps the link stretched to the grid cell (as the pre-wrapper
+    # root <a> was), so the click zone and highlight ring cover the whole cell
+    # even when a neighbouring card in the row is taller.
+
     #: () -> String
     def link_classes
-      base = "block rounded-card"
+      base = "block h-full rounded-card"
       @highlight ? "#{base} box-added-highlight" : base
+    end
+
+    # The control only earns its place when there is a size to copy — a
+    # dimensionless box would duplicate to a plain empty box (that's what
+    # "Add box" is for) and the "same dimensions" copy would over-promise.
+
+    #: () -> untyped
+    def duplicatable?
+      @duplicatable && !@box.missing_dimensions?
     end
 
     #: () -> untyped
@@ -43,7 +65,10 @@ module Components
                  "bg-surface-container-high text-accent-sage"
         ) { render Components::Icons::Boxes.new(css: "h-6 w-6") }
 
-        div(class: "flex flex-col items-end gap-1.5") do
+        # `pr-9` clears the duplicate button overlaid on the card's top-right
+        # corner (h-9 w-9 at right-3) so the number badge / fragile chip never
+        # sit under it.
+        div(class: ["flex flex-col items-end gap-1.5", ("pr-9" if duplicatable?)].compact.join(" ")) do
           if @recognition_state
             render Components::Ui::RecognitionState.new(state: @recognition_state)
           else
@@ -54,6 +79,23 @@ module Components
           render Components::Ui::Chip.new(label: I18n.t("boxes.fragile_badge"), kind: :tag) if @box.fragile?
         end
       end
+    end
+
+    # A one-tap "next box of the same size" (#658). The POST lands back on the
+    # index where the created box gets the toast + highlight treatment.
+
+    #: () -> untyped
+    def duplicate_control
+      label = I18n.t("boxes.index.duplicate_box", number: padded_number)
+      button_to(
+        duplicate_move_box_path(@box.move_id, @box),
+        method: :post,
+        class: "absolute right-3 top-3 flex h-9 w-9 items-center justify-center " \
+               "rounded-full text-muted transition hover:bg-surface-container-high " \
+               "hover:text-text-warm",
+        aria: { label: label },
+        title: label
+      ) { render Components::Icons::Duplicate.new(css: "h-5 w-5") }
     end
 
     #: () -> untyped
@@ -97,8 +139,16 @@ module Components
 
     #: () -> untyped
     def badge_label
+      I18n.t("boxes.card.badge", number: padded_number)
+    end
+
+    # The card's visible identity is the zero-padded badge ("Box 01"), so every
+    # label naming the box (badge, duplicate control) uses the same padding.
+
+    #: () -> String
+    def padded_number
       # Kernel.format (not bare `format`, which is a Phlex element helper).
-      I18n.t("boxes.card.badge", number: Kernel.format("%02d", @box.number.to_i))
+      Kernel.format("%02d", @box.number.to_i)
     end
 
     #: () -> String

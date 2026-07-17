@@ -53,13 +53,29 @@ RSpec.describe "Boxes Home" do
     expect(chip["data-height"]).to eq("25")
   end
 
+  it "duplicates a box in one tap from its card (#658)" do
+    create(:box, move:, number: "1", length_cm: 40, width_cm: 30, height_cm: 25,
+                 room: create(:room, move:, name: "Kitchen"))
+
+    visit move_boxes_path(move)
+    # Capybara matches the button by its title (aria-label matching is off).
+    click_on I18n.t("boxes.index.duplicate_box", number: "01")
+
+    # The copy semantics live in the action/request specs; here we prove the
+    # card's button wires click → new box visible on the index.
+    expect(page).to have_current_path(move_boxes_path(move), ignore_query: true)
+    expect(page).to have_text("Box 02")
+    expect(move.boxes.reload.count).to eq(2)
+  end
+
   it "is read-only for an archived move" do
     archived = create(:move, :archived, created_by: user, name: "Old Move")
-    create(:box, move: archived, number: "1")
+    create(:box, move: archived, number: "1", length_cm: 40, width_cm: 30, height_cm: 25)
 
     visit move_boxes_path(archived)
 
     expect(page).to have_text("My Boxes")
     expect(page).to have_no_link(I18n.t("boxes.index.add"))
+    expect(page).to have_no_button(I18n.t("boxes.index.duplicate_box", number: "01"))
   end
 end
