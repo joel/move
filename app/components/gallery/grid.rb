@@ -35,17 +35,22 @@ module Components
         end
       end
 
+      # Above-the-fold tiles load eagerly — one desktop row (lg:grid-cols-4) /
+      # two mobile rows (grid-cols-2); lazy-loading the likely-LCP first row
+      # would deprioritize the first visible pixels (#673). The rest stay lazy.
+      EAGER_TILES = 4
+
       private
 
       #: () -> untyped
       def grid
         div(class: "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4") do
-          @media.each { |media| tile(media) }
+          @media.each_with_index { |media, index| tile(media, eager: index < EAGER_TILES) }
         end
       end
 
-      #: (untyped media) -> untyped
-      def tile(media)
+      #: (untyped media, eager: bool) -> untyped
+      def tile(media, eager:)
         # An unavailable photo (#563) has nothing to enlarge — render an inert
         # tile so a tap doesn't open a blank lightbox (its detail_src is nil).
         return static_tile(media) unless media.image_displayable?
@@ -58,7 +63,7 @@ module Components
                  "bg-card text-left transition hover:border-accent-sage focus:outline-none " \
                  "focus:ring-2 focus:ring-accent-sage/40"
         ) do
-          tile_body(media)
+          tile_body(media, eager:)
         end
       end
 
@@ -72,10 +77,10 @@ module Components
         end
       end
 
-      #: (untyped media) -> untyped
-      def tile_body(media)
+      #: (untyped media, ?eager: bool) -> untyped
+      def tile_body(media, eager: false)
         div(class: image_tile_classes) do
-          image(media)
+          image(media, eager:)
           generated_badge if generated?(media)
         end
         caption_strip(media)
@@ -97,11 +102,12 @@ module Components
         end
       end
 
-      #: (untyped media) -> untyped
-      def image(media)
+      #: (untyped media, ?eager: bool) -> untyped
+      def image(media, eager: false)
         if media.image_displayable?
           img(
-            src: thumb_url(media), alt: "", loading: "lazy",
+            src: thumb_url(media), alt: "",
+            loading: eager ? "eager" : "lazy", decoding: "async",
             class: "h-full w-full object-cover transition group-hover:scale-105"
           )
         elsif media.image_unavailable?
@@ -158,10 +164,11 @@ module Components
         Rails.application.config.x.media_transform_host.present?
       end
 
-      # Memoized so the grid <img src> and data-thumb are byte-identical: every
-      # TransformUrl call embeds a fresh signed expiry, so a second call can
-      # yield a different query string — and the lightbox's "already cached"
-      # instant thumb would silently become a fresh network fetch.
+      # Memoized so the grid <img src> and data-thumb are byte-identical even if
+      # TransformUrl's expiry bucket rolls over mid-render (#669 quantized the
+      # expiry, so calls normally repeat within a bucket) — a divergent query
+      # string would turn the lightbox's "already cached" instant thumb into a
+      # fresh network fetch. Also saves an HMAC per repeated call.
 
       #: (untyped media) -> String?
       def thumb_url(media)
