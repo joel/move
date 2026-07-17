@@ -1,8 +1,8 @@
 // Cloudflare Worker: edge media transformation (#572).
 //
 // Serves private, tenant-scoped Active Storage media through Cloudflare's edge
-// image transforms, gated by a short-lived HMAC token minted by the Rails app
-// (MediaVariants::TransformUrl). The R2 bucket stays private; the only access is
+// image transforms, gated by an expiring HMAC token minted by the Rails app
+// (MediaVariants::TransformUrl; ~26h validity, quantized to 24h buckets — #669). The R2 bucket stays private; the only access is
 // a request carrying a currently-valid token.
 //
 //   URL:  /<size>/<blob_key>?t=<hex hmac>&exp=<unix>
@@ -66,8 +66,16 @@ export default {
     cacheKeyUrl.search = `?format=${format}`;
     const cacheKey = new Request(cacheKeyUrl.toString(), { method: "GET" });
 
+    // The Cache API is invisible to `cf-cache-status` (that header only reflects
+    // Cloudflare's HTTP cache), so expose HIT/MISS explicitly for observability.
+    // The stored response carries MISS (set below, pre-put); rewrap hits so the
+    // served copy reads HIT without mutating the shared cache entry.
     const cached = await cache.match(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      const hit = new Response(cached.body, cached);
+      hit.headers.set("X-Media-Cache", "HIT");
+      return hit;
+    }
 
     let object;
     try {
@@ -90,6 +98,7 @@ export default {
     const headers = new Headers(out.headers);
     headers.set("Cache-Control", CACHE_CONTROL_SUCCESS);
     headers.set("Vary", "Accept");
+    headers.set("X-Media-Cache", "MISS");
     const response = new Response(out.body, { status: 200, headers });
 
     // Cache the transformed bytes (best-effort, per-colo) so a repeat view at this

@@ -200,10 +200,18 @@ each with where the control lives, so a finding can be traced to code:
   risk shape — URL-secrecy substitutes for a membership check, since a stateless
   edge Worker has no session/tenant context and can only verify
   `HMAC(blob_key\|size\|exp)` — but with a materially **shorter blast radius**: the
-  token carries a real `exp` (≤1h), so a leaked URL goes dead within the hour
-  rather than never. Tenant/Move binding stays enforced at *mint* time (a URL is
-  only rendered to an authorized in-tenant member). Dev/test keep the same-origin
+  token carries a real `exp`, so a leaked URL goes dead within ~a day rather than
+  never. Tenant/Move binding stays enforced at *mint* time (a URL is only
+  rendered to an authorized in-tenant member). Dev/test keep the same-origin
   master proxy (no Worker locally).
+  **Update (#669):** the expiry is **quantized** — `exp` snaps to 24h bucket
+  boundaries with a 26h validity (`EXPIRY_BUCKET` + `ROLLOVER_GRACE` = `TTL` in
+  `MediaVariants::TransformUrl`), so renders within a bucket mint byte-identical
+  URLs and the browser's immutable cache actually gets reused across visits
+  (before this, a fresh per-render `exp` forced a refetch of every image on every
+  navigation). Deliberate trade-off, user-approved: the leaked-URL window widens
+  from ≤1h to **≤26h**; blob-key unguessability and mint-time membership remain
+  the primary controls, and the risk-acceptance rationale above is unchanged.
 
 - **WebAuthn ceremonies bind to the request host, not a pinned apex origin.**
   `webauthn_origin` falls back to the request host (`base_url` in
