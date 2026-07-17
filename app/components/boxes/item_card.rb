@@ -20,8 +20,8 @@ module Components
         "box_item_#{item.id}_card"
       end
 
-      #: (item: untyped, move: untyped, ?image_ready: untyped, ?generating: untyped, ?failed: untyped) -> void
-      def initialize(item:, move:, image_ready: false, generating: false, failed: false)
+      #: (item: untyped, move: untyped, ?image_ready: untyped, ?generating: untyped, ?failed: untyped, ?eager: bool) -> void
+      def initialize(item:, move:, image_ready: false, generating: false, failed: false, eager: false)
         @item = item
         @move = move
         @image_ready = image_ready
@@ -29,6 +29,10 @@ module Components
         # shows "generating" (not an idle generate button) — #416 Codex.
         @generating = generating || item.image_generating?
         @failed = failed
+        # First-visible-row cards must not lazy-load (#673); Turbo Stream
+        # re-renders (generate flow) omit it — a swapped-in card sits in the
+        # viewport, where lazy loads immediately anyway.
+        @eager = eager
       end
 
       #: () -> void
@@ -76,7 +80,8 @@ module Components
           if image?
             img(
               src: MediaVariants::TransformUrl.for(@item.source_media, :thumb),
-              alt: "", loading: "lazy", class: "h-full w-full object-cover"
+              alt: "", loading: @eager ? "eager" : "lazy", decoding: "async",
+              class: "h-full w-full object-cover"
             )
           elsif @generating
             div(class: "h-7 w-7 animate-spin rounded-full border-2 border-accent-sage border-t-transparent")

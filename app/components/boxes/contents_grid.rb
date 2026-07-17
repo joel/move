@@ -15,6 +15,10 @@ module Components
     # first), then standalone cards (most-recent first).
     class ContentsGrid < Components::Base
       CHIP_CAP = 4 # name chips shown per photo card before collapsing to "+N more"
+      # Above-the-fold cards load eagerly — two mobile rows / one sm row; the
+      # photos render before standalone items, so indexing the media loop is
+      # sufficient (#673).
+      EAGER_TILES = 4
 
       # @rbs move: untyped
       # @rbs box: untyped
@@ -76,11 +80,15 @@ module Components
       #: () -> untyped
       def grid
         div(class: "grid grid-cols-2 gap-3 sm:grid-cols-3") do
-          @media.each { |media| photo_card(media) }
+          @media.each_with_index { |media, index| photo_card(media, eager: index < EAGER_TILES) }
           # Standalone items most-recent first (items arrive created-ascending).
-          @standalone_items.reverse_each do |item|
+          # The eager index CONTINUES across them: when the box has fewer than
+          # EAGER_TILES photos, image-backed item cards fill the first visible
+          # row and must not lazy-load the likely LCP (#673 Codex).
+          @standalone_items.reverse_each.with_index(@media.size) do |item, index|
             render Components::Boxes::ItemCard.new(
-              item: item, move: @move, image_ready: @move.image_generation_ready?
+              item: item, move: @move, image_ready: @move.image_generation_ready?,
+              eager: index < EAGER_TILES
             )
           end
         end
@@ -89,13 +97,13 @@ module Components
       # A photo card. Tappable only when it has somewhere to go (review/recovery);
       # a still-processing or settled-empty photo is a plain, inert tile.
 
-      #: (untyped media) -> untyped
-      def photo_card(media)
+      #: (untyped media, ?eager: bool) -> untyped
+      def photo_card(media, eager: false)
         href = photo_href(media)
         attrs = href ? { href: href } : {}
         tag = href ? :a : :div
         public_send(tag, class: card_classes(interactive: href.present?), **attrs) do
-          tile(media)
+          tile(media, eager:)
           names_caption(@items_by_media[media.id] || [])
         end
       end
@@ -120,20 +128,21 @@ module Components
                     "px-2.5 py-1 text-label-caps uppercase text-on-surface-variant") { label }
       end
 
-      #: (untyped media) -> untyped
-      def tile(media)
+      #: (untyped media, ?eager: bool) -> untyped
+      def tile(media, eager: false)
         div(class: tile_classes) do
-          image(media)
+          image(media, eager:)
           unpacked_badge(media)
           recovery_badge(media)
         end
       end
 
-      #: (untyped media) -> untyped
-      def image(media)
+      #: (untyped media, ?eager: bool) -> untyped
+      def image(media, eager: false)
         if media.image_displayable?
           img(
-            src: MediaVariants::TransformUrl.for(media, :thumb), alt: "", loading: "lazy",
+            src: MediaVariants::TransformUrl.for(media, :thumb), alt: "",
+            loading: eager ? "eager" : "lazy", decoding: "async",
             class: "h-full w-full object-cover transition group-hover:scale-105"
           )
         elsif media.image_unavailable?
