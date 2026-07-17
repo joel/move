@@ -76,8 +76,8 @@ module Views
 
       # Photo-first card: the photo + its recognised names as chips, tapping into
       # the per-photo detail (C2) where a wrong name can be fixed — no separate
-      # per-item rows. turbo_prefetch off: ReviewsController#photo marks the photo
-      # reviewed on GET, so a hover prefetch would silently clear pending_review.
+      # per-item rows. turbo_prefetch off: a historic reviewed-when-shown guard
+      # (#660 made the review GET side-effect-free; removing it is #661).
 
       #: (untyped media, untyped items) -> untyped
       def photo_card(media, items)

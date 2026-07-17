@@ -4,12 +4,13 @@
 # Kept in the action layer; the sigil exposes it past enforce_privacy. See packwerk-boundaries.md.
 
 module Reviews
-  # "Reviewed when its photo is shown" (C2 review flow): opening a photo's review
-  # screen surfaces every item detected in it for verification, so the still-
-  # unreviewed ones (pending_review / needs_correction) are accepted as confirmed.
-  # Removing a wrong detection (the × control) overrides this to `removed` via
-  # Items::MarkRemoved. Idempotent — already-confirmed/auto-confirmed items are
-  # untouched. Caller owns the tenant context + writable-Move guard (controller).
+  # The explicit review confirm (C2 review flow — #660; until then this ran as a
+  # "reviewed when shown" GET side effect): the photo screen's "Mark as Reviewed"
+  # accepts every still-unreviewed item detected in the photo (pending_review /
+  # needs_correction → confirmed). Removing a wrong detection (the × control)
+  # overrides to `removed` via Items::MarkRemoved. Idempotent — already-confirmed/
+  # auto-confirmed items are untouched. Caller owns the tenant context + the
+  # writable-Move guard (controller).
   class MarkPhotoReviewed < BaseAction
     #: (media: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, actor:)

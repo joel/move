@@ -49,10 +49,12 @@ Rails.application.routes.draw do
       resources :items, only: %i[new create]
       # C2 — Per-photo review: walk the box's photos; each screen lists every item
       # detected in that photo as an editable field (rename auto-saves on blur),
-      # with × to remove and "+ Add" for a missed item. "Next Photo" only
-      # navigates; opening a photo marks its unreviewed items reviewed.
+      # with × to remove and "+ Add" for a missed item. Reviewing is explicit
+      # (#660): "Mark as Reviewed" POSTs to mark_reviewed and advances; "Ignore"
+      # (plain GET) only navigates — opening a photo changes nothing.
       get "review", to: "reviews#index", as: :review
       get "review/photo/:media_id", to: "reviews#photo", as: :review_photo
+      post "review/photo/:media_id/mark_reviewed", to: "reviews#mark_reviewed", as: :review_mark_reviewed
       # Delete a whole photo (and its items) — packing only; reuses the review_photo
       # path with the DELETE verb.
       delete "review/photo/:media_id", to: "reviews#delete_photo"

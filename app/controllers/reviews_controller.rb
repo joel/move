@@ -1,24 +1,26 @@
 # frozen_string_literal: true
 
 # C2 — Per-photo review. Walks a box's photos one screen at a time; each screen
-# lists every item detected in that photo as an editable field. Opening a photo
-# marks its still-unreviewed items reviewed (Reviews::MarkPhotoReviewed). Items
-# are edited inline (rename auto-saves on blur), removed (×), or added by hand;
-# "Next Photo" only navigates. Runs inside an Organization tenant schema. Thin:
-# authorize, call the action, render/redirect.
+# lists every item detected in that photo as an editable field. Items are edited
+# inline (rename auto-saves on blur), removed (×), or added by hand. Reviewing is
+# explicit (#660, superseding the #143 reviewed-when-shown model): "Mark as
+# Reviewed" confirms the photo's items (Reviews::MarkPhotoReviewed) and advances;
+# "Ignore" advances without changing state. Runs inside an Organization tenant
+# schema. Thin: authorize, call the action, render/redirect.
 class ReviewsController < MoveScopedController
   # ?queue=move flips the photo screen into the Move-wide review-queue walk
-  # (#654): Next crosses box boundaries to the oldest photo still holding an
-  # unreviewed co-located item, and Finish returns to the queue page. Only this
-  # exact value activates it; every mutation redirect threads it through so the
-  # walk survives the no-JS HTML fallbacks.
+  # (#654): Next crosses box boundaries, advancing strictly forward in capture
+  # order through photos still holding an unreviewed co-located item, and Finish
+  # returns to the queue page. Only this exact value activates it; every mutation
+  # redirect threads it through so the walk survives the no-JS HTML fallbacks.
   QUEUE_PARAM = "move"
 
   before_action :set_box
-  before_action :set_media, only: %i[photo rename_item remove_item add_item move_photo delete_photo retake_photo]
+  before_action :set_media,
+                only: %i[photo mark_reviewed rename_item remove_item add_item move_photo delete_photo retake_photo]
   before_action :set_item, only: %i[rename_item remove_item]
   before_action :require_writable_move!,
-                only: %i[rename_item remove_item add_item move_photo delete_photo retake_photo]
+                only: %i[mark_reviewed rename_item remove_item add_item move_photo delete_photo retake_photo]
 
   # GET /moves/:move_id/boxes/:box_id/review
   # Enter at the first photo that still has *unreviewed* items (resuming a
@@ -34,25 +36,38 @@ class ReviewsController < MoveScopedController
   end
 
   # GET /moves/:move_id/boxes/:box_id/review/photo/:media_id
+  # Side-effect-free (#660): confirming is explicit via #mark_reviewed, so opening
+  # (or hover-prefetching) a photo changes nothing. The review links' historic
+  # `data-turbo-prefetch="false"` guards are kept for now — relaxing them is #661.
 
   #: () -> untyped
   def photo
-    # "Reviewed when its photo is shown" — only an editor on a writable Move
-    # mutates (viewers / archived Moves see a read-only screen). This is a GET-side
-    # effect, so every link that reaches a review photo disables Turbo prefetch
-    # (`data-turbo-prefetch="false"` on the box pending badge and the "Next Photo"
-    # link) — otherwise hovering them would confirm a photo before it is opened.
-    Reviews::MarkPhotoReviewed.new.call(media: @media, actor: current_user) if editable_move?
-
     return render_queue_photo if queue_mode?
 
     walk = review_media
+    next_media = next_after(@media, walk)
     render Views::Reviews::Photo.new(
       move: @move, box: @box, media: @media, items: photo_items(@media),
       position: position_of(@media, walk), total: walk.size,
-      next_media: next_after(@media, walk), editable: editable_move?,
-      move_boxes: other_boxes
+      next_media: next_media, editable: editable_move?,
+      move_boxes: other_boxes, pending_review: pending_review?,
+      advance_href: advance_href_for(next_media), mark_href: mark_href
     )
+  end
+
+  # POST .../review/photo/:media_id/mark_reviewed — explicitly confirm this
+  # photo's unreviewed items (#660), then advance the walk. No success toast —
+  # advancing is the feedback, and the badge/queue counts dropping tell the story.
+
+  #: () -> untyped
+  def mark_reviewed
+    case Reviews::MarkPhotoReviewed.new.call(media: @media, actor: current_user)
+    in Dry::Monads::Success(_)
+      redirect_to after_mark_path, notice: t("reviews.flash.photo_marked")
+    in Dry::Monads::Failure(_)
+      redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query),
+                  alert: t("reviews.flash.mark_failed")
+    end
   end
 
   # PATCH .../review/photo/:media_id/items/:id/rename — live auto-save (blur).
@@ -174,32 +189,85 @@ class ReviewsController < MoveScopedController
   private
 
   # Queue mode (?queue=move): the same screen, but the walk set is the Move-wide
-  # pending-photo queue. Computed AFTER MarkPhotoReviewed ran, so on an editable
-  # Move the current photo has already dropped out of the pending set; it is
-  # excluded explicitly anyway for the read-only case. Next = the oldest photo
-  # still pending — except on a read-only Move, where nothing gets confirmed and
-  # "oldest pending" would ping-pong between the two oldest photos forever, so
-  # the walk advances strictly FORWARD in capture order instead and terminates.
+  # pending-photo queue. The current photo stays pending until explicitly marked
+  # (#660), so next AND the "N more after this" count advance strictly FORWARD in
+  # capture order for everyone — "oldest pending" would ping-pong on an ignored
+  # photo, and counting the whole pending set would contradict the Finish control
+  # at the end of a pass. Photos left behind (ignored) resurface on the queue
+  # page after Finish.
 
   #: () -> untyped
   def render_queue_photo
-    remaining = Reviews::PendingPhotos.new.call(move: @move).value!
-                                      .photos.where.not(id: @media.id)
+    next_media = queue_next_media
     render Views::Reviews::Photo.new(
       move: @move, box: @box, media: @media, items: photo_items(@media),
       position: nil, total: nil,
-      next_media: editable_move? ? remaining.first : forward_of(remaining),
+      next_media: next_media,
       editable: editable_move?, move_boxes: other_boxes,
-      queue: true, queue_remaining: remaining.count
+      queue: true, queue_remaining: forward_scope(pending_remaining).count,
+      pending_review: pending_review?,
+      advance_href: advance_href_for(next_media), mark_href: mark_href
     )
   end
 
+  #: () -> untyped
+  def pending_remaining
+    Reviews::PendingPhotos.new.call(move: @move).value!.photos
+  end
+
   # Row-value comparison so the tiebreak matches the queue's (captured_at, id)
-  # FIFO order exactly.
+  # FIFO order exactly; the strict > excludes the current photo whether or not
+  # it is still pending.
 
   #: (untyped scope) -> untyped
-  def forward_of(scope)
-    scope.where("(media.captured_at, media.id) > (?, ?)", @media.captured_at, @media.id).first
+  def forward_scope(scope)
+    scope.where("(media.captured_at, media.id) > (?, ?)", @media.captured_at, @media.id)
+  end
+
+  #: () -> untyped
+  def queue_next_media
+    forward_scope(pending_remaining).first
+  end
+
+  # Whether this photo still holds anything MarkPhotoReviewed would confirm —
+  # exactly the action's scope. Editability gates separately (the component),
+  # so this flag means what it says on read-only walks too.
+
+  #: () -> bool
+  def pending_review?
+    @box.items.unreviewed.exists?(source_media_id: @media.id)
+  end
+
+  # The single home of the walk's URL grammar (#660): where an advance lands —
+  # the next photo (queue mode crosses boxes to the target's OWN box, threading
+  # ?queue=move), else the finish target (queue page / box page). The rendered
+  # Ignore/Next link and the post-mark redirect both come through here so the
+  # two can never drift.
+
+  #: (untyped next_media) -> String
+  def advance_href_for(next_media)
+    if queue_mode?
+      return move_review_path(@move) unless next_media
+
+      move_box_review_photo_path(@move, next_media.box, next_media, queue: QUEUE_PARAM)
+    elsif next_media
+      move_box_review_photo_path(@move, @box, next_media)
+    else
+      move_box_path(@move, @box)
+    end
+  end
+
+  #: () -> String
+  def mark_href
+    move_box_review_mark_reviewed_path(@move, @box, @media, **queue_query)
+  end
+
+  # Post-mark landing: recompute next (in queue mode the current photo just left
+  # the pending set) and reuse the shared URL grammar.
+
+  #: () -> String
+  def after_mark_path
+    advance_href_for(queue_mode? ? queue_next_media : next_after(@media, review_media))
   end
 
   #: () -> bool

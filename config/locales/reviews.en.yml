@@ -36,10 +36,16 @@ en:
       retake_rescan: "Also re-scan for items"
       next: "Next Photo"
       finish: "Finish review"
+      # Explicit review actions (#660): Mark confirms this photo's items and
+      # advances; Ignore advances without changing anything.
+      mark_reviewed: "Mark as Reviewed"
+      ignore: "Ignore"
       empty_title: "Nothing detected here"
       empty_description: "No items remain to review in this photo."
     flash:
       nothing: "Nothing to review in this box yet."
+      photo_marked: "Photo marked as reviewed."
+      mark_failed: "Could not mark this photo as reviewed. Try again."
       item_added: "Added “%{name}”."
       add_failed: "Could not add that item — give it a name and try again."
       photo_moved: "Photo moved to box #%{number}."

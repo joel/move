@@ -18,8 +18,8 @@ module Components
       @pending_count = pending_count
     end
 
-    # Prefetch off: opening a photo marks its items reviewed, so hover must not
-    # confirm them prematurely.
+    # Prefetch off: a historic reviewed-when-shown guard — #660 made the review
+    # GET side-effect-free; removing the attribute across surfaces is #661.
 
     #: () -> void
     def view_template
