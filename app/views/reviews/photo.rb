@@ -5,7 +5,9 @@ module Views
     # C2 — Review by photo. One photo per screen: the image once on the left, and
     # every item detected in it on the right as an editable field (rename auto-saves
     # on blur), each with a pencil (focus + select-all) and × (remove). "+ Add item"
-    # appends a missed item; "Next Photo" only navigates. Renders in AppShellLayout.
+    # appends a missed item. Reviewing is explicit (#660): "Mark as Reviewed"
+    # confirms and advances, "Ignore" only navigates — both offered at the header
+    # AND the footer so long item lists don't hide them. Renders in AppShellLayout.
     class Photo < Views::Base
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::FormWith
@@ -21,9 +23,12 @@ module Views
       # @rbs move_boxes: untyped
       # @rbs queue: untyped
       # @rbs queue_remaining: untyped
+      # @rbs pending_review: untyped
+      # @rbs advance_href: untyped
+      # @rbs mark_href: untyped
       # @rbs return: void
       def initialize(move:, box:, media:, items:, position:, total:, next_media:, editable: false, move_boxes: [],
-                     queue: false, queue_remaining: nil)
+                     queue: false, queue_remaining: nil, pending_review: false, advance_href: nil, mark_href: nil)
         @move = move
         @box = box
         @media = media
@@ -41,6 +46,13 @@ module Views
         # queue page. queue_remaining = pending photos left after this one.
         @queue = queue
         @queue_remaining = queue_remaining
+        # Whether the photo still has anything to confirm (#660) — gates the
+        # Mark/Ignore pair; false renders the plain navigation link instead.
+        @pending_review = pending_review
+        # Precomputed by the controller (advance_href_for / mark_href — the
+        # single home of the walk's URL grammar).
+        @advance_href = advance_href
+        @mark_href = mark_href
       end
 
       #: () -> void
@@ -144,19 +156,27 @@ module Views
         end
       end
 
+      # The advance controls also live up here (#660) so a long item list never
+      # hides them; `flex-wrap` drops them under the title on narrow screens.
+
       #: () -> untyped
       def header
-        h2(class: "text-headline-lg text-text-warm") { I18n.t("reviews.photo.title") }
-        p(class: "mt-1 text-body-md text-muted") do
-          if @editable
-            # Below lg the row actions are swipe-revealed, so the instruction
-            # must name the gesture; at lg+ the inline pencil/× make the
-            # original copy true.
-            span(class: "lg:hidden") { I18n.t("reviews.photo.subtitle_touch") }
-            span(class: "hidden lg:inline") { I18n.t("reviews.photo.subtitle") }
-          else
-            plain I18n.t("reviews.photo.view_only")
+        div(class: "flex flex-wrap items-start justify-between gap-3") do
+          div do
+            h2(class: "text-headline-lg text-text-warm") { I18n.t("reviews.photo.title") }
+            p(class: "mt-1 text-body-md text-muted") do
+              if @editable
+                # Below lg the row actions are swipe-revealed, so the instruction
+                # must name the gesture; at lg+ the inline pencil/× make the
+                # original copy true.
+                span(class: "lg:hidden") { I18n.t("reviews.photo.subtitle_touch") }
+                span(class: "hidden lg:inline") { I18n.t("reviews.photo.subtitle") }
+              else
+                plain I18n.t("reviews.photo.view_only")
+              end
+            end
           end
+          advance_controls(compact: true)
         end
       end
 
@@ -267,38 +287,24 @@ module Views
       #: () -> untyped
       def footer
         div(class: "mt-6") do
-          if @next_media
-            advance_link("reviews.photo.next", next_photo_href)
-          else
-            advance_link("reviews.photo.finish", @queue ? move_review_path(@move) : move_box_path(@move, @box))
-          end
+          advance_controls(compact: false)
         end
       end
 
-      # Queue mode crosses boxes: the next photo's OWN box, never @box.
+      # #660 — the walk's advance controls (Mark as Reviewed / Ignore, or the
+      # plain Next/Finish link), shared by the header (compact) and the footer.
 
-      #: () -> String
-      def next_photo_href
-        move_box_review_photo_path(@move, @queue ? @next_media.box : @box, @next_media, **queue_params)
+      #: (compact: bool) -> untyped
+      def advance_controls(compact:)
+        render Components::Reviews::AdvanceControls.new(
+          advance_href: @advance_href, mark_href: @mark_href, next_photo: @next_media.present?,
+          editable: @editable, pending_review: @pending_review, compact: compact
+        )
       end
 
       #: () -> Hash[Symbol, String]
       def queue_params
         @queue ? { queue: ReviewsController::QUEUE_PARAM } : {}
-      end
-
-      # Turbo prefetch is disabled: opening the next photo marks its items reviewed
-      # (a GET-side effect), so hover-prefetching "Next Photo" must not confirm them
-      # before the reviewer actually advances.
-
-      #: (untyped key, untyped href) -> untyped
-      def advance_link(key, href)
-        a(href: href, data: { turbo_prefetch: "false" },
-          class: "inline-flex w-full items-center justify-center gap-2 rounded-full bg-accent-sage " \
-                 "px-6 py-3 text-sm font-bold text-page transition hover:opacity-90 active:scale-[0.98]") do
-          plain I18n.t(key)
-          render Components::Icons::ChevronRight.new(css: "h-4 w-4")
-        end
       end
 
       # The add-form's submit button shares the row icon-button styling.

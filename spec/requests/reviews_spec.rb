@@ -62,17 +62,18 @@ RSpec.describe "Per-photo review" do
       expect(response.body).to include("swipe-actions")
     end
 
-    it "marks the photo's unreviewed items confirmed when shown" do
+    # #660 — reviewing is explicit: a plain GET (or a hover prefetch) never mutates.
+    it "does not change review state when shown" do
       pending_item = detected(name: "Chair")
       needs = detected(name: "Desk", review_state: "needs_correction")
 
       get move_box_review_photo_path(move, box, media)
 
-      expect(pending_item.reload.review_state).to eq("confirmed")
-      expect(needs.reload.review_state).to eq("confirmed")
+      expect(pending_item.reload.review_state).to eq("pending_review")
+      expect(needs.reload.review_state).to eq("needs_correction")
     end
 
-    it "links to the next photo when more remain" do
+    it "offers Mark as Reviewed and an Ignore link to the next photo when more remain" do
       detected(name: "Lamp")
       other = create(:media, move:, box:)
       create(:item, move:, box:, source_media: other, name: "Sofa", review_state: "pending_review")
@@ -80,7 +81,76 @@ RSpec.describe "Per-photo review" do
       get move_box_review_photo_path(move, box, media)
 
       expect(response.body).to include(move_box_review_photo_path(move, box, other))
+      expect(response.body).to include(I18n.t("reviews.photo.mark_reviewed"))
+      expect(response.body).to include(I18n.t("reviews.photo.ignore"))
+    end
+
+    it "falls back to the plain navigation label when the photo has nothing pending" do
+      detected(name: "Lamp", review_state: "confirmed")
+      other = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: other, name: "Sofa", review_state: "pending_review")
+
+      get move_box_review_photo_path(move, box, media)
+
       expect(response.body).to include(I18n.t("reviews.photo.next"))
+      expect(response.body).not_to include(I18n.t("reviews.photo.mark_reviewed"))
+    end
+  end
+
+  # #660 — the explicit confirm: POST marks this photo's unreviewed items and
+  # advances the walk (queue mode crosses boxes).
+  describe "POST .../review/photo/:media_id/mark_reviewed" do
+    it "confirms the photo's unreviewed items and advances to the next photo" do
+      pending_item = detected(name: "Chair")
+      needs = detected(name: "Desk", review_state: "needs_correction")
+      other = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: other, name: "Sofa", review_state: "pending_review")
+
+      post move_box_review_mark_reviewed_path(move, box, media)
+
+      aggregate_failures do
+        expect(pending_item.reload.review_state).to eq("confirmed")
+        expect(needs.reload.review_state).to eq("confirmed")
+        expect(response).to redirect_to(move_box_review_photo_path(move, box, other))
+        expect(flash[:notice]).to eq(I18n.t("reviews.flash.photo_marked"))
+      end
+    end
+
+    it "finishes at the box page after the last photo" do
+      detected(name: "Chair")
+
+      post move_box_review_mark_reviewed_path(move, box, media)
+
+      expect(response).to redirect_to(move_box_path(move, box))
+    end
+
+    it "advances cross-box with the queue param in queue mode" do
+      item = detected(name: "Lamp")
+      other_box = create(:box, move:, number: "42")
+      newer = create(:media, move:, box: other_box, captured_at: 1.hour.from_now)
+      create(:item, move:, box: other_box, source_media: newer, review_state: "pending_review")
+
+      post move_box_review_mark_reviewed_path(move, box, media, queue: "move")
+
+      expect(item.reload.review_state).to eq("confirmed")
+      expect(response).to redirect_to(move_box_review_photo_path(move, other_box, newer, queue: "move"))
+    end
+
+    it "finishes at the queue page after the last pending photo in queue mode" do
+      detected(name: "Lamp")
+
+      post move_box_review_mark_reviewed_path(move, box, media, queue: "move")
+
+      expect(response).to redirect_to(move_review_path(move))
+    end
+
+    it "returns 404 for a photo in another box" do
+      other_box = create(:box, move:, number: "42")
+      foreign = create(:media, move:, box: other_box)
+
+      post move_box_review_mark_reviewed_path(move, box, foreign)
+
+      expect(response).to have_http_status(:not_found)
     end
   end
 
@@ -269,6 +339,16 @@ RSpec.describe "Per-photo review" do
       expect(response).to redirect_to(move_box_path(move, box))
       expect(flash[:alert]).to eq(I18n.t("moves.archived_alert"))
     end
+
+    it "refuses mark_reviewed and keeps the items pending" do
+      item = detected(name: "Lamp")
+
+      post move_box_review_mark_reviewed_path(move, box, media)
+
+      expect(item.reload.review_state).to eq("pending_review")
+      expect(response).to redirect_to(move_box_path(move, box))
+      expect(flash[:alert]).to eq(I18n.t("moves.archived_alert"))
+    end
   end
 
   describe "DELETE .../review/photo/:media_id (delete photo)" do
@@ -337,7 +417,7 @@ RSpec.describe "Per-photo review" do
       expect(response.body).to include(I18n.t("reviews.photo.queue_progress", count: 1))
     end
 
-    it "locates the photo with a Box badge and finishes to the queue on the last photo" do
+    it "locates the photo with a Box badge and exits to the queue from the last photo" do
       detected(name: "Lamp")
 
       get move_box_review_photo_path(move, box, media, queue: "move")
@@ -345,17 +425,19 @@ RSpec.describe "Per-photo review" do
       aggregate_failures do
         expect(response.body).to include(I18n.t("reviews.photo.queue_badge", number: box.number))
         expect(response.body).to include(I18n.t("reviews.photo.queue_progress.zero"))
-        expect(response.body).to include(I18n.t("reviews.photo.finish"))
+        # The pending photo renders the Mark/Ignore pair; both exit to the queue.
+        expect(response.body).to include(I18n.t("reviews.photo.mark_reviewed"))
+        expect(response.body).to include(I18n.t("reviews.photo.ignore"))
         expect(response.body).to include(move_review_path(move))
       end
     end
 
-    it "still confirms the opened photo's items (same GET-side effect as box mode)" do
+    it "does not change review state on open in queue mode either (#660)" do
       item = detected(name: "Lamp")
 
       get move_box_review_photo_path(move, box, media, queue: "move")
 
-      expect(item.reload.review_state).to eq("confirmed")
+      expect(item.reload.review_state).to eq("pending_review")
     end
 
     it "does not activate on any other queue value" do

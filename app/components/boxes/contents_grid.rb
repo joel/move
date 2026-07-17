@@ -173,8 +173,8 @@ module Components
         end
       end
 
-      # ReviewsController#photo marks the photo's items reviewed on GET, so a hover
-      # prefetch would silently clear pending_review — opt the review link out.
+      # Prefetch stays off on review links: a historic reviewed-when-shown guard
+      # (#660 made the GET side-effect-free; removing the attribute is #661).
 
       #: (untyped media) -> untyped
       def prefetch_for(media)

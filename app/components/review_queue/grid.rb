@@ -6,8 +6,8 @@ module Components
     # (square :thumb, lazy-loaded, caption strip) but each tile is a plain link
     # into the C2 review screen in queue mode — no lightbox — wearing a pending
     # item count badge in the app-wide pending-review tint (BoxReviewBadge).
-    # Opening a review photo confirms its items (a GET-side effect), so every
-    # tile disables Turbo prefetch: hovering must not review a photo.
+    # Tiles keep Turbo prefetch off: a historic reviewed-when-shown guard (#660
+    # made the review GET side-effect-free; removing the attribute is #661).
     class Grid < Components::Base
       #: (move: untyped, media: untyped, pending_counts: untyped) -> void
       def initialize(move:, media:, pending_counts:)

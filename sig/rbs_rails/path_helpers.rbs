@@ -19,6 +19,7 @@ interface ::_RbsRailsPathHelpers
   def new_move_box_item_path: (*untyped) -> ::String
   def move_box_review_path: (*untyped) -> ::String
   def move_box_review_photo_path: (*untyped) -> ::String
+  def move_box_review_mark_reviewed_path: (*untyped) -> ::String
   def move_box_review_rename_item_path: (*untyped) -> ::String
   def move_box_review_remove_item_path: (*untyped) -> ::String
   def move_box_review_add_item_path: (*untyped) -> ::String
@@ -137,6 +138,7 @@ interface ::_RbsRailsPathHelpers
   def new_move_box_item_url: (*untyped) -> ::String
   def move_box_review_url: (*untyped) -> ::String
   def move_box_review_photo_url: (*untyped) -> ::String
+  def move_box_review_mark_reviewed_url: (*untyped) -> ::String
   def move_box_review_rename_item_url: (*untyped) -> ::String
   def move_box_review_remove_item_url: (*untyped) -> ::String
   def move_box_review_add_item_url: (*untyped) -> ::String

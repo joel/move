@@ -19,6 +19,16 @@
   - The **C1 queue is dropped**; the box's pending badge enters the photo walk directly.
 - The recognition pipeline is unchanged — `RecognitionSuggestion`s are still produced as the audit trail; only their UI resolution path (the `RecognitionSuggestions::{Keep,Correct,MarkFalsePositive}` actions) was retired.
 - Recorded in `README.md` §2 (C1 retired, C2 repointed).
+- **Superseded in part (2026-07-17, #660 — user decision):** **"Reviewed when shown" is
+  retired.** "Next Photo" read as pure navigation while the state change had already happened
+  on open — misleading. Reviewing is now **explicit**: a **"Mark as Reviewed"** POST confirms
+  the photo's unreviewed items and advances; **"Ignore"** advances without changing state; the
+  pair renders at **both** the "Review Items" header and the footer (long item lists no longer
+  bury the controls — the "single 'Next Photo'" wording above no longer holds). `GET
+  reviews#photo` is side-effect-free (the `data-turbo-prefetch="false"` guards remain until
+  #661). Read-only walks and already-reviewed box-walk photos keep the plain Next/Finish link.
+  Composed from existing patterns (the advance-pill vocabulary); no Stitch screen shows the
+  pair — backfill optional, same stance as §C1-MOVE-QUEUE.
 
 ---
 
@@ -41,6 +51,13 @@
   pending tint from `BoxReviewBadge` — so no token or `Ui::*` addition and no DESIGN.md change.
 - **Remediation:** optional — generate a Stitch screen for the queue page if/when the surface
   grows bespoke layout (filters, grouping). Not design-blocked; recorded in `README.md` §2 (C1′).
+- **Update (2026-07-17, #660):** with reviewing now explicit (see §C2-REVIEW supersession), the
+  queue walk advances **strictly forward** in `(captured_at, id)` order for everyone (previously
+  editable Moves jumped to the oldest pending photo, which only worked because opening had
+  already confirmed it). Ignored photos stay pending and resurface on the queue page at Finish;
+  the "N more after this" count now counts only the forward remainder of the pass. Entering the
+  walk from a **mid-queue grid tile** starts the pass there — older pending photos are not
+  revisited within that pass; they stay listed on the queue page, which Finish lands on.
 
 ---
 

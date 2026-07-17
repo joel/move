@@ -54,8 +54,8 @@ module Views
       end
 
       # Entry into the cross-box walk: the oldest pending photo, in queue mode.
-      # Opening a review photo confirms its items (a GET-side effect), so the
-      # link disables Turbo prefetch — hovering must not review a photo.
+      # Prefetch stays off: a historic reviewed-when-shown guard (#660 made the
+      # review GET side-effect-free; removing the attribute is #661).
 
       #: () -> untyped
       def review_all
