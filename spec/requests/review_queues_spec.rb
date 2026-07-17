@@ -40,7 +40,7 @@ RSpec.describe "ReviewQueues" do
       expect(response.body.index("Box 2")).to be < response.body.index("Box 1")
     end
 
-    it "links Review all and every tile into the queue-mode walk with prefetch disabled" do
+    it "links Review all and every tile into the queue-mode walk" do
       box = create(:box, move:, number: "1")
       media = pending_photo(box:)
 
@@ -50,8 +50,8 @@ RSpec.describe "ReviewQueues" do
       aggregate_failures do
         expect(response.body).to include(I18n.t("review_queues.show.review_all"))
         expect(response.body).to include(href)
-        # Opening a review photo confirms its items — hover-prefetch must be off.
-        expect(response.body).to include('data-turbo-prefetch="false"')
+        # #661: no prefetch opt-out — the review GET is side-effect-free (#660).
+        expect(response.body).not_to include('data-turbo-prefetch="false"')
       end
     end
 

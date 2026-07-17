@@ -37,8 +37,8 @@ class ReviewsController < MoveScopedController
 
   # GET /moves/:move_id/boxes/:box_id/review/photo/:media_id
   # Side-effect-free (#660): confirming is explicit via #mark_reviewed, so opening
-  # (or hover-prefetching) a photo changes nothing. The review links' historic
-  # `data-turbo-prefetch="false"` guards are kept for now — relaxing them is #661.
+  # (or hover-prefetching) a photo changes nothing — review links prefetch freely
+  # again (#661).
 
   #: () -> untyped
   def photo

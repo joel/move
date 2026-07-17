@@ -76,14 +76,12 @@ module Views
 
       # Photo-first card: the photo + its recognised names as chips, tapping into
       # the per-photo detail (C2) where a wrong name can be fixed — no separate
-      # per-item rows. turbo_prefetch off: a historic reviewed-when-shown guard
-      # (#660 made the review GET side-effect-free; removing it is #661).
+      # per-item rows.
 
       #: (untyped media, untyped items) -> untyped
       def photo_card(media, items)
         a(
           href: view_context.move_box_review_photo_path(@box.move, @box, media_id: media.id),
-          data: { turbo_prefetch: "false" },
           class: "flex items-center gap-3 rounded-xl border border-card-border " \
                  "bg-surface-container p-3 transition hover:border-accent-sage " \
                  "hover:bg-surface-container-high"

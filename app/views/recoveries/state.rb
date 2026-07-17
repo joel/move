@@ -95,7 +95,7 @@ module Views
         heading(I18n.t("recoveries.recovered.title"))
         subtitle(I18n.t("recoveries.recovered.subtitle"))
         a(
-          href: move_box_review_photo_path(@move, @box, @media), data: { turbo_prefetch: "false" },
+          href: move_box_review_photo_path(@move, @box, @media),
           class: primary_classes
         ) { plain I18n.t("recoveries.recovered.view_items") }
       end
