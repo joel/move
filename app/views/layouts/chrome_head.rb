@@ -22,6 +22,17 @@ module Views
           meta(name: "theme-color", content: "#2a2822")
           csrf_meta_tags
           csp_meta_tag
+          # Pre-establish the cross-origin connection to the media transform
+          # host — media pages fetch every image from it, and the hint shaves
+          # DNS+TCP+TLS (~200ms cold, #664 baseline) off the first image. No
+          # `crossorigin`: <img> fetches are no-cors/credentialed, and a
+          # crossorigin preconnect opens an anonymous connection the images
+          # cannot reuse. dns-prefetch is the wider-support fallback. Dev/test
+          # configure no host (media is served same-origin) — no hint.
+          if (media_host = Rails.application.config.x.media_transform_host.presence)
+            link(rel: "preconnect", href: "https://#{media_host}")
+            link(rel: "dns-prefetch", href: "https://#{media_host}")
+          end
           yield(:head) if content_for?(:head)
           link(rel: "icon", href: "/icon.png", type: "image/png")
           link(rel: "icon", href: "/icon.svg", type: "image/svg+xml")
