@@ -27,33 +27,44 @@ module MediaVariants
   # with no Postgres — verifies it independently via Web Crypto. Isolation still
   # rests on the blob key being unguessable and only ever rendered to an
   # authorized in-tenant member; the improvement over the old (never-expiring)
-  # Active Storage signed id is the real `exp` — a leaked URL dies within the hour
-  # (doc/project/security-model.md, accepted risk F5).
+  # Active Storage signed id is the real `exp` — a leaked URL dies within ~26
+  # hours (doc/project/security-model.md, accepted risk F5).
   class TransformUrl
     # The Worker carries its OWN hardcoded copy of this map (it trusts the `size`
     # path segment only once the HMAC verifies), so the two must agree. fit
     # "scale-down" mirrors Media#image's `resize_to_limit:[N,N]` exactly: bounded
     # on both axes, never upscaled, NEVER cropped — the square thumbnail look is
     # the <img class="object-cover"> CSS, not a server crop. Keep in sync with
-    # MediaVariants::Prewarm::VARIANTS (asserted by spec).
+    # SIZES in workers/media-transform/src/index.js (the spec pins this side).
     SIZES = {
       thumb: { width: 400, height: 400, fit: "scale-down" },
       detail: { width: 1600, height: 1600, fit: "scale-down" }
     }.freeze
 
-    # Long enough to outlive a page's lazy-loaded images and an opened lightbox;
-    # short enough that a copied/leaked URL goes dead within the hour. Tokens are
-    # freshly minted on every server render, so normal browsing never hits expiry.
-    DEFAULT_TTL = 1.hour
+    # The expiry is QUANTIZED so the browser cache works across visits: every
+    # render inside one EXPIRY_BUCKET window mints byte-identical URLs (exp — and
+    # therefore the HMAC — only changes at bucket rollover), so the Worker's
+    # `immutable, max-age=1y` response is reused from the browser cache instead
+    # of refetched per navigation (#669). ROLLOVER_GRACE keeps a URL minted an
+    # instant before rollover valid for ≥2h — longer than any realistic page +
+    # lightbox session (a tab left open past the grace re-mints on its next
+    # navigation, as before). Deriving TTL keeps TTL > EXPIRY_BUCKET true by
+    # construction — a negative floor would mint already-expired URLs late in
+    # every bucket. Known trade-offs: a leaked URL stays live for up to ~26h
+    # (accepted risk F5, doc/project/security-model.md), and all URLs roll over
+    # together at the UTC bucket boundary (one full refetch for a visit that
+    # straddles it — accepted for simplicity over per-key phase stagger, #664).
+    EXPIRY_BUCKET = 24.hours
+    ROLLOVER_GRACE = 2.hours
+    TTL = EXPIRY_BUCKET + ROLLOVER_GRACE
 
-    #: (untyped media, Symbol size, ?ttl: ActiveSupport::Duration) -> String?
-    def self.for(media, size, ttl: DEFAULT_TTL) = new(media, size, ttl:).call
+    #: (untyped media, Symbol size) -> String?
+    def self.for(media, size) = new(media, size).call
 
-    #: (untyped media, Symbol size, ttl: ActiveSupport::Duration) -> void
-    def initialize(media, size, ttl:)
+    #: (untyped media, Symbol size) -> void
+    def initialize(media, size)
       @media = media
       @size = size.to_sym
-      @ttl = ttl
     end
 
     # Returns nil when the media has no displayable image (every call site already
@@ -76,8 +87,16 @@ module MediaVariants
 
     #: () -> String
     def worker_url
-      exp = @ttl.from_now.to_i
+      exp = quantized_exp
       "https://#{host}/#{@size}/#{blob_key}?t=#{sign(blob_key, @size, exp)}&exp=#{exp}"
+    end
+
+    # Host-independent floor arithmetic (UTC epoch), so every app container mints
+    # the same exp — and therefore the same URL — for the whole bucket window.
+    #: () -> Integer
+    def quantized_exp
+      bucket = EXPIRY_BUCKET.to_i
+      ((Time.current.to_i / bucket) * bucket) + TTL.to_i
     end
 
     #: () -> String

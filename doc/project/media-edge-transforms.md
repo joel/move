@@ -60,13 +60,15 @@ browser downscales (capture_upload_ctlr)    <img src=media.move-easy.org/<size>/
 
 ## Key design decisions
 
-- **Auth at the edge = a short-lived signed token, not a membership check.** A
+- **Auth at the edge = an expiring signed token, not a membership check.** A
   stateless Worker has no session/tenant context, so it verifies
   `HMAC-SHA256(blob_key | size | exp)` under a **dedicated** secret
   (`MEDIA_TRANSFORM_SECRET`, never `secret_key_base`). Tenant/Move isolation is
   enforced at **mint** time (a URL is only rendered to an authorized in-tenant
   member); the real improvement over the old never-expiring Active Storage proxy
-  id is **`exp`** — a leaked URL dies within ~1h. This shrinks (does not remove)
+  id is **`exp`** — a leaked URL dies within ~26h (the expiry is quantized to
+  24h buckets + 2h grace since #669, so URLs stay byte-identical across renders
+  and the browser cache actually gets reused). This shrinks (does not remove)
   accepted-risk **F5** in [`security-model.md`](security-model.md).
 - **Bounded size set.** Only `thumb`/`detail` are signable, so a client can't
   fan out arbitrary billed Cloudflare transformations.

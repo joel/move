@@ -1,8 +1,8 @@
 // Cloudflare Worker: edge media transformation (#572).
 //
 // Serves private, tenant-scoped Active Storage media through Cloudflare's edge
-// image transforms, gated by a short-lived HMAC token minted by the Rails app
-// (MediaVariants::TransformUrl). The R2 bucket stays private; the only access is
+// image transforms, gated by an expiring HMAC token minted by the Rails app
+// (MediaVariants::TransformUrl; ~26h validity, quantized to 24h buckets — #669). The R2 bucket stays private; the only access is
 // a request carrying a currently-valid token.
 //
 //   URL:  /<size>/<blob_key>?t=<hex hmac>&exp=<unix>

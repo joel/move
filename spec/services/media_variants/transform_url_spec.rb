@@ -42,24 +42,55 @@ RSpec.describe MediaVariants::TransformUrl do
     end
 
     it "signs the canonical 'blob_key|size|exp' string with the dedicated secret" do
-      freeze_time do
-        exp = 1.hour.from_now.to_i
-        token = query(described_class.for(media, :detail)).fetch("t")
-        expected = OpenSSL::HMAC.hexdigest("SHA256", "s3cr3t", "#{media.image.blob.key}|detail|#{exp}")
-        expect(token).to eq(expected)
-      end
+      params = query(described_class.for(media, :detail))
+      expected = OpenSSL::HMAC.hexdigest(
+        "SHA256", "s3cr3t", "#{media.image.blob.key}|detail|#{params.fetch("exp")}"
+      )
+      expect(params.fetch("t")).to eq(expected)
     end
 
-    it "defaults the expiry to one hour out" do
-      freeze_time do
-        expect(query(described_class.for(media, :thumb)).fetch("exp").to_i).to eq(1.hour.from_now.to_i)
+    # The expiry is QUANTIZED to EXPIRY_BUCKET boundaries so every render inside
+    # one bucket mints byte-identical URLs — that identity is what lets the
+    # browser reuse its immutable-cached copy across page visits instead of
+    # refetching every image on every navigation (#669). Expectations pin
+    # INDEPENDENT literals (not the production formula) so a shared arithmetic
+    # bug cannot self-confirm: 24h buckets align to UTC midnight, so a mint any
+    # time on 2026-07-16 must carry exp = 2026-07-17 02:00 UTC (midnight + 26h).
+    describe "expiry quantization (browser-cacheable URLs)" do
+      it "mints byte-identical URLs across renders within one bucket" do
+        travel_to Time.utc(2026, 7, 16, 0, 0, 1) do
+          first = described_class.for(media, :thumb)
+          travel 4.hours
+          expect(described_class.for(media, :thumb)).to eq(first)
+          travel_to Time.utc(2026, 7, 16, 23, 59, 59)
+          expect(described_class.for(media, :thumb)).to eq(first)
+        end
       end
-    end
 
-    it "honours a custom ttl" do
-      freeze_time do
-        expect(query(described_class.for(media, :thumb, ttl: 5.minutes)).fetch("exp").to_i)
-          .to eq(5.minutes.from_now.to_i)
+      it "mints a different URL once the bucket rolls over" do
+        travel_to Time.utc(2026, 7, 16, 12) do
+          first = described_class.for(media, :thumb)
+          travel_to Time.utc(2026, 7, 17, 0, 0, 0)
+          expect(described_class.for(media, :thumb)).not_to eq(first)
+        end
+      end
+
+      it "sets exp to the UTC bucket start plus the 26h TTL" do
+        travel_to Time.utc(2026, 7, 16, 12) do
+          expect(query(described_class.for(media, :thumb)).fetch("exp").to_i)
+            .to eq(Time.utc(2026, 7, 17, 2).to_i)
+        end
+      end
+
+      it "keeps at least a 2h validity floor for a URL minted at the very end of a bucket" do
+        travel_to Time.utc(2026, 7, 16, 23, 59, 59) do
+          exp = query(described_class.for(media, :thumb)).fetch("exp").to_i
+          expect(exp - Time.current.to_i).to be >= 2.hours.to_i
+        end
+      end
+
+      it "enforces TTL > EXPIRY_BUCKET so late-bucket mints can never be already expired" do
+        expect(described_class::TTL).to be > described_class::EXPIRY_BUCKET
       end
     end
 

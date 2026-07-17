@@ -85,9 +85,11 @@ module Views
       #: () -> untyped
       def media_image
         if @item.source_media&.image_displayable?
+          # The page's LCP element — eager + high priority, never lazy (#673).
           img(
             src: MediaVariants::TransformUrl.for(@item.source_media, :detail),
-            class: "aspect-square w-full object-cover", alt: "", loading: "lazy"
+            class: "aspect-square w-full object-cover", alt: "",
+            fetchpriority: "high", decoding: "async"
           )
         elsif @item.source_media&.image_unavailable?
           unavailable_placeholder

@@ -6,8 +6,9 @@ Storage variant pipeline: the Rails app stores only the ≤2048px master in R2
 (`move-media` bucket), and display sizes (`thumb` 400px, `detail` 1600px) are
 produced on demand at the edge and CDN-cached.
 
-Access is gated by a short-lived HMAC token minted by Rails
-(`MediaVariants::TransformUrl`). The bucket stays **private** — nothing is
+Access is gated by an expiring HMAC token minted by Rails
+(`MediaVariants::TransformUrl`) — valid up to ~26h (quantized to 24h buckets +
+2h grace, #669, so URLs stay byte-identical across renders and browser-cache). The bucket stays **private** — nothing is
 publicly listable/readable; the only way in is a request carrying a
 currently-valid token.
 
@@ -106,4 +107,8 @@ itself.
 Rotate by setting a new value on **both** sides in the same window
 (`wrangler secret put` + `doppler secrets set`), then redeploy Rails so it signs
 with the new secret. Outstanding URLs signed with the old secret 403 after the
-Worker flips — acceptable given the ≤1h token TTL.
+Worker flips. Since #669 tokens are quantized to 24h buckets (~26h validity), so
+up to a full day of outstanding URLs break — already-cached images keep serving
+from browser caches (`immutable`), but uncached fetches 403 until the next
+render re-mints. Rotate shortly before 00:00 UTC (bucket rollover) to minimize
+the window, and expect a brief burst of broken images either way.
