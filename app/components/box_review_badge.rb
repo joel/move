@@ -18,13 +18,10 @@ module Components
       @pending_count = pending_count
     end
 
-    # Prefetch off: a historic reviewed-when-shown guard — #660 made the review
-    # GET side-effect-free; removing the attribute across surfaces is #661.
-
     #: () -> void
     def view_template
       reviewed = @pending_count.zero?
-      a(href: move_box_review_path(@move, @box), data: { turbo_prefetch: "false" },
+      a(href: move_box_review_path(@move, @box),
         class: "inline-flex items-center gap-1.5 rounded-full px-3 py-1 " \
                "text-label-caps uppercase transition #{reviewed ? REVIEWED_TINT : PENDING_TINT}") do
         if reviewed

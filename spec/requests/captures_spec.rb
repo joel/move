@@ -154,9 +154,10 @@ RSpec.describe "Captures" do
 
       # Photo-first (D3): the card links to the per-photo review/detail, with the
       # item name shown as a chip inside it — not a separate item-detail row.
+      # #661: no prefetch opt-out — the review GET is side-effect-free (#660).
       expect(response.body).to include(%(href="#{move_box_review_photo_path(move, box, media_id: media.id)}"))
       expect(response.body).to include("Espresso machine")
-      expect(response.body).to include('data-turbo-prefetch="false"')
+      expect(response.body).not_to include('data-turbo-prefetch="false"')
     end
 
     it "surfaces a friendly reason for a known failure category (quota)" do

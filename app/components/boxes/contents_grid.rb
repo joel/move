@@ -92,7 +92,7 @@ module Components
       #: (untyped media) -> untyped
       def photo_card(media)
         href = photo_href(media)
-        attrs = href ? { href: href, **prefetch_for(media) } : {}
+        attrs = href ? { href: href } : {}
         tag = href ? :a : :div
         public_send(tag, class: card_classes(interactive: href.present?), **attrs) do
           tile(media)
@@ -171,14 +171,6 @@ module Components
         elsif @recoverable_media_ids.include?(media.id)
           move_box_recovery_photo_path(@move, @box, media_id: media.id)
         end
-      end
-
-      # Prefetch stays off on review links: a historic reviewed-when-shown guard
-      # (#660 made the GET side-effect-free; removing the attribute is #661).
-
-      #: (untyped media) -> untyped
-      def prefetch_for(media)
-        @reviewable_media_ids.include?(media.id) ? { data: { turbo_prefetch: "false" } } : {}
       end
 
       #: (interactive: untyped) -> String

@@ -6,8 +6,6 @@ module Components
     # (square :thumb, lazy-loaded, caption strip) but each tile is a plain link
     # into the C2 review screen in queue mode — no lightbox — wearing a pending
     # item count badge in the app-wide pending-review tint (BoxReviewBadge).
-    # Tiles keep Turbo prefetch off: a historic reviewed-when-shown guard (#660
-    # made the review GET side-effect-free; removing the attribute is #661).
     class Grid < Components::Base
       #: (move: untyped, media: untyped, pending_counts: untyped) -> void
       def initialize(move:, media:, pending_counts:)
@@ -30,7 +28,6 @@ module Components
         a(
           href: move_box_review_photo_path(@move, media.box, media, queue: "move"),
           aria_label: caption(media),
-          data: { turbo_prefetch: "false" },
           class: "group flex flex-col overflow-hidden rounded-card border border-card-border " \
                  "bg-card text-left transition hover:border-accent-sage focus:outline-none " \
                  "focus:ring-2 focus:ring-accent-sage/40"

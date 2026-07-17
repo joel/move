@@ -60,19 +60,15 @@ module Components
 
       #: () -> untyped
       def ignore_link
-        a(href: @advance_href, data: { turbo_prefetch: "false" }, class: classes(:secondary)) do
+        a(href: @advance_href, class: classes(:secondary)) do
           plain I18n.t("reviews.photo.ignore")
           render Components::Icons::ChevronRight.new(css: "h-4 w-4")
         end
       end
 
-      # Turbo prefetch stays disabled on advance links for now: a historic guard
-      # from the reviewed-when-shown model (#660 made the GET side-effect-free;
-      # removing the attribute across review surfaces is #661).
-
       #: (untyped key) -> untyped
       def advance_link(key)
-        a(href: @advance_href, data: { turbo_prefetch: "false" }, class: classes(:primary)) do
+        a(href: @advance_href, class: classes(:primary)) do
           plain I18n.t(key)
           render Components::Icons::ChevronRight.new(css: "h-4 w-4")
         end

@@ -54,8 +54,6 @@ module Views
       end
 
       # Entry into the cross-box walk: the oldest pending photo, in queue mode.
-      # Prefetch stays off: a historic reviewed-when-shown guard (#660 made the
-      # review GET side-effect-free; removing the attribute is #661).
 
       #: () -> untyped
       def review_all
@@ -63,7 +61,6 @@ module Views
           first = @media.fetch(0)
           a(
             href: move_box_review_photo_path(@move, first.box, first, queue: "move"),
-            data: { turbo_prefetch: "false" },
             class: "inline-flex items-center justify-center gap-2 rounded-full bg-accent-sage " \
                    "px-6 py-3 text-sm font-bold text-page transition hover:opacity-90 active:scale-[0.98]"
           ) do
