@@ -236,6 +236,33 @@ RSpec.describe "Review pending edits (JS)", :js do
     eventually { Apartment::Tenant.switch(slug) { item.reload.review_state == "confirmed" } }
   end
 
+  it "flushes a rename typed while an add was in flight when the list re-renders" do
+    move, box, media, _item = seed_review_photo
+
+    login_as(user: user)
+    visit move_box_review_path(move, box)
+    hold_mark_submission_and_track_fetch
+    hold_first_add_post
+
+    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
+    click_button I18n.t("reviews.photo.add")
+    # Rename typed DURING the held add, with no blur and no flush event: the
+    # add's stream replaces the whole item list, so only the disconnect flush
+    # saves it. Script-driven so desktop Chrome's click-blur can't mask it.
+    page.execute_script(<<~JS)
+      document.querySelector('[data-inline-rename-target="input"]').value = "Espresso machine";
+    JS
+    page.execute_script(%(document.querySelector('form[action*="mark_reviewed"]').requestSubmit()))
+
+    eventually(timeout: 10) { page.evaluate_script("window.__renameSettled === true") }
+    eventually(timeout: 10) do
+      visit move_box_review_photo_path(move, box, media)
+      page.has_field?(with: "Espresso machine", wait: 1)
+    end
+    expect(page).to have_field(with: "Espresso machine")
+    expect(page).to have_field(with: "Cutting board")
+  end
+
   it "keeps a deliberately re-typed duplicate name typed during an in-flight add" do
     move, box, _media, _item = seed_review_photo
 

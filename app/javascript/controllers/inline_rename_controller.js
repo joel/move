@@ -39,7 +39,12 @@ export default class extends Controller {
     document.addEventListener("turbo:before-cache", this.flush)
   }
 
+  // Teardown is the last chance to flush: a Turbo Stream replacing the item
+  // list (e.g. an add landing) fires none of the document events above, yet
+  // destroys a dirty field with it. The input's typed value is still readable
+  // on the detached subtree, and the keepalive PATCH outlives the controller.
   disconnect() {
+    this.flush()
     document.removeEventListener("turbo:submit-start", this.flush)
     document.removeEventListener("turbo:before-visit", this.flush)
     document.removeEventListener("turbo:before-cache", this.flush)
