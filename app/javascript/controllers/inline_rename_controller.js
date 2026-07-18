@@ -14,6 +14,14 @@ import { Controller } from "@hotwired/stimulus"
 // Each PATCH uses keepalive so a save triggered by clicking "Next Photo" still
 // completes after Turbo navigates. A blank value is invalid (name required): the
 // field snaps back to the value being saved.
+//
+// Blur alone is not a reliable commit trigger: iOS Safari doesn't blur a focused
+// input when a button is tapped, so a dirty edit could ride into "Mark as
+// Reviewed"'s redirect unsent (#690). The controller therefore also flushes on
+// every Turbo exit — submit-start (any form on the page, including the mark
+// button_to), before-visit (Ignore/Next/back links), and before-cache (history
+// restores, which before-visit skips). save() is idempotent, so the eventual
+// real blur or overlapping events cost nothing.
 export default class extends Controller {
   static values = { url: String }
   static targets = ["input"]
@@ -23,6 +31,18 @@ export default class extends Controller {
     this.target = this.committed // value the field + server should converge to
     this.url = this.urlValue // captured so a flush can still fire after teardown
     this.saving = false
+    this.flush = () => {
+      if (this.hasInputTarget) this.save()
+    }
+    document.addEventListener("turbo:submit-start", this.flush)
+    document.addEventListener("turbo:before-visit", this.flush)
+    document.addEventListener("turbo:before-cache", this.flush)
+  }
+
+  disconnect() {
+    document.removeEventListener("turbo:submit-start", this.flush)
+    document.removeEventListener("turbo:before-visit", this.flush)
+    document.removeEventListener("turbo:before-cache", this.flush)
   }
 
   // Pencil icon: focus the field and select all so typing replaces the label.
