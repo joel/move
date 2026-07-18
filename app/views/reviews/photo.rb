@@ -157,9 +157,14 @@ module Views
         end
       end
 
+      # pending-add (#690) coordinates the add form with the advance controls
+      # (both instances bubble through this section): typed-but-unsubmitted text
+      # is auto-added before the advance proceeds. Read-only pages get no
+      # controller, so the guard actions in AdvanceControls stay inert there.
+
       #: () -> untyped
       def items_panel
-        section(class: "lg:col-span-5") do
+        section(class: "lg:col-span-5", **items_panel_data) do
           render Components::Ui::Card.new(padding: "p-6") do
             header
             list
@@ -170,6 +175,11 @@ module Views
             footer
           end
         end
+      end
+
+      #: () -> Hash[Symbol, untyped]
+      def items_panel_data
+        @editable ? { data: { controller: "pending-add" } } : {}
       end
 
       # The advance controls also live up here (#660) so a long item list never
@@ -209,12 +219,14 @@ module Views
       #: () -> untyped
       def add_form
         form_with(url: move_box_review_add_item_path(@move, @box, @media, **queue_params), method: :post,
-                  data: { controller: "reset-form", action: "turbo:submit-end->reset-form#reset" },
+                  data: { controller: "reset-form", action: "turbo:submit-end->reset-form#reset",
+                          pending_add_target: "form" },
                   class: "mt-stack-gap flex items-center gap-2 rounded-card border border-dashed " \
                          "border-card-border bg-card p-2 focus-within:border-accent-sage") do
           span(class: "pl-2 text-muted") { render Components::Icons::Plus.new(css: "h-5 w-5") }
           input(type: "text", name: "item[name]", required: true,
                 placeholder: I18n.t("reviews.photo.add_placeholder"),
+                data: { pending_add_target: "input" },
                 class: "w-full border-0 bg-transparent p-0 text-body-md text-text-warm focus:ring-0")
           button(type: "submit", class: icon_button(:sage)) do
             render Components::Icons::Check.new(css: "h-5 w-5")

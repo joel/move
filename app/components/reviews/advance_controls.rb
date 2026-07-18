@@ -46,9 +46,15 @@ module Components
 
       private
 
+      # The pending-add guard actions (#690) hold the advance while the add form
+      # still carries typed text (auto-add, then advance). They resolve against
+      # the pending-add controller scoped on the items panel — absent on
+      # read-only pages, where Stimulus leaves the actions inert.
+
       #: () -> untyped
       def mark_reviewed_button
         button_to(@mark_href, method: :post, form_class: @compact ? "" : "w-full",
+                              form: { data: { action: "submit->pending-add#guardSubmit" } },
                               class: classes(:primary)) do
           render Components::Icons::Check.new(css: "h-4 w-4")
           plain I18n.t("reviews.photo.mark_reviewed")
@@ -60,7 +66,8 @@ module Components
 
       #: () -> untyped
       def ignore_link
-        a(href: @advance_href, class: classes(:secondary)) do
+        a(href: @advance_href, class: classes(:secondary),
+          data: { action: "click->pending-add#guardVisit" }) do
           plain I18n.t("reviews.photo.ignore")
           render Components::Icons::ChevronRight.new(css: "h-4 w-4")
         end
@@ -68,7 +75,8 @@ module Components
 
       #: (untyped key) -> untyped
       def advance_link(key)
-        a(href: @advance_href, class: classes(:primary)) do
+        a(href: @advance_href, class: classes(:primary),
+          data: { action: "click->pending-add#guardVisit" }) do
           plain I18n.t(key)
           render Components::Icons::ChevronRight.new(css: "h-4 w-4")
         end
