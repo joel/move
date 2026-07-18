@@ -811,6 +811,14 @@ Practical notes:
   background poll that watches for *both* a formal review on HEAD (findings) *and*
   the clean issue-comment, with a generous deadline; re-trigger + re-poll if it
   times out silent.
+- **After pushing a fix for a Codex finding, do not hard-gate the merge on a
+  Codex re-verdict** — re-nudge once (`@codex review`), wait a bounded ~15
+  minutes, then merge on the objective gate (CI green + `mergeStateStatus:
+  CLEAN` + 0 unresolved threads) and record the call in the merge summary;
+  Codex frequently stays silent after fix pushes. A poll whose success
+  condition requires "CLEAN **and** a fresh Codex verdict" can wait forever on
+  an already-clean PR (this stalled the #664 campaign overnight) — make the
+  objective conditions the gate and the Codex verdict a bounded bonus.
 - A finding can be valid but **already mitigated** (e.g. a release-scan flags a
   deploy risk you handled via a runbook step) — reply with the evidence and
   resolve; don't re-fix.
