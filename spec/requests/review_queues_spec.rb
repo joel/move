@@ -31,13 +31,13 @@ RSpec.describe "ReviewQueues" do
       expect(response.body).to include(I18n.t("review_queues.show.pending_badge", count: 2))
     end
 
-    it "orders photos oldest-first across boxes (FIFO)" do
+    it "orders photos newest-first across boxes (#687)" do
       pending_photo(box: create(:box, move:, number: "1"), captured_at: 1.hour.ago)
       pending_photo(box: create(:box, move:, number: "2"), captured_at: 5.days.ago)
 
       get move_review_path(move)
 
-      expect(response.body.index("Box 2")).to be < response.body.index("Box 1")
+      expect(response.body.index("Box 1")).to be < response.body.index("Box 2")
     end
 
     it "links Review all and every tile into the queue-mode walk" do
@@ -113,7 +113,7 @@ RSpec.describe "ReviewQueues" do
       expect(response.body).to include(I18n.t("review_queues.show.empty.title"))
     end
 
-    it "keeps the OLDEST photos when capped and says so" do
+    it "keeps the NEWEST photos when capped and says so (#687)" do
       stub_const("ReviewQueuesController::CAP", 1)
       pending_photo(box: create(:box, move:, number: "1"), captured_at: 10.days.ago)
       pending_photo(box: create(:box, move:, number: "2"), captured_at: 1.hour.ago)
@@ -122,8 +122,8 @@ RSpec.describe "ReviewQueues" do
 
       aggregate_failures do
         expect(response.body).to include(I18n.t("review_queues.show.capped", count: 1))
-        expect(response.body).to include("Box 1")
-        expect(response.body).not_to include("Box 2")
+        expect(response.body).to include("Box 2")
+        expect(response.body).not_to include("Box 1")
       end
     end
 

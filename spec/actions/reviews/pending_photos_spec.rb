@@ -13,14 +13,14 @@ RSpec.describe Reviews::PendingPhotos do
     media
   end
 
-  it "returns photos with unreviewed items oldest-first across boxes (FIFO)" do
+  it "returns photos with unreviewed items newest-first across boxes (#687)" do
     other_box = create(:box, move:)
     newer = pending_photo(box:, captured_at: 1.hour.ago)
     older = pending_photo(box: other_box, captured_at: 2.days.ago)
 
     photos = described_class.new.call(move:).value!.photos
 
-    expect(photos.map(&:id)).to eq([older.id, newer.id])
+    expect(photos.map(&:id)).to eq([newer.id, older.id])
   end
 
   it "counts needs_correction as pending and exposes items for grouped counts" do

@@ -191,10 +191,10 @@ class ReviewsController < MoveScopedController
   # Queue mode (?queue=move): the same screen, but the walk set is the Move-wide
   # pending-photo queue. The current photo stays pending until explicitly marked
   # (#660), so next AND the "N more after this" count advance strictly FORWARD in
-  # capture order for everyone — "oldest pending" would ping-pong on an ignored
-  # photo, and counting the whole pending set would contradict the Finish control
-  # at the end of a pass. Photos left behind (ignored) resurface on the queue
-  # page after Finish.
+  # queue order (newest capture first, #687) for everyone — "head of the queue"
+  # would ping-pong on an ignored photo, and counting the whole pending set would
+  # contradict the Finish control at the end of a pass. Photos left behind
+  # (ignored) resurface on the queue page after Finish.
 
   #: () -> untyped
   def render_queue_photo
@@ -215,13 +215,14 @@ class ReviewsController < MoveScopedController
     Reviews::PendingPhotos.new.call(move: @move).value!.photos
   end
 
-  # Row-value comparison so the tiebreak matches the queue's (captured_at, id)
-  # FIFO order exactly; the strict > excludes the current photo whether or not
+  # Row-value comparison so the tiebreak matches the queue's newest-first
+  # (captured_at, id) DESC order exactly (#687): forward = strictly older than
+  # the current photo; the strict < excludes the current photo whether or not
   # it is still pending.
 
   #: (untyped scope) -> untyped
   def forward_scope(scope)
-    scope.where("(media.captured_at, media.id) > (?, ?)", @media.captured_at, @media.id)
+    scope.where("(media.captured_at, media.id) < (?, ?)", @media.captured_at, @media.id)
   end
 
   #: () -> untyped

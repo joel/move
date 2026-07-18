@@ -3,9 +3,9 @@
 module Views
   module ReviewQueues
     # Move-wide review queue (#654) — every photo still holding an unreviewed
-    # co-located item, oldest first, plus a "Review all" entry into the cross-box
-    # walk. Sibling of the Gallery (shared ViewToggle); renders inside the
-    # AppLayout sidebar shell.
+    # co-located item, newest first (#687), plus a "Review all" entry into the
+    # cross-box walk. Sibling of the Gallery (shared ViewToggle); renders inside
+    # the AppLayout sidebar shell.
     class Show < Views::Base
       #: (move: untyped, media: untyped, pending_counts: untyped, ?over_cap: untyped, ?had_reviewable: untyped, ?leftover_unreviewed: untyped) -> void
       def initialize(move:, media:, pending_counts:, over_cap: false, had_reviewable: false,
@@ -53,7 +53,8 @@ module Views
         end
       end
 
-      # Entry into the cross-box walk: the oldest pending photo, in queue mode.
+      # Entry into the cross-box walk: the newest pending photo (#687), in
+      # queue mode.
 
       #: () -> untyped
       def review_all

@@ -10,9 +10,10 @@ module Reviews
   # source_media_id, so an item moved to another box still points here; but
   # opening this photo neither shows nor confirms it, so counting it would leave
   # the photo permanently "pending" and the queue walk unable to terminate.)
-  # Oldest capture first (FIFO), id-tiebroken for a stable order. Read-only —
-  # emits no event; `items` is exposed so callers can derive per-photo counts
-  # with one grouped query without re-deriving the co-location join.
+  # Newest capture first (#687 — review what you just shot while context is
+  # fresh), id-tiebroken for a stable order. Read-only — emits no event;
+  # `items` is exposed so callers can derive per-photo counts with one grouped
+  # query without re-deriving the co-location join.
   class PendingPhotos < BaseAction
     Result = Data.define(:photos, :items)
 
@@ -26,7 +27,7 @@ module Reviews
       photos = move.media.ready.not_generated
                    .where(box_id: move.boxes.select(:id))
                    .where(id: items.select(:source_media_id))
-                   .order(:captured_at, :id)
+                   .order(captured_at: :desc, id: :desc)
       Success(Result.new(photos:, items:))
     end
   end
