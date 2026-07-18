@@ -5,6 +5,17 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.99.3] — 2026-07-18
+
+### Fixed
+- **Nothing you type on the review screen is lost by moving on any more.** An
+  item name you were still editing — or a missed item you had typed but not yet
+  added — used to vanish silently if you tapped "Mark as Reviewed" (or
+  Ignore/Next) without first tapping elsewhere, most often on iPhone. Edits in
+  progress are now saved as you advance, and typed-but-unadded items are added
+  automatically before the walk moves on; if the add fails you stay put with
+  your text intact (#690).
+
 ## [v0.99.2] — 2026-07-18
 
 ### Changed
