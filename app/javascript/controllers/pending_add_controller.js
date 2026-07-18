@@ -22,6 +22,25 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   static targets = ["form", "input"]
 
+  // A queued advance must yield to any navigation the user starts while the
+  // add is still in flight (back arrow, queue badge, another form): the old
+  // page stays connected until the destination renders, so DOM detachment
+  // alone can't catch an add that settles inside that window. The add form's
+  // own submissions are excluded — #addThen arms the resume before submitting.
+  connect() {
+    this.cancelQueued = (event) => {
+      if (this.hasFormTarget && event.target === this.formTarget) return
+      this.queuedResume = null
+    }
+    document.addEventListener("turbo:before-visit", this.cancelQueued)
+    document.addEventListener("turbo:submit-start", this.cancelQueued)
+  }
+
+  disconnect() {
+    document.removeEventListener("turbo:before-visit", this.cancelQueued)
+    document.removeEventListener("turbo:submit-start", this.cancelQueued)
+  }
+
   // Submit of either "Mark as Reviewed" button_to form.
   guardSubmit(event) {
     if (this.resuming) {
@@ -75,20 +94,23 @@ export default class extends Controller {
   // already in flight (a manual ✓ the user beat us to — resubmitting would
   // create the item twice), then run `resume` when it succeeds. The
   // once-listener is consumed on success or failure, so a retry never stacks
-  // resumes. Turbo visits keep the JS context alive, so if the user left
-  // through an unguarded control (back arrow, queue badge) while the add was
-  // in flight, the listener still fires on the detached form — the
-  // connectedness check drops the stale resume instead of yanking them off
-  // the page they deliberately went to.
+  // resumes. Two staleness guards: cancelQueued drops the resume when the
+  // user starts another navigation while the old page is still connected, and
+  // the connectedness check drops it once teardown has happened (Turbo visits
+  // keep the JS context alive, so the listener still fires on a detached
+  // form) — either way the user is never yanked off the page they chose.
   #addThen(resume) {
     this.resumeArmed = true
+    this.queuedResume = resume
     this.formTarget.addEventListener(
       "turbo:submit-end",
       (event) => {
         this.resumeArmed = false
+        const queued = this.queuedResume
+        this.queuedResume = null
         if (event.detail.success === false) return
         if (!this.element.isConnected) return
-        resume()
+        queued?.()
       },
       { once: true }
     )
