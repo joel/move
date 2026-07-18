@@ -219,10 +219,13 @@ module Views
       #: () -> untyped
       def add_form
         form_with(url: move_box_review_add_item_path(@move, @box, @media, **queue_params), method: :post,
+                  # pending-add#addEnded MUST precede reset-form#reset: it
+                  # snapshots the input before a successful add wipes it, so
+                  # text typed during an in-flight add is never lost (#690).
                   data: { controller: "reset-form",
-                          action: "turbo:submit-end->reset-form#reset " \
-                                  "turbo:submit-start->pending-add#addStarted " \
-                                  "turbo:submit-end->pending-add#addEnded",
+                          action: "turbo:submit-start->pending-add#addStarted " \
+                                  "turbo:submit-end->pending-add#addEnded " \
+                                  "turbo:submit-end->reset-form#reset",
                           pending_add_target: "form" },
                   class: "mt-stack-gap flex items-center gap-2 rounded-card border border-dashed " \
                          "border-card-border bg-card p-2 focus-within:border-accent-sage") do

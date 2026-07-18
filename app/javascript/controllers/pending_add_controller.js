@@ -77,13 +77,20 @@ export default class extends Controller {
   }
 
   // The add form's own Turbo submission lifecycle (fires for manual ✓ / Enter
-  // submissions as well as the guard's requestSubmit).
+  // submissions as well as the guard's requestSubmit). addStarted records the
+  // value the submission carries; addEnded snapshots whatever the input holds
+  // at settle time — it is wired BEFORE reset-form#reset in the form's
+  // data-action, so the snapshot is taken before a successful add wipes the
+  // field. Text typed while the earlier add was in flight survives in that
+  // snapshot and gets its own submission (see #addThen).
   addStarted() {
     this.addInFlight = true
+    this.inFlightValue = this.hasInputTarget ? this.inputTarget.value.trim() : ""
   }
 
   addEnded() {
     this.addInFlight = false
+    this.settleValue = this.hasInputTarget ? this.inputTarget.value.trim() : ""
   }
 
   #pending() {
@@ -110,6 +117,14 @@ export default class extends Controller {
         this.queuedResume = null
         if (event.detail.success === false) return
         if (!this.element.isConnected) return
+        // The user typed a different item while the earlier add was in
+        // flight: reset-form just wiped it, but addEnded snapshotted it —
+        // restore the field and converge with another add before advancing.
+        if (queued && this.settleValue && this.settleValue !== this.inFlightValue) {
+          this.inputTarget.value = this.settleValue
+          this.#addThen(queued)
+          return
+        }
         queued?.()
       },
       { once: true }

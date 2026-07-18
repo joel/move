@@ -196,6 +196,46 @@ RSpec.describe "Review pending edits (JS)", :js do
     eventually { Apartment::Tenant.switch(slug) { item.reload.review_state == "confirmed" } }
   end
 
+  # Holds the FIRST add POST on the wire for 800ms so a second value can be
+  # typed while that add is genuinely in flight. Requests stay strictly serial
+  # (the held add, then the converge add, then the mark POST), so the
+  # shared-connection race above never enters the picture.
+  def hold_first_add_post
+    page.execute_script(<<~JS)
+      const of_ = window.fetch;
+      window.fetch = (...args) => {
+        const url = String(args[0] instanceof Request ? args[0].url : args[0]);
+        const method = ((args[0] instanceof Request ? args[0].method : args[1]?.method) || "GET").toLowerCase();
+        if (url.includes("/items") && method === "post" && !window.__heldOnce) {
+          window.__heldOnce = true;
+          return new Promise((resolve) => setTimeout(() => resolve(of_(...args)), 800));
+        }
+        return of_(...args);
+      };
+    JS
+  end
+
+  it "also submits text typed while an earlier add was still in flight" do
+    move, box, _media, item = seed_review_photo
+
+    login_as(user: user)
+    visit move_box_review_path(move, box)
+    hold_first_add_post
+
+    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
+    click_button I18n.t("reviews.photo.add")
+    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Bread knife"
+    click_button I18n.t("reviews.photo.mark_reviewed"), match: :first
+
+    expect(page).to have_current_path(move_box_path(move, box), wait: 15)
+    eventually do
+      Apartment::Tenant.switch(slug) do
+        box.items.where(name: "Cutting board").one? && box.items.where(name: "Bread knife").one?
+      end
+    end
+    eventually { Apartment::Tenant.switch(slug) { item.reload.review_state == "confirmed" } }
+  end
+
   it "advances normally when nothing is pending (guard passthrough)" do
     move, box, media, item = seed_review_photo
 
