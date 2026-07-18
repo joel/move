@@ -5,6 +5,14 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.99.1] — 2026-07-18
+
+### Changed
+- **You can now jump to a photo's box from the review walk.** In the Move-wide
+  review queue, the "Box N · Room" label on each photo is now a link straight
+  to that box — previously a photo from another box gave you no way to visit it
+  without leaving the walk (#684).
+
 ## [v0.99.0] — 2026-07-18
 
 ### Added
