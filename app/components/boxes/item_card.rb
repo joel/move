@@ -78,10 +78,11 @@ module Components
       def tile
         div(class: tile_classes) do
           if image?
-            img(
+            render Components::Ui::BlurUpImage.new(
               src: MediaVariants::TransformUrl.for(@item.source_media, :thumb),
-              alt: "", loading: @eager ? "eager" : "lazy", decoding: "async",
-              class: "h-full w-full object-cover"
+              lqip: @item.source_media.image_lqip,
+              loading: @eager ? "eager" : "lazy", decoding: "async",
+              img_class: "h-full w-full object-cover"
             )
           elsif @generating
             div(class: "h-7 w-7 animate-spin rounded-full border-2 border-accent-sage border-t-transparent")

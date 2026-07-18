@@ -51,9 +51,10 @@ module Components
         div(class: "relative flex aspect-square items-center justify-center overflow-hidden " \
                    "bg-surface-container-high text-muted") do
           if media
-            img(
-              src: thumb_url(media), alt: "", loading: "lazy",
-              class: "h-full w-full object-cover transition group-hover:scale-105"
+            render Components::Ui::BlurUpImage.new(
+              src: thumb_url(media), lqip: media.image_lqip,
+              loading: "lazy", decoding: "async",
+              img_class: "h-full w-full object-cover transition group-hover:scale-105"
             )
           else
             render Components::Icons::Camera.new(css: "h-5 w-5 opacity-40")

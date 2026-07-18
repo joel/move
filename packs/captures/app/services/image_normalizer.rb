@@ -1,7 +1,14 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/captures: normalizes uploaded image
+# bytes into the bounded stored master, and derives the blur-up preview
+# (lqip_base64) that non-capture creation paths stamp too (the generated-image
+# action, the images:lqip backfill — #681). The sigil exposes it past
+# enforce_privacy; see packwerk-boundaries.md.
+
 require "marcel"
 require "stringio"
+require "base64"
 
 # NB: ruby-vips (`require "vips"`) is loaded lazily inside #optimize, not here —
 # it dlopens libvips at require time. Requiring it at load would make boot/
@@ -46,6 +53,12 @@ class ImageNormalizer
   ].freeze
   PROCESSABLE = (NATIVE + TRANSCODABLE).freeze
   JPEG_QUALITY = 85
+  # LQIP (blur-up placeholder, #681): a tiny stripped JPEG stored as base64 in
+  # blob metadata (~300-800 bytes) and inlined as a data URI under the real
+  # image. 24px is enough structure once blurred; artifacts are hidden by the
+  # blur, so quality stays low.
+  LQIP_EDGE = 24
+  LQIP_QUALITY = 50
   # Long-edge cap for the stored master. 2048 keeps full-screen viewing crisp on
   # retina/desktop while recognition re-downscales to 1536 with negligible loss;
   # a 12MP phone photo (~3-5MB) lands around 300-600KB. Display surfaces request
@@ -63,6 +76,29 @@ class ImageNormalizer
   # @raise [ImageTooLarge] when the upload exceeds Media::MAX_IMAGE_BYTES.
   # @raise [UnsupportedFormat] for non-image / vector / undecodable input.
   def self.call(attachable) = new(attachable).call
+
+  # Base64 of a tiny (LQIP_EDGE long-edge) stripped JPEG derived from any
+  # vips-decodable bytes — the blur-up placeholder stored in blob metadata
+  # (#681). thumbnail_buffer shrinks on load (cheap even for a full master,
+  # which is how the images:lqip backfill uses it). Returns nil when the bytes
+  # won't decode or libvips is unavailable — the caller just omits the key and
+  # surfaces fall back to the plain placeholder.
+  #: (String bytes) -> String?
+  def self.lqip_base64(bytes)
+    # The require gets its own rescue: referencing Vips::Error in a rescue
+    # clause before libvips loaded would NameError on the constant.
+    begin
+      require "vips"
+    rescue LoadError
+      return nil
+    end
+
+    tiny = Vips::Image.thumbnail_buffer(bytes, LQIP_EDGE)
+    tiny = tiny.flatten(background: 255) if tiny.has_alpha?
+    Base64.strict_encode64(tiny.jpegsave_buffer(Q: LQIP_QUALITY, strip: true))
+  rescue Vips::Error
+    nil
+  end
 
   def initialize(attachable)
     @attachable = attachable
@@ -98,9 +134,15 @@ class ImageNormalizer
     jpeg  = img.jpegsave_buffer(Q: JPEG_QUALITY, strip: true)
     # The pipeline just decoded the image, so record its dimensions as blob
     # metadata up front (analyzed: true skips the async AnalyzeJob round trip) —
-    # display surfaces need real dimensions for lightbox slides (#675).
+    # display surfaces need real dimensions for lightbox slides (#675) and the
+    # tiny blur-up preview (#681). LQIP is derived from the freshly-encoded
+    # master bytes, NOT the sequential-access pipeline image (a second scan of
+    # a sequential image raises in vips).
+    metadata = { width: img.width, height: img.height, analyzed: true }
+    lqip = self.class.lqip_base64(jpeg)
+    metadata[:lqip] = lqip if lqip
     { io: StringIO.new(jpeg), filename: "#{File.basename(filename, ".*")}.jpg", content_type: "image/jpeg",
-      metadata: { width: img.width, height: img.height, analyzed: true } }
+      metadata: }
   rescue LoadError
     # libvips genuinely unavailable. A native upload is already display/provider
     # safe, so store it unchanged (unoptimised); a transcodable one can't be made

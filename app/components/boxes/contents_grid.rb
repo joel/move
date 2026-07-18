@@ -140,10 +140,10 @@ module Components
       #: (untyped media, ?eager: bool) -> untyped
       def image(media, eager: false)
         if media.image_displayable?
-          img(
-            src: MediaVariants::TransformUrl.for(media, :thumb), alt: "",
+          render Components::Ui::BlurUpImage.new(
+            src: MediaVariants::TransformUrl.for(media, :thumb), lqip: media.image_lqip,
             loading: eager ? "eager" : "lazy", decoding: "async",
-            class: "h-full w-full object-cover transition group-hover:scale-105"
+            img_class: "h-full w-full object-cover transition group-hover:scale-105"
           )
         elsif media.image_unavailable?
           render Components::Icons::ImageOff.new(css: "h-7 w-7")

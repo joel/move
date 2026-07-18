@@ -97,6 +97,44 @@ RSpec.describe "Galleries" do
       expect(response.body).not_to include("data-pswp-width")
     end
 
+    it "paints the blur-up preview under a tile when the blob carries an lqip (#681)" do
+      box = create(:box, move:, number: "4")
+      media = create(:media, move:, box:)
+      media.image.blob.update!(
+        metadata: media.image.blob.metadata.merge("lqip" => "dGVzdA==")
+      )
+
+      get move_gallery_path(move)
+
+      expect(response.body).to include("background-image: url(data:image/jpeg;base64,dGVzdA==)")
+    end
+
+    it "drops a non-base64 or non-string lqip instead of reaching the style attribute" do
+      box = create(:box, move:, number: "4")
+      injection = create(:media, move:, box:, captured_at: 1.hour.ago)
+      injection.image.blob.update!(
+        metadata: injection.image.blob.metadata.merge("lqip" => "aa) no-repeat; background:url(//evil\n")
+      )
+      corrupt = create(:media, move:, box:, captured_at: 2.hours.ago)
+      corrupt.image.blob.update!(metadata: corrupt.image.blob.metadata.merge("lqip" => true))
+
+      get move_gallery_path(move)
+
+      expect(response).to have_http_status(:ok) # non-String must degrade, not 500
+      expect(response.body).not_to include("background-image")
+      expect(response.body).not_to include("evil")
+    end
+
+    it "renders no preview layer while the blob has no lqip (legacy) — plain placeholder" do
+      box = create(:box, move:, number: "4")
+      create(:media, move:, box:)
+
+      get move_gallery_path(move)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("background-image: url(data:")
+    end
+
     it "renders the lightbox controller and tiles that open it with a box link" do
       box = create(:box, move:, number: "7")
       create(:media, move:, box:)

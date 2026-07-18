@@ -119,12 +119,12 @@ module Views
 
       #: (untyped media) -> untyped
       def thumb(media)
-        div(class: "flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden " \
+        div(class: "relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden " \
                    "rounded-lg bg-surface-container-high text-muted") do
           if media.image_displayable?
-            img(
-              src: MediaVariants::TransformUrl.for(media, :thumb),
-              class: "h-full w-full object-cover", alt: "", loading: "lazy"
+            render Components::Ui::BlurUpImage.new(
+              src: MediaVariants::TransformUrl.for(media, :thumb), lqip: media.image_lqip,
+              loading: "lazy", decoding: "async", img_class: "h-full w-full object-cover"
             )
           elsif media.image_unavailable?
             render Components::Icons::ImageOff.new(css: "h-6 w-6")

@@ -86,9 +86,10 @@ module Views
       def media_image
         if @item.source_media&.image_displayable?
           # The page's LCP element — eager + high priority, never lazy (#673).
-          img(
+          render Components::Ui::BlurUpImage.new(
             src: MediaVariants::TransformUrl.for(@item.source_media, :detail),
-            class: "aspect-square w-full object-cover", alt: "",
+            lqip: @item.source_media.image_lqip,
+            img_class: "aspect-square w-full object-cover",
             fetchpriority: "high", decoding: "async"
           )
         elsif @item.source_media&.image_unavailable?
