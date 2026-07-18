@@ -55,7 +55,11 @@ export default class extends Controller {
   }
 
   // Submit the add form; run `resume` only if it succeeded. The once-listener
-  // is consumed on success or failure, so a retry never stacks resumes.
+  // is consumed on success or failure, so a retry never stacks resumes. Turbo
+  // visits keep the JS context alive, so if the user left through an unguarded
+  // control (back arrow, queue badge) while the add was in flight, the listener
+  // still fires on the detached form — the connectedness check drops the stale
+  // resume instead of yanking them off the page they deliberately went to.
   #addThen(resume) {
     this.awaitingAdd = true
     this.formTarget.addEventListener(
@@ -63,6 +67,7 @@ export default class extends Controller {
       (event) => {
         this.awaitingAdd = false
         if (event.detail.success === false) return
+        if (!this.element.isConnected) return
         resume()
       },
       { once: true }
