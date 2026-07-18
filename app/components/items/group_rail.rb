@@ -68,13 +68,13 @@ module Components
 
       #: (untyped sibling) -> untyped
       def sibling_thumb(sibling)
-        div(class: "flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden " \
+        div(class: "relative flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden " \
                    "rounded-lg bg-surface-container-high text-muted") do
           media = sibling.source_media
           if media&.image_displayable?
-            img(
-              src: MediaVariants::TransformUrl.for(media, :thumb),
-              alt: "", loading: "lazy", class: "h-full w-full object-cover"
+            render Components::Ui::BlurUpImage.new(
+              src: MediaVariants::TransformUrl.for(media, :thumb), lqip: media.image_lqip,
+              loading: "lazy", decoding: "async", img_class: "h-full w-full object-cover"
             )
           else
             render Components::Icons::Camera.new(css: "h-5 w-5 opacity-40")
