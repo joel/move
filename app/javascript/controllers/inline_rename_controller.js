@@ -22,12 +22,13 @@ import { Controller } from "@hotwired/stimulus"
 // button_to), before-visit (Ignore/Next/back links), and before-cache (history
 // restores, which before-visit skips). save() is idempotent, so the eventual
 // real blur or overlapping events cost nothing.
-// Renames whose PATCH is still in flight, keyed by endpoint. A Turbo Stream
-// replacing the item list (an add landing) renders rows from a DB snapshot
-// that may predate the PATCH commit; the replacement controller adopts the
-// pending value from here on connect so the visible field never regresses to
-// the stale snapshot. A failed PATCH after such a replacement stays invisible
-// (#692) — the map only bridges the success path across teardown.
+// Renames whose PATCH is still in flight, keyed by endpoint: { name, promise }.
+// A Turbo Stream replacing the item list (an add landing) renders rows from a
+// DB snapshot that may predate the PATCH commit; the replacement controller
+// adopts the pending rename on connect — showing the value being saved and
+// chaining onto the SAME request, so a re-edit stays serialized behind it (no
+// out-of-order second PATCH) and a failure reverts + flags the active field
+// just as it would have without the teardown.
 const inFlightRenames = new Map()
 
 export default class extends Controller {
@@ -40,12 +41,28 @@ export default class extends Controller {
     this.url = this.urlValue // captured so a flush can still fire after teardown
     this.saving = false
     const pending = inFlightRenames.get(this.url)
-    if (pending !== undefined && pending !== this.committed) {
+    if (pending && pending.name !== this.committed) {
       // A save for this item is mid-flight across a list replacement: show
-      // the value being saved, not the snapshot the server rendered.
-      this.inputTarget.value = pending
-      this.target = pending
-      this.committed = pending
+      // the value being saved (not the snapshot the server rendered) and take
+      // over its request — committed only moves when the server confirms.
+      this.inputTarget.value = pending.name
+      this.target = pending.name
+      this.saving = true
+      pending.promise
+        .then((response) => {
+          this.saving = false
+          if (!this.hasInputTarget) return
+          if (response.ok) {
+            this.committed = pending.name
+            this.#sync() // edited while adopting? converge again
+          } else {
+            this.#revert()
+          }
+        })
+        .catch(() => {
+          this.saving = false
+          this.#revert()
+        })
     }
     this.flush = () => {
       if (this.hasInputTarget) this.save()
@@ -106,10 +123,9 @@ export default class extends Controller {
     if (this.saving || this.target === this.committed) return
     this.saving = true
     const name = this.target
-    inFlightRenames.set(this.url, name)
 
     const token = document.querySelector('meta[name="csrf-token"]')?.content
-    fetch(this.url, {
+    const request = fetch(this.url, {
       method: "PATCH",
       keepalive: true,
       headers: {
@@ -119,9 +135,12 @@ export default class extends Controller {
       },
       body: JSON.stringify({ name }),
     })
+    inFlightRenames.set(this.url, { name, promise: request })
+
+    request
       .then((response) => {
         this.saving = false
-        if (inFlightRenames.get(this.url) === name) inFlightRenames.delete(this.url)
+        if (inFlightRenames.get(this.url)?.name === name) inFlightRenames.delete(this.url)
         if (response.ok) {
           this.committed = name
           this.#sync() // target moved while saving? converge again
@@ -131,7 +150,7 @@ export default class extends Controller {
       })
       .catch(() => {
         this.saving = false
-        if (inFlightRenames.get(this.url) === name) inFlightRenames.delete(this.url)
+        if (inFlightRenames.get(this.url)?.name === name) inFlightRenames.delete(this.url)
         this.#revert()
       })
   }

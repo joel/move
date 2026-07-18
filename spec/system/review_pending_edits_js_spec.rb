@@ -266,6 +266,49 @@ RSpec.describe "Review pending edits (JS)", :js do
     expect(page).to have_field(with: "Cutting board")
   end
 
+  # Holds the mark POST off the wire, delays the first add by 800ms, and fakes
+  # a 422 for the rename PATCH 3s after it fires — so the failure lands on the
+  # ADOPTED controller, after the add's stream has replaced the item list.
+  def hold_add_and_fail_rename
+    page.execute_script(<<~JS)
+      const of_ = window.fetch;
+      window.fetch = (...args) => {
+        const url = String(args[0] instanceof Request ? args[0].url : args[0]);
+        const method = ((args[0] instanceof Request ? args[0].method : args[1]?.method) || "GET").toLowerCase();
+        if (url.includes("mark_reviewed")) return new Promise(() => {});
+        if (url.includes("/rename") && method === "patch") {
+          return new Promise((resolve) => setTimeout(() => resolve(new Response(null, { status: 422 })), 3000));
+        }
+        if (url.includes("/items") && method === "post" && !window.__heldOnce) {
+          window.__heldOnce = true;
+          return new Promise((resolve) => setTimeout(() => resolve(of_(...args)), 800));
+        }
+        return of_(...args);
+      };
+    JS
+  end
+
+  it "reverts and flags the replacement row when the adopted rename fails" do
+    move, box, _media, _item = seed_review_photo
+
+    login_as(user: user)
+    visit move_box_review_path(move, box)
+    hold_add_and_fail_rename
+
+    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
+    click_button I18n.t("reviews.photo.add")
+    page.execute_script(<<~JS)
+      document.querySelector('[data-inline-rename-target="input"]').value = "Espresso machine";
+    JS
+    page.execute_script(%(document.querySelector('form[action*="mark_reviewed"]').requestSubmit()))
+
+    # The stream-replaced row first adopts the pending rename…
+    expect(page).to have_field(with: "Espresso machine")
+    # …then the 422 lands on the ACTIVE controller: revert + error ring.
+    expect(page).to have_field(with: "Coffee machine", wait: 8)
+    expect(page).to have_css('input[aria-invalid="true"]')
+  end
+
   it "keeps a deliberately re-typed duplicate name typed during an in-flight add" do
     move, box, _media, _item = seed_review_photo
 
