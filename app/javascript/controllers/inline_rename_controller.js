@@ -14,6 +14,23 @@ import { Controller } from "@hotwired/stimulus"
 // Each PATCH uses keepalive so a save triggered by clicking "Next Photo" still
 // completes after Turbo navigates. A blank value is invalid (name required): the
 // field snaps back to the value being saved.
+//
+// Blur alone is not a reliable commit trigger: iOS Safari doesn't blur a focused
+// input when a button is tapped, so a dirty edit could ride into "Mark as
+// Reviewed"'s redirect unsent (#690). The controller therefore also flushes on
+// every Turbo exit — submit-start (any form on the page, including the mark
+// button_to), before-visit (Ignore/Next/back links), and before-cache (history
+// restores, which before-visit skips). save() is idempotent, so the eventual
+// real blur or overlapping events cost nothing.
+// Renames whose PATCH is still in flight, keyed by endpoint: { name, promise }.
+// A Turbo Stream replacing the item list (an add landing) renders rows from a
+// DB snapshot that may predate the PATCH commit; the replacement controller
+// adopts the pending rename on connect — showing the value being saved and
+// chaining onto the SAME request, so a re-edit stays serialized behind it (no
+// out-of-order second PATCH) and a failure reverts + flags the active field
+// just as it would have without the teardown.
+const inFlightRenames = new Map()
+
 export default class extends Controller {
   static values = { url: String }
   static targets = ["input"]
@@ -23,6 +40,47 @@ export default class extends Controller {
     this.target = this.committed // value the field + server should converge to
     this.url = this.urlValue // captured so a flush can still fire after teardown
     this.saving = false
+    const pending = inFlightRenames.get(this.url)
+    if (pending && pending.name !== this.committed) {
+      // A save for this item is mid-flight across a list replacement: show
+      // the value being saved (not the snapshot the server rendered) and take
+      // over its request — committed only moves when the server confirms.
+      this.inputTarget.value = pending.name
+      this.target = pending.name
+      this.saving = true
+      pending.promise
+        .then((response) => {
+          this.saving = false
+          if (!this.hasInputTarget) return
+          if (response.ok) {
+            this.committed = pending.name
+            this.#sync() // edited while adopting? converge again
+          } else {
+            this.#revert()
+          }
+        })
+        .catch(() => {
+          this.saving = false
+          this.#revert()
+        })
+    }
+    this.flush = () => {
+      if (this.hasInputTarget) this.save()
+    }
+    document.addEventListener("turbo:submit-start", this.flush)
+    document.addEventListener("turbo:before-visit", this.flush)
+    document.addEventListener("turbo:before-cache", this.flush)
+  }
+
+  // Teardown is the last chance to flush: a Turbo Stream replacing the item
+  // list (e.g. an add landing) fires none of the document events above, yet
+  // destroys a dirty field with it. The input's typed value is still readable
+  // on the detached subtree, and the keepalive PATCH outlives the controller.
+  disconnect() {
+    this.flush()
+    document.removeEventListener("turbo:submit-start", this.flush)
+    document.removeEventListener("turbo:before-visit", this.flush)
+    document.removeEventListener("turbo:before-cache", this.flush)
   }
 
   // Pencil icon: focus the field and select all so typing replaces the label.
@@ -67,7 +125,7 @@ export default class extends Controller {
     const name = this.target
 
     const token = document.querySelector('meta[name="csrf-token"]')?.content
-    fetch(this.url, {
+    const request = fetch(this.url, {
       method: "PATCH",
       keepalive: true,
       headers: {
@@ -77,8 +135,12 @@ export default class extends Controller {
       },
       body: JSON.stringify({ name }),
     })
+    inFlightRenames.set(this.url, { name, promise: request })
+
+    request
       .then((response) => {
         this.saving = false
+        if (inFlightRenames.get(this.url)?.name === name) inFlightRenames.delete(this.url)
         if (response.ok) {
           this.committed = name
           this.#sync() // target moved while saving? converge again
@@ -88,6 +150,7 @@ export default class extends Controller {
       })
       .catch(() => {
         this.saving = false
+        if (inFlightRenames.get(this.url)?.name === name) inFlightRenames.delete(this.url)
         this.#revert()
       })
   }
