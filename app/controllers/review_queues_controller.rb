@@ -1,16 +1,17 @@
 # frozen_string_literal: true
 
 # Move-wide review queue (#654) — the C1 concept reborn at Move level: every
-# photo that still holds an unreviewed co-located item, oldest capture first,
-# with a "Review all" walk that crosses box boundaries (the C2 photo screen in
-# queue mode). Runs inside the tenant schema, scoped to one Move. Thin and
-# read-only: any member may browse — the walk's own mutations carry the guards.
+# photo that still holds an unreviewed co-located item, newest capture first
+# (#687), with a "Review all" walk that crosses box boundaries (the C2 photo
+# screen in queue mode). Runs inside the tenant schema, scoped to one Move. Thin
+# and read-only: any member may browse — the walk's own mutations carry the guards.
 class ReviewQueuesController < MoveScopedController
   before_action { Current.nav_section = :menu }
 
   # Same safety valve as the Gallery: bound the grid for a pathological Move.
-  # FIFO means the cap keeps the OLDEST photos (the order is applied in SQL
-  # before the limit), so the head of the queue is always workable.
+  # Newest-first means the cap keeps the NEWEST photos (the order is applied in
+  # SQL before the limit) — the head of the queue is always the fresh work;
+  # older strays surface as the queue drains.
   CAP = 300
 
   # GET /moves/:move_id/review

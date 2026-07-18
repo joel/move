@@ -127,13 +127,13 @@ RSpec.describe "Per-photo review" do
     it "advances cross-box with the queue param in queue mode" do
       item = detected(name: "Lamp")
       other_box = create(:box, move:, number: "42")
-      newer = create(:media, move:, box: other_box, captured_at: 1.hour.from_now)
-      create(:item, move:, box: other_box, source_media: newer, review_state: "pending_review")
+      older = create(:media, move:, box: other_box, captured_at: 1.hour.ago)
+      create(:item, move:, box: other_box, source_media: older, review_state: "pending_review")
 
       post move_box_review_mark_reviewed_path(move, box, media, queue: "move")
 
       expect(item.reload.review_state).to eq("confirmed")
-      expect(response).to redirect_to(move_box_review_photo_path(move, other_box, newer, queue: "move"))
+      expect(response).to redirect_to(move_box_review_photo_path(move, other_box, older, queue: "move"))
     end
 
     it "finishes at the queue page after the last pending photo in queue mode" do
@@ -405,15 +405,15 @@ RSpec.describe "Per-photo review" do
       photo
     end
 
-    it "advances across box boundaries to the oldest remaining pending photo" do
+    it "advances across box boundaries to the next-newest remaining pending photo (#687)" do
       detected(name: "Lamp") # in `box`, on `media` (captured now)
       other_box = create(:box, move:, number: "42")
-      newer = pending_photo(box: other_box, captured_at: 1.hour.from_now)
+      older = pending_photo(box: other_box, captured_at: 1.hour.ago)
 
       get move_box_review_photo_path(move, box, media, queue: "move")
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include(move_box_review_photo_path(move, other_box, newer, queue: "move"))
+      expect(response.body).to include(move_box_review_photo_path(move, other_box, older, queue: "move"))
       expect(response.body).to include(I18n.t("reviews.photo.queue_progress", count: 1))
     end
 
@@ -480,13 +480,14 @@ RSpec.describe "Per-photo review" do
       end
 
       # Nothing is confirmed on a read-only Move, so from the middle photo the
-      # walk must offer the NEXT one (never back to the oldest)...
+      # walk must offer the NEXT one down the newest-first queue (never back up
+      # to the newest)...
       get move_box_review_photo_path(archived, archived_box, photos[1], queue: "move")
-      expect(response.body).to include(move_box_review_photo_path(archived, archived_box, photos[2], queue: "move"))
-      expect(response.body).not_to include(">#{move_box_review_photo_path(archived, archived_box, photos[0])}?queue")
+      expect(response.body).to include(move_box_review_photo_path(archived, archived_box, photos[0], queue: "move"))
+      expect(response.body).not_to include(">#{move_box_review_photo_path(archived, archived_box, photos[2])}?queue")
 
-      # ...and from the newest, finish back to the queue.
-      get move_box_review_photo_path(archived, archived_box, photos[2], queue: "move")
+      # ...and from the end of the walk (the oldest), finish back to the queue.
+      get move_box_review_photo_path(archived, archived_box, photos[0], queue: "move")
       expect(response.body).to include(I18n.t("reviews.photo.finish"))
       expect(response.body).to include(move_review_path(archived))
     end
