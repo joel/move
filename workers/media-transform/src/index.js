@@ -25,6 +25,18 @@ const SIZES = {
 // master never changes in place — so cache it hard at the edge and in the browser.
 const CACHE_CONTROL_SUCCESS = "public, max-age=31536000, immutable";
 
+// Explicit output quality (default was ~85): at 1600px a single detail could
+// weigh ~1MB as webp (#679 — Cloudflare declines avif on large sources, and
+// PhotoSwipe preloads ±2 neighbours). 80 is imperceptible at these display
+// sizes and cuts detail payloads substantially; thumbs barely change.
+const OUTPUT_QUALITY = 80;
+
+// Version the edge cache key when the ENCODING changes (quality/format logic):
+// the key deliberately omits t/exp, so without a bump the year-immutable
+// entries encoded under the old settings would keep serving at hot colos.
+// Bumping re-transforms each (key, size, format) once per colo on next access.
+const CACHE_VERSION = "2";
+
 export default {
   async fetch(request, env, ctx) {
     if (request.method !== "GET" && request.method !== "HEAD") {
@@ -60,10 +72,10 @@ export default {
 
     // Normalized cache key: STRIP the short-lived t/exp (so every valid token for
     // the same key+size shares ONE cache entry) but KEEP the format (avif/webp/jpeg
-    // are genuinely different bytes and must not collide).
+    // are genuinely different bytes and must not collide) + the encoding version.
     const cache = caches.default;
     const cacheKeyUrl = new URL(url);
-    cacheKeyUrl.search = `?format=${format}`;
+    cacheKeyUrl.search = `?format=${format}&v=${CACHE_VERSION}`;
     const cacheKey = new Request(cacheKeyUrl.toString(), { method: "GET" });
 
     // The Cache API is invisible to `cf-cache-status` (that header only reflects
@@ -89,7 +101,7 @@ export default {
     try {
       transformed = await env.IMAGES.input(object.body)
         .transform({ width: transform.width, height: transform.height, fit: transform.fit })
-        .output({ format: `image/${format}` });
+        .output({ format: `image/${format}`, quality: OUTPUT_QUALITY });
     } catch {
       return errorResponse(502, "Transform failed");
     }
