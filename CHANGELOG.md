@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.99.0] — 2026-07-18
+
+### Added
+- **Photos now appear as a soft preview the instant a page opens.** Instead of
+  a flat grey box while each photo downloads, every image spot shows a tiny
+  blurred preview of the actual photo immediately — the real image then
+  sharpens over it as it arrives. This covers the gallery, box contents, the
+  review queue, item cards and detail screens, and AI-generated item images
+  (#681).
+
 ## [v0.98.1] — 2026-07-18
 
 ### Changed
