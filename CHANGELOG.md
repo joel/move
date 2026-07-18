@@ -5,6 +5,14 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.99.2] — 2026-07-18
+
+### Changed
+- **The review queue now starts with your newest photos.** "Review all" and the
+  review grid run newest capture first, so you check what you just shot while
+  it's fresh in mind; older unreviewed photos surface as the queue drains
+  (#687).
+
 ## [v0.99.1] — 2026-07-18
 
 ### Changed
