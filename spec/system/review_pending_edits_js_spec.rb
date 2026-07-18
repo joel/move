@@ -236,6 +236,27 @@ RSpec.describe "Review pending edits (JS)", :js do
     eventually { Apartment::Tenant.switch(slug) { item.reload.review_state == "confirmed" } }
   end
 
+  it "keeps a deliberately re-typed duplicate name typed during an in-flight add" do
+    move, box, _media, _item = seed_review_photo
+
+    login_as(user: user)
+    visit move_box_review_path(move, box)
+    hold_first_add_post
+
+    # Duplicate names are valid (two identical candles): re-typing the SAME
+    # name during the first add's flight is a second intended item, which a
+    # value comparison would drop — the edit-revision flag must not.
+    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
+    click_button I18n.t("reviews.photo.add")
+    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
+    click_button I18n.t("reviews.photo.mark_reviewed"), match: :first
+
+    expect(page).to have_current_path(move_box_path(move, box), wait: 15)
+    eventually do
+      Apartment::Tenant.switch(slug) { box.items.where(name: "Cutting board").count == 2 }
+    end
+  end
+
   it "advances normally when nothing is pending (guard passthrough)" do
     move, box, media, item = seed_review_photo
 

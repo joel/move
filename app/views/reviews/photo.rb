@@ -232,7 +232,7 @@ module Views
           span(class: "pl-2 text-muted") { render Components::Icons::Plus.new(css: "h-5 w-5") }
           input(type: "text", name: "item[name]", required: true,
                 placeholder: I18n.t("reviews.photo.add_placeholder"),
-                data: { pending_add_target: "input" },
+                data: { pending_add_target: "input", action: "input->pending-add#inputEdited" },
                 class: "w-full border-0 bg-transparent p-0 text-body-md text-text-warm focus:ring-0")
           button(type: "submit", class: icon_button(:sage)) do
             render Components::Icons::Check.new(css: "h-5 w-5")
