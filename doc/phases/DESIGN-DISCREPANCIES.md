@@ -39,7 +39,8 @@
   otherwise reachable only box-by-box, there was no place to see — or clear — everything pending
   across a Move.
 - **What shipped (product decision, user-confirmed):** a gallery-style **queue page**
-  (`/moves/:id/review`, `ReviewQueuesController`) — a flat FIFO grid (oldest capture first) of
+  (`/moves/:id/review`, `ReviewQueuesController`) — a flat grid (**newest capture first** since
+  #687; originally FIFO/oldest-first) of
   every photo still holding an unreviewed co-located item, each tile wearing a pending-item count
   badge and a "Box N · Room" caption — plus a **"Review all"** walk: the C2 photo screen in
   `?queue=move` mode, where Next crosses box boundaries and Finish returns to the queue. Entry
@@ -52,12 +53,18 @@
 - **Remediation:** optional — generate a Stitch screen for the queue page if/when the surface
   grows bespoke layout (filters, grouping). Not design-blocked; recorded in `README.md` §2 (C1′).
 - **Update (2026-07-17, #660):** with reviewing now explicit (see §C2-REVIEW supersession), the
-  queue walk advances **strictly forward** in `(captured_at, id)` order for everyone (previously
-  editable Moves jumped to the oldest pending photo, which only worked because opening had
+  queue walk advances **strictly forward** in queue order for everyone (previously
+  editable Moves jumped to the head of the pending queue, which only worked because opening had
   already confirmed it). Ignored photos stay pending and resurface on the queue page at Finish;
   the "N more after this" count now counts only the forward remainder of the pass. Entering the
-  walk from a **mid-queue grid tile** starts the pass there — older pending photos are not
-  revisited within that pass; they stay listed on the queue page, which Finish lands on.
+  walk from a **mid-queue grid tile** starts the pass there — photos before it in queue order
+  are not revisited within that pass; they stay listed on the queue page, which Finish lands on.
+- **Update (2026-07-18, #687):** the queue order flipped to **newest capture first**
+  (`(captured_at, id)` DESC) — you review what you just shot while context is fresh; the gallery
+  remains the recency-browsing surface and the queue drains toward older strays. "Strictly
+  forward" in the walk now steps **next-oldest**, with the same no-ping-pong and termination
+  guarantees; the 300-photo cap keeps the **newest** photos (the head of the queue is always the
+  fresh work).
 
 ---
 

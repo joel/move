@@ -53,7 +53,8 @@ module Views
         end
       end
 
-      # Entry into the cross-box walk: the oldest pending photo, in queue mode.
+      # Entry into the cross-box walk: the newest pending photo (#687), in
+      # queue mode.
 
       #: () -> untyped
       def review_all
