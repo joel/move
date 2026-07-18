@@ -8,6 +8,9 @@ en:
       # Queue mode (#654) — the Move-wide walk: no stable total, so progress is
       # the honest remaining count; the badge locates the photo instead ("Box 3").
       queue_badge: "Box %{number}"
+      # The queue badge doubles as the jump-to-box link (#684) — the walk's back
+      # arrow returns to the queue, so this is the photo's only path to its box.
+      view_box: "View box %{number}"
       queue_progress:
         zero: "Last photo to review"
         one: "1 more photo after this"
