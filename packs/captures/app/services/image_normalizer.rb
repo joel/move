@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
+# pack_public: true -- public API of packs/captures: normalizes uploaded image
+# bytes into the bounded stored master, and derives the blur-up preview
+# (lqip_base64) that non-capture creation paths stamp too (the generated-image
+# action, the images:lqip backfill — #681). The sigil exposes it past
+# enforce_privacy; see packwerk-boundaries.md.
+
 require "marcel"
 require "stringio"
 require "base64"

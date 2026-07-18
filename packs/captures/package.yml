@@ -10,8 +10,10 @@
 #   PUBLIC (app/public): Media, RecognitionRun, RecognitionSuggestion.
 #   PUBLIC (sigil): Captures::Create, Captures::SessionContent, RecognitionRuns::
 #     Enqueue, RecognitionRuns::Retry, RecognitionProviders, MediaVariants::
-#     TransformUrl (the display-URL builder the root views/components call).
-#   PRIVATE: ImageNormalizer, RecognitionRuns::Process (+Job), the provider
+#     TransformUrl (the display-URL builder the root views/components call),
+#     ImageNormalizer (master normalization + lqip_base64 for non-capture
+#     creation paths — generated images, backfills; #681).
+#   PRIVATE: RecognitionRuns::Process (+Job), the provider
 #     adapters, and the capture subscribers. (The MediaVariants::Prewarm variant
 #     pipeline was decommissioned with the edge-transform cutover — #572.)
 #
