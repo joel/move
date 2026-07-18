@@ -197,6 +197,20 @@ the same wrapper. One row open per page; closes on tap-away, tap of the row, or
 focus moving on; `turbo:before-cache` resets. First use: C2 review item rows
 (#602).
 
+### `Ui::BlurUpImage` — LQIP blur-up under every photo (#681)
+Zero-JS loading placeholder: a ~24px stripped-JPEG preview (base64 in
+`blob.metadata["lqip"]`, stamped at ingest by `ImageNormalizer`; `images:lqip`
+backfills legacy blobs) paints instantly as an absolutely-positioned,
+`blur(12px)`+`scale(1.1)` background layer under the real `<img>`, which simply
+covers it as it loads — first views read as "sharpening", not a grey pop. The
+caller's wrapper must be `relative overflow-hidden` (every tile/hero container
+is) and overlay badges need `z-10` (the img is `relative`, so it paints above
+non-z-indexed earlier siblings). `img_class:` + passthrough attrs preserve the
+`loading`/`decoding`/`fetchpriority` policy (#673); without an `lqip` only the
+img renders (legacy grey placeholder). The value is gated on strict base64
+before touching the style attribute. Used by the gallery/contents/review-queue
+grids, `ItemCard`, and the three `:detail` heroes.
+
 ### Other primitives
 `Ui::ProgressBar` (pill, sage fill) ·
 `Ui::EmptyState` · `Ui::SectionHeader` / `Ui::PageHeader` · `Ui::Toast` /

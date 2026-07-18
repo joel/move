@@ -93,6 +93,37 @@ namespace :images do
     puts "[images:analyze] total: #{total}"
   end
 
+  desc "Backfill blur-up previews (lqip) into blob metadata for media missing them (#681)"
+  task lqip: :environment do
+    total = 0
+    # Presence of the lqip key is the idempotency guard (post-#681 uploads are
+    # pre-stamped by ImageNormalizer). Downloads each remaining master once to
+    # derive the ~24px preview; undecodable/unreadable masters warn and skip.
+    Organization.pluck(:slug).each do |slug|
+      Apartment::Tenant.switch(slug) do
+        done = 0
+        Media.with_discarded.joins(:image_attachment).find_each do |media|
+          blob = media.image.blob
+          next if blob.metadata["lqip"].present?
+
+          lqip = ImageNormalizer.lqip_base64(blob.download)
+          if lqip.nil?
+            warn "[images:lqip] skip media #{media.id}: bytes did not decode"
+            next
+          end
+          blob.update!(metadata: blob.metadata.merge("lqip" => lqip))
+          done += 1
+        rescue ActiveStorage::Error => e
+          # Missing/undownloadable objects must not strand the rest of the run.
+          warn "[images:lqip] skip media #{media.id} (storage): #{e.class} (#{e.message})"
+        end
+        total += done
+        puts "[images:lqip] #{slug}: #{done} previews stored"
+      end
+    end
+    puts "[images:lqip] total: #{total}"
+  end
+
   desc "One-off: purge orphaned Active Storage variant records + their stored objects (#572 decommission)"
   task cleanup_variants: :environment do
     # After the edge-transform cutover (#572) the app no longer generates Active

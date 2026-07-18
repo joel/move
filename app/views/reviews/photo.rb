@@ -104,9 +104,11 @@ module Views
             badge
             if @media.image_displayable?
               # The page's LCP element — eager + high priority, never lazy (#673).
-              img(src: MediaVariants::TransformUrl.for(@media, :detail),
-                  class: "aspect-square w-full object-cover lg:aspect-auto lg:h-full", alt: "",
-                  fetchpriority: "high", decoding: "async")
+              render Components::Ui::BlurUpImage.new(
+                src: MediaVariants::TransformUrl.for(@media, :detail), lqip: @media.image_lqip,
+                img_class: "aspect-square w-full object-cover lg:aspect-auto lg:h-full",
+                fetchpriority: "high", decoding: "async"
+              )
             elsif @media.image_unavailable?
               div(class: "flex aspect-square w-full flex-col items-center justify-center gap-2 text-muted") do
                 render Components::Icons::ImageOff.new(css: "h-10 w-10")

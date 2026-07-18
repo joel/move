@@ -91,6 +91,13 @@ class Media < ApplicationRecord
   #: () -> bool
   def image_displayable? = image.attached? && !image_unavailable?
 
+  # Base64 of the tiny blur-up preview stamped into blob metadata at ingest
+  # (ImageNormalizer, #681; `images:lqip` backfills legacy blobs). nil until
+  # generated — surfaces then keep their plain placeholder.
+
+  #: () -> String?
+  def image_lqip = image.attached? ? image.blob.metadata["lqip"] : nil
+
   #: () -> void
   def image_must_be_an_image
     return unless image.attached?

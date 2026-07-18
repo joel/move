@@ -76,6 +76,18 @@ RSpec.describe ImageNormalizer do
     expect(out.bytesize).to be < bytes.bytesize
   end
 
+  it "stamps a decodable blur-up preview (lqip) into the metadata (#681)" do
+    bytes = vips_jpeg(3000, 2000) || skip("libvips unavailable")
+    attachable = { io: StringIO.new(bytes), filename: "huge.jpg", content_type: "image/jpeg" }
+
+    lqip = described_class.call(attachable)[:metadata][:lqip]
+
+    expect(lqip).to match(%r{\A[A-Za-z0-9+/]+={0,2}\z}) # strict base64, data-URI safe
+    tiny = Vips::Image.new_from_buffer(Base64.decode64(lqip), "")
+    expect([tiny.width, tiny.height].max).to eq(ImageNormalizer::LQIP_EDGE)
+    expect(Base64.decode64(lqip).bytesize).to be < 2_000 # stays inline-weight
+  end
+
   it "records the output dimensions as pre-analyzed blob metadata (#675)" do
     bytes = vips_jpeg(3000, 2000) || skip("libvips unavailable")
     attachable = { io: StringIO.new(bytes), filename: "huge.jpg", content_type: "image/jpeg" }
@@ -86,7 +98,7 @@ RSpec.describe ImageNormalizer do
     # Metadata must match the ACTUAL encoded output (post-downscale), and carry
     # analyzed: true so attaching skips the async AnalyzeJob round trip.
     expect(width).to eq(2048)
-    expect(result[:metadata]).to eq(width:, height:, analyzed: true)
+    expect(result[:metadata]).to include(width:, height:, analyzed: true)
   end
 
   it "does not up-scale an image already within the cap" do
