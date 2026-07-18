@@ -76,21 +76,26 @@ RSpec.describe "Review pending edits (JS)", :js do
     end
   end
 
-  # Stops the mark submission right after turbo:submit-start (the controller's
-  # flush listener registered earlier, so it runs first) and records when the
-  # rename PATCH settles. Under transactional fixtures every server thread
-  # shares ONE connection and concurrent requests race its Apartment
-  # search_path, 404ing either request — a test-env-only artifact (production
-  # checks out a connection per request). Stopping the POST keeps the keepalive
-  # PATCH as the only request in flight, making the example deterministic.
+  # Holds the mark POST at the fetch layer (Turbo routes its submission through
+  # window.fetch, so a never-resolving promise keeps it off the wire entirely —
+  # turbo:submit-start, and with it the controller's flush, has already fired
+  # by then) and records when the rename PATCH settles. Under transactional
+  # fixtures every server thread shares ONE connection and concurrent requests
+  # race its Apartment search_path, 404ing either request — a test-env-only
+  # artifact (production checks out a connection per request). Holding the POST
+  # keeps the keepalive PATCH as the only request in flight, making the
+  # example deterministic.
   def hold_mark_submission_and_track_fetch
     page.execute_script(<<~JS)
-      document.addEventListener("turbo:submit-start", (e) => e.detail.formSubmission.stop(), { once: true });
       window.__renameSettled = false;
       const of_ = window.fetch;
       window.fetch = (...args) => {
+        const url = String(args[0] instanceof Request ? args[0].url : args[0]);
+        if (url.includes("mark_reviewed")) return new Promise(() => {});
         const p = of_(...args);
-        p.then(() => { window.__renameSettled = true }, () => { window.__renameSettled = true });
+        if (url.includes("/rename")) {
+          p.then(() => { window.__renameSettled = true }, () => { window.__renameSettled = true });
+        }
         return p;
       };
     JS
@@ -168,6 +173,27 @@ RSpec.describe "Review pending edits (JS)", :js do
           item.reload.review_state == "pending_review"
       end
     end
+  end
+
+  it "does not resubmit an add the user already submitted before clicking Mark" do
+    move, box, _, item = seed_review_photo
+
+    login_as(user: user)
+    visit move_box_review_path(move, box)
+    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
+
+    # Manual ✓ then Mark straight after: whether the add is still in flight
+    # (guard queues the advance behind it) or already settled (input reset →
+    # plain passthrough), the outcome must be ONE item and an advance — never
+    # a duplicate from the guard resubmitting the already-submitting form.
+    click_button I18n.t("reviews.photo.add")
+    click_button I18n.t("reviews.photo.mark_reviewed"), match: :first
+
+    expect(page).to have_current_path(move_box_path(move, box), wait: 15)
+    eventually do
+      Apartment::Tenant.switch(slug) { box.items.where(name: "Cutting board").one? }
+    end
+    eventually { Apartment::Tenant.switch(slug) { item.reload.review_state == "confirmed" } }
   end
 
   it "advances normally when nothing is pending (guard passthrough)" do

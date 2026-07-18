@@ -15,6 +15,10 @@ import { Controller } from "@hotwired/stimulus"
 // stops both the native submission and Turbo (verified against Turbo 8.0.23).
 // reset-form blanks the input on the add's success before the resume runs; the
 // `resuming` flag makes re-interception impossible regardless of ordering.
+//
+// The add form reports its own submissions via addStarted/addEnded
+// (turbo:submit-start/end actions), so a manual ✓ submission already in
+// flight is never resubmitted — the guard just queues the advance behind it.
 export default class extends Controller {
   static targets = ["form", "input"]
 
@@ -24,8 +28,8 @@ export default class extends Controller {
       this.resuming = false
       return
     }
-    if (this.awaitingAdd) {
-      event.preventDefault() // a second advance while the add is in flight is noise
+    if (this.resumeArmed) {
+      event.preventDefault() // a second advance while one is queued is noise
       return
     }
     if (!this.#pending()) return
@@ -37,9 +41,12 @@ export default class extends Controller {
     })
   }
 
-  // Click on the Ignore / Next / Finish anchors.
+  // Click on the Ignore / Next / Finish anchors. Modified clicks (new tab /
+  // window) keep their browser semantics — Turbo ignores them too, and the
+  // typed text survives on the current page either way.
   guardVisit(event) {
-    if (this.awaitingAdd) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    if (this.resumeArmed) {
       event.preventDefault()
       return
     }
@@ -50,29 +57,42 @@ export default class extends Controller {
     this.#addThen(() => this.#visit(href))
   }
 
+  // The add form's own Turbo submission lifecycle (fires for manual ✓ / Enter
+  // submissions as well as the guard's requestSubmit).
+  addStarted() {
+    this.addInFlight = true
+  }
+
+  addEnded() {
+    this.addInFlight = false
+  }
+
   #pending() {
     return this.hasInputTarget && this.inputTarget.value.trim() !== ""
   }
 
-  // Submit the add form; run `resume` only if it succeeded. The once-listener
-  // is consumed on success or failure, so a retry never stacks resumes. Turbo
-  // visits keep the JS context alive, so if the user left through an unguarded
-  // control (back arrow, queue badge) while the add was in flight, the listener
-  // still fires on the detached form — the connectedness check drops the stale
-  // resume instead of yanking them off the page they deliberately went to.
+  // Queue `resume` behind the add: submit the form unless a submission is
+  // already in flight (a manual ✓ the user beat us to — resubmitting would
+  // create the item twice), then run `resume` when it succeeds. The
+  // once-listener is consumed on success or failure, so a retry never stacks
+  // resumes. Turbo visits keep the JS context alive, so if the user left
+  // through an unguarded control (back arrow, queue badge) while the add was
+  // in flight, the listener still fires on the detached form — the
+  // connectedness check drops the stale resume instead of yanking them off
+  // the page they deliberately went to.
   #addThen(resume) {
-    this.awaitingAdd = true
+    this.resumeArmed = true
     this.formTarget.addEventListener(
       "turbo:submit-end",
       (event) => {
-        this.awaitingAdd = false
+        this.resumeArmed = false
         if (event.detail.success === false) return
         if (!this.element.isConnected) return
         resume()
       },
       { once: true }
     )
-    this.formTarget.requestSubmit()
+    if (!this.addInFlight) this.formTarget.requestSubmit()
   }
 
   #visit(url) {

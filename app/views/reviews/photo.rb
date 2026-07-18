@@ -219,7 +219,10 @@ module Views
       #: () -> untyped
       def add_form
         form_with(url: move_box_review_add_item_path(@move, @box, @media, **queue_params), method: :post,
-                  data: { controller: "reset-form", action: "turbo:submit-end->reset-form#reset",
+                  data: { controller: "reset-form",
+                          action: "turbo:submit-end->reset-form#reset " \
+                                  "turbo:submit-start->pending-add#addStarted " \
+                                  "turbo:submit-end->pending-add#addEnded",
                           pending_add_target: "form" },
                   class: "mt-stack-gap flex items-center gap-2 rounded-card border border-dashed " \
                          "border-card-border bg-card p-2 focus-within:border-accent-sage") do
