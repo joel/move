@@ -41,7 +41,7 @@ browser downscales (capture_upload_ctlr)    <img src=media.move-easy.org/<size>/
       Move-scoped signed_id]                      → R2.get(key)  (private bucket, Worker binding)
   → PUT bytes → R2 (presigned, direct)           → Images.transform(scale-down 400/1600)
   → POST signed_id → StartIngest                 → negotiate avif/webp/jpeg by Accept
-     → pending Media + IngestJob                 → edge-cache (token-stripped key) + immutable
+     → pending Media + IngestJob                 → edge-cache (token-stripped, versioned key) + immutable
   → IngestJob: download raw → ImageNormalizer   dev/test: no Worker → same-origin master proxy
      (re-sniff, STRIP EXIF/GPS, ≤2048, JPEG)      (MediaVariants::TransformUrl fallback)
      → replace master → media.captured

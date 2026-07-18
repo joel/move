@@ -5,6 +5,15 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.98.1] — 2026-07-18
+
+### Changed
+- **Full-size photos are lighter.** The large image the lightbox and detail
+  screens load is now encoded at a tuned quality level — visually identical at
+  these sizes, but substantially fewer bytes per photo (a single full-size view
+  could previously weigh ~1MB), which matters most when swiping through photos
+  on mobile data (#679).
+
 ## [v0.98.0] — 2026-07-17
 
 ### Changed

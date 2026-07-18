@@ -20,7 +20,10 @@ Worker:  parse size+key+t+exp
       →  crypto.subtle.verify HMAC-SHA256("<key>|<size>|<exp>", SECRET)   (constant-time)
       →  env.MEDIA_BUCKET.get(key)            (R2 native binding, private)
       →  env.IMAGES.transform({w,h,fit})      (scale-down; negotiate avif/webp/jpeg by Accept)
-      →  cache at the edge under a TOKEN-STRIPPED key (format kept) + immutable Cache-Control
+      →  encode at quality 80 (#679), cache at the edge under a TOKEN-STRIPPED key
+      (format + encoding version kept — bump CACHE_VERSION in src/index.js whenever
+      quality/format logic changes, or year-immutable old encodings keep serving)
+      + immutable Cache-Control
 ```
 
 The Worker deploys **independently** of the Rails app (Kamal never touches it).
