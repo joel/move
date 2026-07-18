@@ -124,15 +124,27 @@ module Views
       end
 
       # In queue mode Next crosses boxes, so the overlay names the photo's
-      # location ("Box 3 · Kitchen") instead of a within-box position.
+      # location ("Box 3 · Kitchen") — and doubles as the jump-to-box link
+      # (#684): the walk's back arrow returns to the QUEUE, so without this the
+      # photo would have no path to its box. Box mode keeps the plain badge
+      # (its back arrow already goes to the box).
 
       #: () -> untyped
       def badge
-        div(class: "absolute left-3 top-3 z-10 inline-flex items-center gap-2 rounded-full " \
-                   "bg-surface-container-high/80 px-3 py-1 text-label-caps uppercase text-on-surface-variant " \
-                   "backdrop-blur") do
+        base = "absolute left-3 top-3 z-10 inline-flex items-center gap-2 rounded-full " \
+               "bg-surface-container-high/80 px-3 py-1 text-label-caps uppercase text-on-surface-variant " \
+               "backdrop-blur"
+        tag = @queue ? :a : :div
+        attrs = if @queue
+                  { href: move_box_path(@move, @box), class: "#{base} transition hover:text-text-warm",
+                    aria: { label: I18n.t("reviews.photo.view_box", number: @box.number) } }
+                else
+                  { class: base }
+                end
+        public_send(tag, **attrs) do
           render Components::Icons::Camera.new(css: "h-3.5 w-3.5 text-accent-sage")
           plain badge_text
+          render Components::Icons::ChevronRight.new(css: "h-3 w-3") if @queue
         end
       end
 

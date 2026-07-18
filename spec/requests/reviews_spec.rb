@@ -417,6 +417,28 @@ RSpec.describe "Per-photo review" do
       expect(response.body).to include(I18n.t("reviews.photo.queue_progress", count: 1))
     end
 
+    it "links the location badge to the photo's box (#684 — the back arrow exits to the queue)" do
+      detected(name: "Lamp")
+
+      get move_box_review_photo_path(move, box, media, queue: "move")
+
+      aggregate_failures do
+        expect(response.body).to include(
+          %(aria-label="#{I18n.t("reviews.photo.view_box", number: box.number)}")
+        )
+        # The badge anchor carries the box href (the queue-mode box jump).
+        expect(response.body).to include(%(href="#{move_box_path(move, box)}"))
+      end
+    end
+
+    it "keeps the box-mode badge a plain locator (the back arrow already links the box)" do
+      detected(name: "Lamp")
+
+      get move_box_review_photo_path(move, box, media)
+
+      expect(response.body).not_to include(I18n.t("reviews.photo.view_box", number: box.number))
+    end
+
     it "locates the photo with a Box badge and exits to the queue from the last photo" do
       detected(name: "Lamp")
 
