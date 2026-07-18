@@ -96,7 +96,11 @@ class ImageNormalizer
     # PNG/WEBP transparency would render as black in JPEG — flatten onto white.
     img   = img.flatten(background: 255) if img.has_alpha?
     jpeg  = img.jpegsave_buffer(Q: JPEG_QUALITY, strip: true)
-    { io: StringIO.new(jpeg), filename: "#{File.basename(filename, ".*")}.jpg", content_type: "image/jpeg" }
+    # The pipeline just decoded the image, so record its dimensions as blob
+    # metadata up front (analyzed: true skips the async AnalyzeJob round trip) —
+    # display surfaces need real dimensions for lightbox slides (#675).
+    { io: StringIO.new(jpeg), filename: "#{File.basename(filename, ".*")}.jpg", content_type: "image/jpeg",
+      metadata: { width: img.width, height: img.height, analyzed: true } }
   rescue LoadError
     # libvips genuinely unavailable. A native upload is already display/provider
     # safe, so store it unchanged (unoptimised); a transcodable one can't be made

@@ -63,6 +63,36 @@ namespace :images do
          "#{ActiveSupport::NumberHelper.number_to_human_size(grand_total)}"
   end
 
+  desc "Backfill blob width/height metadata (analyze) for media missing it (#675)"
+  task analyze: :environment do
+    total = 0
+    # Media lives in each tenant schema; blobs are shared (public), so switch per
+    # tenant to find the rows, then analyze their blobs. The idempotency guard is
+    # the presence of BOTH dimensions — not `analyzed?`, which can be true with
+    # no width/height after an earlier analyzer failure and would then skip the
+    # exact blobs this backfill exists for (#676 Codex). The flip side is that a
+    # permanently unanalyzable image is re-attempted on every run — acceptable
+    # for a manual, occasional task.
+    Organization.pluck(:slug).each do |slug|
+      Apartment::Tenant.switch(slug) do
+        done = 0
+        Media.with_discarded.joins(:image_attachment).find_each do |media|
+          blob = media.image.blob
+          next if blob.metadata["width"].to_i.positive? && blob.metadata["height"].to_i.positive?
+
+          blob.analyze
+          done += 1
+        rescue ActiveStorage::Error => e
+          # Missing/undownloadable objects must not strand the rest of the run.
+          warn "[images:analyze] skip media #{media.id} (storage): #{e.class} (#{e.message})"
+        end
+        total += done
+        puts "[images:analyze] #{slug}: #{done} analyzed"
+      end
+    end
+    puts "[images:analyze] total: #{total}"
+  end
+
   desc "One-off: purge orphaned Active Storage variant records + their stored objects (#572 decommission)"
   task cleanup_variants: :environment do
     # After the edge-transform cutover (#572) the app no longer generates Active

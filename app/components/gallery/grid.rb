@@ -10,6 +10,10 @@ module Components
     # caption and a "view box" href as data-*; PhotoSwipe injects its own DOM at
     # open, seeded thumb-first via msrc. Read-only — no mutating affordances.
     class Grid < Components::Base
+      # The lightbox slide box — mirrors the Worker's :detail geometry so the
+      # data-pswp-* contract stays "the served detail size".
+      DETAIL_BOX = MediaVariants::TransformUrl::SIZES.fetch(:detail).fetch(:width)
+
       #: (move: untyped, media: untyped) -> void
       def initialize(move:, media:)
         @move = move
@@ -131,7 +135,33 @@ module Components
           thumb: thumb_url(media),
           caption: caption(media),
           href: move_box_path(@move, media.box)
-        }
+        }.merge(pswp_dimensions(media))
+      end
+
+      # Real slide dimensions when blob analysis has them. The dataset contract
+      # is "the SERVED detail size" (the viewer reads data-pswp-* first —
+      # photoswipe_viewer.js#dimensionsFor — and corrects any mismatch with a
+      # slide refresh): behind the edge Worker that is the master scaled into
+      # the :detail box, clamped at 1.0 to mirror scale-down (never upscaled);
+      # the dev/test fallback proxies the UNRESIZED master, so emit the raw
+      # dimensions there or the correction reflow returns (#676 Codex). Omitted
+      # while a blob is unanalyzed — the JS falls back to its estimate (#675).
+
+      #: (untyped media) -> Hash[Symbol, Integer]
+      def pswp_dimensions(media)
+        meta = media.image.blob.metadata
+        width = meta["width"].to_i
+        height = meta["height"].to_i
+        return {} unless width.positive? && height.positive?
+        return { pswp_width: width, pswp_height: height } unless edge_transforms?
+
+        scale = [DETAIL_BOX.to_f / width, DETAIL_BOX.to_f / height, 1.0].min
+        { pswp_width: (width * scale).round, pswp_height: (height * scale).round }
+      end
+
+      #: () -> bool
+      def edge_transforms?
+        Rails.application.config.x.media_transform_host.present?
       end
 
       # Memoized so the grid <img src> and data-thumb are byte-identical even if
