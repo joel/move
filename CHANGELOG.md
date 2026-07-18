@@ -5,6 +5,50 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.98.0] — 2026-07-17
+
+### Changed
+- **Photos now load dramatically faster on repeat visits.** Every image URL used
+  to change on every page load, so your browser re-downloaded every thumbnail
+  each time you opened the gallery or a box — even ones it had just shown.
+  Image URLs now stay stable for a day, so returning to the gallery reuses the
+  photos already on your device: on a revisit, images appear instantly with
+  zero network traffic (#669). The connection to the image server is also
+  pre-warmed as each page loads, shaving the setup delay off the first photo
+  (#671).
+- **The most important image on each screen shows up first.** The large photo
+  on the item, review, and recovery screens — and the first row of every photo
+  grid — now tells the browser to fetch it at top priority instead of lazily,
+  so the picture you're actually looking at is no longer the last thing to
+  arrive (#673).
+- **Opening a photo in the gallery lightbox no longer resizes mid-view.** The
+  app now knows each photo's real dimensions up front, so the lightbox opens at
+  the correct shape immediately instead of guessing and visibly correcting
+  itself once the image arrives (#675).
+
+## [v0.97.0] — 2026-07-17
+
+### Changed
+- **Reviewing a photo is now an explicit choice.** The review screen offers
+  "Mark as Reviewed" and "Ignore" at both the top and bottom, so long item
+  lists never hide the controls, and simply looking at a photo no longer counts
+  as reviewing it (#660).
+
+## [v0.96.0] — 2026-07-17
+
+### Added
+- **Duplicate a box in one tap.** Boxes without recorded dimensions offer a
+  one-tap duplicate control right on the box card, copying the dimensions setup
+  for the next identical box (#658).
+
+## [v0.95.0] — 2026-07-15
+
+### Added
+- **Review everything across the whole Move in one walk.** A Move-wide review
+  queue lists every photo still awaiting review across all boxes and walks you
+  through them in order — no more opening each box to hunt for pending photos
+  (#654).
+
 ## [v0.94.2] — 2026-07-15
 
 ### Fixed
