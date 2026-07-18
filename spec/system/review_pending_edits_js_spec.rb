@@ -255,11 +255,14 @@ RSpec.describe "Review pending edits (JS)", :js do
     page.execute_script(%(document.querySelector('form[action*="mark_reviewed"]').requestSubmit()))
 
     eventually(timeout: 10) { page.evaluate_script("window.__renameSettled === true") }
+    # The stream-replaced row must show the pending rename ON PAGE, without a
+    # reload — the replacement controller adopts the in-flight value even
+    # though the server rendered the list from a pre-PATCH snapshot.
+    expect(page).to have_field(with: "Espresso machine")
     eventually(timeout: 10) do
       visit move_box_review_photo_path(move, box, media)
       page.has_field?(with: "Espresso machine", wait: 1)
     end
-    expect(page).to have_field(with: "Espresso machine")
     expect(page).to have_field(with: "Cutting board")
   end
 

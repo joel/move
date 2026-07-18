@@ -22,6 +22,14 @@ import { Controller } from "@hotwired/stimulus"
 // button_to), before-visit (Ignore/Next/back links), and before-cache (history
 // restores, which before-visit skips). save() is idempotent, so the eventual
 // real blur or overlapping events cost nothing.
+// Renames whose PATCH is still in flight, keyed by endpoint. A Turbo Stream
+// replacing the item list (an add landing) renders rows from a DB snapshot
+// that may predate the PATCH commit; the replacement controller adopts the
+// pending value from here on connect so the visible field never regresses to
+// the stale snapshot. A failed PATCH after such a replacement stays invisible
+// (#692) — the map only bridges the success path across teardown.
+const inFlightRenames = new Map()
+
 export default class extends Controller {
   static values = { url: String }
   static targets = ["input"]
@@ -31,6 +39,14 @@ export default class extends Controller {
     this.target = this.committed // value the field + server should converge to
     this.url = this.urlValue // captured so a flush can still fire after teardown
     this.saving = false
+    const pending = inFlightRenames.get(this.url)
+    if (pending !== undefined && pending !== this.committed) {
+      // A save for this item is mid-flight across a list replacement: show
+      // the value being saved, not the snapshot the server rendered.
+      this.inputTarget.value = pending
+      this.target = pending
+      this.committed = pending
+    }
     this.flush = () => {
       if (this.hasInputTarget) this.save()
     }
@@ -90,6 +106,7 @@ export default class extends Controller {
     if (this.saving || this.target === this.committed) return
     this.saving = true
     const name = this.target
+    inFlightRenames.set(this.url, name)
 
     const token = document.querySelector('meta[name="csrf-token"]')?.content
     fetch(this.url, {
@@ -104,6 +121,7 @@ export default class extends Controller {
     })
       .then((response) => {
         this.saving = false
+        if (inFlightRenames.get(this.url) === name) inFlightRenames.delete(this.url)
         if (response.ok) {
           this.committed = name
           this.#sync() // target moved while saving? converge again
@@ -113,6 +131,7 @@ export default class extends Controller {
       })
       .catch(() => {
         this.saving = false
+        if (inFlightRenames.get(this.url) === name) inFlightRenames.delete(this.url)
         this.#revert()
       })
   }
