@@ -18,11 +18,14 @@ module InsuranceDeclarations
   # → Insurance::AuditSubscriber. Read-only — NOT ensure_writable-guarded: an
   # archived Move may still be declared for insurance.
   class Generate < BaseAction
-    # Same ceiling as the dossier (InsuranceDossierRuns::Start::MAX_ITEMS) for a
-    # different resource: the declaration renders synchronously in-request, and
-    # prawn-table's layout cost grows super-linearly with row count — an
-    # uncapped Move-wide table could hold a Puma worker for tens of seconds.
-    MAX_ITEMS = 1_000
+    # The declaration renders synchronously in-request, and prawn-table's
+    # layout cost grows super-linearly with ROW count — an uncapped Move-wide
+    # table could hold a Puma worker for tens of seconds. The rows are unique
+    # (family, name) LINES, not items ("Moving boxes ×40" is one row), so the
+    # cap binds to lines: a many-items Move with ordinary name reuse renders
+    # fine (#705 — the original items-summed cap rejected a real 1,000+-item
+    # Move whose table was small).
+    MAX_LINES = 1_000
 
     # Trim + case-fold in SQL so " Kitchenware" and "kitchenware " merge; an
     # empty string folds into the nil (Miscellaneous) bucket via NULLIF — and so
@@ -33,16 +36,14 @@ module InsuranceDeclarations
     #: (move: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, actor:)
       # The cap is enforced on the SAME aggregate that renders — a separate
-      # pre-count would race concurrent packing (TOCTOU) and leave the Prawn
-      # table unbounded. LIMIT caps the fetched GROUPS (each holds ≥1 item, so
-      # >MAX groups is over-cap by itself and memory stays bounded); the summed
-      # counts catch the few-groups/many-items shape from the same result.
+      # pre-count would race concurrent packing (TOCTOU) — and LIMIT bounds the
+      # fetched rows, so memory stays bounded for an over-cap Move. Item count
+      # deliberately does NOT gate: it drives no render cost (the aggregation
+      # is SQL-side and the total is just a printed number).
       rows = grouped_rows(move)
-      return Failure(:too_many) if rows.size > MAX_ITEMS
+      return Failure(:too_many_lines) if rows.size > MAX_LINES
 
       total_items = rows.values.sum
-      return Failure(:too_many) if total_items > MAX_ITEMS
-
       sections = build_sections(rows)
       yield emit_event(move, actor, total_items)
       Success(sections: sections, total_items: total_items)
@@ -54,14 +55,14 @@ module InsuranceDeclarations
     # its count, ordered family-alphabetical with NULLS LAST — which lands the
     # Miscellaneous bucket at the end for free — then names alphabetical (a
     # declaration is a checking document; lookup order beats recency). LIMIT
-    # bounds the fetched group rows for the cap check above.
+    # bounds the fetched line rows for the cap check above.
 
     #: (untyped move) -> untyped
     def grouped_rows(move)
       move.items.in_box
           .group(Arel.sql(FAMILY_NORM), :name)
           .order(Arel.sql("#{FAMILY_NORM} ASC NULLS LAST"), name: :asc)
-          .limit(MAX_ITEMS + 1)
+          .limit(MAX_LINES + 1)
           .count
     end
 

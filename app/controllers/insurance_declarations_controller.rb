@@ -20,7 +20,7 @@ class InsuranceDeclarationsController < MoveScopedController
                             type: "application/pdf", disposition: "inline"
     in Dry::Monads::Failure(reason)
       redirect_to move_insurance_path(@move),
-                  alert: t("insurance.errors.#{reason}", max: InsuranceDeclarations::Generate::MAX_ITEMS)
+                  alert: t("insurance.errors.#{reason}", max: InsuranceDeclarations::Generate::MAX_LINES)
     end
   end
 end
