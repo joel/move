@@ -32,7 +32,11 @@ module InsuranceDossierRuns
     MAX_PAGES = 400
     SECTION_PT = 52
     ROW_PT = 64
-    USABLE_PAGE_PT = 762
+    # Effective capacity per page: usable A4 height MINUS the worst-case waste
+    # from a section-keep page break (SECTION_MIN_CURSOR ≈ 104pt) — the
+    # estimate must over-count pages, never under-count, or the pathological
+    # one-item-per-box shape squeezes past the budget (#706 review round 3).
+    USABLE_PAGE_PT = 658
 
     # Singleton defs aren't supported by inline RBS; declared in
     # sig/insurance_dossier_runs.rbs (the label_print_runs.rbs pattern).
@@ -58,7 +62,7 @@ module InsuranceDossierRuns
 
       item_count = move.items.in_box.where(box_id: box_ids).count
       return Failure(:too_many) if item_count > MAX_ITEMS
-      return Failure(:too_many) if self.class.over_page_budget?(box_ids.size, item_count)
+      return Failure(:too_many_pages) if self.class.over_page_budget?(box_ids.size, item_count)
 
       run = move.insurance_dossier_runs.create!(
         total_count: box_ids.size, item_count: item_count,
