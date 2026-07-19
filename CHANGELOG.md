@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.101.0] — 2026-07-19
+
+### Added
+- **Step back and forth through the photo review walk.** Prev/next arrows now
+  sit at the top of the review screen — in a box's own walk and in the
+  move-wide review queue — so you can revisit the photo you just passed
+  without leaving the walk. Anything you had typed in the "add a missed item"
+  field is saved before the arrows navigate, reviewing stays explicit, and
+  the queue still only counts the photos ahead of you (#699).
+
 ## [v0.100.0] — 2026-07-19
 
 ### Added
