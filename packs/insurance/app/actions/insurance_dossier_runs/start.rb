@@ -28,9 +28,13 @@ module InsuranceDossierRuns
       # hold in_box items), then count items scoped to that same snapshot — one
       # direction of derivation, so a concurrent mutation can't mint a
       # "0 boxes · N items" run. The job renders THIS box set, not a re-query,
-      # mirroring LabelPrintRuns::Start.
-      box_ids = move.boxes.where(id: move.items.in_box.select(:box_id)).ordered.ids
+      # mirroring LabelPrintRuns::Start — including its LIMIT cap+1 bound: each
+      # dossier box holds ≥1 item, so an over-cap Move fetches one extra id and
+      # is rejected without ever materializing an arbitrarily large id set.
+      box_ids = move.boxes.where(id: move.items.in_box.select(:box_id))
+                    .ordered.limit(MAX_ITEMS + 1).ids
       return Failure(:empty) if box_ids.empty?
+      return Failure(:too_many) if box_ids.size > MAX_ITEMS
 
       item_count = move.items.in_box.where(box_id: box_ids).count
       return Failure(:too_many) if item_count > MAX_ITEMS
