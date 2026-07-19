@@ -40,10 +40,34 @@ module InsuranceDossierRuns
                           content_type: "application/pdf")
       run.update!(status: "completed", completed_count: run.total_count, finished_at: Time.current)
       Broadcasting.broadcast_status(run)
+      reap_if_deleted(run)
     rescue StandardError # rubocop:disable Move/BroadRescue -- mark failed + broadcast, then re-raise (no swallow)
-      run.update!(status: "failed", finished_at: Time.current)
-      Broadcasting.broadcast_status(run)
+      begin
+        run.update!(status: "failed", finished_at: Time.current)
+        Broadcasting.broadcast_status(run)
+      rescue ActiveRecord::ActiveRecordError
+        # The run row (or its whole tenant schema) vanished mid-job — nothing
+        # to finalize; fall through to the reap so an attached PDF can't orphan.
+      end
+      reap_if_deleted(run)
       raise # Solid Queue records it; a retry no-ops (run no longer in_progress)
+    end
+
+    # The Move (or the whole tenant) can be deleted while this job renders:
+    # Moves::Destroy / Accounts::Delete capture attachment ids BEFORE deleting
+    # rows, so an attach landing after that capture would strand a sensitive
+    # blob in the public schema forever — the run purge can't see it (row
+    # gone) and the abandoned-blob sweep skips it (still attached). Re-check
+    # after finalizing and reap our own work.
+
+    def reap_if_deleted(run)
+      return if InsuranceDossierRun.exists?(run.id)
+
+      run.document.purge
+    rescue ActiveRecord::StatementInvalid
+      # Tenant schema dropped mid-job (account deletion): the run row is gone
+      # with its schema — purge the attachment just written to public.
+      run.document.purge
     end
 
     # Renders exactly the ids Start snapshotted (in box-number order), so the PDF

@@ -65,6 +65,25 @@ RSpec.describe InsuranceDossierRuns::GenerateJob do
     expect(run.reload.status).to eq("failed")
   end
 
+  it "reaps its own attachment when the run was deleted while rendering (#703)" do
+    ids = [seed_box(1)].map(&:id)
+    run = run_for(ids, 1)
+    fake = instance_double(InsuranceDossierPdf)
+    allow(InsuranceDossierPdf).to receive(:new).and_return(fake)
+    allow(fake).to receive(:render) do
+      # Moves::Destroy deletes the row (having captured attachment ids BEFORE
+      # this render finished) — the job must purge the blob it then attaches.
+      InsuranceDossierRun.where(id: run.id).delete_all
+      "%PDF-1.4 fake"
+    end
+
+    described_class.perform_now(run.id, tenant:, box_ids: ids)
+
+    expect(
+      ActiveStorage::Attachment.where(record_type: "InsuranceDossierRun", record_id: run.id)
+    ).to be_empty
+  end
+
   it "no-ops on a run that is already terminal (idempotent retry)" do
     ids = [seed_box(1)].map(&:id)
     run = create(:insurance_dossier_run, :failed, move:)
