@@ -50,7 +50,7 @@ class InsuranceDeclarationPdf
   private
 
   def title(doc)
-    doc.text "Insurance Declaration — #{@move.name}", size: 22, style: :bold
+    doc.text title_line("Insurance Declaration", @move), size: 22, style: :bold
     doc.move_down 4
   end
 

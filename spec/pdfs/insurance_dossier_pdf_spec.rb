@@ -96,6 +96,20 @@ RSpec.describe InsuranceDossierPdf do
     expect(text).not_to include("second bathroom")
   end
 
+  it "bounds user-authored cover text (an overlong move name truncates)" do
+    long_name = "Our absolutely enormous once in a lifetime intercontinental relocation " \
+                "with every possession we have ever owned and then some extra descriptive text"
+    big = create(:move, name: long_name)
+    box = create(:box, move: big, number: "1")
+    item = create(:item, :manual, move: big, box:, name: "Broom")
+
+    text = document_text(described_class.new(move: big, sections: [{ box: box, items: [item] }],
+                                             thumbnails: fake_thumbs).render).gsub(/\s+/, " ")
+
+    expect(text).to include("Insurance Claim Dossier — Our absolutely enormous")
+    expect(text).not_to include("then some extra descriptive")
+  end
+
   it "renders Unicode item names without crashing (the #85 AFM trap)" do
     box = create(:box, move:, number: "1", room: room)
     item = create(:item, :manual, move:, box:, name: "Lámpara – Große 📦")

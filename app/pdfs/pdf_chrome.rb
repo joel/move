@@ -22,8 +22,20 @@ module PdfChrome
     doc.move_down height + 12
   end
 
-  # "Origin  →  Destination", or nil when neither address is set.
+  # User-authored strings on PDF covers are truncated: Move name and addresses
+  # validate only presence, and unbounded cover text would wrap onto extra
+  # pages outside any page-budget estimate (#706 review round 5). A bounded
+  # heading is plenty for identification; the ellipsis is explicit.
+  TITLE_MAX = 80
+  ROUTE_MAX = 120
+
+  # The document heading: "<prefix> — <move name>", name bounded to one line.
+  def title_line(prefix, move)
+    "#{prefix} — #{move.name.truncate(TITLE_MAX)}"
+  end
+
+  # "Origin  →  Destination" (bounded), or nil when neither address is set.
   def route_line(move)
-    [move.origin_address, move.destination_address].compact_blank.join("  →  ").presence
+    [move.origin_address, move.destination_address].compact_blank.join("  →  ").presence&.truncate(ROUTE_MAX)
   end
 end

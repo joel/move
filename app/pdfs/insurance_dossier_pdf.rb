@@ -52,7 +52,7 @@ class InsuranceDossierPdf
   private
 
   def cover(doc)
-    doc.text "Insurance Claim Dossier — #{@move.name}", size: 22, style: :bold
+    doc.text title_line("Insurance Claim Dossier", @move), size: 22, style: :bold
     doc.move_down 4
     route = route_line(@move)
     doc.text route, size: 10, color: "6B6B6B" if route
