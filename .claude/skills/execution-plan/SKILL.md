@@ -565,12 +565,38 @@ After committing and before pushing, perform live verification. Use the
 > **Fallback when `/product-review` is not invocable.** In some sessions the
 > `product-review` skill is **not registered** under that name (the Skill tool
 > rejects it as unknown). When that happens, do **not** skip live verification —
-> drive it directly instead:
-> - the **`/verify`** skill (runs the app and observes behaviour), or
-> - the manual loop below: `agent-browser` for rendering/interaction, and
->   `bin/rails runner` (via `docker exec -i move-app-dev bin/rails runner -`) for
->   server-side setup (mint magic links / tokens — dev mail is unreachable from the
->   container; see agent memory `dev-magic-link-mint`).
+> run this checklist instead (the login mint is the slowest part to reconstruct
+> from scratch, hence the inline recipe):
+>
+> 1. **Try the `/verify` skill** (runs the app and observes behaviour). If it
+>    covers the changed journey, it replaces the rest of this list.
+> 2. **Start the app with the new code**: `bin/cli app restart` suffices for
+>    Ruby-only changes (source is mounted); `bin/cli app rebuild` first when
+>    dependencies changed. Asset gotchas still apply: a new Stimulus/importmap
+>    pin needs `assets:precompile` + restart, a new Tailwind class needs
+>    `tailwindcss:build` (AGENTS.md §4).
+> 3. **Mint a login** — dev mail is unreachable from the app container (no
+>    `mail` alias), so mint the Rodauth magic link directly (recipe verified
+>    2026-07-19; gotchas in agent memory `dev-magic-link-mint`):
+>    ```ruby
+>    # docker exec -i move-app-dev bin/rails runner - < mint.rb
+>    uid = User.find_by(email: "demo@example.com").id
+>    raw = SecureRandom.urlsafe_base64(32)
+>    r = RodauthApp.rodauth(nil).allocate
+>    r.account_from_id(uid)
+>    r.instance_variable_set(:@email_auth_key_value, raw) # REQUIRED under .allocate
+>    ActiveRecord::Base.connection.execute("DELETE FROM public.user_email_auth_keys WHERE id = '#{uid}'")
+>    r.send(:create_email_auth_key)
+>    puts r.send(:email_auth_email_link)
+>    ```
+>    Open the printed link with `agent-browser`, click **Login** (the email-auth
+>    page is a confirm form — it does not log in on landing); the apex handoff
+>    then redirects to the tenant. Demo data: demo@example.com / `acme` /
+>    "Seattle Relocation".
+> 4. **Drive the changed journey with `agent-browser`** end-to-end: every state
+>    the surface renders, dark + light themes, mobile viewport
+>    (`set viewport 393 852`), and `eval` for DOM assertions a snapshot can't
+>    show (aria attributes, computed styles, selected options).
 
 ```bash
 bin/cli app rebuild
