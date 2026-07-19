@@ -175,6 +175,35 @@ RSpec.describe "Review pending edits (JS)", :js do
     end
   end
 
+  it "auto-adds typed add-item text when navigating with the prev arrow (#699)" do
+    move, box, media, item = seed_review_photo
+    older = Apartment::Tenant.switch(slug) do
+      photo = create(:media, move:, box:, captured_at: 2.hours.ago)
+      create(:item, move:, box:, source_media: photo, name: "Sofa", review_state: "pending_review")
+      photo
+    end
+
+    login_as(user: user)
+    visit move_box_review_photo_path(move, box, media) # newest → prev = older
+    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
+
+    # The arrows live on the progress-bar row, OUTSIDE the items panel — this
+    # example is the net for the pending-add controller scope: if the
+    # controller ever narrows back to the panel, the guard on this click goes
+    # silently inert and the typed text is lost (the v0.99.3 bug).
+    find("a[aria-label='#{I18n.t("reviews.photo.nav.previous")}']").click
+
+    expect(page).to have_current_path(move_box_review_photo_path(move, box, older), wait: 15)
+    # The guard sequenced the add BEFORE navigating; the item landed on the
+    # ORIGIN photo, and pure navigation confirmed nothing.
+    eventually do
+      Apartment::Tenant.switch(slug) do
+        box.items.find_by(name: "Cutting board")&.source_media_id == media.id
+      end
+    end
+    eventually { Apartment::Tenant.switch(slug) { item.reload.review_state == "pending_review" } }
+  end
+
   it "does not resubmit an add the user already submitted before clicking Mark" do
     move, box, _, item = seed_review_photo
 

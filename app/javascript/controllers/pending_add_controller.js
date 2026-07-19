@@ -8,8 +8,10 @@ import { Controller } from "@hotwired/stimulus"
 // page: the existing error toast + retained text explain, and retrying the
 // advance just repeats the attempt.
 //
-// Scoped on the items panel (editable pages only): both AdvanceControls
-// instances (header + footer) bubble their events through it. Turbo's own
+// Scoped on the WHOLE review screen via a display:contents wrapper (editable
+// pages only, widened in #699): both AdvanceControls instances (header +
+// footer), the progress-row exit arrow and nav arrows, and the queue box
+// badge all bubble their events through it. Turbo's own
 // window-level submit/click handlers run in the bubble phase after these
 // actions and stand down on defaultPrevented, so preventDefault() here cleanly
 // stops both the native submission and Turbo (verified against Turbo 8.0.23).

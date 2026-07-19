@@ -97,6 +97,77 @@ RSpec.describe "Per-photo review" do
     end
   end
 
+  describe "nav arrows on the box walk (#699)" do
+    # A walk photo older than `media` (the let is captured "now"); the box walk
+    # orders oldest capture first.
+    def walk_photo(captured_at:, name: "Thing", state: "pending_review")
+      photo = create(:media, move:, box:, captured_at:)
+      create(:item, move:, box:, source_media: photo, name:, review_state: state)
+      photo
+    end
+
+    it "links both neighbours from a mid-walk photo, each carrying the pending-add guard" do
+      oldest = walk_photo(captured_at: 2.hours.ago)
+      middle = walk_photo(captured_at: 1.hour.ago)
+      detected(name: "Lamp") # `media`, captured now — the walk's end
+
+      get move_box_review_photo_path(move, box, middle)
+
+      guard = %([^>]*data-action="click->pending-add#guardVisit")
+      prev_href = Regexp.escape(move_box_review_photo_path(move, box, oldest))
+      next_href = Regexp.escape(move_box_review_photo_path(move, box, media))
+      expect(response.body)
+        .to match(/<a href="#{prev_href}"[^>]*aria-label="#{I18n.t("reviews.photo.nav.previous")}"#{guard}/)
+      expect(response.body)
+        .to match(/<a href="#{next_href}"[^>]*aria-label="#{I18n.t("reviews.photo.nav.next")}"#{guard}/)
+    end
+
+    it "disables prev at the start of the walk without dropping its label" do
+      oldest = walk_photo(captured_at: 2.hours.ago)
+      detected(name: "Lamp")
+
+      get move_box_review_photo_path(move, box, oldest)
+
+      expect(response.body).not_to match(/<a [^>]*aria-label="#{I18n.t("reviews.photo.nav.previous")}"/)
+      expect(response.body)
+        .to match(/<span [^>]*aria-disabled="true" aria-label="#{I18n.t("reviews.photo.nav.previous")}"/)
+      expect(response.body).to match(/<a [^>]*aria-label="#{I18n.t("reviews.photo.nav.next")}"/)
+    end
+
+    it "disables next at the end of the walk while the advance still offers Finish" do
+      walk_photo(captured_at: 2.hours.ago)
+      detected(name: "Lamp", review_state: "confirmed") # nothing pending → plain advance link
+
+      get move_box_review_photo_path(move, box, media)
+
+      # The nav boundary is a disabled arrow — distinct from the advance
+      # control's finish fallback, which still exits to the box.
+      expect(response.body)
+        .to match(/<span [^>]*aria-disabled="true" aria-label="#{I18n.t("reviews.photo.nav.next")}"/)
+      expect(response.body).to include(I18n.t("reviews.photo.finish"))
+      expect(response.body).to include(%(href="#{move_box_path(move, box)}"))
+    end
+
+    it "reaches an already-marked photo with prev (the walk is stable, not state-filtered)" do
+      marked = walk_photo(captured_at: 2.hours.ago, state: "confirmed")
+      detected(name: "Lamp")
+
+      get move_box_review_photo_path(move, box, media)
+
+      expect(response.body).to match(
+        /<a href="#{Regexp.escape(move_box_review_photo_path(move, box, marked))}"[^>]*aria-label="#{I18n.t("reviews.photo.nav.previous")}"/
+      )
+    end
+
+    it "hides the pair entirely on a single-photo walk" do
+      detected(name: "Lamp")
+
+      get move_box_review_photo_path(move, box, media)
+
+      expect(response.body).not_to include(%(aria-label="#{I18n.t("reviews.photo.nav.label")}"))
+    end
+  end
+
   # #660 — the explicit confirm: POST marks this photo's unreviewed items and
   # advances the walk (queue mode crosses boxes).
   describe "POST .../review/photo/:media_id/mark_reviewed" do
@@ -451,7 +522,51 @@ RSpec.describe "Per-photo review" do
         expect(response.body).to include(I18n.t("reviews.photo.mark_reviewed"))
         expect(response.body).to include(I18n.t("reviews.photo.ignore"))
         expect(response.body).to include(move_review_path(move))
+        # A single-photo walk has no neighbours — the nav pair hides (#699).
+        expect(response.body).not_to include(%(aria-label="#{I18n.t("reviews.photo.nav.label")}"))
       end
+    end
+
+    it "prev skips a just-marked photo and crosses boxes to the nearest newer pending one (#699)" do
+      detected(name: "Lamp") # `media` in `box`, captured now — the newest pending
+      marked_box = create(:box, move:, number: "7")
+      marked = create(:media, move:, box: marked_box, captured_at: 1.hour.ago)
+      create(:item, move:, box: marked_box, source_media: marked, review_state: "confirmed")
+      oldest_box = create(:box, move:, number: "42")
+      oldest = pending_photo(box: oldest_box, captured_at: 2.hours.ago)
+
+      get move_box_review_photo_path(move, oldest_box, oldest, queue: "move")
+
+      # The marked mid photo left the pending set ("marked is done"); prev
+      # lands on the newest pending photo, in ITS box, threading the queue.
+      expect(response.body).to match(
+        /<a href="#{Regexp.escape(move_box_review_photo_path(move, box, media,
+                                                             queue: "move"))}"[^>]*aria-label="#{I18n.t("reviews.photo.nav.previous")}"/
+      )
+      expect(response.body).not_to include(move_box_review_photo_path(move, marked_box, marked, queue: "move"))
+    end
+
+    it "prev reaches an ignored (still-pending) photo (#699)" do
+      detected(name: "Lamp") # newest pending
+      mid = pending_photo(box:, captured_at: 1.hour.ago)
+      oldest = pending_photo(box:, captured_at: 2.hours.ago)
+
+      get move_box_review_photo_path(move, box, oldest, queue: "move")
+
+      expect(response.body).to match(
+        /<a href="#{Regexp.escape(move_box_review_photo_path(move, box, mid, queue: "move"))}"[^>]*aria-label="#{I18n.t("reviews.photo.nav.previous")}"/
+      )
+    end
+
+    it "disables prev at the newest pending photo (#699)" do
+      detected(name: "Lamp") # newest pending
+      pending_photo(box:, captured_at: 1.hour.ago)
+
+      get move_box_review_photo_path(move, box, media, queue: "move")
+
+      expect(response.body).not_to match(/<a [^>]*aria-label="#{I18n.t("reviews.photo.nav.previous")}"/)
+      expect(response.body)
+        .to match(/<span [^>]*aria-disabled="true" aria-label="#{I18n.t("reviews.photo.nav.previous")}"/)
     end
 
     it "does not change review state on open in queue mode either (#660)" do
@@ -484,7 +599,14 @@ RSpec.describe "Per-photo review" do
       # to the newest)...
       get move_box_review_photo_path(archived, archived_box, photos[1], queue: "move")
       expect(response.body).to include(move_box_review_photo_path(archived, archived_box, photos[0], queue: "move"))
-      expect(response.body).not_to include(">#{move_box_review_photo_path(archived, archived_box, photos[2])}?queue")
+      # The newest photo is reachable ONLY through the prev nav arrow (#699) —
+      # the advance/Ignore controls never point backward, so its href appears
+      # exactly once, as the labelled nav anchor.
+      backward = move_box_review_photo_path(archived, archived_box, photos[2], queue: "move")
+      expect(response.body.scan(%(href="#{backward}")).count).to eq(1)
+      expect(response.body).to match(
+        /<a href="#{Regexp.escape(backward)}"[^>]*aria-label="#{I18n.t("reviews.photo.nav.previous")}"/
+      )
 
       # ...and from the end of the walk (the oldest), finish back to the queue.
       get move_box_review_photo_path(archived, archived_box, photos[0], queue: "move")

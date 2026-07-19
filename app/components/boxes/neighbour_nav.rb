@@ -67,7 +67,9 @@ module Components
             class: "rounded-full p-2 text-muted transition hover:bg-surface-container-high hover:text-text-warm"
           ) { render Components::Icons::ChevronRight.new(css: css) }
         else
-          span(role: "link", aria_disabled: "true", aria_label: I18n.t(key),
+          # tabindex keeps the disabled link in the tab order (the APG disabled-
+          # link pattern) so keyboard users encounter the boundary too.
+          span(role: "link", tabindex: "0", aria_disabled: "true", aria_label: I18n.t(key),
                class: "rounded-full p-2 text-muted/40") do
             render Components::Icons::ChevronRight.new(css: css)
           end

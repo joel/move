@@ -65,6 +65,14 @@
   forward" in the walk now steps **next-oldest**, with the same no-ping-pong and termination
   guarantees; the 300-photo cap keeps the **newest** photos (the head of the queue is always the
   fresh work).
+- **Update (2026-07-19, #699):** prev/next **navigation** arrows joined the walk's progress-bar
+  row (the box-detail #694 nav recipe — no jump select, photos have no labels to jump by).
+  Auto-advance and the "N more after this" count stay **strictly forward**, unchanged; the
+  arrows are pure navigation — in queue mode prev steps to the nearest **newer still-pending**
+  photo (a marked photo has left the set and stays done; ignored photos remain reachable; prev
+  can pass above a mid-queue entry point), in box mode it walks the stable list (marked photos
+  included). The pending-add controller (#690) now scopes the whole screen so the arrows guard
+  in-progress edits too.
 
 ---
 

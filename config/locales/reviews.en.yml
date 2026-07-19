@@ -15,6 +15,13 @@ en:
         zero: "Last photo to review"
         one: "1 more photo after this"
         other: "%{count} more photos after this"
+      # #699 — prev/next walk navigation (pure navigation, distinct from the
+      # advance controls): prev reaches marked photos in box mode and
+      # still-pending photos in queue mode.
+      nav:
+        label: "Photo navigation"
+        previous: "Previous photo"
+        next: "Next photo"
       title: "Review Items"
       subtitle: "We spotted these items. Tap to edit or remove."
       subtitle_touch: "We spotted these items. Tap a name to edit — swipe left to remove."
