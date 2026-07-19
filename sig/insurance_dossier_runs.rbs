@@ -1,0 +1,7 @@
+# Hand-written singleton for InsuranceDossierRuns::Start — inline RBS can't
+# declare `def self.` yet (the sig/label_print_runs.rbs pattern).
+module InsuranceDossierRuns
+  class Start < BaseAction
+    def self.over_page_budget?: (untyped box_count, untyped item_count) -> bool
+  end
+end

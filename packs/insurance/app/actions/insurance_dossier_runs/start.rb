@@ -17,10 +17,34 @@ module InsuranceDossierRuns
   # unlike labels, the dossier contains no URLs.
   class Start < BaseAction
     # Hard cap on dossier size (the domain guard, AGENTS §1 #2). Like labels'
-    # MAX_PAGES, the whole PDF is rendered into memory — here the real driver is
-    # unique-photo bytes (each unique capture is downloaded + downscaled to a
-    # ~15-25 KB thumbnail once), so 1,000 items is a ~25 MB worst-case document.
-    MAX_ITEMS = 1_000
+    # MAX_PAGES, the whole PDF is rendered into memory — but in a background
+    # job, not a Puma worker. The drivers: unique-photo bytes (each unique
+    # capture is downloaded + downscaled to a ~15-25 KB thumbnail ONCE, and
+    # shared photos dedupe) and page count (~11 rows/page → 4,000 items ≈ 370
+    # pages, inside the 400-page budget labels sanctions for in-memory PDF
+    # renders). Raised from 1,000 after a real Move exceeded it (#705).
+    MAX_ITEMS = 4_000
+    # The page budget itself (the labels MAX_PAGES precedent), estimated from
+    # per-box section overhead + per-item row height against usable A4 height.
+    # Approximate on purpose — it exists to reject pathological shapes the
+    # item cap alone admits (#706 review: 4,000 one-item boxes ≈ 667 pages of
+    # mostly headings). Constants mirror InsuranceDossierPdf's layout.
+    MAX_PAGES = 400
+    SECTION_PT = 52
+    ROW_PT = 64
+    # Effective capacity per page: usable A4 height MINUS the worst-case waste
+    # from a section-keep page break (SECTION_MIN_CURSOR ≈ 104pt) — the
+    # estimate must over-count pages, never under-count, or the pathological
+    # one-item-per-box shape squeezes past the budget (#706 review round 3).
+    USABLE_PAGE_PT = 658
+
+    # Singleton defs aren't supported by inline RBS; declared in
+    # sig/insurance_dossier_runs.rbs (the label_print_runs.rbs pattern).
+
+    # @rbs skip
+    def self.over_page_budget?(box_count, item_count)
+      (((box_count * SECTION_PT) + (item_count * ROW_PT)) / USABLE_PAGE_PT.to_f) > MAX_PAGES
+    end
 
     #: (move: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, actor:)
@@ -38,6 +62,7 @@ module InsuranceDossierRuns
 
       item_count = move.items.in_box.where(box_id: box_ids).count
       return Failure(:too_many) if item_count > MAX_ITEMS
+      return Failure(:too_many_pages) if self.class.over_page_budget?(box_ids.size, item_count)
 
       run = move.insurance_dossier_runs.create!(
         total_count: box_ids.size, item_count: item_count,

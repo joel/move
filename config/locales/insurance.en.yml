@@ -19,6 +19,8 @@ en:
     errors:
       empty: "There are no packed items to export yet."
       too_many: "This move is too large for one export — at %{max} items max."
+      too_many_lines: "This move has too many distinct item names for one declaration — at %{max} max."
+      too_many_pages: "This move would make the dossier too long to generate — at %{max} pages max."
     run:
       title: "Generating dossier"
       subtitle: "%{boxes} boxes · %{items} items"

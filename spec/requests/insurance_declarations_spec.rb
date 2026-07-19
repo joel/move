@@ -72,15 +72,15 @@ RSpec.describe "Insurance declaration" do
       expect(response).to have_http_status(:not_found)
     end
 
-    it "redirects to the hub with an alert when the move exceeds the sync-render cap" do
+    it "redirects to the hub with an alert when distinct lines exceed the sync-render cap" do
       box = create(:box, move:, number: "1")
       create(:item, :manual, move:, box:, name: "Mug")
-      stub_const("InsuranceDeclarations::Generate::MAX_ITEMS", 0)
+      stub_const("InsuranceDeclarations::Generate::MAX_LINES", 0)
 
       get move_insurance_declaration_path(move)
 
       expect(response).to redirect_to(move_insurance_path(move))
-      expect(flash[:alert]).to eq(I18n.t("insurance.errors.too_many", max: 0))
+      expect(flash[:alert]).to eq(I18n.t("insurance.errors.too_many_lines", max: 0))
     end
   end
 

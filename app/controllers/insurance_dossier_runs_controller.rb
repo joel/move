@@ -27,8 +27,7 @@ class InsuranceDossierRunsController < MoveScopedController
     in Dry::Monads::Success(run)
       redirect_to move_insurance_dossier_run_path(@move, run)
     in Dry::Monads::Failure(reason)
-      redirect_to move_insurance_path(@move),
-                  alert: t("insurance.errors.#{reason}", max: InsuranceDossierRuns::Start::MAX_ITEMS)
+      redirect_to move_insurance_path(@move), alert: dossier_error(reason)
     end
   end
 
@@ -43,6 +42,19 @@ class InsuranceDossierRunsController < MoveScopedController
   end
 
   private
+
+  # Each rejection reason names ITS cap — telling a 3,000-item user "4,000
+  # items max" on a page-budget rejection points at a retry that can't succeed.
+
+  #: (untyped reason) -> String
+  def dossier_error(reason)
+    max = if reason == :too_many_pages
+            InsuranceDossierRuns::Start::MAX_PAGES
+          else
+            InsuranceDossierRuns::Start::MAX_ITEMS
+          end
+    t("insurance.errors.#{reason}", max: max)
+  end
 
   #: () -> untyped
   def authorize_dossier!
