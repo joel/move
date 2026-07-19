@@ -5,6 +5,15 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.102.1] — 2026-07-19
+
+### Fixed
+- **Large moves can export their insurance documents again.** The declaration
+  no longer refuses a move for having many items — its real limit is distinct
+  item names (1,000), since "Moving blanket ×2000" is a single line. The claim
+  dossier's ceiling rises to 4,000 items with honest page-budget guards, and
+  each rejection now names the actual limit it hit (#705).
+
 ## [v0.102.0] — 2026-07-19
 
 ### Added
