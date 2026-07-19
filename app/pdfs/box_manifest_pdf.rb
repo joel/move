@@ -10,6 +10,7 @@ require "prawn/table"
 # (see Manifests::Generate); this object only renders.
 class BoxManifestPdf
   include PdfFonts
+  include PdfChrome
 
   WARNING = "Confidential — this manifest lists the box contents. " \
             "Keep it with the move; do not share publicly or attach it to the exterior label."
@@ -44,14 +45,7 @@ class BoxManifestPdf
   end
 
   def warning(doc)
-    doc.bounding_box([0, doc.cursor], width: doc.bounds.width) do
-      doc.fill_color "FBE9E7"
-      doc.fill_rectangle([0, doc.cursor], doc.bounds.width, 38)
-      doc.fill_color "B23C17"
-      doc.text_box WARNING, at: [10, doc.cursor - 8], width: doc.bounds.width - 20, size: 9
-      doc.fill_color "000000"
-    end
-    doc.move_down 50
+    banner(doc, WARNING, background: "FBE9E7", foreground: "B23C17", height: 38)
   end
 
   def table(doc)

@@ -214,7 +214,10 @@ grids, `ItemCard`, and the three `:detail` heroes.
 ### Other primitives
 `Ui::ProgressBar` (pill, sage fill) ·
 `Ui::EmptyState` · `Ui::SectionHeader` / `Ui::PageHeader` · `Ui::Toast` /
-`FlashToasts` · `Ui::SaveStatus` · `Ui::ThemeToggle`.
+`FlashToasts` · `Ui::SaveStatus` · `Ui::ThemeToggle` ·
+`Ui::AiIndexingStatus` / `Ui::LabelPrintStatus` / `Ui::InsuranceDossierStatus`
+(async-run status: progress bar → download / retry; stable id = the Turbo
+Stream replace target).
 
 ### Overlays — native `<dialog>` + Stimulus
 Three card/full-bleed overlay chromes built on native `<dialog>` (`showModal()` gives

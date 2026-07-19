@@ -245,10 +245,12 @@ module SeedData
   # so re-running never duplicates. Spans the review axis (confirmed /
   # needs_correction) and the presence axis (in_box / removed). The box-5 "Hair
   # dryer" backs the semantic-search demo ("blow dryer" ~ "Hair dryer").
+  # Some manual items carry a `family` (#702) so the insurance declaration
+  # seeds real theme groups; family-less ones showcase the Miscellaneous bucket.
   MANUAL_ITEMS = [
-    { box: "2", name: "Espresso Machine",
+    { box: "2", name: "Espresso Machine", family: "kitchenware",
       review: "confirmed", presence: "in_box" },
-    { box: "2", name: "Dinner Plates",
+    { box: "2", name: "Dinner Plates", family: "kitchenware",
       review: "confirmed", presence: "in_box" },
     { box: "4", name: "Paperback Novels",
       review: "needs_correction", presence: "in_box" },
@@ -256,9 +258,9 @@ module SeedData
       review: "confirmed", presence: "removed" },
     { box: "5", name: "Hair dryer",
       review: "confirmed", presence: "in_box" },
-    { box: "7", name: "Bedside Lamp",
+    { box: "7", name: "Bedside Lamp", family: "lamps & lighting",
       review: "confirmed", presence: "in_box" },
-    { box: "7", name: "Folded Bedsheets",
+    { box: "7", name: "Folded Bedsheets", family: "bedding & linens",
       review: "confirmed", presence: "in_box" },
     { box: "7", name: "Alarm Clock",
       review: "confirmed", presence: "in_box" },
@@ -270,11 +272,11 @@ module SeedData
     # scattered across three boxes — the epic's headline scenario ("packed
     # in a rush, found anyway"). Word-share similarity clusters them under
     # any provider, so the demo shows Groups with no AI key configured.
-    { box: "2", name: "AA batteries",
+    { box: "2", name: "AA batteries", family: "batteries & power",
       review: "confirmed", presence: "in_box" },
-    { box: "5", name: "AAA batteries",
+    { box: "5", name: "AAA batteries", family: "batteries & power",
       review: "confirmed", presence: "in_box" },
-    { box: "7", name: "Battery charger",
+    { box: "7", name: "Battery charger", family: "batteries & power",
       review: "confirmed", presence: "in_box" }
   ].freeze
 

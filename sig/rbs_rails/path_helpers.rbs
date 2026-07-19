@@ -73,6 +73,11 @@ interface ::_RbsRailsPathHelpers
   def download_move_label_print_run_path: (*untyped) -> ::String
   def move_label_print_runs_path: (*untyped) -> ::String
   def move_label_print_run_path: (*untyped) -> ::String
+  def move_insurance_path: (*untyped) -> ::String
+  def move_insurance_declaration_path: (*untyped) -> ::String
+  def download_move_insurance_dossier_run_path: (*untyped) -> ::String
+  def move_insurance_dossier_runs_path: (*untyped) -> ::String
+  def move_insurance_dossier_run_path: (*untyped) -> ::String
   def move_settings_path: (*untyped) -> ::String
   def move_settings_unit_system_path: (*untyped) -> ::String
   def move_settings_auto_confirm_threshold_path: (*untyped) -> ::String
@@ -193,6 +198,11 @@ interface ::_RbsRailsPathHelpers
   def download_move_label_print_run_url: (*untyped) -> ::String
   def move_label_print_runs_url: (*untyped) -> ::String
   def move_label_print_run_url: (*untyped) -> ::String
+  def move_insurance_url: (*untyped) -> ::String
+  def move_insurance_declaration_url: (*untyped) -> ::String
+  def download_move_insurance_dossier_run_url: (*untyped) -> ::String
+  def move_insurance_dossier_runs_url: (*untyped) -> ::String
+  def move_insurance_dossier_run_url: (*untyped) -> ::String
   def move_settings_url: (*untyped) -> ::String
   def move_settings_unit_system_url: (*untyped) -> ::String
   def move_settings_auto_confirm_threshold_url: (*untyped) -> ::String

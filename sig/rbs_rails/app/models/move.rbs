@@ -1221,6 +1221,10 @@ class ::Move < ::ApplicationRecord
   def label_print_runs=: (::LabelPrintRun::ActiveRecord_Associations_CollectionProxy | ::Array[::LabelPrintRun]) -> (::LabelPrintRun::ActiveRecord_Associations_CollectionProxy | ::Array[::LabelPrintRun])
   def label_print_run_ids: () -> ::Array[::String]
   def label_print_run_ids=: (::Array[::String]) -> ::Array[::String]
+  def insurance_dossier_runs: () -> ::InsuranceDossierRun::ActiveRecord_Associations_CollectionProxy
+  def insurance_dossier_runs=: (::InsuranceDossierRun::ActiveRecord_Associations_CollectionProxy | ::Array[::InsuranceDossierRun]) -> (::InsuranceDossierRun::ActiveRecord_Associations_CollectionProxy | ::Array[::InsuranceDossierRun])
+  def insurance_dossier_run_ids: () -> ::Array[::String]
+  def insurance_dossier_run_ids=: (::Array[::String]) -> ::Array[::String]
 
   def created_by: () -> ::User
   def created_by=: (::User?) -> ::User?
@@ -1316,4 +1320,8 @@ end
 class ::LabelPrintRun < ::ApplicationRecord
 end
 class ::LabelPrintRun::ActiveRecord_Associations_CollectionProxy < ::ActiveRecord::Associations::CollectionProxy
+end
+class ::InsuranceDossierRun < ::ApplicationRecord
+end
+class ::InsuranceDossierRun::ActiveRecord_Associations_CollectionProxy < ::ActiveRecord::Associations::CollectionProxy
 end

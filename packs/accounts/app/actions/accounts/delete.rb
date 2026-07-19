@@ -52,7 +52,7 @@ module Accounts
     # schema (config/initializers/apartment.rb), so DROP SCHEMA removes the tenant
     # rows but would otherwise orphan their public attachments, blobs and stored
     # files forever (the abandoned-blob job only sweeps *unattached* blobs).
-    TENANT_ATTACHMENTS = { Media => :image, LabelPrintRun => :document }.freeze
+    TENANT_ATTACHMENTS = { Media => :image, LabelPrintRun => :document, InsuranceDossierRun => :document }.freeze
 
     #: (user: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(user:)

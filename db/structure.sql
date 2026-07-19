@@ -970,6 +970,24 @@ CREATE TABLE public.indexing_runs (
 
 
 --
+-- Name: insurance_dossier_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.insurance_dossier_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    total_count integer DEFAULT 0 NOT NULL,
+    completed_count integer DEFAULT 0 NOT NULL,
+    item_count integer DEFAULT 0 NOT NULL,
+    status character varying DEFAULT 'queued'::character varying NOT NULL,
+    started_at timestamp(6) without time zone,
+    finished_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: item_cluster_memberships; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1464,6 +1482,14 @@ ALTER TABLE ONLY public.indexing_runs
 
 
 --
+-- Name: insurance_dossier_runs insurance_dossier_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.insurance_dossier_runs
+    ADD CONSTRAINT insurance_dossier_runs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: item_cluster_memberships item_cluster_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1801,6 +1827,20 @@ CREATE INDEX index_indexing_runs_on_move_id ON public.indexing_runs USING btree 
 --
 
 CREATE INDEX index_indexing_runs_on_move_id_and_status ON public.indexing_runs USING btree (move_id, status);
+
+
+--
+-- Name: index_insurance_dossier_runs_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_insurance_dossier_runs_on_move_id ON public.insurance_dossier_runs USING btree (move_id);
+
+
+--
+-- Name: index_insurance_dossier_runs_on_move_id_and_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_insurance_dossier_runs_on_move_id_and_status ON public.insurance_dossier_runs USING btree (move_id, status);
 
 
 --
@@ -2299,6 +2339,14 @@ ALTER TABLE ONLY public.recognition_suggestions
 
 
 --
+-- Name: insurance_dossier_runs fk_rails_1be795569c; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.insurance_dossier_runs
+    ADD CONSTRAINT fk_rails_1be795569c FOREIGN KEY (move_id) REFERENCES public.moves(id);
+
+
+--
 -- Name: cluster_name_embeddings fk_rails_1d70077445; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2593,6 +2641,7 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260719120000'),
 ('20260714120003'),
 ('20260714120002'),
 ('20260714120001'),

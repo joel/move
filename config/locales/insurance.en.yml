@@ -1,0 +1,32 @@
+# #702 — Insurance exports strings. No customer-facing copy is hard-coded in
+# the Phlex views; everything renders through insurance.*. (The PDF bodies keep
+# their copy as class constants — the app/pdfs precedent.)
+en:
+  insurance:
+    title: "Insurance"
+    subtitle: "Two documents, two audiences — a declaration you can hand to the movers, and a private dossier for a claim."
+    declaration:
+      title: "Insurance declaration"
+      description: "Every item you're moving, grouped into auto-generated categories. The document adds no box numbers, no room names and no photos — nothing that says where an item is packed. Send this one to the moving company (item names appear exactly as you wrote them)."
+      download: "Download declaration"
+    dossier:
+      title: "Claim dossier"
+      description: "Every item under its box, with photos — the evidence file for a claim. Keep it private; share it only with your insurer if something goes wrong."
+      generate: "Generate dossier"
+    empty:
+      title: "Nothing to declare yet"
+      description: "Pack some items first — the insurance documents list what's in your boxes."
+    errors:
+      empty: "There are no packed items to export yet."
+      too_many: "This move is too large for one export — at %{max} items max."
+    run:
+      title: "Generating dossier"
+      subtitle: "%{boxes} boxes · %{items} items"
+      back: "Back to Insurance"
+    status:
+      progress_label: "Generating"
+      in_progress: "Rendering %{done} of %{total} boxes…"
+      ready_title: "Your dossier is ready."
+      download: "Download PDF"
+      failed_title: "Dossier generation failed."
+      retry: "Try again"

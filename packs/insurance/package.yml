@@ -1,0 +1,45 @@
+# packs/insurance — the two Move-level insurance PDF exports (#702): the
+# movers-facing declaration (theme-grouped, deliberately no box/room/photo
+# information) and the private claim dossier (per box, with photos — the async
+# InsuranceDossierRun lifecycle, mirroring packs/labels' LabelPrintRun).
+#
+# All four boundary axes are enforced (the packs/labels template):
+#
+#   enforce_dependencies  — may only reference packs listed in `dependencies`.
+#   enforce_privacy       — only constants under app/public/ (or pack_public-
+#                           sigiled actions) are referenceable from outside.
+#   enforce_visibility    — only packs listed in `visible_to` may depend on us.
+#   enforce_architecture  — as a `domain` pack it may reference `domain`/`utility`
+#                           (and the unlayered root), never the application layer.
+#
+# PUBLIC API:
+#   InsuranceDossierRun               — the run record (referenced by
+#                                       Accounts::Delete, Moves::Destroy, the
+#                                       purge job and the controllers).
+#   InsuranceDeclarations::Generate   — the declaration entry point (pack_public).
+#   InsuranceDossierRuns::Start       — the dossier entry point (pack_public).
+# PRIVATE:
+#   InsuranceDossierRuns::{RecordProgress, Broadcasting, GenerateJob,
+#   ThumbnailCache}, Insurance::AuditSubscriber (wired from config/initializers,
+#   which is outside packwerk's include — the manifests precedent).
+#
+# Dependencies: `packs/utility` for the kernel bases (ApplicationRecord,
+# ApplicationJob) and `.` (root) for the domain constants (Move, Box, Item, the
+# app/pdfs builders) AND BaseAction (still in root, #443). `visible_to`: the root
+# app (controllers, Moves::Destroy, purge job) and packs/accounts
+# (Accounts::Delete purges the run's attachment on account deletion).
+
+enforce_dependencies: true
+enforce_privacy: true
+enforce_visibility: true
+enforce_architecture: true
+
+layer: domain
+
+dependencies:
+  - "."
+  - "packs/utility"
+
+visible_to:
+  - "."
+  - "packs/accounts"

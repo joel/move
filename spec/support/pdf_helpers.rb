@@ -19,6 +19,13 @@ module PdfHelpers
     PDF::Reader.new(StringIO.new(pdf)).pages.first.text
   end
 
+  # The extracted text of EVERY page joined — for whole-document invariants
+  # (e.g. the insurance declaration's "no box numbers anywhere" privacy spec,
+  # #702), where a first-page-only probe would pass vacuously.
+  def document_text(pdf)
+    PDF::Reader.new(StringIO.new(pdf)).pages.map(&:text).join("\n")
+  end
+
   # The [r, g, b] fill color (floats, 0.0–1.0) in effect when +text+ is drawn on the
   # first page — the last fill-color operator before its text op.
   def fill_color_at(pdf, text)

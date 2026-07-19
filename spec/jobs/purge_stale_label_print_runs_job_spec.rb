@@ -30,4 +30,13 @@ RSpec.describe PurgeStaleLabelPrintRunsJob do
     expect(LabelPrintRun.exists?(queued.id)).to be(true)
     expect(LabelPrintRun.exists?(processing.id)).to be(true)
   end
+
+  it "skips a slug whose schema is gone (account-deletion race) and sweeps the rest" do
+    old = create(:label_print_run, :completed, move:, finished_at: 2.days.ago)
+    allow(Organization).to receive(:pluck).with(:slug)
+                                          .and_return(["ghost-tenant", Apartment::Tenant.current])
+
+    expect { described_class.perform_now }.not_to raise_error
+    expect(LabelPrintRun.exists?(old.id)).to be(false) # the real tenant still swept
+  end
 end

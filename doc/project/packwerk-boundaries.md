@@ -148,10 +148,11 @@ layer for now — they reference only the labels **public** API.
 ## Migration status — what's a pack, and what stays in the root (and why)
 
 The migration is **complete**: every domain that *can* be a self-contained pack is
-one. **18 packs** now exist — the `utility` kernel plus 17 peripheral domains
+one. **19 packs** now exist — the `utility` kernel plus 18 peripheral domains
 (labels, manifests, search, activity, qr, terms, reviews, photos,
 move_integration_tokens, move_memberships, session_handoffs, accounts, vocabularies,
-image_generation, demo_data, organizations, and **captures** — which absorbed
+image_generation, demo_data, organizations, insurance — the #702 PDF exports,
+mirroring labels' run lifecycle — and **captures**, which absorbed
 recognition, see below).
 
 **The core stays in the root — on purpose.** These are **not** un-migrated TODOs;
@@ -201,6 +202,7 @@ graph TD
     end
 
     labels["labels ✅"]
+    insurance["insurance ✅"]
     utility["utility ✅ (kernel)"]
     boxes["boxes"]
     items["items"]
@@ -233,12 +235,13 @@ graph TD
     activity --> moves & boxes & items & captures
     manifests --> boxes & items
     labels --> moves & boxes
-    accounts --> tenancy & auth & captures & labels
+    insurance --> root & utility
+    accounts --> tenancy & auth & captures & labels & insurance
     demo --> moves & boxes & captures & items & search & tenancy
     discards --> moves
 
     classDef done fill:#2f6f4e,stroke:#ECE7DC,color:#fff;
-    class labels,utility,manifests,search,activity,qr,terms,reviews,photos,integration_tokens,move_memberships,session_handoffs,accounts,vocabularies,image_gen,demo,captures,tenancy done;
+    class labels,insurance,utility,manifests,search,activity,qr,terms,reviews,photos,integration_tokens,move_memberships,session_handoffs,accounts,vocabularies,image_gen,demo,captures,tenancy done;
 ```
 
 **kernel** = the domain-free framework infrastructure (`ApplicationRecord`,

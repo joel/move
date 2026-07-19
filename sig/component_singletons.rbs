@@ -49,5 +49,9 @@ module Components
 
       def self.editor?: (?untyped move) -> bool
     end
+
+    class Button
+      def self.classes: (?variant: untyped, ?full_width: untyped) -> String
+    end
   end
 end

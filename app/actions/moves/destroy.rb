@@ -22,12 +22,12 @@ module Moves
     # item_id/move_id FKs are `ON DELETE CASCADE`, so the DB removes it for us.)
     DELETE_ORDER = [
       RecognitionSuggestion, RecognitionRun, Item, Media,
-      Activity, IndexingRun, LabelPrintRun, MoveIntegrationToken, MoveMembership,
-      Box, Room
+      Activity, IndexingRun, LabelPrintRun, InsuranceDossierRun, MoveIntegrationToken,
+      MoveMembership, Box, Room
     ].freeze
 
     # Models holding Active Storage attachments whose blobs we purge explicitly.
-    ATTACHMENT_MODELS = [Media, LabelPrintRun].freeze
+    ATTACHMENT_MODELS = [Media, LabelPrintRun, InsuranceDossierRun].freeze
 
     #: (move: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:)

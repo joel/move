@@ -91,4 +91,21 @@ RSpec.describe LabelPrintRuns::GenerateJob do
       described_class.perform_now(run.id, tenant:, host: "h", protocol: "https", box_ids: [])
     end.not_to(change { run.reload.updated_at })
   end
+
+  it "reaps its own attachment when the run was deleted while rendering (#703)" do
+    run = run_for(1, 1)
+    ids = ids_in(1, 1)
+    fake = instance_double(BoxLabelsPdf)
+    allow(BoxLabelsPdf).to receive(:new).and_return(fake)
+    allow(fake).to receive(:render) do
+      LabelPrintRun.where(id: run.id).delete_all
+      "%PDF-1.4 fake"
+    end
+
+    described_class.perform_now(run.id, tenant:, host: "h", protocol: "https", box_ids: ids)
+
+    expect(
+      ActiveStorage::Attachment.where(record_type: "LabelPrintRun", record_id: run.id)
+    ).to be_empty
+  end
 end
