@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.100.0] — 2026-07-19
+
+### Added
+- **Walk box-to-box straight from a box's page.** Prev/next arrows at the top
+  of the box detail page step through your boxes in label order, and a jump
+  menu between them takes you straight to any box — no more bouncing back
+  through the box list and scrolling to find the next one. The arrows grey out
+  at the ends of the walk, and the whole control stays out of the way until
+  you have at least two boxes (#694).
+
 ## [v0.99.3] — 2026-07-18
 
 ### Fixed
