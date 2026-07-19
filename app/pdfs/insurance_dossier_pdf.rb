@@ -23,8 +23,11 @@ class InsuranceDossierPdf
   ROW_HEIGHT = 64
   # Long names truncate EXPLICITLY (String#truncate's ellipsis) — Prawn's
   # shrink_to_fit shrinks to an illegible 5pt and then cuts silently (#508), the
-  # worst behavior for a claim-evidence document.
+  # worst behavior for a claim-evidence document. Room names truncate too: the
+  # page-budget estimate assumes single-line box headings, and Room validates
+  # only presence (#706 review round 4).
   NAME_MAX = 140
+  ROOM_MAX = 60
   # Heading + at least the first item row must fit together.
   SECTION_MIN_CURSOR = ROW_HEIGHT + 40
 
@@ -64,7 +67,7 @@ class InsuranceDossierPdf
   def box_section(doc, section)
     doc.start_new_page if doc.cursor < SECTION_MIN_CURSOR
     box = section[:box]
-    room = box.room&.name.presence || "Unassigned"
+    room = (box.room&.name.presence || "Unassigned").truncate(ROOM_MAX)
     doc.text "Box ##{format("%03d", box.number.to_i)} — #{room}", size: 13, style: :bold
     doc.text "#{section[:items].size} items", size: 9, color: "6B6B6B"
     doc.move_down 8
