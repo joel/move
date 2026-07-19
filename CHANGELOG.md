@@ -5,6 +5,18 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.102.0] — 2026-07-19
+
+### Added
+- **Insurance documents, built for how insurance actually works.** A new
+  Insurance page (in the Menu) produces two PDFs: a **declaration** you can
+  hand to the moving company — every item grouped by category, with no box
+  numbers, no room names and no photos, so the list never shows where your
+  valuables are packed — and a private **claim dossier** (admins only) that
+  lists every item under its box with photographs, for your insurer if
+  something goes wrong. Both are watermarked with their purpose, and every
+  export is recorded (#702).
+
 ## [v0.101.0] — 2026-07-19
 
 ### Added
