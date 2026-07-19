@@ -51,6 +51,15 @@ RSpec.describe InsuranceDossierRuns::Start do
     expect(InsuranceDossierRuns::GenerateJob).not_to have_received(:perform_later)
   end
 
+  it "fails :too_many when the page-budget estimate is exceeded (many one-item boxes, #706)" do
+    box_with_item(1)
+    stub_const("InsuranceDossierRuns::Start::MAX_PAGES", 0)
+
+    result = described_class.new.call(move: move, actor: user)
+
+    expect(result.failure).to eq(:too_many)
+  end
+
   it "fails :too_many over the item cap without creating a run" do
     box_with_item(1)
     stub_const("InsuranceDossierRuns::Start::MAX_ITEMS", 0)

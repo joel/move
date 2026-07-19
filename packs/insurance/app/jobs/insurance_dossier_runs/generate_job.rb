@@ -81,7 +81,7 @@ module InsuranceDossierRuns
     def build_sections(move, box_ids)
       items = move.items.in_box.where(box_id: box_ids).ordered
                   .includes(source_media: { image_attachment: :blob }).to_a
-      raise TooManyItems, items.size.to_s if items.size > Start::MAX_ITEMS
+      raise TooManyItems, items.size.to_s if items.size > Start::MAX_ITEMS || Start.over_page_budget?(box_ids.size, items.size)
 
       by_box = items.group_by(&:box_id)
       move.boxes.where(id: box_ids).ordered.includes(:room).map do |box|
