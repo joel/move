@@ -42,9 +42,19 @@ RSpec.describe InsuranceDeclarations::Generate do
     expect(result.last[:lines]).to contain_exactly(["Junk drawer things", 1], ["Odd lamp", 1])
   end
 
-  it "fails :too_many over the sync-render cap" do
+  it "fails :too_many when the group count exceeds the cap" do
     item("Mug", family: "kitchenware")
     stub_const("InsuranceDeclarations::Generate::MAX_ITEMS", 0)
+
+    result = described_class.new.call(move: move, actor: user)
+
+    expect(result.failure).to eq(:too_many)
+  end
+
+  it "fails :too_many when few groups hold more items than the cap (atomic — no separate pre-count)" do
+    item("Mug", family: "kitchenware")
+    item("Mug", family: "kitchenware") # one group, two items
+    stub_const("InsuranceDeclarations::Generate::MAX_ITEMS", 1)
 
     result = described_class.new.call(move: move, actor: user)
 

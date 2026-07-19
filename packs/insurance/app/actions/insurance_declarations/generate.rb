@@ -32,10 +32,18 @@ module InsuranceDeclarations
 
     #: (move: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, actor:)
-      return Failure(:too_many) if move.items.in_box.count > MAX_ITEMS
+      # The cap is enforced on the SAME aggregate that renders — a separate
+      # pre-count would race concurrent packing (TOCTOU) and leave the Prawn
+      # table unbounded. LIMIT caps the fetched GROUPS (each holds ≥1 item, so
+      # >MAX groups is over-cap by itself and memory stays bounded); the summed
+      # counts catch the few-groups/many-items shape from the same result.
+      rows = grouped_rows(move)
+      return Failure(:too_many) if rows.size > MAX_ITEMS
 
-      sections = build_sections(grouped_rows(move))
-      total_items = sections.sum { |section| section[:lines].sum(&:last) }
+      total_items = rows.values.sum
+      return Failure(:too_many) if total_items > MAX_ITEMS
+
+      sections = build_sections(rows)
       yield emit_event(move, actor, total_items)
       Success(sections: sections, total_items: total_items)
     end
@@ -45,13 +53,15 @@ module InsuranceDeclarations
     # One aggregated query (AGENTS §1 #5): one row per (family, name) pair with
     # its count, ordered family-alphabetical with NULLS LAST — which lands the
     # Miscellaneous bucket at the end for free — then names alphabetical (a
-    # declaration is a checking document; lookup order beats recency).
+    # declaration is a checking document; lookup order beats recency). LIMIT
+    # bounds the fetched group rows for the cap check above.
 
     #: (untyped move) -> untyped
     def grouped_rows(move)
       move.items.in_box
           .group(Arel.sql(FAMILY_NORM), :name)
           .order(Arel.sql("#{FAMILY_NORM} ASC NULLS LAST"), name: :asc)
+          .limit(MAX_ITEMS + 1)
           .count
     end
 
