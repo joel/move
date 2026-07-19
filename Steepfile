@@ -41,6 +41,9 @@ target :actions do
   check "app/controllers/gallery_groups_controller.rb", inline: true
   check "app/controllers/google_one_tap_sessions_controller.rb", inline: true
   check "app/controllers/integration_tokens_controller.rb", inline: true
+  check "app/controllers/insurance_controller.rb", inline: true
+  check "app/controllers/insurance_declarations_controller.rb", inline: true
+  check "app/controllers/insurance_dossier_runs_controller.rb", inline: true
   check "app/controllers/items_controller.rb", inline: true
   check "app/controllers/label_print_runs_controller.rb", inline: true
   check "app/controllers/label_prints_controller.rb", inline: true
@@ -83,6 +86,8 @@ target :actions do
   check "app/views/captures", inline: true
   check "app/views/galleries", inline: true
   check "app/views/gallery_groups", inline: true
+  check "app/views/insurance", inline: true
+  check "app/views/insurance_dossier_runs", inline: true
   check "app/views/items", inline: true
   check "app/views/label_print_runs", inline: true
   check "app/views/label_prints", inline: true
@@ -116,6 +121,7 @@ target :actions do
   check "packs/activity/app/public", inline: true
   check "packs/captures/app/public", inline: true
   check "packs/labels/app/public", inline: true
+  check "packs/insurance/app/public", inline: true
   check "packs/move_integration_tokens/app/public", inline: true
   check "packs/move_invitations/app/public", inline: true
   check "packs/move_memberships/app/public", inline: true
@@ -142,6 +148,7 @@ target :actions do
   check "packs/captures/app/actions", inline: true
   check "packs/demo_data/app/actions", inline: true
   check "packs/labels/app/actions", inline: true
+  check "packs/insurance/app/actions", inline: true
   check "packs/move_invitations/app/actions", inline: true
   check "packs/manifests/app/actions", inline: true
   check "packs/move_integration_tokens/app/actions", inline: true

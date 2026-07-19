@@ -179,6 +179,14 @@ Rails.application.routes.draw do
     resources :label_print_runs, path: "label_print/runs", only: %i[create show] do
       member { get :download }
     end
+    # #702 — Insurance exports hub + the two PDFs: the sanitized declaration
+    # (synchronous, any member) and the private claim dossier (async run with
+    # photos, admin-only). Reached from the Menu.
+    get "insurance", to: "insurance#show", as: :insurance
+    get "insurance/declaration", to: "insurance_declarations#show", as: :insurance_declaration
+    resources :insurance_dossier_runs, path: "insurance/dossier/runs", only: %i[create show] do
+      member { get :download }
+    end
     get "settings", to: "settings#show", as: :settings
     patch "settings/unit_system", to: "settings#update_unit_system", as: :settings_unit_system
     patch "settings/auto_confirm_threshold", to: "settings#update_auto_confirm_threshold",

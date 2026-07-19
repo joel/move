@@ -63,6 +63,8 @@ class Move < ApplicationRecord
   has_many :activities, dependent: :destroy
   # E1 — bulk label-print generation passes, for live progress + download (#303).
   has_many :label_print_runs, dependent: :destroy
+  # #702 — insurance claim-dossier generation passes (same run lifecycle).
+  has_many :insurance_dossier_runs, dependent: :destroy
 
   validates :name, presence: true
   validates :status, inclusion: { in: STATUSES }

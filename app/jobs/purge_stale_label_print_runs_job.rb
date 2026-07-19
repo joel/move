@@ -24,6 +24,12 @@ class PurgeStaleLabelPrintRunsJob < ApplicationJob
         LabelPrintRun.where(status: LabelPrintRun::TERMINAL, finished_at: ..RETENTION.ago)
                      .find_each(&:destroy)
       end
+    rescue Apartment::TenantNotFound
+      # Account-deletion race (the PurgeExpiredDiscardsJob precedent): the tenant
+      # schema is dropped before the Organization row is deleted, so a listed
+      # slug can have no schema. Skip — aborting would starve every tenant later
+      # in the list of its sweep (#702 found this copied gap).
+      next
     end
   end
 end

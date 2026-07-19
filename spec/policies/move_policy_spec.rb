@@ -45,6 +45,37 @@ RSpec.describe MovePolicy do
     end
   end
 
+  describe "export_insurance_declaration? (any member — sanitized by design, #702)" do
+    it "permits a viewer" do
+      move = create(:move)
+      create(:move_membership, move:, user:, role: "viewer")
+      expect(described_class.new(move, user:).apply(:export_insurance_declaration?)).to be(true)
+    end
+
+    it "denies a non-member" do
+      expect(described_class.new(create(:move), user:).apply(:export_insurance_declaration?)).to be(false)
+    end
+  end
+
+  describe "export_insurance_dossier? (admin-only, #702)" do
+    it "permits an admin" do
+      move = create(:move, created_by: user)
+      expect(described_class.new(move, user:).apply(:export_insurance_dossier?)).to be(true)
+    end
+
+    it "denies a contributor" do
+      move = create(:move)
+      create(:move_membership, move:, user:, role: "contributor")
+      expect(described_class.new(move, user:).apply(:export_insurance_dossier?)).to be(false)
+    end
+
+    it "denies a viewer" do
+      move = create(:move)
+      create(:move_membership, move:, user:, role: "viewer")
+      expect(described_class.new(move, user:).apply(:export_insurance_dossier?)).to be(false)
+    end
+  end
+
   describe "manage_recognition_keys? (admin-only)" do
     it "permits an admin" do
       move = create(:move, created_by: user)

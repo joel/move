@@ -15,6 +15,7 @@ en:
       summary: "Summary & Volume"
       box_steps: "Bulk Box Steps"
       label_print: "Print Labels"
+      insurance: "Insurance"
       settings: "Settings"
       assistant: "Assistant & Integrations"
       account: "Account"

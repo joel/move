@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="980" height="490" viewBox="0 0 980 490">
 <rect x="0" y="0" width="980" height="490" fill="#15120E"/>
-<text x="30" y="40" font-family="Inter,sans-serif" font-size="21" font-weight="bold" fill="#ECE7DC">Packwerk inter-pack dependency map — move (18 packs)</text>
+<text x="30" y="40" font-family="Inter,sans-serif" font-size="21" font-weight="bold" fill="#ECE7DC">Packwerk inter-pack dependency map — move (19 packs)</text>
 <rect x="30" y="70" width="920" height="32" rx="7" fill="#4A4033" stroke="#ECE7DC" stroke-width="2"/>
 <text x="42" y="91" font-family="Inter,sans-serif" font-size="13" fill="#ECE7DC">root (unlayered) — Move aggregate (Move/Box/Item/Room) · identity (User/Rodauth) · controllers/views/MCP · BaseAction · Discards</text>
 <rect x="30" y="430" width="920" height="32" rx="7" fill="#2F6F4E" stroke="#ECE7DC" stroke-width="2"/>
 <text x="42" y="451" font-family="Inter,sans-serif" font-size="13" font-weight="bold" fill="#ECE7DC">packs/utility (kernel) — ApplicationRecord · ApplicationJob · ApplicationMailer · Current · Discardable · Roleable · ProviderHttp</text>
-<text x="30" y="478" font-family="Inter,sans-serif" font-size="11.5" fill="#6B6357">Every domain pack also depends on root (▲, for Move/Box/…) and utility (▼); those 34 edges are omitted for clarity. Coloured arrows = pack→pack deps. Acyclic (packwerk validate ✓).</text>
+<text x="30" y="478" font-family="Inter,sans-serif" font-size="11.5" fill="#6B6357">Every domain pack also depends on root (▲, for Move/Box/…) and utility (▼); those 36 edges are omitted for clarity. Coloured arrows = pack→pack deps. Acyclic (packwerk validate ✓).</text>
 <line x1="129" y1="184" x2="129" y2="250" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="129,250 125,241 133,241" fill="#C99A5B" opacity="1.0"/>
 <line x1="129" y1="184" x2="489" y2="250" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="489,250 479,252 481,245" fill="#C99A5B" opacity="1.0"/>
 <line x1="129" y1="184" x2="309" y2="250" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="309,250 299,250 302,243" fill="#C99A5B" opacity="1.0"/>
@@ -37,19 +37,22 @@
 <text x="489" y="271" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">labels</text>
 <rect x="810" y="250" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
 <text x="869" y="271" text-anchor="middle" font-family="Inter,sans-serif" font-size="10.5" fill="#ECE7DC">session_handoffs</text>
-<rect x="70" y="345" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="129" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">activity</text>
-<rect x="198" y="345" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="257" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">image_gen</text>
-<rect x="326" y="345" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="385" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">manifests</text>
-<rect x="454" y="345" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="513" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">photos</text>
-<rect x="582" y="345" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="641" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">qr</text>
-<rect x="710" y="345" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="769" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">reviews</text>
-<rect x="838" y="345" width="118" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
-<text x="897" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">terms</text>
+<line x1="129" y1="184" x2="351" y2="345" stroke="#C99A5B" stroke-width="2.0" opacity="1.0"/><polygon points="351,345 342,343 346,336" fill="#C99A5B" opacity="1.0"/>
+<rect x="70" y="345" width="106" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="123" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">activity</text>
+<rect x="184" y="345" width="106" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="237" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">image_gen</text>
+<rect x="298" y="345" width="106" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="351" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">insurance</text>
+<rect x="412" y="345" width="106" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="465" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">manifests</text>
+<rect x="526" y="345" width="106" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="579" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">photos</text>
+<rect x="640" y="345" width="106" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="693" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">qr</text>
+<rect x="754" y="345" width="106" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="807" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">reviews</text>
+<rect x="868" y="345" width="106" height="34" rx="6" fill="#3A352C" stroke="#ECE7DC" stroke-width="1"/>
+<text x="921" y="366" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#ECE7DC">terms</text>
 <text x="730" y="40" font-family="Inter,sans-serif" font-size="11.5" fill="#2F6F4E">green outline = hub (depended-on)</text>
 </svg>

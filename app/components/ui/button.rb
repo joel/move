@@ -22,6 +22,25 @@ module Components
         danger: "bg-error text-on-error hover:opacity-90"
       }.freeze
 
+      # The pill recipe as a plain class string — for form helpers (button_to /
+      # submit buttons) that can't render the component but must not fork the
+      # recipe (#702; hand-rolled copies kept dropping select-none and the
+      # focus-visible ring). Singleton defs aren't supported by inline RBS;
+      # declared in sig/component_singletons.rbs.
+
+      # @rbs skip
+      def self.classes(variant: :primary, full_width: false)
+        [
+          "inline-flex items-center justify-center gap-2 rounded-full",
+          "px-6 py-3 text-sm font-bold transition select-none",
+          "active:scale-[0.98] focus-visible:outline-2",
+          "focus-visible:outline-offset-2 focus-visible:outline-accent-sage",
+          "disabled:opacity-50 disabled:pointer-events-none",
+          VARIANTS.fetch(variant, VARIANTS[:primary]),
+          (full_width ? "w-full" : nil)
+        ].compact.join(" ")
+      end
+
       #: (?label: untyped, ?variant: untyped, ?href: untyped, ?type: untyped, ?full_width: untyped, ?icon: untyped, ?disabled: untyped, **untyped) -> void
       def initialize(
         label: nil, variant: :primary, href: nil, type: "button",
@@ -62,16 +81,7 @@ module Components
 
       #: () -> String
       def classes
-        variant = VARIANTS.fetch(@variant, VARIANTS[:primary])
-        [
-          "inline-flex items-center justify-center gap-2 rounded-full",
-          "px-6 py-3 text-sm font-bold transition select-none",
-          "active:scale-[0.98] focus-visible:outline-2",
-          "focus-visible:outline-offset-2 focus-visible:outline-accent-sage",
-          "disabled:opacity-50 disabled:pointer-events-none",
-          variant,
-          (@full_width ? "w-full" : nil)
-        ].compact.join(" ")
+        self.class.classes(variant: @variant, full_width: @full_width)
       end
     end
   end

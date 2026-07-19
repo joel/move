@@ -3,7 +3,9 @@
 # An inventory item in exactly one Box (Domain §4.12). Created by recognition
 # (auto_confirmed/pending_review) or manually. An item is just a name —
 # category, tags, quantity and fragility were all removed across the
-# simplification epic. No value, bounding box, or crop fields.
+# simplification epic. No value, bounding box, or crop fields. The hidden
+# `family` column (#626) feeds search/clustering and has exactly ONE rendering
+# consumer: the insurance declaration's theme grouping (#702).
 class Item < ApplicationRecord
   # Field-level history (Logidze) over the editable column (name) — powers the
   # activity feed's revert (PR3). The whitelist trigger ignores discard/system

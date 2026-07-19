@@ -65,6 +65,19 @@ class MovePolicy < ApplicationPolicy
     admin_of?(record)
   end
 
+  # #702 — the movers-facing insurance declaration is sanitized by design (no
+  # box numbers / rooms / photos), so any member may generate it — parity with
+  # the box manifest (BoxPolicy#manifest? = show?).
+  def export_insurance_declaration?
+    reader_of?(record)
+  end
+
+  # #702 — the claim dossier reveals which box holds each item, with photos,
+  # as a downloadable file: admin-only, like the other sensitive Move controls.
+  def export_insurance_dossier?
+    admin_of?(record)
+  end
+
   relation_scope do |relation|
     next relation.none if user.blank?
 

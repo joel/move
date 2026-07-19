@@ -154,13 +154,19 @@ module DemoData
         next unless box
 
         item = box.items.find_or_initialize_by(name: attrs[:name])
-        next unless item.new_record?
-
-        item.assign_attributes(
-          move: @move, created_via: "manual",
-          review_state: attrs[:review], presence_state: attrs[:presence]
-        )
-        item.save!
+        if item.new_record?
+          item.assign_attributes(
+            move: @move, created_via: "manual", family: attrs[:family],
+            review_state: attrs[:review], presence_state: attrs[:presence]
+          )
+          item.save!
+        elsif attrs[:family] && item.family.nil?
+          # Backfill (#702): family values added to the catalog must reach an
+          # already-seeded org too, or the insurance declaration's theme groups
+          # never materialize without a full DB reset. Idempotent — only fills
+          # a blank, never overwrites.
+          item.update!(family: attrs[:family])
+        end
       end
     end
 

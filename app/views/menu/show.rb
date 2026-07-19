@@ -51,6 +51,8 @@ module Views
         links << [I18n.t("menu.show.summary"), Components::Icons::Chart, move_summary_path(@move)]
         links << [I18n.t("menu.show.box_steps"), Components::Icons::Bolt, move_box_steps_path(@move)] if @editor
         links << [I18n.t("menu.show.label_print"), Components::Icons::Tag, move_label_print_path(@move)]
+        # #702 — the Insurance hub is member-visible; it gates the dossier card.
+        links << [I18n.t("menu.show.insurance"), Components::Icons::Shield, move_insurance_path(@move)]
         links
       end
 

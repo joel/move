@@ -418,5 +418,6 @@ E1 (`ea5a8a69…` + mobile) and the four E2 state screens were implemented in D9
 | B1-CONTENTS | ⚠️ | post-D | ✅ decided | 5 Stitch screens created (`c3adef35…`, `dce2995c…`, `78ec0a5f…`, `0b3ebf18…`, `e5dcff39…`); detail panel labelled "Contents" not "AI Suggested Contents"; ✨ on edit form + seal modal only (#210) |
 | A2-DUPLICATE | ⚠️ | post-D | ✅ decided | box-card duplicate icon composed from existing patterns (ghost icon button + new `Icons::Duplicate`); Stitch A2 card backfill optional (#658) |
 | B1-BOXNAV | ⚠️ | post-D | ✅ decided | detail prev/next arrows + jump select composed from existing idioms (icon-button arrows + compact auto-submit select); Stitch B1 backfill optional (#694) |
+| INSURANCE | ⚠️ | post-D | ✅ decided | Insurance hub + dossier-run page composed from existing idioms (Menu row, SectionHeader + ha-cards, the label-print run/status chrome); the two PDFs are print artifacts (BoxManifestPdf language), not app screens; Stitch screen optional (#702) |
 
 *Update this file whenever a discrepancy is found or closed. A 🚫 row must be ✅ before its phase leaves "Ready".*
