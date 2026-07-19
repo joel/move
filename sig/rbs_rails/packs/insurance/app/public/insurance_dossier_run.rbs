@@ -481,12 +481,9 @@ class ::InsuranceDossierRun < ::ApplicationRecord
   end
   include ::InsuranceDossierRun::GeneratedAssociationMethods
 
-  def self.active: () -> ::InsuranceDossierRun::ActiveRecord_Relation
   def self.with_attached_document: () -> ::InsuranceDossierRun::ActiveRecord_Relation
 
   module ::InsuranceDossierRun::GeneratedRelationMethods
-    def active: () -> ::InsuranceDossierRun::ActiveRecord_Relation
-
     def with_attached_document: () -> ::InsuranceDossierRun::ActiveRecord_Relation
   end
 
