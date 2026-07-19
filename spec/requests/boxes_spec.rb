@@ -542,6 +542,145 @@ RSpec.describe "Boxes" do
     end
   end
 
+  describe "GET /moves/:move_id/boxes/:id — box-to-box nav (#694)" do
+    it "links the numeric-order neighbours from a middle box" do
+      box1 = create(:box, move:, number: "1")
+      box2 = create(:box, move:, number: "2")
+      box3 = create(:box, move:, number: "3")
+
+      get move_box_path(move, box2)
+
+      expect(response.body)
+        .to include(%(href="#{move_box_path(move, box1)}" aria-label="#{I18n.t("boxes.show.nav.previous")}"))
+      expect(response.body)
+        .to include(%(href="#{move_box_path(move, box3)}" aria-label="#{I18n.t("boxes.show.nav.next")}"))
+    end
+
+    it "walks numerically, not lexically (the ::bigint cast guard)" do
+      box2 = create(:box, move:, number: "2")
+      box9 = create(:box, move:, number: "9")
+      box10 = create(:box, move:, number: "10")
+
+      get move_box_path(move, box9)
+
+      # Lexically "10" < "9", which would flip both neighbours.
+      expect(response.body)
+        .to include(%(href="#{move_box_path(move, box2)}" aria-label="#{I18n.t("boxes.show.nav.previous")}"))
+      expect(response.body)
+        .to include(%(href="#{move_box_path(move, box10)}" aria-label="#{I18n.t("boxes.show.nav.next")}"))
+    end
+
+    it "disables the ends of the walk without dropping the arrows or their labels" do
+      box1 = create(:box, move:, number: "1")
+      create(:box, move:, number: "2")
+
+      get move_box_path(move, box1)
+
+      # The start of the walk: no prev LINK, but a labelled disabled span in its
+      # place (the boundary stays perceivable to assistive tech); next stays a link.
+      expect(response.body).not_to match(/<a [^>]*aria-label="#{I18n.t("boxes.show.nav.previous")}"/)
+      expect(response.body)
+        .to match(/<span [^>]*aria-disabled="true" aria-label="#{I18n.t("boxes.show.nav.previous")}"/)
+      expect(response.body).to match(/<a [^>]*aria-label="#{I18n.t("boxes.show.nav.next")}"/)
+    end
+
+    it "skips a discarded box in the walk" do
+      box1 = create(:box, move:, number: "1")
+      box2 = create(:box, move:, number: "2")
+      box3 = create(:box, move:, number: "3")
+      box2.discard
+
+      get move_box_path(move, box1)
+
+      expect(response.body)
+        .to include(%(href="#{move_box_path(move, box3)}" aria-label="#{I18n.t("boxes.show.nav.next")}"))
+      expect(response.body).not_to include("#002")
+    end
+
+    it "lists every box in numeric order in the jump select, current one selected" do
+      box2 = create(:box, move:, number: "2")
+      create(:box, move:, number: "10")
+      create(:box, move:, number: "1")
+
+      get move_box_path(move, box2)
+
+      options = response.body.scan(%r{<option[^>]*>(#\d+)</option>}).flatten
+      expect(options).to eq(["#001", "#002", "#010"])
+      expect(response.body).to include(%(<option value="#{box2.id}" selected>))
+    end
+
+    it "hides the nav entirely when the move has a single box" do
+      box = create(:box, move:, number: "1")
+
+      get move_box_path(move, box)
+
+      expect(response.body).not_to include(%(aria-label="#{I18n.t("boxes.show.nav.label")}"))
+      expect(response.body).not_to include(jump_move_boxes_path(move))
+    end
+
+    it "keeps cast-tied numbers distinguishable in the jump select" do
+      # "1" and "01" both pass the string numericality and both cast to 1 —
+      # padding both to "#001" would render two indistinguishable options, so
+      # tied numbers fall back to their raw stored strings.
+      create(:box, move:, number: "1")
+      create(:box, move:, number: "01")
+      box2 = create(:box, move:, number: "2")
+
+      get move_box_path(move, box2)
+
+      options = response.body.scan(%r{<option[^>]*>(#\d+)</option>}).flatten
+      expect(options).to contain_exactly("#1", "#01", "#002")
+    end
+
+    it "renders nothing when the current box has vanished from the walk (concurrent discard)" do
+      # set_box and the walk pluck are separate queries; a box discarded between
+      # them (reload is unscoped on the stream path) must hide the nav, not
+      # fabricate the first box's neighbours from a nil index.
+      box = create(:box, move:, number: "1")
+      other = create(:box, move:, number: "2")
+
+      html = Components::Boxes::NeighbourNav.new(
+        move:, box:, boxes: [[other.id, other.number], [SecureRandom.uuid, "3"]]
+      ).call
+
+      expect(html).to eq("")
+    end
+  end
+
+  describe "GET /moves/:move_id/boxes/jump" do
+    it "redirects to the chosen box" do
+      box = create(:box, move:, number: "1")
+
+      get jump_move_boxes_path(move, id: box.id)
+
+      expect(response).to redirect_to(move_box_path(move, box))
+    end
+
+    it "404s on a box from another move" do
+      other_move = create(:move, created_by: user)
+      foreign = create(:box, move: other_move, number: "1")
+
+      get jump_move_boxes_path(move, id: foreign.id)
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "404s on a discarded box" do
+      box = create(:box, move:, number: "1")
+      box.discard
+
+      get jump_move_boxes_path(move, id: box.id)
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "400s when the id is missing" do
+      get jump_move_boxes_path(move)
+
+      expect(response).to have_http_status(:bad_request)
+    end
+  end
+
   describe "GET /moves/:move_id/boxes/:id/edit" do
     it "excludes the edited box's own size from the reuse-dimensions chips" do
       edited = create(:box, move:, number: "1", length_cm: 99, width_cm: 99, height_cm: 99)

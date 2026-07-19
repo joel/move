@@ -28,15 +28,19 @@ module Views
       # @rbs reviewable_media_ids: untyped
       # @rbs recoverable_media_ids: untyped
       # @rbs unpacked_media_ids: untyped
+      # @rbs boxes: untyped
       # @rbs return: void
       def initialize(move:, box:, items: [], media: [], editable: false, pending_count: 0,
                      reviewable: false, reviewable_media_ids: [], recoverable_media_ids: [],
-                     unpacked_media_ids: [])
+                     unpacked_media_ids: [], boxes: [])
         @move = move
         @box = box
         @items = items
         @media = media
         @editable = editable
+        # The detail nav's numeric-order walk (#694): ordered [id, number]
+        # pairs, precomputed by the controller (BoxesController#box_walk).
+        @boxes = boxes
         @unpacked_media_ids = unpacked_media_ids # photos whose every item is unpacked
         # Count of in-box items still awaiting review, any source photo (see
         # BoxesController#unreviewed_count). Zero → the badge's green "reviewed" state.
@@ -60,7 +64,12 @@ module Views
           # Live card swaps for the opt-in image generation (#416): the job
           # broadcasts the replaced ItemCard to this box-scoped stream.
           turbo_stream_from(@box, :contents)
-          back_link
+          # Back link on the left, the box-to-box walk (#694) on the right;
+          # wraps on narrow viewports rather than squeezing the select.
+          div(class: "flex flex-wrap items-center justify-between gap-3") do
+            back_link
+            render Components::Boxes::NeighbourNav.new(move: @move, box: @box, boxes: @boxes)
+          end
           render Components::Boxes::HeaderBento.new(move: @move, box: @box, editable: @editable)
           review_banner if @reviewable
           detail_stack

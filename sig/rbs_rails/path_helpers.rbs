@@ -15,6 +15,7 @@ interface ::_RbsRailsPathHelpers
   def fragile_move_box_path: (*untyped) -> ::String
   def seal_move_box_path: (*untyped) -> ::String
   def description_suggestion_move_box_path: (*untyped) -> ::String
+  def jump_move_boxes_path: (*untyped) -> ::String
   def move_box_items_path: (*untyped) -> ::String
   def new_move_box_item_path: (*untyped) -> ::String
   def move_box_review_path: (*untyped) -> ::String
@@ -134,6 +135,7 @@ interface ::_RbsRailsPathHelpers
   def fragile_move_box_url: (*untyped) -> ::String
   def seal_move_box_url: (*untyped) -> ::String
   def description_suggestion_move_box_url: (*untyped) -> ::String
+  def jump_move_boxes_url: (*untyped) -> ::String
   def move_box_items_url: (*untyped) -> ::String
   def new_move_box_item_url: (*untyped) -> ::String
   def move_box_review_url: (*untyped) -> ::String

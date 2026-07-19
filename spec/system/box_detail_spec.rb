@@ -114,4 +114,28 @@ RSpec.describe "Box detail & lifecycle" do
     expect(page).to have_no_button(I18n.t("boxes.actions.seal"))
     expect(page).to have_no_link(I18n.t("boxes.show.edit"))
   end
+
+  it "walks box-to-box with the header nav, disabling the ends (#694)" do
+    create(:box, move:, number: "1")
+    box2 = create(:box, move:, number: "2")
+    create(:box, move:, number: "3")
+
+    visit move_box_path(move, box2)
+
+    # The jump select lists the whole walk inside the form targeting the jump
+    # redirect. (The auto-submit itself is JS; the redirect is request-spec covered.)
+    expect(page).to have_css(
+      "form[action='#{jump_move_boxes_path(move)}'] select[name='id'] option", count: 3
+    )
+
+    find("a[aria-label='#{I18n.t("boxes.show.nav.next")}']").click
+    expect(page).to have_text("Box #003")
+    expect(page).to have_no_css("a[aria-label='#{I18n.t("boxes.show.nav.next")}']")
+    expect(page).to have_css("nav span[aria-disabled='true']")
+
+    find("a[aria-label='#{I18n.t("boxes.show.nav.previous")}']").click
+    find("a[aria-label='#{I18n.t("boxes.show.nav.previous")}']").click
+    expect(page).to have_text("Box #001")
+    expect(page).to have_no_css("a[aria-label='#{I18n.t("boxes.show.nav.previous")}']")
+  end
 end

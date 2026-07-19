@@ -377,6 +377,15 @@ E1 (`ea5a8a69…` + mobile) and the four E2 state screens were implemented in D9
 
 ---
 
+## ⚠️ §B1-BOXNAV — Box detail prev/next + jump select (#694) — control not in Stitch
+
+- **Observation:** The Stitch B1 box-detail screens predate the box-to-box navigation added by #694 (prev/next chevron arrows + a jump-to-box select in the back-link row, walking the Move's boxes in numeric label order).
+- **Decision:** Composed entirely from existing shipped idioms — the header-bento icon-button recipe for the arrows and the members-row compact auto-submit select for the jump control — so the addition introduces no new visual vocabulary; hidden when the Move has fewer than two boxes.
+- **Risk:** Cosmetic only.
+- **Remediation:** Optional Stitch B1 backfill next time the screen is regenerated. **Status: ⚠️ decided.**
+
+---
+
 ## Resolution tracker
 
 | ID | Blocking? | Phase | Status | Action |
@@ -400,5 +409,6 @@ E1 (`ea5a8a69…` + mobile) and the four E2 state screens were implemented in D9
 | RECOVERY | ⚠️ | post-D | ✅ decided | photo-recovery screen (orphaned/failed photo) ships as a state-variant of the designed C2 review/photo layout — same split (image left, action card right) + the shipped recognition-error caption; no new Stitch screen generated (#181) |
 | B1-CONTENTS | ⚠️ | post-D | ✅ decided | 5 Stitch screens created (`c3adef35…`, `dce2995c…`, `78ec0a5f…`, `0b3ebf18…`, `e5dcff39…`); detail panel labelled "Contents" not "AI Suggested Contents"; ✨ on edit form + seal modal only (#210) |
 | A2-DUPLICATE | ⚠️ | post-D | ✅ decided | box-card duplicate icon composed from existing patterns (ghost icon button + new `Icons::Duplicate`); Stitch A2 card backfill optional (#658) |
+| B1-BOXNAV | ⚠️ | post-D | ✅ decided | detail prev/next arrows + jump select composed from existing idioms (icon-button arrows + compact auto-submit select); Stitch B1 backfill optional (#694) |
 
 *Update this file whenever a discrepancy is found or closed. A 🚫 row must be ✅ before its phase leaves "Ready".*

@@ -45,6 +45,12 @@ Rails.application.routes.draw do
         get :seal
         get :description_suggestion
       end
+      collection do
+        # B1 — the detail nav's jump select (#694). A collection GET on purpose:
+        # a form's action is fixed at render time while the box is chosen at
+        # submit time, so the target id rides `?id` and the action redirects.
+        get :jump
+      end
       # B3 — Manual add item (scoped to the box it lands in).
       resources :items, only: %i[new create]
       # C2 — Per-photo review: walk the box's photos; each screen lists every item
