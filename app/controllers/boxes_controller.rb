@@ -6,7 +6,7 @@
 # authorize, call the action, pattern-match, render.
 class BoxesController < MoveScopedController
   before_action :set_box,
-                only: %i[show edit update transition set_fragile seal description_suggestion
+                only: %i[show jump edit update transition set_fragile seal description_suggestion
                          destroy duplicate]
   # `seal` and `description_suggestion` can spend the Move's AI quota (they call
   # the configured vendor provider), so they need the same editing-role + writable
@@ -44,6 +44,16 @@ class BoxesController < MoveScopedController
   #: () -> untyped
   def show
     render box_show_view
+  end
+
+  # GET /moves/:move_id/boxes/jump?id=N — the detail nav's jump select (#694).
+  # `set_box` resolves the query-param id through the same authorized scope as
+  # `show` (404 on a foreign or discarded id), so this is a pure redirect. Not
+  # behind `require_writable_move!`: navigation is open to viewers.
+
+  #: () -> untyped
+  def jump
+    redirect_to move_box_path(@move, @box)
   end
 
   # GET /moves/:move_id/boxes/new
@@ -339,6 +349,9 @@ class BoxesController < MoveScopedController
                            .ids
     Views::Boxes::Show.new(
       move: @move, box: @box, items: items,
+      # The detail nav's box-to-box walk (#694) — ordered [id, number] pairs,
+      # recomputed on `transition` re-streams like the rest of this context.
+      boxes: box_walk,
       # Gallery photos only (not_generated): generated images render via ItemCard.
       # Preload the blob so the grid's edge-transform URLs (which read blob.key)
       # don't N+1 the blob (#572).
@@ -361,6 +374,21 @@ class BoxesController < MoveScopedController
       # Photos whose every sourced item has been unpacked — the gallery badges them.
       unpacked_media_ids: unpacked_media_ids
     )
+  end
+
+  # The numeric-order walk the detail nav renders (#694): ordered [id, number]
+  # pairs. ORDER BY number::bigint, id — the :id append keeps equal casts in a
+  # stable order, because `number` is unique per move only as a STRING ("01"
+  # and "1" can coexist with equal casts; that tie is also why the nav derives
+  # neighbours positionally from this list instead of `where("number::bigint
+  # < ?")` — a strict comparison would skip the tied box from both directions).
+  # One query feeds the arrows, the jump select and the neighbour derivation
+  # (NeighbourNav), so they can never disagree; authorized_scope mirrors
+  # set_box (policy + kept default_scope).
+
+  #: () -> untyped
+  def box_walk
+    authorized_scope(@move.boxes).ordered.order(:id).pluck(:id, :number)
   end
 
   #: () -> untyped

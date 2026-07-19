@@ -97,6 +97,13 @@ en:
     show:
       title: "Box #%{number}"
       back: "Back to boxes"
+      # #694 — box-to-box navigation (prev/next arrows + jump select).
+      nav:
+        label: "Box navigation"
+        previous: "Previous box"
+        next: "Next box"
+        jump: "Jump to box"
+        option: "#%{number}"
       edit: "Edit box"
       dimensions: "Dimensions"
       volume: "Vol: %{value}"
