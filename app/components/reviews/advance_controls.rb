@@ -48,8 +48,9 @@ module Components
 
       # The pending-add guard actions (#690) hold the advance while the add form
       # still carries typed text (auto-add, then advance). They resolve against
-      # the pending-add controller scoped on the items panel — absent on
-      # read-only pages, where Stimulus leaves the actions inert.
+      # the pending-add controller scoped on the WHOLE review screen (the
+      # view_template `contents` wrapper, widened for the #699 nav arrows) —
+      # absent on read-only pages, where Stimulus leaves the actions inert.
 
       #: () -> untyped
       def mark_reviewed_button

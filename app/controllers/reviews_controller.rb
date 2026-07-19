@@ -51,7 +51,11 @@ class ReviewsController < MoveScopedController
       position: position_of(@media, walk), total: walk.size,
       next_media: next_media, editable: editable_move?,
       move_boxes: other_boxes, pending_review: pending_review?,
-      advance_href: advance_href_for(next_media), mark_href: mark_href
+      advance_href: advance_href_for(next_media), mark_href: mark_href,
+      # The nav arrows (#699) walk the same stable list positionally — prev
+      # reaches already-marked photos; nil at a boundary disables the arrow.
+      prev_href: nav_href_for(prev_before(@media, walk)),
+      next_href: nav_href_for(next_media)
     )
   end
 
@@ -206,13 +210,24 @@ class ReviewsController < MoveScopedController
       editable: editable_move?, move_boxes: other_boxes,
       queue: true, queue_remaining: forward_scope(pending_remaining).count,
       pending_review: pending_review?,
-      advance_href: advance_href_for(next_media), mark_href: mark_href
+      advance_href: advance_href_for(next_media), mark_href: mark_href,
+      # The nav arrows (#699): prev = nearest NEWER still-pending photo — a
+      # marked photo has left the pending set ("marked is done"), an ignored
+      # one is reachable. Auto-advance and the count above stay strictly
+      # forward (#660) — the arrows are pure navigation.
+      prev_href: nav_href_for(queue_prev_media),
+      next_href: nav_href_for(next_media)
     )
   end
 
+  # Memoized: a queue render reads it three times (next, count, prev — #699);
+  # forward_scope/backward_scope chain fresh .where relations off it, so the
+  # memoized base is never mutated, and nothing changes the pending set within
+  # one GET render.
+
   #: () -> untyped
   def pending_remaining
-    Reviews::PendingPhotos.new.call(move: @move).value!.photos
+    @pending_remaining ||= Reviews::PendingPhotos.new.call(move: @move).value!.photos
   end
 
   # Row-value comparison so the tiebreak matches the queue's newest-first
@@ -230,6 +245,26 @@ class ReviewsController < MoveScopedController
     forward_scope(pending_remaining).first
   end
 
+  # Backward mirror of forward_scope (#699): strictly NEWER than the current
+  # photo; the strict > excludes the current photo whether or not it is still
+  # pending.
+
+  #: (untyped scope) -> untyped
+  def backward_scope(scope)
+    scope.where("(media.captured_at, media.id) > (?, ?)", @media.captured_at, @media.id)
+  end
+
+  # Nearest newer still-pending photo — the prev arrow's target. The pending
+  # scope orders (captured_at, id) DESC, so nearest-newer is its LAST row:
+  # `.last` reverses to ASC LIMIT 1 (the scope carries no LIMIT — the 300 cap
+  # lives in ReviewQueuesController), keeping the queue order's single home in
+  # Reviews::PendingPhotos, symmetric with queue_next_media's `.first`.
+
+  #: () -> untyped
+  def queue_prev_media
+    backward_scope(pending_remaining).last
+  end
+
   # Whether this photo still holds anything MarkPhotoReviewed would confirm —
   # exactly the action's scope. Editability gates separately (the component),
   # so this flag means what it says on read-only walks too.
@@ -239,23 +274,27 @@ class ReviewsController < MoveScopedController
     @box.items.unreviewed.exists?(source_media_id: @media.id)
   end
 
+  # Pure-navigation href for a walk photo — the shared grammar under both the
+  # advance controls and the nav arrows (#699): queue mode crosses boxes to the
+  # target's OWN box, threading ?queue=move. Nil at a walk boundary — the nav
+  # arrows render that as a disabled arrow; only the advance controls add the
+  # finish fallback below.
+
+  #: (untyped media) -> String?
+  def nav_href_for(media)
+    return nil unless media
+
+    move_box_review_photo_path(@move, queue_mode? ? media.box : @box, media, **queue_query)
+  end
+
   # The single home of the walk's URL grammar (#660): where an advance lands —
-  # the next photo (queue mode crosses boxes to the target's OWN box, threading
-  # ?queue=move), else the finish target (queue page / box page). The rendered
-  # Ignore/Next link and the post-mark redirect both come through here so the
-  # two can never drift.
+  # the next photo via nav_href_for, else the finish target (queue page / box
+  # page). The rendered Ignore/Next link and the post-mark redirect both come
+  # through here so the two can never drift.
 
   #: (untyped next_media) -> String
   def advance_href_for(next_media)
-    if queue_mode?
-      return move_review_path(@move) unless next_media
-
-      move_box_review_photo_path(@move, next_media.box, next_media, queue: QUEUE_PARAM)
-    elsif next_media
-      move_box_review_photo_path(@move, @box, next_media)
-    else
-      move_box_path(@move, @box)
-    end
+    nav_href_for(next_media) || (queue_mode? ? move_review_path(@move) : move_box_path(@move, @box))
   end
 
   #: () -> String
@@ -343,8 +382,11 @@ class ReviewsController < MoveScopedController
     @review_media ||= begin
       ids = @box.items.where.not(source_media_id: nil).distinct.pluck(:source_media_id)
       # not_generated: an AI-generated item image is not a recognised capture, so it
-      # never enters the review walk (#416).
-      @box.media.not_generated.where(id: ids).order(:captured_at, :created_at).to_a
+      # never enters the review walk (#416). The :id tiebreak makes the walk a
+      # TOTAL order — same-microsecond captures would otherwise sort
+      # nondeterministically per query, which prev/next (#699) would round-trip
+      # into visible ping-pong (the queue walk's order has the same tiebreak).
+      @box.media.not_generated.where(id: ids).order(:captured_at, :created_at, :id).to_a
     end
   end
 
@@ -368,15 +410,33 @@ class ReviewsController < MoveScopedController
     @box.items.in_box.where(source_media_id: media.id).order(:created_at)
   end
 
+  # The one identity rule for locating a photo in the walk — position, next
+  # and prev all derive from it, so they can never disagree.
+
+  #: (untyped media, Array[untyped] walk) -> Integer?
+  def walk_index(media, walk)
+    walk.index { |m| m.id == media.id }
+  end
+
   #: (untyped media, Array[untyped] walk) -> Integer
   def position_of(media, walk)
-    (walk.index { |m| m.id == media.id } || 0) + 1
+    (walk_index(media, walk) || 0) + 1
   end
 
   #: (untyped media, Array[untyped] walk) -> untyped
   def next_after(media, walk)
-    idx = walk.index { |m| m.id == media.id }
+    idx = walk_index(media, walk)
     idx && walk[idx + 1]
+  end
+
+  # Positional prev on the same stable walk (#699) — so prev reaches
+  # already-marked photos too. The positive? guard is load-bearing: walk[-1]
+  # would wrap the first photo's prev around to the end of the walk.
+
+  #: (untyped media, Array[untyped] walk) -> untyped
+  def prev_before(media, walk)
+    idx = walk_index(media, walk)
+    idx&.positive? ? walk[idx - 1] : nil
   end
 
   #: () -> untyped

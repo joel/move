@@ -7,7 +7,9 @@ module Views
     # on blur), each with a pencil (focus + select-all) and × (remove). "+ Add item"
     # appends a missed item. Reviewing is explicit (#660): "Mark as Reviewed"
     # confirms and advances, "Ignore" only navigates — both offered at the header
-    # AND the footer so long item lists don't hide them. Renders in AppShellLayout.
+    # AND the footer so long item lists don't hide them. The progress-bar row
+    # carries prev/next nav arrows (#699, pure navigation — auto-advance stays
+    # strictly forward). Renders in AppShellLayout.
     class Photo < Views::Base
       include Phlex::Rails::Helpers::ButtonTo
       include Phlex::Rails::Helpers::FormWith
@@ -26,9 +28,12 @@ module Views
       # @rbs pending_review: untyped
       # @rbs advance_href: untyped
       # @rbs mark_href: untyped
+      # @rbs prev_href: untyped
+      # @rbs next_href: untyped
       # @rbs return: void
       def initialize(move:, box:, media:, items:, position:, total:, next_media:, editable: false, move_boxes: [],
-                     queue: false, queue_remaining: nil, pending_review: false, advance_href: nil, mark_href: nil)
+                     queue: false, queue_remaining: nil, pending_review: false, advance_href: nil, mark_href: nil,
+                     prev_href: nil, next_href: nil)
         @move = move
         @box = box
         @media = media
@@ -53,49 +58,31 @@ module Views
         # single home of the walk's URL grammar).
         @advance_href = advance_href
         @mark_href = mark_href
+        # The nav arrows' hrefs (#699, nav_href_for): nil = walk boundary =
+        # disabled arrow; both nil (single-photo walk) hides the pair.
+        @prev_href = prev_href
+        @next_href = next_href
       end
 
       #: () -> void
       def view_template
-        progress_bar
-        div(class: "grid grid-cols-1 gap-stack-gap lg:grid-cols-12") do
-          media_panel
-          items_panel
+        # display:contents — invisible to the layout's flex column (gap kept)
+        # while giving the pending-add controller (#690) a DOM ancestor over
+        # the WHOLE screen: Stimulus only resolves actions inside the
+        # controller's subtree, and the top-row nav arrows (#699) must guard.
+        div(class: "contents", **pending_add_data) do
+          render Components::Reviews::ProgressBar.new(
+            move: @move, box: @box, queue: @queue, queue_remaining: @queue_remaining,
+            position: @position, total: @total, prev_href: @prev_href, next_href: @next_href
+          )
+          div(class: "grid grid-cols-1 gap-stack-gap lg:grid-cols-12") do
+            media_panel
+            items_panel
+          end
         end
       end
 
       private
-
-      # In queue mode the percentage fill is omitted: the pending set shrinks as
-      # photos are confirmed, so a bar over a moving total would be dishonest —
-      # the "N more after this" count is the real progress.
-
-      #: () -> untyped
-      def progress_bar
-        div(class: "flex items-center gap-4") do
-          a(href: @queue ? move_review_path(@move) : move_box_path(@move, @box),
-            class: "flex h-10 w-10 items-center justify-center rounded-full bg-card text-muted hover:text-text-warm") do
-            render Components::Icons::ChevronRight.new(css: "h-5 w-5 rotate-180")
-          end
-          div(class: "flex flex-1 flex-col gap-1") do
-            span(class: "text-label-caps uppercase text-muted") { progress_label }
-            unless @queue
-              div(class: "h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high") do
-                div(class: "h-full rounded-full bg-accent-sage", style: "width: #{progress_pct}%")
-              end
-            end
-          end
-        end
-      end
-
-      #: () -> String
-      def progress_label
-        if @queue
-          I18n.t("reviews.photo.queue_progress", count: @queue_remaining)
-        else
-          I18n.t("reviews.photo.progress", position: @position, total: @total)
-        end
-      end
 
       #: () -> untyped
       def media_panel
@@ -136,8 +123,10 @@ module Views
                "backdrop-blur"
         tag = @queue ? :a : :div
         attrs = if @queue
+                  # Guarded like every navigation on this screen (#690/#699).
                   { href: move_box_path(@move, @box), class: "#{base} transition hover:text-text-warm",
-                    aria: { label: I18n.t("reviews.photo.view_box", number: @box.number) } }
+                    aria: { label: I18n.t("reviews.photo.view_box", number: @box.number) },
+                    data: { action: "click->pending-add#guardVisit" } }
                 else
                   { class: base }
                 end
@@ -157,14 +146,12 @@ module Views
         end
       end
 
-      # pending-add (#690) coordinates the add form with the advance controls
-      # (both instances bubble through this section): typed-but-unsubmitted text
-      # is auto-added before the advance proceeds. Read-only pages get no
-      # controller, so the guard actions in AdvanceControls stay inert there.
+      # The pending-add scope moved up to the view_template `contents` wrapper
+      # (#699) — this section carries only layout now.
 
       #: () -> untyped
       def items_panel
-        section(class: "lg:col-span-5", **items_panel_data) do
+        section(class: "lg:col-span-5") do
           render Components::Ui::Card.new(padding: "p-6") do
             header
             list
@@ -177,8 +164,12 @@ module Views
         end
       end
 
+      # pending-add (#690) auto-adds typed-but-unsubmitted text before any
+      # advance or nav-arrow navigation proceeds; read-only pages get no
+      # controller, so the guard actions everywhere stay inert there.
+
       #: () -> Hash[Symbol, untyped]
-      def items_panel_data
+      def pending_add_data
         @editable ? { data: { controller: "pending-add" } } : {}
       end
 
@@ -347,13 +338,6 @@ module Views
       def icon_button(tint)
         hover = tint == :error ? "hover:text-error hover:bg-error/10" : "hover:text-accent-sage hover:bg-accent-sage/10"
         "flex h-10 w-10 items-center justify-center rounded-full text-muted transition #{hover}"
-      end
-
-      #: () -> Integer
-      def progress_pct
-        return 0 if @total.zero?
-
-        ((@position.to_f / @total) * 100).round
       end
     end
   end
