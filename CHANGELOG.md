@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.102.2] — 2026-07-20
+
+### Fixed
+- **The insurance declaration now handles big, photo-recognized moves.**
+  Recognition gives most items unique names, so large moves hit the previous
+  1,000-line ceiling. The declaration's renderer was rebuilt to scale (about
+  5× faster), the ceiling is now 10,000 lines, long item names wrap in full
+  instead of being cut off, and stray line breaks in names can no longer
+  distort the document (#708).
+
 ## [v0.102.1] — 2026-07-19
 
 ### Fixed
