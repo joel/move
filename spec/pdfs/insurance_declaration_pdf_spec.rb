@@ -48,6 +48,15 @@ RSpec.describe InsuranceDeclarationPdf do
     expect(text).to include("...") # the Ruby truncation marker prints
   end
 
+  it "flattens embedded newlines in names — they must not become real PDF lines" do
+    sneaky = "Chandelier#{"\n" * 40}crystal"
+    pdf = render(sections: [{ family: "lighting", lines: [[sneaky, 1]] }])
+
+    reader = PDF::Reader.new(StringIO.new(pdf))
+    expect(reader.page_count).to eq(1) # 40 embedded newlines would overflow the page
+    expect(document_text(pdf).gsub(/\s+/, " ")).to include("Chandelier crystal")
+  end
+
   it "renders Unicode item names without crashing (the #85 AFM trap)" do
     pdf = nil
     expect do

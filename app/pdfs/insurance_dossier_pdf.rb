@@ -67,7 +67,7 @@ class InsuranceDossierPdf
   def box_section(doc, section)
     doc.start_new_page if doc.cursor < SECTION_MIN_CURSOR
     box = section[:box]
-    room = (box.room&.name.presence || "Unassigned").truncate(ROOM_MAX)
+    room = pdf_text(box.room&.name.presence || "Unassigned", ROOM_MAX)
     doc.text "Box ##{format("%03d", box.number.to_i)} — #{room}", size: 13, style: :bold
     doc.text "#{section[:items].size} items", size: 9, color: "6B6B6B"
     doc.move_down 8
@@ -82,9 +82,9 @@ class InsuranceDossierPdf
     # Two full lines at 10pt (NotoSans leading ≈ 13.6pt — a 24pt box only fits
     # ONE line and Prawn would cut before the Ruby marker): NAME_MAX chars wrap
     # within two lines, so the "..." from String#truncate always prints.
-    doc.text_box item.name.truncate(NAME_MAX), at: [THUMB + 12, top - ((ROW_HEIGHT - 28) / 2)],
-                                               width: doc.bounds.width - THUMB - 12, height: 28,
-                                               size: 10, overflow: :truncate
+    doc.text_box pdf_text(item.name, NAME_MAX), at: [THUMB + 12, top - ((ROW_HEIGHT - 28) / 2)],
+                                                width: doc.bounds.width - THUMB - 12, height: 28,
+                                                size: 10, overflow: :truncate
     doc.move_cursor_to(top - ROW_HEIGHT + 6)
     doc.stroke_color "E2E2E2"
     doc.stroke_horizontal_rule

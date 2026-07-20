@@ -29,13 +29,24 @@ module PdfChrome
   TITLE_MAX = 80
   ROUTE_MAX = 120
 
+  # Flatten + bound any user-authored string before it reaches PDF layout:
+  # embedded newlines/control whitespace render as REAL lines under doc.text,
+  # breaking every height estimate (#709 review round 3 — MCP passes names
+  # through raw), and unbounded length wraps onto unbudgeted pages. squish
+  # collapses all whitespace runs BEFORE the truncate so the explicit
+  # ellipsis lands on visible content.
+  def pdf_text(value, max)
+    value.to_s.squish.truncate(max)
+  end
+
   # The document heading: "<prefix> — <move name>", name bounded to one line.
   def title_line(prefix, move)
-    "#{prefix} — #{move.name.truncate(TITLE_MAX)}"
+    "#{prefix} — #{pdf_text(move.name, TITLE_MAX)}"
   end
 
   # "Origin  →  Destination" (bounded), or nil when neither address is set.
   def route_line(move)
-    [move.origin_address, move.destination_address].compact_blank.join("  →  ").presence&.truncate(ROUTE_MAX)
+    route = [move.origin_address, move.destination_address].compact_blank.join("  →  ").presence
+    route && pdf_text(route, ROUTE_MAX)
   end
 end

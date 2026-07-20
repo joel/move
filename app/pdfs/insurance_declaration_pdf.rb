@@ -113,7 +113,7 @@ class InsuranceDeclarationPdf
     doc.text_box count.to_s, at: [doc.bounds.width - QTY_WIDTH, y], width: QTY_WIDTH, height: 14,
                              size: 9, align: :right
     doc.bounding_box([0, y], width: doc.bounds.width - QTY_WIDTH - 10) do
-      doc.text name.truncate(NAME_MAX), size: 9
+      doc.text pdf_text(name, NAME_MAX), size: 9
     end
     doc.move_down ROW_GAP
   end
