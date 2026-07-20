@@ -23,10 +23,14 @@ class InsuranceDeclarationPdf
   # Minimum space to start a section: heading + column header + one row — a
   # heading must never be orphaned at a page bottom.
   SECTION_MIN_CURSOR = 70
-  # Manual row layout (NOT prawn-table): measured at ~5x faster — 1.8s and
-  # ~213 pages for 10,000 lines vs 3.9s for 5,000 table rows — because
-  # prawn-table's per-cell measuring dominates at scale (#708).
-  ROW_HEIGHT = 16
+  # Manual row layout (NOT prawn-table): ~5x faster at scale because
+  # prawn-table's per-cell measuring dominates (#708). Names WRAP to their
+  # full (Ruby-truncated) length via doc.text in a bounded column — a
+  # fixed-height text_box would silently clip long names at rendered width,
+  # losing content the old table preserved (#709 review). ROW_MIN guards the
+  # page break for the tallest possible row (3 wrapped lines + gap).
+  ROW_MIN = 48
+  ROW_GAP = 4
   QTY_WIDTH = 60
   NAME_MAX = 150
 
@@ -101,15 +105,16 @@ class InsuranceDeclarationPdf
   end
 
   def line_row(doc, name, count)
-    if doc.cursor < ROW_HEIGHT
+    if doc.cursor < ROW_MIN
       doc.start_new_page
       column_header(doc)
     end
     y = doc.cursor
-    doc.text_box name.truncate(NAME_MAX), at: [0, y], width: doc.bounds.width - QTY_WIDTH - 10,
-                                          height: 14, size: 9, overflow: :truncate
     doc.text_box count.to_s, at: [doc.bounds.width - QTY_WIDTH, y], width: QTY_WIDTH, height: 14,
                              size: 9, align: :right
-    doc.move_down ROW_HEIGHT
+    doc.bounding_box([0, y], width: doc.bounds.width - QTY_WIDTH - 10) do
+      doc.text name.truncate(NAME_MAX), size: 9
+    end
+    doc.move_down ROW_GAP
   end
 end

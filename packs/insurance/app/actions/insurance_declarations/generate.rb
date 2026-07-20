@@ -32,7 +32,12 @@ module InsuranceDeclarations
     # USABLE discounts the section-keep break waste; the estimate over-counts.
     MAX_PAGES = 400
     SECTION_PT = 70
-    ROW_PT = 16
+    # Per-line height depends on how far the (≤150-char) name wraps: ~14pt a
+    # line at a conservative 60 chars/line, + the row gap. Estimated per line
+    # below, not flat — a flat ROW_PT would under-count long-name moves.
+    LINE_PT = 14
+    ROW_GAP_PT = 4
+    CHARS_PER_LINE = 60
     USABLE_PAGE_PT = 692
 
     # Trim + case-fold in SQL so " Kitchenware" and "kitchenware " merge; an
@@ -52,7 +57,7 @@ module InsuranceDeclarations
       return Failure(:too_many_lines) if rows.size > MAX_LINES
 
       sections = build_sections(rows)
-      return Failure(:too_many_pages) if over_page_budget?(sections.size, rows.size)
+      return Failure(:too_many_pages) if over_page_budget?(sections, rows)
 
       total_items = rows.values.sum
       yield emit_event(move, actor, total_items)
@@ -89,9 +94,16 @@ module InsuranceDeclarations
           .map { |family, lines| { family:, lines: lines.map { |(_f, name), count| [name, count] } } }
     end
 
-    #: (Integer section_count, Integer line_count) -> bool
-    def over_page_budget?(section_count, line_count)
-      (((section_count * SECTION_PT) + (line_count * ROW_PT)) / USABLE_PAGE_PT.to_f) > MAX_PAGES
+    # Length-aware: each line costs a wrapped-lines estimate of its (already
+    # NAME_MAX-bounded) name, so long-name moves can't slip under a flat
+    # per-row constant. Ruby arithmetic over the ≤MAX_LINES bounded rows.
+
+    #: (untyped sections, untyped rows) -> bool
+    def over_page_budget?(sections, rows)
+      row_pt = rows.keys.sum do |(_family, name)|
+        ((name.to_s.length.clamp(1, 150) / CHARS_PER_LINE.to_f).ceil * LINE_PT) + ROW_GAP_PT
+      end
+      (((sections.size * SECTION_PT) + row_pt) / USABLE_PAGE_PT.to_f) > MAX_PAGES
     end
 
     #: (untyped move, untyped actor, Integer total_items) -> Dry::Monads::Success[nil]
