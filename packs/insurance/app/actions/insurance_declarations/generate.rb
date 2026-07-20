@@ -18,14 +18,13 @@ module InsuranceDeclarations
   # → Insurance::AuditSubscriber. Read-only — NOT ensure_writable-guarded: an
   # archived Move may still be declared for insurance.
   class Generate < BaseAction
-    # The declaration renders synchronously in-request, and prawn-table's
-    # layout cost grows super-linearly with ROW count — an uncapped Move-wide
-    # table could hold a Puma worker for tens of seconds. The rows are unique
-    # (family, name) LINES, not items ("Moving boxes ×40" is one row), so the
-    # cap binds to lines: a many-items Move with ordinary name reuse renders
-    # fine (#705 — the original items-summed cap rejected a real 1,000+-item
-    # Move whose table was small).
-    MAX_LINES = 1_000
+    # The declaration renders synchronously in-request; the cap binds to
+    # unique (family, name) LINES — the rendered rows. Recognition writes
+    # mostly-unique names, so lines ≈ items on a recognized Move (#708 — a
+    # 1,000-line cap was the same wall as the original item cap). The manual
+    # row layout measures ~2s and ~213 body pages at 10,000 lines (inside
+    # the 400-page budget), so 10,000 bounds pathology, not households.
+    MAX_LINES = 10_000
 
     # Trim + case-fold in SQL so " Kitchenware" and "kitchenware " merge; an
     # empty string folds into the nil (Miscellaneous) bucket via NULLIF — and so
