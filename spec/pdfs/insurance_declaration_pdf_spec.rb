@@ -38,6 +38,25 @@ RSpec.describe InsuranceDeclarationPdf do
     expect(document_text(pdf)).to include("intentionally contains no box numbers")
   end
 
+  it "wraps long item names in full up to the explicit ellipsis (no silent width clipping)" do
+    long = "Hand-carved walnut jewellery cabinet with seven velvet-lined drawers, " \
+           "brass butterfly hinges and the little key kept in the blue envelope somewhere safe"
+    pdf = render(sections: [{ family: "furniture", lines: [[long, 1]] }])
+
+    text = document_text(pdf).gsub(/\s+/, " ")
+    expect(text).to include("brass butterfly hinges") # content beyond one rendered line survives
+    expect(text).to include("...") # the Ruby truncation marker prints
+  end
+
+  it "flattens embedded newlines in names — they must not become real PDF lines" do
+    sneaky = "Chandelier#{"\n" * 40}crystal"
+    pdf = render(sections: [{ family: "lighting", lines: [[sneaky, 1]] }])
+
+    reader = PDF::Reader.new(StringIO.new(pdf))
+    expect(reader.page_count).to eq(1) # 40 embedded newlines would overflow the page
+    expect(document_text(pdf).gsub(/\s+/, " ")).to include("Chandelier crystal")
+  end
+
   it "renders Unicode item names without crashing (the #85 AFM trap)" do
     pdf = nil
     expect do

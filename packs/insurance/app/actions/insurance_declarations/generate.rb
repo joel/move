@@ -18,14 +18,27 @@ module InsuranceDeclarations
   # → Insurance::AuditSubscriber. Read-only — NOT ensure_writable-guarded: an
   # archived Move may still be declared for insurance.
   class Generate < BaseAction
-    # The declaration renders synchronously in-request, and prawn-table's
-    # layout cost grows super-linearly with ROW count — an uncapped Move-wide
-    # table could hold a Puma worker for tens of seconds. The rows are unique
-    # (family, name) LINES, not items ("Moving boxes ×40" is one row), so the
-    # cap binds to lines: a many-items Move with ordinary name reuse renders
-    # fine (#705 — the original items-summed cap rejected a real 1,000+-item
-    # Move whose table was small).
-    MAX_LINES = 1_000
+    # The declaration renders synchronously in-request; the cap binds to
+    # unique (family, name) LINES — the rendered rows. Recognition writes
+    # mostly-unique names, so lines ≈ items on a recognized Move (#708 — a
+    # 1,000-line cap was the same wall as the original item cap). The manual
+    # row layout measures ~2s and ~213 body pages at 10,000 lines (inside
+    # the 400-page budget), so 10,000 bounds pathology, not households.
+    MAX_LINES = 10_000
+    # Page budget: sections carry ~70pt of overhead (heading + column header +
+    # spacing) vs 16pt rows, so 10,000 one-line FAMILIES would blow the page
+    # assumption the line cap rests on (#709 review — family is unvalidated
+    # provider output, so pathological family cardinality is possible).
+    # USABLE discounts the section-keep break waste; the estimate over-counts.
+    MAX_PAGES = 400
+    SECTION_PT = 70
+    # Per-line height depends on how far the (≤150-char) name wraps: ~14pt a
+    # line at a conservative 60 chars/line, + the row gap. Estimated per line
+    # below, not flat — a flat ROW_PT would under-count long-name moves.
+    LINE_PT = 14
+    ROW_GAP_PT = 4
+    CHARS_PER_LINE = 60
+    USABLE_PAGE_PT = 692
 
     # Trim + case-fold in SQL so " Kitchenware" and "kitchenware " merge; an
     # empty string folds into the nil (Miscellaneous) bucket via NULLIF — and so
@@ -43,8 +56,10 @@ module InsuranceDeclarations
       rows = grouped_rows(move)
       return Failure(:too_many_lines) if rows.size > MAX_LINES
 
-      total_items = rows.values.sum
       sections = build_sections(rows)
+      return Failure(:too_many_pages) if over_page_budget?(sections, rows)
+
+      total_items = rows.values.sum
       yield emit_event(move, actor, total_items)
       Success(sections: sections, total_items: total_items)
     end
@@ -77,6 +92,18 @@ module InsuranceDeclarations
     def build_sections(rows)
       rows.group_by { |(family, _name), _count| family }
           .map { |family, lines| { family:, lines: lines.map { |(_f, name), count| [name, count] } } }
+    end
+
+    # Length-aware: each line costs a wrapped-lines estimate of its (already
+    # NAME_MAX-bounded) name, so long-name moves can't slip under a flat
+    # per-row constant. Ruby arithmetic over the ≤MAX_LINES bounded rows.
+
+    #: (untyped sections, untyped rows) -> bool
+    def over_page_budget?(sections, rows)
+      row_pt = rows.keys.sum do |(_family, name)|
+        ((name.to_s.length.clamp(1, 150) / CHARS_PER_LINE.to_f).ceil * LINE_PT) + ROW_GAP_PT
+      end
+      (((sections.size * SECTION_PT) + row_pt) / USABLE_PAGE_PT.to_f) > MAX_PAGES
     end
 
     #: (untyped move, untyped actor, Integer total_items) -> Dry::Monads::Success[nil]

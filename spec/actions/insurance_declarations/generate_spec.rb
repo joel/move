@@ -88,4 +88,13 @@ RSpec.describe InsuranceDeclarations::Generate do
     expect(result[:sections]).to eq([])
     expect(result[:total_items]).to eq(0)
   end
+
+  it "fails :too_many_pages when section overhead breaks the page budget (many one-line families)" do
+    item("Mug", family: "kitchenware")
+    stub_const("InsuranceDeclarations::Generate::MAX_PAGES", 0)
+
+    result = described_class.new.call(move: move, actor: user)
+
+    expect(result.failure).to eq(:too_many_pages)
+  end
 end
