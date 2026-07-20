@@ -25,6 +25,15 @@ module InsuranceDeclarations
     # row layout measures ~2s and ~213 body pages at 10,000 lines (inside
     # the 400-page budget), so 10,000 bounds pathology, not households.
     MAX_LINES = 10_000
+    # Page budget: sections carry ~70pt of overhead (heading + column header +
+    # spacing) vs 16pt rows, so 10,000 one-line FAMILIES would blow the page
+    # assumption the line cap rests on (#709 review — family is unvalidated
+    # provider output, so pathological family cardinality is possible).
+    # USABLE discounts the section-keep break waste; the estimate over-counts.
+    MAX_PAGES = 400
+    SECTION_PT = 70
+    ROW_PT = 16
+    USABLE_PAGE_PT = 692
 
     # Trim + case-fold in SQL so " Kitchenware" and "kitchenware " merge; an
     # empty string folds into the nil (Miscellaneous) bucket via NULLIF — and so
@@ -42,8 +51,10 @@ module InsuranceDeclarations
       rows = grouped_rows(move)
       return Failure(:too_many_lines) if rows.size > MAX_LINES
 
-      total_items = rows.values.sum
       sections = build_sections(rows)
+      return Failure(:too_many_pages) if over_page_budget?(sections.size, rows.size)
+
+      total_items = rows.values.sum
       yield emit_event(move, actor, total_items)
       Success(sections: sections, total_items: total_items)
     end
@@ -76,6 +87,11 @@ module InsuranceDeclarations
     def build_sections(rows)
       rows.group_by { |(family, _name), _count| family }
           .map { |family, lines| { family:, lines: lines.map { |(_f, name), count| [name, count] } } }
+    end
+
+    #: (Integer section_count, Integer line_count) -> bool
+    def over_page_budget?(section_count, line_count)
+      (((section_count * SECTION_PT) + (line_count * ROW_PT)) / USABLE_PAGE_PT.to_f) > MAX_PAGES
     end
 
     #: (untyped move, untyped actor, Integer total_items) -> Dry::Monads::Success[nil]

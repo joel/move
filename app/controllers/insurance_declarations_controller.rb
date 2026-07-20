@@ -19,8 +19,21 @@ class InsuranceDeclarationsController < MoveScopedController
       send_data pdf.render, filename: "insurance-declaration.pdf",
                             type: "application/pdf", disposition: "inline"
     in Dry::Monads::Failure(reason)
-      redirect_to move_insurance_path(@move),
-                  alert: t("insurance.errors.#{reason}", max: InsuranceDeclarations::Generate::MAX_LINES)
+      redirect_to move_insurance_path(@move), alert: declaration_error(reason)
     end
+  end
+
+  private
+
+  # Each rejection names ITS cap (the dossier_error precedent).
+
+  #: (untyped reason) -> String
+  def declaration_error(reason)
+    max = if reason == :too_many_pages
+            InsuranceDeclarations::Generate::MAX_PAGES
+          else
+            InsuranceDeclarations::Generate::MAX_LINES
+          end
+    t("insurance.errors.#{reason}", max: max)
   end
 end
