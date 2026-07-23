@@ -10,14 +10,15 @@ module Views
 
       SORTS = %w[recent oldest].freeze
 
-      #: (move: untyped, media: untyped, rooms: untyped, sort_key: untyped, ?selected_room_id: untyped, ?over_cap: untyped) -> void
-      def initialize(move:, media:, rooms:, sort_key:, selected_room_id: nil, over_cap: false)
+      #: (move: untyped, media: untyped, rooms: untyped, sort_key: untyped, ?selected_room_id: untyped, ?cursor: untyped, ?remaining: Integer) -> void
+      def initialize(move:, media:, rooms:, sort_key:, selected_room_id: nil, cursor: nil, remaining: 0)
         @move = move
         @media = media
         @rooms = rooms
         @sort_key = sort_key
         @selected_room_id = selected_room_id
-        @over_cap = over_cap
+        @cursor = cursor
+        @remaining = remaining
       end
 
       #: () -> void
@@ -26,8 +27,7 @@ module Views
           header
           render Components::Gallery::ViewToggle.new(move: @move, active: "photos")
           controls
-          cap_notice if @over_cap
-          @media.any? ? grid : empty_state
+          @media.any? ? grid_with_pager : empty_state
         end
       end
 
@@ -40,13 +40,6 @@ module Views
           title: I18n.t("galleries.index.title"),
           subtitle: I18n.t("galleries.index.subtitle")
         )
-      end
-
-      #: () -> untyped
-      def cap_notice
-        p(class: "text-body-md text-on-surface-variant") do
-          I18n.t("galleries.index.capped.#{@sort_key}", count: GalleriesController::CAP)
-        end
       end
 
       # Room filter (left) + sort (right), both GET-param driven so they survive
@@ -110,9 +103,17 @@ module Views
         end
       end
 
+      # The pager renders below the grid whenever photos are shown — its wrapper
+      # is the stable turbo_stream replace target for "Load more" (#718), so it
+      # must exist even when nothing remains (it then carries no chrome).
+
       #: () -> untyped
-      def grid
+      def grid_with_pager
         render Components::Gallery::Grid.new(move: @move, media: @media)
+        render Components::Gallery::Pager.new(
+          move: @move, cursor: @cursor, remaining: @remaining,
+          sort_key: @sort_key, selected_room_id: @selected_room_id
+        )
       end
 
       #: () -> untyped

@@ -199,29 +199,122 @@ RSpec.describe "Galleries" do
       expect(response.body).not_to include("Box 9")
     end
 
-    it "surfaces the cap notice when the photo count exceeds the cap" do
-      stub_const("GalleriesController::CAP", 1)
+    it "windows the grid to one page and renders the pager cursored at the last tile (#718)" do
+      stub_const("GalleriesController::PAGE", 2)
       box = create(:box, move:, number: "1")
-      create_list(:media, 2, move:, box:)
+      oldest = create(:media, move:, box:, captured_at: 3.days.ago)
+      middle = create(:media, move:, box:, captured_at: 2.days.ago)
+      create(:media, move:, box:, captured_at: 1.day.ago)
 
       get move_gallery_path(move)
-      expect(response.body).to include(I18n.t("galleries.index.capped.recent", count: 1))
 
-      get move_gallery_path(move, sort: "oldest")
-      expect(response.body).to include(I18n.t("galleries.index.capped.oldest", count: 1))
+      expect(response.body).to include(I18n.t("galleries.index.pager.remaining", count: 1))
+      expect(response.body).not_to include(%(id="#{ActionView::RecordIdentifier.dom_id(oldest)}"))
+      expect(rendered_cursor(response.body).fetch("cursor_id")).to eq(middle.id)
     end
 
-    it "takes the oldest photos (not a reversed newest window) when capped + sort=oldest" do
-      stub_const("GalleriesController::CAP", 1)
+    it "appends the next page as a turbo_stream and retires the exhausted pager (#718)" do
+      stub_const("GalleriesController::PAGE", 2)
+      box = create(:box, move:, number: "1")
+      oldest = create(:media, move:, box:, captured_at: 3.days.ago)
+      create(:media, move:, box:, captured_at: 2.days.ago)
+      create(:media, move:, box:, captured_at: 1.day.ago)
+
+      get move_gallery_path(move)
+
+      get move_gallery_path(move, **rendered_cursor(response.body)),
+          headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+      expect(response.media_type).to eq("text/vnd.turbo-stream.html")
+      expect(response.body).to include(%(action="append" target="#{Components::Gallery::Grid::TILES_ID}"))
+      expect(response.body).to include(%(id="#{ActionView::RecordIdentifier.dom_id(oldest)}"))
+      # The advanced pager replaces itself empty — nothing remains to load.
+      expect(response.body).to include(%(action="replace" target="#{Components::Gallery::Pager::ID}"))
+      expect(response.body).not_to include(I18n.t("galleries.index.pager.load_more"))
+    end
+
+    it "advances past a page boundary of photos sharing captured_at without skips or repeats" do
+      stub_const("GalleriesController::PAGE", 1)
+      box = create(:box, move:, number: "1")
+      taken = Time.current.change(usec: 123_456)
+      twins = create_list(:media, 2, move:, box:, captured_at: taken)
+
+      get move_gallery_path(move)
+      first_ids = tile_dom_ids(response.body)
+      get move_gallery_path(move, **rendered_cursor(response.body))
+      second_ids = tile_dom_ids(response.body)
+
+      expect(first_ids.size).to eq(1)
+      expect(second_ids.size).to eq(1)
+      expect(first_ids + second_ids)
+        .to match_array(twins.map { |m| ActionView::RecordIdentifier.dom_id(m) })
+      expect(response.body).not_to include(I18n.t("galleries.index.pager.load_more"))
+    end
+
+    it "starts at the genuinely oldest page for sort=oldest and walks forward from there" do
+      stub_const("GalleriesController::PAGE", 1)
       create(:media, move:, box: create(:box, move:, number: "1"), captured_at: 10.days.ago)
       create(:media, move:, box: create(:box, move:, number: "2"), captured_at: 1.hour.ago)
 
       get move_gallery_path(move, sort: "oldest")
 
-      # The single capped tile is the genuinely-oldest photo (Box 1), not the
-      # newest one reversed into view.
+      # Page one is the genuinely-oldest photo (Box 1), not the newest one
+      # reversed into view; the cursor keeps the non-default sort.
       expect(response.body).to include("Box 1")
       expect(response.body).not_to include("Box 2")
+      cursor = rendered_cursor(response.body)
+      expect(cursor.fetch("sort")).to eq("oldest")
+
+      get move_gallery_path(move, **cursor)
+
+      expect(response.body).to include("Box 2")
+      expect(response.body).not_to include("Box 1")
+    end
+
+    it "keeps the room filter on the pager and counts only filtered photos as remaining" do
+      stub_const("GalleriesController::PAGE", 1)
+      kitchen = create(:room, move:, name: "Kitchen")
+      k_box = create(:box, move:, number: "1", room: kitchen)
+      create(:media, move:, box: k_box, captured_at: 2.days.ago)
+      create(:media, move:, box: k_box, captured_at: 1.day.ago)
+      create(:media, move:, box: create(:box, move:, number: "2"), captured_at: 1.hour.ago)
+
+      get move_gallery_path(move, room_id: kitchen.id)
+
+      # The unfiltered Move holds 2 more photos, but only 1 is in the Kitchen.
+      expect(response.body).to include(I18n.t("galleries.index.pager.remaining", count: 1))
+      expect(rendered_cursor(response.body).fetch("room_id")).to eq(kitchen.id)
+    end
+
+    it "treats a malformed cursor as the first page instead of erroring" do
+      box = create(:box, move:, number: "1")
+      media = create(:media, move:, box:)
+
+      get move_gallery_path(move, cursor: "not-a-time", cursor_id: "not-a-uuid")
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Box 1")
+
+      # A well-formed uuid with a garbage timestamp is equally forgiven.
+      get move_gallery_path(move, cursor: "garbage", cursor_id: media.id)
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Box 1")
+
+      # A Ruby-parseable year that overflows Postgres's timestamp range must
+      # not become a PG::DatetimeFieldOverflow 500 (security pass, #718).
+      get move_gallery_path(move, cursor: "999999-01-01T00:00:00Z", cursor_id: media.id)
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Box 1")
+    end
+
+    it "renders no pager while the photos fit a single page" do
+      stub_const("GalleriesController::PAGE", 2)
+      box = create(:box, move:, number: "1")
+      create_list(:media, 2, move:, box:)
+
+      get move_gallery_path(move)
+
+      # Exactly-full page: the remaining count is 0, so no zero-value chrome.
+      expect(response.body).not_to include(I18n.t("galleries.index.pager.load_more"))
     end
 
     it "renders the empty state when the move has no photos" do
@@ -313,5 +406,20 @@ RSpec.describe "Galleries" do
       expect(response.body).to include(move_gallery_path(move))
       expect(response.body).to include(I18n.t("menu.show.gallery"))
     end
+  end
+
+  # The pager's cursor as Turbo would submit it — read from the rendered hidden
+  # fields, never hand-built, so serialization drift (precision truncation, a
+  # dropped filter) fails the walk the way it would fail a user (#194 pattern).
+
+  def rendered_cursor(body)
+    pager = Nokogiri::HTML(body).at_css("##{Components::Gallery::Pager::ID}")
+    raise "no pager rendered" if pager.nil?
+
+    pager.css("input[type=hidden]").to_h { |input| [input["name"], input["value"]] }
+  end
+
+  def tile_dom_ids(body)
+    Nokogiri::HTML(body).css("##{Components::Gallery::Grid::TILES_ID} [id^='media_']").map { |el| el["id"] }
   end
 end
