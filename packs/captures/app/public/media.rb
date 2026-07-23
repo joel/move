@@ -131,6 +131,14 @@ class Media < ApplicationRecord
 
   scope :recent_first, -> { order(captured_at: :desc) }
   scope :ready, -> { where(status: "ready") }
+  # Keyset cursors for a (captured_at, id)-ordered walk in either direction —
+  # the gallery's "Load more" pages (#718). The id half is essential: bulk
+  # captures share captured_at, so a time-only cursor would skip or repeat every
+  # row on the page-boundary timestamp (the activity feed's #194 lesson). The
+  # tuple comparison advances past exactly the last row seen; id casts to uuid
+  # so the bound string compares as a uuid, not text.
+  scope :captured_before, ->(time, id) { where("(captured_at, id) < (?, ?::uuid)", time, id) }
+  scope :captured_after, ->(time, id) { where("(captured_at, id) > (?, ?::uuid)", time, id) }
   # Rows whose image ingest hasn't settled yet — pending (in flight) or failed.
   # The reaper (purge_abandoned_uploads) uses `pending` + age to clear orphans.
   scope :pending, -> { where(status: "pending") }
