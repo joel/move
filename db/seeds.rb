@@ -311,6 +311,38 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     )
   end
 
+  # #718 — a bulk-photo Move so the Gallery's keyset "Load more" is showcase-
+  # ready: a full first page (GalleriesController::PAGE tiles) plus a second
+  # page to load. Kept out of "Seattle Relocation" so the main demo's review
+  # queue / activity / exports stay curated. One shared blob keeps re-seed
+  # cheap and storage flat; no items on purpose (a pure gallery surface).
+  # Idempotent: skipped once the move has media (media have no natural key).
+  stress_move = Move.find_or_create_by!(name: "Gallery Stress Test") do |m|
+    m.status = "started"
+    m.unit_system = "metric"
+    m.created_by = owner
+    m.recognition_provider = "fake"
+    m.embedding_provider = "fake"
+  end
+  stress_move.move_memberships.find_or_create_by!(user: owner) { |mm| mm.role = "admin" }
+  if stress_move.media.none?
+    stress_room = stress_move.rooms.find_or_create_by!(name: "Warehouse")
+    stress_box = stress_move.boxes.find_or_create_by!(number: "1") do |b|
+      b.room = stress_room
+      b.qr_token = "demo-stress-box" # raw seed bypasses Boxes::Create, which mints this
+    end
+    stress_blob = ActiveStorage::Blob.create_and_upload!(**SeedData.image_attachable("skillet-and-bowls"))
+    photo_count = GalleriesController::PAGE + 10
+    photo_count.times do |i|
+      media = stress_box.media.new(
+        move: stress_move, media_type: "image", captured_via: "web",
+        captured_at: (photo_count - i).hours.ago
+      )
+      media.image.attach(stress_blob)
+      media.save!
+    end
+  end
+
   # D13 — MCP integration tokens (F3 Assistant panel). Two active tokens (one
   # recently used, one never) plus a revoked one, so the panel shows live tokens
   # and the model exercises the revoked state. Only the digest is stored; the

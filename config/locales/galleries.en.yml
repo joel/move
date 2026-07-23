@@ -7,9 +7,12 @@ en:
       subtitle: "Every photo across this move, newest first."
       generated: "Generated"
       box_label: "Box %{number}"
-      capped:
-        recent: "Showing the most recent %{count} photos."
-        oldest: "Showing the oldest %{count} photos."
+      pager:
+        remaining:
+          one: "1 more photo"
+          other: "%{count} more photos"
+        load_more: "Load more"
+        loading: "Loading…"
       sort:
         label: "Sort"
         recent: "Newest first"

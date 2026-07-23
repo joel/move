@@ -5,6 +5,15 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.103.0] — 2026-07-23
+
+### Added
+- **The gallery now reaches every photo.** Large moves used to stop at the 300
+  most recent photos with no way to see the rest. The grid now loads photos in
+  pages of 100 with a "Load more" button that appends in place — scroll
+  position, the active room filter, and the sort order all survive, and the
+  photo viewer picks up newly loaded photos automatically (#718).
+
 ## [v0.102.2] — 2026-07-20
 
 ### Fixed

@@ -1970,6 +1970,13 @@ CREATE INDEX index_label_print_runs_on_move_id_and_status ON public.label_print_
 
 
 --
+-- Name: index_media_gallery_keyset; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_media_gallery_keyset ON public.media USING btree (move_id, status, captured_at, id) WHERE (discarded_at IS NULL);
+
+
+--
 -- Name: index_media_on_box_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2641,6 +2648,7 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260723163405'),
 ('20260719120000'),
 ('20260714120003'),
 ('20260714120002'),
