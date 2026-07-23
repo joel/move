@@ -741,6 +741,8 @@ class ::Media < ::ApplicationRecord
 
   def self.recent_first: () -> ::Media::ActiveRecord_Relation
   def self.ready: () -> ::Media::ActiveRecord_Relation
+  def self.captured_before: (untyped time, untyped id) -> ::Media::ActiveRecord_Relation
+  def self.captured_after: (untyped time, untyped id) -> ::Media::ActiveRecord_Relation
   def self.pending: () -> ::Media::ActiveRecord_Relation
   def self.not_generated: () -> ::Media::ActiveRecord_Relation
   def self.with_attached_image: () -> ::Media::ActiveRecord_Relation
@@ -749,6 +751,10 @@ class ::Media < ::ApplicationRecord
     def recent_first: () -> ::Media::ActiveRecord_Relation
 
     def ready: () -> ::Media::ActiveRecord_Relation
+
+    def captured_before: (untyped time, untyped id) -> ::Media::ActiveRecord_Relation
+
+    def captured_after: (untyped time, untyped id) -> ::Media::ActiveRecord_Relation
 
     def pending: () -> ::Media::ActiveRecord_Relation
 
