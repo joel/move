@@ -211,6 +211,9 @@ RSpec.describe "Galleries" do
       expect(response.body).to include(I18n.t("galleries.index.pager.remaining", count: 1))
       expect(response.body).not_to include(%(id="#{ActionView::RecordIdentifier.dom_id(oldest)}"))
       expect(rendered_cursor(response.body).fetch("cursor_id")).to eq(middle.id)
+      # The pager form carries the auto-load trigger (#720); the button inside
+      # it stays the no-JS fallback.
+      expect(response.body).to include(%(data-controller="infinite-scroll"))
     end
 
     it "appends the next page as a turbo_stream and retires the exhausted pager (#718)" do

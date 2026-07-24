@@ -2,13 +2,15 @@
 
 require "rails_helper"
 
-# JS-driven coverage for the Gallery's keyset "Load more" (#718). The rack_test
-# request spec asserts the cursor walk and the turbo_stream payload; this one
-# drives a real browser to prove the in-place append — clicking Load more grows
-# the grid without a navigation (scroll survives), the pager retires on the
-# last page, and the lightbox discovers the appended tiles (its Stimulus
-# targets are queried live at open time, the property the whole design leans
-# on).
+# JS-driven coverage for the Gallery's infinite scroll (#718, #720). The
+# rack_test request spec asserts the cursor walk and the turbo_stream payload;
+# this one drives a real browser to prove the auto-load loop — with the pager
+# in reach of the observer the next page streams in with NO click, pages chain
+# until the pager retires, and the lightbox discovers the appended tiles (its
+# Stimulus targets are queried live at open time, the property the whole
+# design leans on). The no-JS fallback (the Load more button + a full-page GET
+# at the cursor) stays covered by the request spec — a browser click test
+# would race the observer's own submit.
 #
 # Like the other JS specs, a real browser runs in a separate server thread, so
 # the in-thread `stub_current_tenant` mock can't apply — provision a real
@@ -50,19 +52,15 @@ RSpec.describe "Gallery pagination (JS)", :js do
     end
   end
 
-  it "appends the next page in place and the lightbox picks the new tiles up" do
+  it "auto-loads the next page with no click and the lightbox picks the new tiles up" do
     stub_const("GalleriesController::PAGE", 2)
     move = seed_three_photos
     login_as(user: user)
     visit move_gallery_path(move)
 
-    expect(page).to have_css("button[data-lightbox-target='tile']", count: 2)
-    expect(page).to have_button(I18n.t("galleries.index.pager.load_more"))
-
-    click_button I18n.t("galleries.index.pager.load_more")
-
-    # The third photo streams into the existing grid — no navigation — and the
-    # exhausted pager retires.
+    # Two pages of a short grid: the pager mounts within the observer's reach,
+    # so the third photo streams into the existing grid with no interaction —
+    # the cascade drains to exhaustion and the pager retires.
     expect(page).to have_css("button[data-lightbox-target='tile']", count: 3)
     expect(page).to have_no_button(I18n.t("galleries.index.pager.load_more"))
 

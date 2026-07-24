@@ -5,6 +5,15 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.104.0] — 2026-07-24
+
+### Changed
+- **The photo gallery now loads more photos on its own.** Reaching the rest of
+  a large gallery used to take a "Load more" click for every page of 100
+  photos. The next page now streams in automatically as you scroll near the
+  bottom — no click, no lost scroll position — and the button sticks around as
+  the fallback when scripting is unavailable (#720).
+
 ## [v0.103.0] — 2026-07-23
 
 ### Added
