@@ -24,16 +24,21 @@ module Components
       # @rbs reviewable_media_ids: untyped
       # @rbs recoverable_media_ids: untyped
       # @rbs unpacked_media_ids: untyped
+      # @rbs editable: bool
       # @rbs return: void
       def initialize(move:, box:, media:, items:, reviewable_media_ids: [],
-                     recoverable_media_ids: [], unpacked_media_ids: [])
+                     recoverable_media_ids: [], unpacked_media_ids: [], editable: false)
         @move = move
         @box = box
         @media = media # recent_first, blobs preloaded
-        @items = items # all in-box items
+        @items = items # all in-box items (removed ride along while unpacking, #727)
         @reviewable_media_ids = reviewable_media_ids.to_set
         @recoverable_media_ids = recoverable_media_ids.to_set
         @unpacked_media_ids = unpacked_media_ids.to_set
+        # In-place checklist mode (#727): checked states render for anyone
+        # viewing an unpacking box; the toggles need an editable Move too.
+        @unpacking = box.unpacking?
+        @interactive = @unpacking && editable
         # In-box items grouped by their source photo (only this box's photos are
         # rendered as cards).
         @items_by_media = items.group_by(&:source_media_id)
@@ -47,7 +52,10 @@ module Components
       #: () -> void
       def view_template
         section(class: "flex flex-col gap-stack-gap") do
-          render Components::Boxes::ContentsHeader.new(total: @items.size)
+          render Components::Boxes::ContentsHeader.new(
+            total: @items.size,
+            unpacked: @unpacking ? @items.count(&:removed?) : nil
+          )
           any_cards? ? grid : empty
         end
       end
@@ -69,7 +77,8 @@ module Components
               reviewable: @reviewable_media_ids.include?(media.id),
               recoverable: @recoverable_media_ids.include?(media.id),
               unpacked: @unpacked_media_ids.include?(media.id),
-              eager: index < EAGER_TILES
+              eager: index < EAGER_TILES,
+              unpacking: @unpacking, interactive: @interactive
             )
           end
           # Standalone items most-recent first (items arrive created-ascending).
@@ -79,7 +88,7 @@ module Components
           @standalone_items.reverse_each.with_index(@media.size) do |item, index|
             render Components::Boxes::ItemCard.new(
               item: item, move: @move, image_ready: @move.image_generation_ready?,
-              eager: index < EAGER_TILES
+              eager: index < EAGER_TILES, unpacking: @interactive
             )
           end
         end

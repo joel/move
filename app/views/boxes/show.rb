@@ -98,7 +98,8 @@ module Views
         render Components::Boxes::ContentsGrid.new(
           move: @move, box: @box, media: @media, items: @items,
           reviewable_media_ids: @reviewable_media_ids,
-          recoverable_media_ids: @recoverable_media_ids, unpacked_media_ids: @unpacked_media_ids
+          recoverable_media_ids: @recoverable_media_ids, unpacked_media_ids: @unpacked_media_ids,
+          editable: @editable
         )
       end
 

@@ -20,8 +20,14 @@ module Components
         "box_item_#{item.id}_card"
       end
 
-      #: (item: untyped, move: untyped, ?image_ready: untyped, ?generating: untyped, ?failed: untyped, ?eager: bool) -> void
-      def initialize(item:, move:, image_ready: false, generating: false, failed: false, eager: false)
+      # `unpacking:` renders the in-place toggle row (#727 — Mark unpacked /
+      # Restore) for the box-detail grid while the box is actively unpacking on
+      # an editable Move; the removed-state display (check badge + note) keys
+      # off the item itself, so a viewer sees the truth without the controls.
+
+      #: (item: untyped, move: untyped, ?image_ready: untyped, ?generating: untyped, ?failed: untyped, ?eager: bool, ?unpacking: bool) -> void
+      def initialize(item:, move:, image_ready: false, generating: false, failed: false, eager: false,
+                     unpacking: false)
         @item = item
         @move = move
         @image_ready = image_ready
@@ -33,6 +39,7 @@ module Components
         # re-renders (generate flow) omit it — a swapped-in card sits in the
         # viewport, where lazy loads immediately anyway.
         @eager = eager
+        @unpacking = unpacking
       end
 
       #: () -> void
@@ -43,6 +50,7 @@ module Components
             caption
           end
           generate_control if show_generate?
+          unpacking_control if @unpacking
         end
       end
 
@@ -74,9 +82,24 @@ module Components
         @image_ready && @item.source_media_id.nil? && !@generating
       end
 
+      # Same treatment as the photo cards' green "Unpacked" badge — the
+      # removed state must read identically across both card kinds.
+
+      #: () -> untyped
+      def unpacked_badge
+        return unless @item.removed?
+
+        span(class: "absolute left-1.5 top-1.5 z-10 inline-flex items-center gap-1 rounded-full " \
+                    "bg-accent-sage/90 px-2 py-0.5 text-label-caps uppercase text-page") do
+          render Components::Icons::Check.new(css: "h-3 w-3")
+          plain I18n.t("boxes.gallery.unpacked")
+        end
+      end
+
       #: () -> untyped
       def tile
         div(class: tile_classes) do
+          unpacked_badge
           if image?
             render Components::Ui::BlurUpImage.new(
               src: MediaVariants::TransformUrl.for(@item.source_media, :thumb),
@@ -104,7 +127,9 @@ module Components
 
       #: () -> untyped
       def caption_note
-        if @generating
+        if @item.removed?
+          span(class: "text-label-caps uppercase text-accent-sage") { I18n.t("boxes.contents.item_unpacked") }
+        elsif @generating
           span(class: "text-label-caps uppercase text-muted") { I18n.t("boxes.contents.generating") }
         elsif @failed
           span(class: "text-label-caps uppercase text-error") { I18n.t("boxes.contents.generate_failed") }
@@ -136,6 +161,32 @@ module Components
                    "uppercase text-text-warm transition hover:bg-accent-sage hover:text-page",
             data: { turbo_submits_with: I18n.t("boxes.contents.generating") }
           ) { I18n.t("boxes.contents.generate") }
+        end
+      end
+
+      # The in-place unpacking toggle (#727) — a sibling of the card's link,
+      # like generate_control. Reversible, so no confirm.
+
+      #: () -> untyped
+      def unpacking_control
+        div(class: "px-2 pb-2") do
+          if @item.removed?
+            button_to(
+              view_context.move_box_unpacking_restore_path(@move, @item.box, @item),
+              method: :patch, params: { origin: "box" },
+              class: "w-full rounded-full bg-accent-sage/15 px-3 py-1.5 text-label-caps " \
+                     "uppercase text-accent-sage transition hover:bg-accent-sage hover:text-page",
+              aria: { label: I18n.t("boxes.contents.restore_item", name: @item.name) }
+            ) { I18n.t("items.show.restore") }
+          else
+            button_to(
+              view_context.move_box_unpacking_remove_path(@move, @item.box, @item),
+              method: :patch, params: { origin: "box" },
+              class: "w-full rounded-full bg-surface-container-high px-3 py-1.5 text-label-caps " \
+                     "uppercase text-text-warm transition hover:bg-accent-sage hover:text-page",
+              aria: { label: I18n.t("boxes.contents.mark_item_unpacked", name: @item.name) }
+            ) { I18n.t("boxes.contents.mark_unpacked") }
+          end
         end
       end
 

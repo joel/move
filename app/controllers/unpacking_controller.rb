@@ -195,7 +195,8 @@ class UnpackingController < MoveScopedController
                             reviewable: @box.items.exists?(source_media_id: media.id),
                             # Move-wide, matching BoxesController#unpacked_media_ids —
                             # a sibling moved to another box keeps the badge withheld.
-                            unpacked: @move.items.in_box.where(source_media_id: media.id).none?
+                            unpacked: @move.items.in_box.where(source_media_id: media.id).none?,
+                            unpacking: @box.unpacking?, interactive: editable_move?
                           ))
     )
   end
@@ -205,7 +206,8 @@ class UnpackingController < MoveScopedController
     turbo_stream.replace(
       Components::Boxes::ItemCard.dom_id(@item),
       view_context.render(Components::Boxes::ItemCard.new(
-                            item: @item, move: @move, image_ready: @move.image_generation_ready?
+                            item: @item, move: @move, image_ready: @move.image_generation_ready?,
+                            unpacking: @box.unpacking? && editable_move?
                           ))
     )
   end
