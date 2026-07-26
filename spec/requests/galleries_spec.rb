@@ -169,6 +169,48 @@ RSpec.describe "Galleries" do
       end
     end
 
+    it "carries the photo's items as seeded-search chip data on its tile (#724)" do
+      box = create(:box, move:, number: "6")
+      media = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: media, name: "Copper kettle")
+      create(:item, move:, box:, source_media: media, name: "Toaster")
+
+      get move_gallery_path(move)
+
+      tile = Capybara.string(response.body).find("button[data-lightbox-target='tile']")
+      payload = JSON.parse(tile["data-items"])
+      aggregate_failures do
+        expect(payload.pluck("name")).to contain_exactly("Copper kettle", "Toaster")
+        expect(payload.find { |chip| chip["name"] == "Copper kettle" }&.fetch("url"))
+          .to eq(move_search_path(move, q: "Copper kettle"))
+      end
+    end
+
+    it "omits the items data entirely for a photo that sourced no items" do
+      box = create(:box, move:, number: "6")
+      create(:media, move:, box:)
+
+      get move_gallery_path(move)
+
+      tile = Capybara.string(response.body).find("button[data-lightbox-target='tile']")
+      expect(tile["data-items"]).to be_nil
+    end
+
+    it "caps the chip payload at six oldest-first items and excludes removed ones" do
+      box = create(:box, move:, number: "6")
+      media = create(:media, move:, box:)
+      7.times { |i| create(:item, move:, box:, source_media: media, name: "Mug #{i}", created_at: i.minutes.ago) }
+      create(:item, move:, box:, source_media: media, name: "Gone", presence_state: "removed")
+
+      get move_gallery_path(move)
+
+      payload = JSON.parse(Capybara.string(response.body).find("button[data-lightbox-target='tile']")["data-items"])
+      aggregate_failures do
+        expect(payload.size).to eq(6)
+        expect(payload.pluck("name")).not_to include("Gone")
+      end
+    end
+
     it "offers a room as a filter chip only when it has at least one photo" do
       kitchen = create(:room, move:, name: "Kitchen")
       create(:room, move:, name: "EmptyAttic")

@@ -13,6 +13,10 @@ module Components
       # data-pswp-* contract stays "the served detail size".
       DETAIL_BOX = MediaVariants::TransformUrl::SIZES.fetch(:detail).fetch(:width)
 
+      # A shelf photo can source many items; the lightbox chrome can only hold a
+      # few chips (no "+N" overflow — it would navigate nowhere).
+      MAX_ITEM_CHIPS = 6
+
       # Appended pages render entirely lazy (eager_tiles: 0) — only the initial
       # page's first row is ever above the fold (#673).
 
@@ -118,7 +122,20 @@ module Components
           thumb: thumb_url(media),
           caption: caption(media),
           href: move_box_path(@move, media.box)
-        }.merge(pswp_dimensions(media))
+        }.merge(pswp_dimensions(media)).merge(items_data(media))
+      end
+
+      # The photo's items as lightbox chips: name + a server-minted seeded-search
+      # URL (#724 — the JS never builds URLs). Omitted entirely when the photo
+      # sourced nothing so the viewers render no chip chrome at all. Reads the
+      # page-level :sourced_items preload — keep this in-memory (no queries).
+
+      #: (untyped media) -> Hash[Symbol, String]
+      def items_data(media)
+        chips = media.sourced_items.reject(&:removed?)
+                     .sort_by(&:created_at).first(MAX_ITEM_CHIPS)
+                     .map { |item| { name: item.name, url: move_search_path(@move, q: item.name) } }
+        chips.empty? ? {} : { items: chips.to_json }
       end
 
       # Real slide dimensions when blob analysis has them. The dataset contract

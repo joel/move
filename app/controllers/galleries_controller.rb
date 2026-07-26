@@ -84,7 +84,7 @@ class GalleriesController < MoveScopedController
   def page_of(scope)
     time, id = cursor
     scope = seek(scope, time, id) if time
-    scope.includes(box: :room, image_attachment: :blob)
+    scope.includes(:sourced_items, box: :room, image_attachment: :blob)
          .order(captured_at: sort_direction, id: sort_direction)
          .limit(PAGE)
          .to_a

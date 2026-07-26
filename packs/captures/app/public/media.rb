@@ -55,6 +55,12 @@ class Media < ApplicationRecord
   has_many :co_located_sourced_items, ->(media) { where(box_id: media.box_id) },
            class_name: "Item", foreign_key: :source_media_id, dependent: nil
   discard_cascade_to :co_located_sourced_items
+  # ALL kept items this photo sourced, Move-wide — unlike the co-located scope
+  # above, an item moved to another box stays in this set. Instance-independent
+  # so it is `includes`-preloadable; powers the gallery lightbox "items in this
+  # photo" chips (#724). Not part of any cascade — purely a read association.
+  has_many :sourced_items, class_name: "Item", foreign_key: :source_media_id,
+                           inverse_of: :source_media, dependent: nil
   # The attachment is the optimised master (≤2048px JPEG, written by
   # ImageNormalizer). Display sizes are produced on demand at Cloudflare's edge —
   # `MediaVariants::TransformUrl.for(media, :thumb|:detail)` mints a signed URL to
