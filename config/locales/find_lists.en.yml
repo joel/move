@@ -1,0 +1,25 @@
+# #730 — the personal find list. No customer-facing copy is hard-coded in the
+# Phlex views — everything renders through find_lists.*.
+en:
+  find_lists:
+    search_link: "Find list · %{count}"
+    toggle:
+      add: "Add %{name} to your find list"
+      remove: "Remove %{name} from your find list"
+      add_short: "Add to find list"
+      on_list: "On your find list"
+    show:
+      title: "Find list"
+      subtitle: "Your pinned items, grouped by the boxes to open."
+      box_label: "Box %{number}"
+      found: "Found"
+      found_count: "%{found} of %{total} found"
+      clear_found: "Clear found"
+      empty:
+        title: "Nothing pinned yet"
+        description: "Search for something you need, then tap + on a result to build your picking list."
+        cta: "Search your move"
+    flash:
+      cleared:
+        one: "Cleared 1 found item"
+        other: "Cleared %{count} found items"

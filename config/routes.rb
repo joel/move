@@ -131,6 +131,13 @@ Rails.application.routes.draw do
     delete "vocabularies/:kind/:id", to: "vocabularies#destroy", constraints: kind
     # D1 — Hybrid search over the Move's items (full-text + trigram + pgvector).
     get "search", to: "searches#index", as: :search
+    # Personal find list (#730): pin exact items while searching; the list rolls
+    # up by box. Personal rows only — viewers and archived-Move members may pin
+    # (see FindListsController). Item-keyed so the search card needs no entry id.
+    get "find_list", to: "find_lists#show", as: :find_list
+    post "find_list/items/:item_id", to: "find_lists#pin", as: :find_list_pin
+    delete "find_list/items/:item_id", to: "find_lists#unpin", as: :find_list_unpin
+    delete "find_list/found", to: "find_lists#clear_found", as: :find_list_clear_found
     # Gallery — browse every captured (and AI-generated) photo across the whole
     # Move in one recent-first grid, filterable by room. Read-only; reached from
     # the Menu hub. A tile opens a client-side lightbox (the :detail variant).

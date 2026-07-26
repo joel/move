@@ -54,6 +54,10 @@ interface ::_RbsRailsPathHelpers
   def move_vocabularies_path: (*untyped) -> ::String
   def move_vocabulary_path: (*untyped) -> ::String
   def move_search_path: (*untyped) -> ::String
+  def move_find_list_path: (*untyped) -> ::String
+  def move_find_list_pin_path: (*untyped) -> ::String
+  def move_find_list_unpin_path: (*untyped) -> ::String
+  def move_find_list_clear_found_path: (*untyped) -> ::String
   def move_gallery_path: (*untyped) -> ::String
   def move_gallery_group_path: (*untyped) -> ::String
   def move_review_path: (*untyped) -> ::String
@@ -180,6 +184,10 @@ interface ::_RbsRailsPathHelpers
   def move_vocabularies_url: (*untyped) -> ::String
   def move_vocabulary_url: (*untyped) -> ::String
   def move_search_url: (*untyped) -> ::String
+  def move_find_list_url: (*untyped) -> ::String
+  def move_find_list_pin_url: (*untyped) -> ::String
+  def move_find_list_unpin_url: (*untyped) -> ::String
+  def move_find_list_clear_found_url: (*untyped) -> ::String
   def move_gallery_url: (*untyped) -> ::String
   def move_gallery_group_url: (*untyped) -> ::String
   def move_review_url: (*untyped) -> ::String
