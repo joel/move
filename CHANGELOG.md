@@ -5,6 +5,39 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [Unreleased]
+
+### Added
+- **A personal find list.** While searching, pin any result (or an item from
+  its detail page) onto your own per-move list; the list rolls your pins up by
+  box — each "Box N · Room" header opens that box's unpacking checklist — and
+  entries strike themselves off as items get unpacked, with one-tap
+  "Clear found" (#730).
+
+## [v0.107.0] — 2026-07-26
+
+### Added
+- **Unpack items right on the box page.** While a box is unpacking, its detail
+  page becomes an in-place checklist: tap a photo's "Unpack photo" to mark all
+  its items removed at once, toggle individual name chips, and standalone item
+  cards gain Mark unpacked / Restore — with the "N of M unpacked" progress
+  ticking in place (#727).
+
+## [v0.106.0] — 2026-07-26
+
+### Added
+- **Find similar items from anywhere.** Gallery photos show tappable item
+  chips, item pages gain "Search similar items", and every search result
+  carries a "More like this" shortcut — all landing on a search pre-filled
+  with that item's name (#724).
+
+## [v0.105.0] — 2026-07-26
+
+### Changed
+- **Search results show photos.** Result cards lead with the item's photo
+  (match badge overlaid) instead of text-only cards, with a placeholder for
+  items that have none (#722).
+
 ## [v0.104.0] — 2026-07-24
 
 ### Changed

@@ -397,10 +397,24 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     Search::RefreshDocument.new.call(item: item)
   end
 
+  # Find list (#730): the demo admin's personal pins — a by-box rollup with one
+  # entry already struck (box 7's removed "Reading Glasses") so auto-strike +
+  # Clear found demo immediately. Manual-item names lead because recorded
+  # recognition replaces authored photo-item names; find_by + guard keeps the
+  # block resilient either way. Idempotent via the unique (move, user, item)
+  # triple.
+  if FindListEntry.where(move: move, user_id: owner.id).none?
+    ["Reading Glasses", "Bedside Lamp", "Bath Towels", "Wine Glasses"].each do |name|
+      item = move.items.find_by(name: name)
+      FindLists::Pin.new.call(move: move, user: owner, item: item) if item
+    end
+  end
+
   Rails.logger.info(
     "[seeds] #{organization.slug}: #{move.boxes.count} boxes, #{move.rooms.count} rooms, " \
     "#{move.items.count} items, #{move.media.count} media, " \
     "#{move.items.unreviewed.count} to review, " \
-    "#{ItemSearchDocument.count} search docs"
+    "#{ItemSearchDocument.count} search docs, " \
+    "#{FindListEntry.where(user_id: owner.id).count} find-list pins"
   )
 end

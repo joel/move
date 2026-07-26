@@ -9,6 +9,7 @@ en:
       app: "App"
       actions: "Actions"
       gallery: "Gallery"
+      find_list: "Find List"
       review: "Review"
       rooms: "Rooms"
       members: "Members & Roles"

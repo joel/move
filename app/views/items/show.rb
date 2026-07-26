@@ -6,8 +6,8 @@ module Views
     # never cropped) on the left; the edit form plus Move and Remove/Restore
     # controls on the right. Review and presence are shown as independent axes.
     class Show < Views::Base
-      #: (move: untyped, item: untyped, boxes: untyped, ?editable: untyped, ?photo_siblings: untyped) -> void
-      def initialize(move:, item:, boxes:, editable: false, photo_siblings: 0)
+      #: (move: untyped, item: untyped, boxes: untyped, ?editable: untyped, ?photo_siblings: untyped, ?find_list_pinned: bool) -> void
+      def initialize(move:, item:, boxes:, editable: false, photo_siblings: 0, find_list_pinned: false)
         @move = move
         @item = item
         @boxes = boxes
@@ -15,6 +15,7 @@ module Views
         # Count of *other* in-box items detected in this item's source photo (0 for
         # manual items) — surfaces the one-photo → many-items relationship on C3.
         @photo_siblings = photo_siblings
+        @find_list_pinned = find_list_pinned
       end
 
       #: () -> void
@@ -137,18 +138,22 @@ module Views
       end
 
       # Seeded search by this item's name (#724) — the looser companion to the
-      # precomputed GroupRail below: works for unclustered items and catches
-      # semantic cousins the exact name-family misses. Read-only-safe, so it
-      # renders in both editable and viewer/archived modes.
+      # precomputed GroupRail below — plus the personal find-list toggle (#730).
+      # Both are read-only-safe, so the row renders in editable and
+      # viewer/archived modes alike (pinning mutates only personal rows).
 
       #: () -> untyped
       def search_similar_action
-        div(class: "mt-5 border-t border-card-border pt-4") do
+        div(class: "mt-5 flex flex-wrap items-center gap-3 border-t border-card-border pt-4",
+            data: { controller: "refocus" }) do
           render Components::Ui::Button.new(
             label: I18n.t("items.show.search_similar"),
             href: move_search_path(@move, q: @item.name),
             variant: :ghost,
             icon: Components::Icons::Search
+          )
+          render Components::FindLists::Toggle.new(
+            move: @move, item: @item, pinned: @find_list_pinned, labeled: true
           )
         end
       end

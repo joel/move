@@ -951,6 +951,20 @@ CREATE TABLE public.cluster_states (
 
 
 --
+-- Name: find_list_entries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.find_list_entries (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    move_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    item_id uuid NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: indexing_runs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1474,6 +1488,14 @@ ALTER TABLE ONLY public.cluster_states
 
 
 --
+-- Name: find_list_entries find_list_entries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.find_list_entries
+    ADD CONSTRAINT find_list_entries_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: indexing_runs indexing_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1813,6 +1835,34 @@ CREATE UNIQUE INDEX index_cluster_name_embeddings_on_move_model_text ON public.c
 --
 
 CREATE UNIQUE INDEX index_cluster_states_on_move_id ON public.cluster_states USING btree (move_id);
+
+
+--
+-- Name: index_find_list_entries_on_item_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_find_list_entries_on_item_id ON public.find_list_entries USING btree (item_id);
+
+
+--
+-- Name: index_find_list_entries_on_move_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_find_list_entries_on_move_id ON public.find_list_entries USING btree (move_id);
+
+
+--
+-- Name: index_find_list_entries_on_move_id_and_user_id_and_item_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_find_list_entries_on_move_id_and_user_id_and_item_id ON public.find_list_entries USING btree (move_id, user_id, item_id);
+
+
+--
+-- Name: index_find_list_entries_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_find_list_entries_on_user_id ON public.find_list_entries USING btree (user_id);
 
 
 --
@@ -2434,6 +2484,14 @@ ALTER TABLE ONLY public.media
 
 
 --
+-- Name: find_list_entries fk_rails_50e6bf0e3c; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.find_list_entries
+    ADD CONSTRAINT fk_rails_50e6bf0e3c FOREIGN KEY (move_id) REFERENCES public.moves(id) ON DELETE CASCADE;
+
+
+--
 -- Name: recognition_suggestions fk_rails_56e971506f; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2586,6 +2644,14 @@ ALTER TABLE ONLY public.user_verification_keys
 
 
 --
+-- Name: find_list_entries fk_rails_b6dd3ebce2; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.find_list_entries
+    ADD CONSTRAINT fk_rails_b6dd3ebce2 FOREIGN KEY (item_id) REFERENCES public.items(id) ON DELETE CASCADE;
+
+
+--
 -- Name: active_storage_attachments fk_rails_c3b3935057; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2648,6 +2714,7 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260726180000'),
 ('20260723163405'),
 ('20260719120000'),
 ('20260714120003'),

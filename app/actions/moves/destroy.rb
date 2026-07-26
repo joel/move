@@ -18,8 +18,9 @@ module Moves
   # Active Storage blobs by hand since `delete_all` fires no Active Storage callbacks.
   class Destroy < BaseAction
     # Move-owned tables in child-first order: no row is deleted while a still-present,
-    # no-`ON DELETE` FK references it. (`item_search_documents` is omitted — its
-    # item_id/move_id FKs are `ON DELETE CASCADE`, so the DB removes it for us.)
+    # no-`ON DELETE` FK references it. (`item_search_documents` and
+    # `find_list_entries` are omitted — their item_id/move_id FKs are
+    # `ON DELETE CASCADE`, so the DB removes them for us.)
     DELETE_ORDER = [
       RecognitionSuggestion, RecognitionRun, Item, Media,
       Activity, IndexingRun, LabelPrintRun, InsuranceDossierRun, MoveIntegrationToken,

@@ -17,6 +17,16 @@ module Components
     end
   end
 
+  module FindLists
+    class Toggle
+      def self.dom_id: (untyped item, ?labeled: bool) -> String
+    end
+
+    class Row
+      def self.dom_id: (untyped entry) -> String
+    end
+  end
+
   module Reviews
     class ItemRow
       def self.dom_id: (untyped item) -> String

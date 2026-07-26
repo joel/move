@@ -24,8 +24,16 @@ class SearchesController < MoveScopedController
       recent_searches = recent.record(query) if results.any?
     end
 
+    # The caller's pins (#730): drives each result card's toggle state and the
+    # header pill. One pluck per render; personal rows only. The :item join
+    # (kept default scope) drops dangling pins of soft-deleted items so the
+    # pill count always matches what the list renders.
+    pinned_item_ids = FindListEntry.where(move_id: @move.id, user_id: current_user.id)
+                                   .joins(:item).pluck(:item_id).to_set
+
     render Views::Searches::Index.new(
-      move: @move, query: query, results: results, recent_searches: recent_searches
+      move: @move, query: query, results: results, recent_searches: recent_searches,
+      pinned_item_ids: pinned_item_ids
     )
   end
 
