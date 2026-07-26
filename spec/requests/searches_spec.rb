@@ -78,6 +78,20 @@ RSpec.describe "Searches" do
       end
     end
 
+    it "overlays a more-like-this shortcut on each result card without nesting anchors (#724)" do
+      box = create(:box, move:, number: "3")
+      create(:item, :confirmed, move:, box:, name: "Power strip")
+      index_all
+
+      get move_search_path(move, q: "strip")
+
+      aggregate_failures do
+        expect(response.body).to include(move_search_path(move, q: "Power strip"))
+        expect(response.body).to include(I18n.t("searches.more_like_this", name: "Power strip"))
+        expect(Capybara.string(response.body)).to have_no_css("a a")
+      end
+    end
+
     it "shows the no-results state for an unmatched query" do
       get move_search_path(move, q: "zzzznotathing")
 

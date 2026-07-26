@@ -33,6 +33,19 @@ RSpec.describe "Hybrid search" do
     expect(page).to have_css('img[alt="Cast iron skillet"]')
   end
 
+  it "re-seeds the search from a result card's more-like-this overlay (#724)" do
+    box = create(:box, move:, number: "1")
+    item = create(:item, :confirmed, move:, box:, name: "Cast iron skillet")
+    Search::RefreshDocument.new.call(item: item)
+
+    visit move_search_path(move, q: "skillet")
+
+    # Located by attribute — Capybara's aria-label matching is off by default.
+    find("a[aria-label='#{I18n.t("searches.more_like_this", name: "Cast iron skillet")}']").click
+    expect(page).to have_css("input[name='q'][value='Cast iron skillet']")
+    expect(page).to have_text("Cast iron skillet")
+  end
+
   it "shows the no-results state for an unmatched query" do
     visit move_search_path(move, q: "zzzznotathing")
     expect(page).to have_text(I18n.t("searches.empty.description"))

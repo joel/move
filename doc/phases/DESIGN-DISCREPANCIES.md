@@ -316,6 +316,27 @@ The canonical screen `Search (Dark) - Refined Palette`
 
 ---
 
+## ⚠️ §SIMILAR-SEARCH — "Find similar items" affordances (post-D8, #724)
+
+Three entry points jump to the existing D1 search screen seeded with an item's
+name (`/search?q=<name>`) — none has a Stitch representation (the C3 item-detail
+screen was checked and carries no similar-items affordance):
+
+- **C3 item detail**: a ghost "Search similar items" action under the form body —
+  the looser companion to the precomputed same-group rail (#642), covering
+  unclustered items and semantic cousins.
+- **D1 result cards**: a "More like …" icon overlay (top-left; the match badge
+  owns the top-right), sibling-anchor pattern per §A2-DUPLICATE.
+- **Gallery lightbox**: per-photo item chips (bottom row, ≤6) in both viewers,
+  tapping through to the seeded search. Chips render only when the photo sourced
+  items.
+
+Decision: build on the shipped D1 surface rather than a bespoke "similar items"
+screen; the destination is designed, only the jump-off affordances are new.
+**Status: ⚠️ decided.**
+
+---
+
 ## ⚠️ §E1/E2-IMPL — "Labels & Scan" build adaptations (D9)
 
 E1 (`ea5a8a69…` + mobile) and the four E2 state screens were implemented in D9.
