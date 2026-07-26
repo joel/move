@@ -127,13 +127,14 @@ module Components
 
       # The photo's items as lightbox chips: name + a server-minted seeded-search
       # URL (#724 — the JS never builds URLs). Omitted entirely when the photo
-      # sourced nothing so the viewers render no chip chrome at all. Reads the
-      # page-level :sourced_items preload — keep this in-memory (no queries).
+      # sourced nothing so the viewers render no chip chrome at all. The
+      # association filters and orders in SQL; only the per-media cap lives here
+      # — Rails silently ignores a LIMIT on a preloaded has_many, so `.first(n)`
+      # over the preloaded (already-ordered) rows is the preload-safe cap.
 
       #: (untyped media) -> Hash[Symbol, String]
       def items_data(media)
-        chips = media.sourced_items.reject(&:removed?)
-                     .sort_by(&:created_at).first(MAX_ITEM_CHIPS)
+        chips = media.sourced_items.first(MAX_ITEM_CHIPS)
                      .map { |item| { name: item.name, url: move_search_path(@move, q: item.name) } }
         chips.empty? ? {} : { items: chips.to_json }
       end
