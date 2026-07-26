@@ -127,16 +127,36 @@ module Components
 
       # The photo's items as lightbox chips: name + a server-minted seeded-search
       # URL (#724 — the JS never builds URLs). Omitted entirely when the photo
-      # sourced nothing so the viewers render no chip chrome at all. The
-      # association filters and orders in SQL; only the per-media cap lives here
-      # — Rails silently ignores a LIMIT on a preloaded has_many, so `.first(n)`
-      # over the preloaded (already-ordered) rows is the preload-safe cap.
+      # sourced nothing so the viewers render no chip chrome at all.
 
       #: (untyped media) -> Hash[Symbol, String]
       def items_data(media)
-        chips = media.sourced_items.first(MAX_ITEM_CHIPS)
-                     .map { |item| { name: item.name, url: move_search_path(@move, q: item.name) } }
+        chips = (chips_by_media[media.id] || [])
+                .map { |item| { name: item.name, url: move_search_path(@move, q: item.name) } }
         chips.empty? ? {} : { items: chips.to_json }
+      end
+
+      # One windowed query for the whole page: kept, still-in-box items ranked
+      # per photo (id breaks created_at ties from batch materialization) and
+      # capped at MAX_ITEM_CHIPS **in SQL**, so a photo with many items never
+      # inflates the page load (a preloaded has_many can't carry a per-parent
+      # LIMIT — Rails silently ignores it). group_by here runs on the already-
+      # bounded in-memory rows.
+
+      #: () -> Hash[untyped, Array[untyped]]
+      def chips_by_media
+        @chips_by_media ||= if @media.empty?
+                              {}
+                            else
+                              ranked = Item.in_box.where(source_media_id: @media.map(&:id)).select(
+                                Arel.sql("items.*, ROW_NUMBER() OVER (PARTITION BY source_media_id " \
+                                         "ORDER BY created_at, id) AS chip_rank")
+                              )
+                              Item.from(ranked, :items)
+                                  .where(Arel.sql("chip_rank <= #{MAX_ITEM_CHIPS}"))
+                                  .order(:created_at, :id)
+                                  .group_by(&:source_media_id)
+                            end
       end
 
       # Real slide dimensions when blob analysis has them. The dataset contract
