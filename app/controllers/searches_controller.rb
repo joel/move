@@ -24,8 +24,14 @@ class SearchesController < MoveScopedController
       recent_searches = recent.record(query) if results.any?
     end
 
+    # The caller's pins (#730): drives each result card's toggle state and the
+    # header pill. One pluck per render; personal rows only.
+    pinned_item_ids = FindListEntry.where(move_id: @move.id, user_id: current_user.id)
+                                   .pluck(:item_id).to_set
+
     render Views::Searches::Index.new(
-      move: @move, query: query, results: results, recent_searches: recent_searches
+      move: @move, query: query, results: results, recent_searches: recent_searches,
+      pinned_item_ids: pinned_item_ids
     )
   end
 

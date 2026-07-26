@@ -16,7 +16,9 @@ class ItemsController < MoveScopedController
   def show
     render Views::Items::Show.new(
       move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-      editable: editable_move?, photo_siblings: photo_siblings(@item)
+      editable: editable_move?, photo_siblings: photo_siblings(@item),
+      find_list_pinned: FindListEntry.exists?(move_id: @move.id, user_id: current_user.id,
+                                              item_id: @item.id)
     )
   end
 

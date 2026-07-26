@@ -15,12 +15,13 @@ module Views
       # First grid row (lg is 3-col) loads eager, the rest lazy (#673).
       EAGER_THUMBS = 3
 
-      #: (move: untyped, query: untyped, results: untyped, ?recent_searches: untyped) -> void
-      def initialize(move:, query:, results:, recent_searches: [])
+      #: (move: untyped, query: untyped, results: untyped, ?recent_searches: untyped, ?pinned_item_ids: untyped) -> void
+      def initialize(move:, query:, results:, recent_searches: [], pinned_item_ids: Set.new)
         @move = move
         @query = query.to_s
         @results = results
         @recent_searches = recent_searches
+        @pinned_item_ids = pinned_item_ids
       end
 
       #: () -> void
@@ -44,6 +45,8 @@ module Views
       def hero
         div(class: "mx-auto flex w-full max-w-3xl flex-col items-center #{searched? ? "pt-2" : "pt-10"}") do
           search_form
+          # The find-list pill (#730) — a stable stream target, empty at zero.
+          render Components::FindLists::SearchLink.new(move: @move, count: @pinned_item_ids.size)
         end
       end
 
@@ -116,7 +119,9 @@ module Views
           h2(class: "border-b border-card-border pb-4 text-headline-lg-mobile md:text-headline-xl text-text-warm") do
             I18n.t("searches.results_count", count: @results.size, query: @query)
           end
-          div(class: "grid grid-cols-1 gap-stack-gap sm:grid-cols-2 lg:grid-cols-3") do
+          # `refocus` keeps keyboard focus on a pin toggle across its stream swap.
+          div(class: "grid grid-cols-1 gap-stack-gap sm:grid-cols-2 lg:grid-cols-3",
+              data: { controller: "refocus" }) do
             @results.each_with_index { |result, index| result_card(result, eager: index < EAGER_THUMBS) }
           end
         end
@@ -139,6 +144,21 @@ module Views
             end
           end
           more_like_this_control(result)
+          pin_control(result)
+        end
+      end
+
+      # The find-list pin (#730) — third sibling overlay, bottom-right of the
+      # h-48 thumbnail: top-36 (9rem) + the control's h-9 leaves the same
+      # 0.75rem inset that right-3/left-3 give the two top corners.
+
+      #: (untyped result) -> untyped
+      def pin_control(result)
+        div(class: "absolute right-3 top-36") do
+          render Components::FindLists::Toggle.new(
+            move: @move, item: result.item,
+            pinned: @pinned_item_ids.include?(result.item.id)
+          )
         end
       end
 

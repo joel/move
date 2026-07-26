@@ -44,6 +44,7 @@ module Views
           # The Move-wide review queue (#654), wearing the pending-item count.
           [I18n.t("menu.show.review"), Components::Icons::Eye, move_review_path(@move), @pending_review],
           [I18n.t("menu.show.activity"), Components::Icons::Clock, move_activity_path(@move)],
+          [I18n.t("menu.show.find_list"), Components::Icons::Search, move_find_list_path(@move)],
           [I18n.t("menu.show.rooms"), Components::Icons::Boxes,
            move_vocabularies_path(@move, "rooms")]
         ] #: Array[untyped]
