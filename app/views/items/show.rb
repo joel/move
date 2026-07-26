@@ -131,7 +131,25 @@ module Views
         section(class: "lg:col-span-7") do
           render Components::Ui::Card.new(padding: "p-6") do
             @editable ? editable_body : read_only_body
+            search_similar_action
           end
+        end
+      end
+
+      # Seeded search by this item's name (#724) — the looser companion to the
+      # precomputed GroupRail below: works for unclustered items and catches
+      # semantic cousins the exact name-family misses. Read-only-safe, so it
+      # renders in both editable and viewer/archived modes.
+
+      #: () -> untyped
+      def search_similar_action
+        div(class: "mt-5 border-t border-card-border pt-4") do
+          render Components::Ui::Button.new(
+            label: I18n.t("items.show.search_similar"),
+            href: move_search_path(@move, q: @item.name),
+            variant: :ghost,
+            icon: Components::Icons::Search
+          )
         end
       end
 
