@@ -173,9 +173,11 @@ module Components
         return unless @interactive && @items.any? { |item| !item.removed? }
 
         div(class: "px-2 pb-2") do
+          # The id lets the refocus controller find a fallback inside this card
+          # when the control itself disappears after a successful bulk unpack.
           button_to(
             view_context.move_box_unpacking_photo_remove_path(@move, @box, media_id: @media.id),
-            method: :patch,
+            method: :patch, id: "unpack-photo-#{@media.id}",
             class: "w-full rounded-full bg-surface-container-high px-3 py-1.5 text-label-caps " \
                    "uppercase text-text-warm transition hover:bg-accent-sage hover:text-page"
           ) { I18n.t("boxes.contents.unpack_photo") }
