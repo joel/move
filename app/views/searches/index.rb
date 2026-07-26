@@ -3,12 +3,17 @@
 module Views
   module Searches
     # D1 — Search. A centred search hero, semantic example-query hints (empty
-    # state), and a results grid (item + match badge + box/room location).
+    # state), and a results grid (item photo + match badge + box/room location).
     # Renders inside the AppLayout sidebar shell. Light from Refined-Palette
-    # tokens (Stitch is dark canonical). No per-item images in the data model, so
-    # result cards are text-first (see DESIGN-DISCREPANCIES §D1).
+    # tokens (Stitch is dark canonical). Cards lead with the item's source photo
+    # (a same-geometry placeholder tile when there is none); the design's
+    # one-line description is omitted — items carry no description field
+    # (see DESIGN-DISCREPANCIES §D1).
     class Index < Views::Base
       include Phlex::Rails::Helpers::FormWith
+
+      # First grid row (lg is 3-col) loads eager, the rest lazy (#673).
+      EAGER_THUMBS = 3
 
       #: (move: untyped, query: untyped, results: untyped, ?recent_searches: untyped) -> void
       def initialize(move:, query:, results:, recent_searches: [])
@@ -112,23 +117,59 @@ module Views
             I18n.t("searches.results_count", count: @results.size, query: @query)
           end
           div(class: "grid grid-cols-1 gap-stack-gap sm:grid-cols-2 lg:grid-cols-3") do
-            @results.each { |result| result_card(result) }
+            @results.each_with_index { |result, index| result_card(result, eager: index < EAGER_THUMBS) }
           end
         end
       end
 
-      #: (untyped result) -> untyped
-      def result_card(result)
+      #: (untyped result, eager: bool) -> untyped
+      def result_card(result, eager:)
         a(
           href: move_item_path(@move, result.item),
-          class: "flex flex-col gap-4 rounded-card border border-card-border bg-card p-5 " \
+          class: "group flex flex-col overflow-hidden rounded-card border border-card-border bg-card " \
                  "transition hover:-translate-y-0.5 hover:border-accent-sage"
         ) do
-          div(class: "flex items-start justify-between gap-3") do
-            h3(class: "text-headline-md text-text-warm") { result.item.name }
+          thumbnail(result, eager:)
+          div(class: "flex flex-1 flex-col gap-4 p-5") do
+            h3(class: "text-headline-md text-text-warm transition-colors group-hover:text-accent-sage") do
+              result.item.name
+            end
+            location(result)
+          end
+        end
+      end
+
+      # The photo fills a fixed-height area so photo and placeholder cards keep
+      # identical geometry; the match badge overlays it on a blurred backing to
+      # stay readable over any image.
+
+      #: (untyped result, eager: bool) -> untyped
+      def thumbnail(result, eager:)
+        media = result.item.source_media
+        div(class: "relative flex h-48 shrink-0 items-center justify-center overflow-hidden " \
+                   "bg-surface-container-high text-muted") do
+          thumbnail_visual(media, alt: result.item.name.to_s, eager:)
+          div(class: "absolute right-3 top-3 rounded-full bg-card/90 shadow-sm backdrop-blur-sm") do
             match_badge(result.matched_on)
           end
-          location(result)
+        end
+      end
+
+      #: (untyped media, alt: String, eager: bool) -> untyped
+      def thumbnail_visual(media, alt:, eager:)
+        if media&.image_displayable?
+          render Components::Ui::BlurUpImage.new(
+            src: MediaVariants::TransformUrl.for(media, :thumb),
+            lqip: media.image_lqip,
+            alt: alt,
+            loading: eager ? "eager" : "lazy",
+            decoding: "async",
+            img_class: "h-full w-full object-cover transition duration-300 group-hover:scale-105"
+          )
+        elsif media&.image_unavailable?
+          render Components::Icons::ImageOff.new(css: "h-10 w-10")
+        else
+          render Components::Icons::Boxes.new(css: "h-10 w-10")
         end
       end
 

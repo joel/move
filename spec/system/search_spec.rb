@@ -14,7 +14,8 @@ RSpec.describe "Hybrid search" do
   it "shows the hero + example hints, then finds an item with its box/room context" do
     room = create(:room, move:, name: "Kitchen")
     box = create(:box, move:, number: "1", room:)
-    item = create(:item, :confirmed, move:, box:, name: "Cast iron skillet")
+    media = create(:media, move:, box:)
+    item = create(:item, :confirmed, move:, box:, source_media: media, name: "Cast iron skillet")
     # Indexing is event-driven off item actions; index the factory item directly.
     Search::RefreshDocument.new.call(item: item)
 
@@ -29,6 +30,7 @@ RSpec.describe "Hybrid search" do
     expect(page).to have_text("Cast iron skillet")
     expect(page).to have_text("Box 1").and have_text("Kitchen")
     expect(page).to have_text(I18n.t("searches.match.exact"))
+    expect(page).to have_css('img[alt="Cast iron skillet"]')
   end
 
   it "shows the no-results state for an unmatched query" do

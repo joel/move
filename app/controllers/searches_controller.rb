@@ -18,6 +18,7 @@ class SearchesController < MoveScopedController
     recent_searches = recent.list
     if query.present?
       results = Search::Items.new.call(move: @move, query: query).value!
+      preload_thumbnails(results)
       # Remember the query only when it actually found something, so the empty
       # state surfaces useful re-runs rather than dead ends (#338, ux principle 4).
       recent_searches = recent.record(query) if results.any?
@@ -26,5 +27,22 @@ class SearchesController < MoveScopedController
     render Views::Searches::Index.new(
       move: @move, query: query, results: results, recent_searches: recent_searches
     )
+  end
+
+  private
+
+  # Each result card renders its item's source photo; batch the media +
+  # attachment + blob loads for the page instead of three queries per card.
+  # Done here rather than in Search::Items so the pack-public action (also
+  # called by the MCP tool, which never renders images) stays lean.
+
+  #: (untyped results) -> void
+  def preload_thumbnails(results)
+    return if results.empty?
+
+    # The community activerecord sig predates the kwargs Preloader API.
+    ActiveRecord::Associations::Preloader.new(
+      records: results.map(&:item), associations: { source_media: { image_attachment: :blob } } # steep:ignore UnexpectedKeywordArgument
+    ).call # steep:ignore NoMethod
   end
 end

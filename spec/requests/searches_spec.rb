@@ -36,6 +36,48 @@ RSpec.describe "Searches" do
       expect(response.body).to include("Cast iron skillet").and include("Box 1").and include("Kitchen")
     end
 
+    it "renders the item's photo thumbnail on the result card" do
+      box = create(:box, move:, number: "3")
+      media = create(:media, move:, box:)
+      create(:item, :confirmed, move:, box:, source_media: media, name: "Copper kettle")
+      index_all
+
+      get move_search_path(move, q: "kettle")
+
+      expect(response).to have_http_status(:ok)
+      aggregate_failures do
+        expect(response.body).to include('alt="Copper kettle"')
+        expect(response.body).to include('loading="eager"')
+      end
+    end
+
+    it "renders the placeholder tile, not an image, for a photo-less item" do
+      box = create(:box, move:, number: "4")
+      create(:item, :confirmed, move:, box:, name: "Bare lamp")
+      index_all
+
+      get move_search_path(move, q: "lamp")
+
+      expect(response.body).to include("Bare lamp")
+      expect(response.body).not_to include("<img")
+    end
+
+    it "eager-loads the first row of thumbnails, lazy-loads the rest" do
+      box = create(:box, move:, number: "5")
+      4.times do |i|
+        media = create(:media, move:, box:)
+        create(:item, :confirmed, move:, box:, source_media: media, name: "Mug #{i}")
+      end
+      index_all
+
+      get move_search_path(move, q: "mug")
+
+      aggregate_failures do
+        expect(response.body.scan('loading="eager"').size).to eq(3)
+        expect(response.body.scan('loading="lazy"').size).to eq(1)
+      end
+    end
+
     it "shows the no-results state for an unmatched query" do
       get move_search_path(move, q: "zzzznotathing")
 
