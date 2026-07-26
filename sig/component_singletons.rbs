@@ -11,6 +11,10 @@ module Components
     class ItemCard
       def self.dom_id: (untyped item) -> String
     end
+
+    class PhotoCard
+      def self.dom_id: (untyped media) -> String
+    end
   end
 
   module Reviews
