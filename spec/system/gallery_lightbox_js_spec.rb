@@ -37,11 +37,16 @@ RSpec.describe "Gallery lightbox (JS)", :js do
     Capybara.always_include_port = original_include_port
   end
 
+  # Box 2's photo (most recent — the lightbox opens on it) sources an indexed
+  # item; Box 1's photo sources none, so navigating to it must hide the chips.
   def seed_two_photos
     Apartment::Tenant.switch(slug) do
       m = create(:move, created_by: user)
       create(:media, move: m, box: create(:box, move: m, number: "1"), captured_at: 5.days.ago)
-      create(:media, move: m, box: create(:box, move: m, number: "2"), captured_at: 1.hour.ago)
+      box_two = create(:box, move: m, number: "2")
+      photo = create(:media, move: m, box: box_two, captured_at: 1.hour.ago)
+      kettle = create(:item, :confirmed, move: m, box: box_two, source_media: photo, name: "Copper kettle")
+      Search::RefreshDocument.new.call(item: kettle)
       m
     end
   end
@@ -87,6 +92,24 @@ RSpec.describe "Gallery lightbox (JS)", :js do
     expect(page).to have_css(".pswp__move-caption", text: /Box 2/i)
   end
 
+  # The seeded-search chips (#724): rendered from data-items on the opened
+  # slide, following slide changes, and absent (container hidden) on an
+  # item-less photo. Chip text is CSS-uppercased — match case-insensitively.
+  it "shows the photo's item chips and hides them on an item-less slide" do
+    move = seed_two_photos
+    login_as(user: user)
+    visit move_gallery_path(move)
+    first("button[data-lightbox-target='tile']").click
+    expect(page).to have_css(".pswp--open")
+
+    expect(page).to have_css(
+      ".pswp__move-items a[href='#{move_search_path(move, q: "Copper kettle")}']", text: /copper kettle/i
+    )
+
+    click_button(I18n.t("galleries.index.lightbox.next"))
+    expect(page).to have_no_css(".pswp__move-items a")
+  end
+
   # Touch / coarse-pointer devices get the Swiper thumbs-gallery instead of
   # PhotoSwipe (#604). Headless Chrome reports a fine pointer, so force it with
   # the `?viewer=thumbs` override the controller honours for exactly this. As
@@ -124,6 +147,23 @@ RSpec.describe "Gallery lightbox (JS)", :js do
       expect(page).to have_css(".move-gallery")
 
       click_button(I18n.t("galleries.index.lightbox.close"))
+      expect(page).to have_no_css(".move-gallery")
+    end
+
+    # The full #724 loop: a chip is a plain anchor, so tapping it Turbo-navigates
+    # to the seeded search (teardown strips the overlay via turbo:before-cache)
+    # and the searched item is on the results page.
+    it "navigates from an item chip to the seeded search" do
+      move = seed_two_photos
+      login_as(user: user)
+      visit "#{move_gallery_path(move)}?viewer=thumbs"
+      first("button[data-lightbox-target='tile']").click
+
+      expect(page).to have_css(".move-gallery__item", text: /copper kettle/i)
+      find(".move-gallery__item", text: /copper kettle/i).click
+
+      expect(page).to have_current_path(move_search_path(move), ignore_query: true)
+      expect(page).to have_css("input[name='q'][value='Copper kettle']")
       expect(page).to have_no_css(".move-gallery")
     end
   end

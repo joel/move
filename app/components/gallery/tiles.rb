@@ -13,6 +13,10 @@ module Components
       # data-pswp-* contract stays "the served detail size".
       DETAIL_BOX = MediaVariants::TransformUrl::SIZES.fetch(:detail).fetch(:width)
 
+      # A shelf photo can source many items; the lightbox chrome can only hold a
+      # few chips (no "+N" overflow — it would navigate nowhere).
+      MAX_ITEM_CHIPS = 6
+
       # Appended pages render entirely lazy (eager_tiles: 0) — only the initial
       # page's first row is ever above the fold (#673).
 
@@ -118,7 +122,50 @@ module Components
           thumb: thumb_url(media),
           caption: caption(media),
           href: move_box_path(@move, media.box)
-        }.merge(pswp_dimensions(media))
+        }.merge(pswp_dimensions(media)).merge(items_data(media))
+      end
+
+      # The photo's items as lightbox chips: name + a server-minted seeded-search
+      # URL (#724 — the JS never builds URLs). Omitted entirely when the photo
+      # sourced nothing so the viewers render no chip chrome at all.
+
+      #: (untyped media) -> Hash[Symbol, String]
+      def items_data(media)
+        chips = (chips_by_media[media.id] || [])
+                .map { |item| { name: item.name, url: move_search_path(@move, q: item.name) } }
+        chips.empty? ? {} : { items: chips.to_json }
+      end
+
+      # One query for the whole page, fully bounded in SQL: kept, still-in-box
+      # items are deduped to one representative per (photo, name) — identical
+      # names would render identical seeded-search chips, crowding distinct ones
+      # out of the cap — then ranked per photo (id breaks created_at ties from
+      # batch materialization) and capped at MAX_ITEM_CHIPS, so a photo with
+      # many items never inflates the page load (a preloaded has_many can't
+      # carry a per-parent LIMIT — Rails silently ignores it). group_by here
+      # runs on the already-bounded in-memory rows.
+
+      #: () -> Hash[untyped, Array[untyped]]
+      def chips_by_media
+        @chips_by_media ||= if @media.empty?
+                              {}
+                            else
+                              Item.from(ranked_chip_items, :items)
+                                  .where(Arel.sql("chip_rank <= #{MAX_ITEM_CHIPS}"))
+                                  .order(:created_at, :id)
+                                  .group_by(&:source_media_id)
+                            end
+      end
+
+      #: () -> untyped
+      def ranked_chip_items
+        deduped = Item.in_box.where(source_media_id: @media.map(&:id))
+                      .select(Arel.sql("DISTINCT ON (source_media_id, name) items.*"))
+                      .order(Arel.sql("source_media_id, name, created_at, id"))
+        Item.from(deduped, :items).select(
+          Arel.sql("items.*, ROW_NUMBER() OVER (PARTITION BY source_media_id " \
+                   "ORDER BY created_at, id) AS chip_rank")
+        )
       end
 
       # Real slide dimensions when blob analysis has them. The dataset contract

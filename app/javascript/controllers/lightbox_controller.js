@@ -95,7 +95,20 @@ export default class extends Controller {
   slides() {
     return this.tileTargets.map((tile) => {
       const { src, thumb, caption, href } = tile.dataset
-      return { src, thumb, caption: caption || "", href, tile }
+      return { src, thumb, caption: caption || "", href, items: this.itemsFor(tile), tile }
     })
+  }
+
+  // data-items is server-minted JSON [{name, url}] — the photo's items with
+  // their seeded-search URLs (#724). Anything malformed degrades to "no chips"
+  // rather than breaking the open.
+  itemsFor(tile) {
+    try {
+      const parsed = JSON.parse(tile.dataset.items || "[]")
+      if (!Array.isArray(parsed)) return []
+      return parsed.filter((item) => typeof item?.name === "string" && typeof item?.url === "string")
+    } catch {
+      return []
+    }
   }
 }

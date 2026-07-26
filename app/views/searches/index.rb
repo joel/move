@@ -124,19 +124,39 @@ module Views
 
       #: (untyped result, eager: bool) -> untyped
       def result_card(result, eager:)
-        a(
-          href: move_item_path(@move, result.item),
-          class: "group flex flex-col overflow-hidden rounded-card border border-card-border bg-card " \
-                 "transition hover:-translate-y-0.5 hover:border-accent-sage"
-        ) do
-          thumbnail(result, eager:)
-          div(class: "flex flex-1 flex-col gap-4 p-5") do
-            h3(class: "text-headline-md text-text-warm transition-colors group-hover:text-accent-sage") do
-              result.item.name
+        div(class: "relative h-full") do
+          a(
+            href: move_item_path(@move, result.item),
+            class: "group flex h-full flex-col overflow-hidden rounded-card border border-card-border " \
+                   "bg-card transition hover:-translate-y-0.5 hover:border-accent-sage"
+          ) do
+            thumbnail(result, eager:)
+            div(class: "flex flex-1 flex-col gap-4 p-5") do
+              h3(class: "text-headline-md text-text-warm transition-colors group-hover:text-accent-sage") do
+                result.item.name
+              end
+              location(result)
             end
-            location(result)
           end
+          more_like_this_control(result)
         end
+      end
+
+      # Sibling overlay, not a nested anchor (#658 pattern — the card is one big
+      # link, so a second jump must sit beside it in the DOM). Re-seeds the
+      # search with this item's own name (#724); opposite corner from the match
+      # badge, which owns the thumbnail's top-right.
+
+      #: (untyped result) -> untyped
+      def more_like_this_control(result)
+        label = I18n.t("searches.more_like_this", name: result.item.name)
+        a(
+          href: move_search_path(@move, q: result.item.name),
+          title: label,
+          aria: { label: label },
+          class: "absolute left-3 top-3 flex h-9 w-9 items-center justify-center rounded-full " \
+                 "bg-card/90 text-muted shadow-sm backdrop-blur-sm transition hover:text-accent-sage"
+        ) { render Components::Icons::Search.new(css: "h-4 w-4") }
       end
 
       # The photo fills a fixed-height area so photo and placeholder cards keep

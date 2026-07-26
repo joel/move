@@ -93,6 +93,22 @@ RSpec.describe "Items" do
       expect(response.body).to include(I18n.t("items.show.title")).and include("Toaster")
     end
 
+    it "offers a seeded similar-items search in editable and read-only modes (#724)" do
+      item = create(:item, :manual, move:, box:, name: "Extension lead")
+      similar_href = move_search_path(move, q: "Extension lead")
+
+      get move_item_path(move, item)
+      expect(response.body).to include(I18n.t("items.show.search_similar")).and include(similar_href)
+
+      archived_move = create(:move, :archived, created_by: user)
+      archived_box = create(:box, move: archived_move, number: "9")
+      archived_item = create(:item, :manual, move: archived_move, box: archived_box, name: "Extension lead")
+
+      get move_item_path(archived_move, archived_item)
+      expect(response.body).to include(I18n.t("items.show.search_similar"))
+        .and include(move_search_path(archived_move, q: "Extension lead"))
+    end
+
     it "notes the other in-box items detected in the same photo" do
       media = create(:media, move:, box:)
       item = create(:item, move:, box:, name: "Coffee machine", source_media: media)

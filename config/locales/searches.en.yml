@@ -14,6 +14,7 @@ en:
       other: "%{count} results for “%{query}”"
     location: "Location"
     box: "Box %{number}"
+    more_like_this: "More like “%{name}”"
     match:
       exact: "Exact match"
       lexical: "Match"

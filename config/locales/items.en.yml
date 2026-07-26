@@ -34,6 +34,7 @@ en:
       delete_confirm: "Delete this item? Its photo is removed too if no other item uses it. You can restore it from the activity feed."
       archived: "This move is archived and is read-only."
       view_only: "You have view-only access to this move."
+      search_similar: "Search similar items"
       from_same_photo:
         one: "Detected with 1 other item in this photo."
         other: "Detected with %{count} other items in this photo."
