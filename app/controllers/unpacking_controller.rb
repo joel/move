@@ -199,6 +199,10 @@ class UnpackingController < MoveScopedController
     )
   end
 
+  # Both card streams morph instead of replacing (idiomorph): a keyboard/AT
+  # user's focus stays on the toggled chip — the node is attribute-updated in
+  # place, not torn out (UX rule 5; Codex #728).
+
   #: (untyped media) -> untyped
   def photo_card_stream(media)
     items = authorized_scope(@box.items).where(source_media_id: media.id).order(:created_at, :id).to_a
@@ -213,7 +217,8 @@ class UnpackingController < MoveScopedController
                             # a sibling moved to another box keeps the badge withheld.
                             unpacked: @move.items.in_box.where(source_media_id: media.id).none?,
                             unpacking: @box.unpacking?, interactive: editable_move?
-                          ))
+                          )),
+      method: :morph
     )
   end
 
@@ -224,7 +229,8 @@ class UnpackingController < MoveScopedController
       view_context.render(Components::Boxes::ItemCard.new(
                             item: @item, move: @move, image_ready: @move.image_generation_ready?,
                             unpacking: @box.unpacking? && editable_move?
-                          ))
+                          )),
+      method: :morph
     )
   end
 

@@ -289,6 +289,8 @@ RSpec.describe "Unpacking" do
       expect(response.body)
         .to include(%(target="#{Components::Boxes::PhotoCard.dom_id(photo)}"))
         .and include(%(target="#{Components::Boxes::ContentsHeader::ID}"))
+      # The card replace morphs so a keyboard user's focus survives the toggle.
+      expect(response.body).to include(%(method="morph"))
       expect(response.body).not_to include(Components::Unpacking::UnpackedSection::ID)
       expect(item.reload.presence_state).to eq("removed")
     end

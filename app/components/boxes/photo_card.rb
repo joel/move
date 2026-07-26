@@ -96,28 +96,33 @@ module Components
 
       #: (untyped item) -> untyped
       def item_chip(item)
-        if !@interactive
-          name_chip(item.name, checked: item.removed?)
-        elsif item.removed?
-          chip_toggle(
-            view_context.move_box_unpacking_restore_path(@move, @box, item),
-            label: I18n.t("boxes.contents.restore_item", name: item.name), checked: true
-          ) { chip_body(item.name, checked: true) }
+        return name_chip(item.name, checked: item.removed?) unless @interactive
+
+        if item.removed?
+          chip_toggle(view_context.move_box_unpacking_restore_path(@move, @box, item),
+                      item: item, checked: true,
+                      label: I18n.t("boxes.contents.restore_item", name: item.name)) do
+            chip_body(item.name, checked: true)
+          end
         else
-          chip_toggle(
-            view_context.move_box_unpacking_remove_path(@move, @box, item),
-            label: I18n.t("boxes.contents.mark_item_unpacked", name: item.name), checked: false
-          ) { chip_body(item.name, checked: false) }
+          chip_toggle(view_context.move_box_unpacking_remove_path(@move, @box, item),
+                      item: item, checked: false,
+                      label: I18n.t("boxes.contents.mark_item_unpacked", name: item.name)) do
+            chip_body(item.name, checked: false)
+          end
         end
       end
 
       # A chip-shaped button_to; the wrapping <form> gets display:contents so
-      # the chip participates in the flex-wrap row like the inert spans do.
+      # the chip participates in the flex-wrap row like the inert spans do. The
+      # stable per-item button id is what lets the morphed card re-render keep
+      # the focused chip's node identity (focus survives the toggle — UX rule 5).
 
-      #: (String path, label: String, checked: bool) ?{ (*untyped) -> untyped } -> untyped
-      def chip_toggle(path, label:, checked:, &)
+      #: (String path, item: untyped, label: String, checked: bool) ?{ (*untyped) -> untyped } -> untyped
+      def chip_toggle(path, item:, label:, checked:, &)
         button_to(
           path, method: :patch, params: { origin: "box" }, form: { class: "contents" },
+                id: "unpack-chip-#{item.id}",
                 class: "inline-flex max-w-full items-center gap-1 truncate rounded-full px-2.5 py-1 " \
                        "text-label-caps uppercase transition " \
                        "#{checked ? "bg-accent-sage/90 text-page hover:bg-accent-sage" : chip_tint}",

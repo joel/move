@@ -170,10 +170,12 @@ module Components
       #: () -> untyped
       def unpacking_control
         div(class: "px-2 pb-2") do
+          # The stable button id keeps the focused control's node identity
+          # across the morphed card re-render (focus survives the toggle).
           if @item.removed?
             button_to(
               view_context.move_box_unpacking_restore_path(@move, @item.box, @item),
-              method: :patch, params: { origin: "box" },
+              method: :patch, params: { origin: "box" }, id: "unpack-item-#{@item.id}",
               class: "w-full rounded-full bg-accent-sage/15 px-3 py-1.5 text-label-caps " \
                      "uppercase text-accent-sage transition hover:bg-accent-sage hover:text-page",
               aria: { label: I18n.t("boxes.contents.restore_item", name: @item.name) }
@@ -181,7 +183,7 @@ module Components
           else
             button_to(
               view_context.move_box_unpacking_remove_path(@move, @item.box, @item),
-              method: :patch, params: { origin: "box" },
+              method: :patch, params: { origin: "box" }, id: "unpack-item-#{@item.id}",
               class: "w-full rounded-full bg-surface-container-high px-3 py-1.5 text-label-caps " \
                      "uppercase text-text-warm transition hover:bg-accent-sage hover:text-page",
               aria: { label: I18n.t("boxes.contents.mark_item_unpacked", name: @item.name) }

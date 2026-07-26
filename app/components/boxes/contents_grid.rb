@@ -51,7 +51,9 @@ module Components
 
       #: () -> void
       def view_template
-        section(class: "flex flex-col gap-stack-gap") do
+        # `refocus` restores focus to the tapped toggle after its card is
+        # re-streamed (#727) — button ids are stable across presence flips.
+        section(class: "flex flex-col gap-stack-gap", data: { controller: "refocus" }) do
           render Components::Boxes::ContentsHeader.new(
             total: @items.size,
             unpacked: @unpacking ? @items.count(&:removed?) : nil
