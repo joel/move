@@ -161,6 +161,27 @@ module SeedData
         { name: "Paperback", confidence: 0.90, review: "confirmed" }
       ] },
 
+    # --- Box 7 (Bedroom, unpacking): in-place checklist demo (#727) — a multi-
+    # item photo for the chip toggles and a single-item photo for the one-tap
+    # "Unpack photo". Default presence (in_box) so both start toggleable.
+    { box: "7", slug: "wardrobe-shelf", status: "succeeded", captured_at: 90,
+      provider: "fake", provider_model: "fake-1",
+      prompt: "A realistic smartphone photo of an open wardrobe shelf with folded " \
+              "sweaters, a stack of jeans, and a woven storage basket. Even indoor " \
+              "light, no text.",
+      items: [
+        { name: "Folded Sweaters", confidence: 0.91, review: "auto_confirmed" },
+        { name: "Stack of Jeans", confidence: 0.88, review: "confirmed" },
+        { name: "Woven Basket", confidence: 0.75, review: "confirmed" }
+      ] },
+    { box: "7", slug: "bedside-drawer", status: "succeeded", captured_at: 60,
+      provider: "fake", provider_model: "fake-1",
+      prompt: "A realistic smartphone photo of an open bedside drawer holding a " \
+              "single hardcover journal. Even indoor light, no text.",
+      items: [
+        { name: "Hardcover Journal", confidence: 0.93, review: "auto_confirmed" }
+      ] },
+
     # --- Box 9 (Kitchen, packing): removal demo — one photo, two in-box items --
     { box: "9", slug: "skillet-and-bowls", status: "succeeded", captured_at: 120,
       provider: "fake", provider_model: "fake-1",

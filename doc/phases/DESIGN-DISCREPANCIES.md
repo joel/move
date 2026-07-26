@@ -337,6 +337,27 @@ screen; the destination is designed, only the jump-off affordances are new.
 
 ---
 
+## ⚠️ §B1-UNPACK — In-place unpacking checklist on Box Detail (post-D10, #727)
+
+While a box is `unpacking`, B1's contents grid becomes an in-place checklist:
+photo-card name chips toggle remove/restore, photos with in-box items carry a
+full-width "Unpack photo" row (the primary gesture — most photos hold one
+item), standalone item cards gain Mark unpacked / Restore, and the header
+ticks "N of M unpacked". No Stitch screen shows B1 in this state:
+
+- **Treatment borrowed from E3** (`Unpacking Mode - Active Checklist`
+  `screens/8e990c6d258d473cad16101819689246`, celebration `2cb7c29c…`): checked
+  = accent-sage fill + check glyph, applied at chip/card scale on the existing
+  D1 grid tokens. No new `Ui::*` component or token.
+- **Sibling-anchor structure** per §A2-DUPLICATE: in unpacking mode only the
+  photo tile is the review/recovery link; chips and the unpack row are
+  siblings, never nested in the anchor.
+- Controls render only for editable Moves while actively `unpacking` (matching
+  the checklist's own gate); viewers/archived see checked truth read-only.
+  **Status: ⚠️ decided.**
+
+---
+
 ## ⚠️ §E1/E2-IMPL — "Labels & Scan" build adaptations (D9)
 
 E1 (`ea5a8a69…` + mobile) and the four E2 state screens were implemented in D9.
