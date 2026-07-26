@@ -718,7 +718,12 @@
     right: 16px;
     display: flex;
     flex-wrap: nowrap;
+    /* `safe` keeps every chip scroll-reachable when the row overflows —
+     * plain `center` pushes leading overflow beyond the scroll origin, so the
+     * first chips would be unreachable. The bare `center` line is the fallback
+     * for engines without `safe` alignment (they drop the later declaration). */
     justify-content: center;
+    justify-content: safe center;
     gap: 8px;
     overflow-x: auto;
     pointer-events: none;
