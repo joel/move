@@ -701,6 +701,10 @@ class ::Media < ::ApplicationRecord
   def co_located_sourced_items=: (::Item::ActiveRecord_Associations_CollectionProxy | ::Array[::Item]) -> (::Item::ActiveRecord_Associations_CollectionProxy | ::Array[::Item])
   def co_located_sourced_item_ids: () -> ::Array[::String]
   def co_located_sourced_item_ids=: (::Array[::String]) -> ::Array[::String]
+  def sourced_items: () -> ::Item::ActiveRecord_Associations_CollectionProxy
+  def sourced_items=: (::Item::ActiveRecord_Associations_CollectionProxy | ::Array[::Item]) -> (::Item::ActiveRecord_Associations_CollectionProxy | ::Array[::Item])
+  def sourced_item_ids: () -> ::Array[::String]
+  def sourced_item_ids=: (::Array[::String]) -> ::Array[::String]
 
   def image_attachment: () -> ::ActiveStorage::Attachment?
   def image_attachment=: (::ActiveStorage::Attachment?) -> ::ActiveStorage::Attachment?
