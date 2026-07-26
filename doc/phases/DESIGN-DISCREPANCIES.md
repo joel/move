@@ -297,11 +297,14 @@ three sibling surfaces from **one** controller + view (kind registry).
 The canonical screen `Search (Dark) - Refined Palette`
 (`screens/ca6172ef…`) was implemented in Phase D8.
 
-- **No per-item images → text-first result cards.** The mockup shows a photo on
-  every result card; the data model has no per-item image (recognition captures
-  box-level media, not per-item crops — Technical Foundation §13). Cards render
-  the item name, a match badge, and the box/room location instead. Adding
-  per-item images would be a domain change, not a D8 fix.
+- **Per-item images: ✅ resolved (#722).** D8 shipped text-first cards because
+  the data model then had no per-item image. Since the items/photos
+  simplification (#406) every item carries a representative photo via
+  `Item#source_media`, and result cards now match the mockup: the photo fills a
+  fixed-height area with the match badge overlaid, with a same-geometry
+  placeholder tile for photo-less items. One residual gap stays open: the
+  mockup's one-line description under the item name is omitted — items have no
+  description field (only `name`), so there is no data to render there.
 - **Match badges map to the hybrid signal.** "Exact Match" / "Related Item" in
   the design map to `Search::Items#matched_on` → exact / lexical / fuzzy /
   semantic, surfaced as a chip.
