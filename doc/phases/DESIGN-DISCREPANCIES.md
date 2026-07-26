@@ -358,6 +358,25 @@ ticks "N of M unpacked". No Stitch screen shows B1 in this state:
 
 ---
 
+## ⚠️ §FIND-LIST — Personal find list (post-D10, #730)
+
+A per-user picking list pinned from search results and rolled up by box
+(`/find_list`, nav :search, menu-hub row). No Stitch screen exists for it:
+
+- **Composed strictly from designed primitives**: SectionHeader, EmptyState,
+  the gallery-group member-row treatment (thumb + name + locator), the
+  Vocabularies list/stream mechanics, and the search card's §A2-DUPLICATE
+  sibling-overlay pattern for the pin toggle (third overlay, bottom-right of
+  the thumbnail — the two top corners stay owned by the match badge and the
+  more-like-this control).
+- **Struck ("Found") state borrows E3's checked treatment** (accent-sage fill +
+  check glyph) at chip scale; box group headers reuse the "Box N · Room"
+  locator vocabulary and link to the B1 in-place unpacking checklist
+  (§B1-UNPACK).
+- The #726 Stitch push-back scope now includes this screen. **Status: ⚠️ decided.**
+
+---
+
 ## ⚠️ §E1/E2-IMPL — "Labels & Scan" build adaptations (D9)
 
 E1 (`ea5a8a69…` + mobile) and the four E2 state screens were implemented in D9.
