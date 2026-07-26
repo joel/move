@@ -101,6 +101,17 @@ RSpec.describe "FindLists" do
       expect(response).to have_http_status(:not_found)
     end
 
+    it "keeps the pill count in step with the visible list when a pinned item is soft-deleted" do
+      box = create(:box, move:)
+      doomed = create(:item, move:, box:, name: "Doomed Lamp")
+      create(:find_list_entry, move:, user:, item: doomed)
+      doomed.discard!
+
+      get move_search_path(move)
+
+      expect(response.body).not_to include(I18n.t("find_lists.search_link", count: 1))
+    end
+
     it "lets a viewer pin on someone else's move" do
       viewer = create(:user)
       create(:move_membership, move:, user: viewer, role: "viewer")

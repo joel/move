@@ -12,12 +12,24 @@ module FindLists
   class Pin < BaseAction
     #: (move: untyped, user: untyped, item: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, user:, item:)
+      yield ensure_same_move(move, item)
       entry = yield persist(move, user, item)
       yield emit_event(entry)
       Success(entry)
     end
 
     private
+
+    # Defense in depth for non-controller callers: both FKs are individually
+    # valid on a cross-Move pair, and a persisted mismatch would render Move B's
+    # item under Move A's list.
+
+    #: (untyped move, untyped item) -> Dry::Monads::Result[untyped, untyped]
+    def ensure_same_move(move, item)
+      return Failure(:foreign_item) unless item.move_id == move.id
+
+      Success()
+    end
 
     #: (untyped move, untyped user, untyped item) -> Dry::Monads::Result[untyped, untyped]
     def persist(move, user, item)

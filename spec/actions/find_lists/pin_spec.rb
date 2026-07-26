@@ -29,6 +29,17 @@ RSpec.describe FindLists::Pin do
     expect(FindListEntry.where(item:).count).to eq(2)
   end
 
+  it "refuses an item from a different move" do
+    other_move = create(:move, created_by: user)
+    foreign = create(:item, move: other_move, box: create(:box, move: other_move), name: "Alien")
+
+    result = described_class.new.call(move:, user:, item: foreign)
+
+    expect(result).to be_failure
+    expect(result.failure).to eq(:foreign_item)
+    expect(FindListEntry.count).to eq(0)
+  end
+
   it "allows pinning on an archived move (personal rows only)" do
     archived = create(:move, :archived, created_by: user)
     item = create(:item, move: archived, box: create(:box, move: archived), name: "Kettle")

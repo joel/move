@@ -74,7 +74,8 @@ class FindListsController < MoveScopedController
 
   #: () -> untyped
   def search_link_stream
-    count = FindListEntry.where(move_id: @move.id, user_id: current_user.id).count
+    # :item join (kept scope): dangling pins never inflate the pill count.
+    count = FindListEntry.where(move_id: @move.id, user_id: current_user.id).joins(:item).count
     turbo_stream.replace(
       Components::FindLists::SearchLink::ID,
       view_context.render(Components::FindLists::SearchLink.new(move: @move, count: count))
