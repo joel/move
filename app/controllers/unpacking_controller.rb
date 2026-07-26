@@ -10,8 +10,9 @@ class UnpackingController < MoveScopedController
   before_action :set_box
   before_action :ensure_unpacking_surface, only: :show
   before_action :set_item, only: %i[remove restore]
-  before_action :require_writable_move!, only: %i[remove restore complete reopen]
-  before_action :require_active_checklist, only: %i[remove restore]
+  before_action :set_media, only: :remove_photo
+  before_action :require_writable_move!, only: %i[remove restore remove_photo complete reopen]
+  before_action :require_active_checklist, only: %i[remove restore remove_photo]
 
   # GET /moves/:move_id/boxes/:box_id/unpacking
 
@@ -36,6 +37,8 @@ class UnpackingController < MoveScopedController
   #: () -> untyped
   def remove
     Items::MarkRemoved.new.call(item: @item, actor: current_user)
+    return respond_from_box if box_origin?
+
     respond_with_streams(move_item_streams(from: :remaining, to: :unpacked),
                          redirect: move_box_unpacking_path(@move, @box))
   end
@@ -45,8 +48,22 @@ class UnpackingController < MoveScopedController
   #: () -> untyped
   def restore
     Items::RestoreToBox.new.call(item: @item, actor: current_user)
+    return respond_from_box if box_origin?
+
     respond_with_streams(move_item_streams(from: :unpacked, to: :remaining),
                          redirect: move_box_unpacking_path(@move, @box))
+  end
+
+  # PATCH /moves/:move_id/boxes/:box_id/unpacking/photos/:media_id/remove
+  # B1's photo-level "Unpack photo" (#727): marks all the photo's still-in-box
+  # items removed in one tap. Always box-origin — the control only exists on
+  # the box detail grid.
+
+  #: () -> untyped
+  def remove_photo
+    Items::MarkPhotoRemoved.new.call(box: @box, media: @media, actor: current_user)
+    respond_with_streams([contents_header_stream, photo_card_stream(@media)],
+                         redirect: move_box_path(@move, @box))
   end
 
   # PATCH /moves/:move_id/boxes/:box_id/unpacking/complete — mark the box unpacked
@@ -138,9 +155,74 @@ class UnpackingController < MoveScopedController
     turbo_stream.replace(id, view_context.render(component))
   end
 
+  # --- B1 box-detail origin (#727) -----------------------------------------
+  # The grid's toggles send origin=box; the response then re-renders the
+  # affected contents-grid card + the header count in place instead of the
+  # checklist sections, and the HTML fallback returns to the box detail.
+
+  #: () -> bool
+  def box_origin?
+    params[:origin] == "box"
+  end
+
+  #: () -> untyped
+  def respond_from_box
+    media = @box.media.ready.not_generated.find_by(id: @item.source_media_id)
+    streams = [contents_header_stream, media ? photo_card_stream(media) : item_card_stream]
+    respond_with_streams(streams, redirect: move_box_path(@move, @box))
+  end
+
+  #: () -> untyped
+  def contents_header_stream
+    scope = authorized_scope(@box.items)
+    turbo_stream.replace(
+      Components::Boxes::ContentsHeader::ID,
+      view_context.render(Components::Boxes::ContentsHeader.new(
+                            total: scope.count, unpacked: scope.removed.count
+                          ))
+    )
+  end
+
+  #: (untyped media) -> untyped
+  def photo_card_stream(media)
+    items = authorized_scope(@box.items).where(source_media_id: media.id).order(:created_at, :id).to_a
+    turbo_stream.replace(
+      Components::Boxes::PhotoCard.dom_id(media),
+      view_context.render(Components::Boxes::PhotoCard.new(
+                            move: @move, box: @box, media: media, items: items,
+                            # Review membership is presence-agnostic: the photo produced
+                            # items, so its tile keeps linking to the review walk.
+                            reviewable: @box.items.exists?(source_media_id: media.id),
+                            # Move-wide, matching BoxesController#unpacked_media_ids —
+                            # a sibling moved to another box keeps the badge withheld.
+                            unpacked: @move.items.in_box.where(source_media_id: media.id).none?
+                          ))
+    )
+  end
+
+  #: () -> untyped
+  def item_card_stream
+    turbo_stream.replace(
+      Components::Boxes::ItemCard.dom_id(@item),
+      view_context.render(Components::Boxes::ItemCard.new(
+                            item: @item, move: @move, image_ready: @move.image_generation_ready?
+                          ))
+    )
+  end
+
   #: () -> untyped
   def set_box
     @box = authorized_scope(@move.boxes).find(params.expect(:box_id))
+  rescue ActiveRecord::RecordNotFound
+    head :not_found
+  end
+
+  # Mirrors the contents grid's photo-card membership (ready, not generated) so
+  # a generated/ingesting media id can never be bulk-unpacked.
+
+  #: () -> untyped
+  def set_media
+    @media = @box.media.ready.not_generated.find(params.expect(:media_id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
   end

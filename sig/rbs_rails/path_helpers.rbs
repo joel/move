@@ -39,6 +39,7 @@ interface ::_RbsRailsPathHelpers
   def move_box_unpacking_reopen_path: (*untyped) -> ::String
   def move_box_unpacking_remove_path: (*untyped) -> ::String
   def move_box_unpacking_restore_path: (*untyped) -> ::String
+  def move_box_unpacking_photo_remove_path: (*untyped) -> ::String
   def move_boxes_path: (*untyped) -> ::String
   def new_move_box_path: (*untyped) -> ::String
   def edit_move_box_path: (*untyped) -> ::String
@@ -164,6 +165,7 @@ interface ::_RbsRailsPathHelpers
   def move_box_unpacking_reopen_url: (*untyped) -> ::String
   def move_box_unpacking_remove_url: (*untyped) -> ::String
   def move_box_unpacking_restore_url: (*untyped) -> ::String
+  def move_box_unpacking_photo_remove_url: (*untyped) -> ::String
   def move_boxes_url: (*untyped) -> ::String
   def new_move_box_url: (*untyped) -> ::String
   def edit_move_box_url: (*untyped) -> ::String

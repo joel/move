@@ -24,7 +24,10 @@ module Items
       # items are all already removed still fails correctly on a wrong phase.
       yield ensure_unpacking_phase(box)
 
-      items = box.items.in_box.where(source_media_id: media.id).order(:created_at, :id).to_a
+      # :move/:box preloaded — the per-item MarkRemoved guards read both, and
+      # the loop must not re-load them per item (Bullet).
+      items = box.items.in_box.where(source_media_id: media.id)
+                 .includes(:move, :box).order(:created_at, :id).to_a
       items.each { |item| yield MarkRemoved.new.call(item: item, actor: actor) }
       Success(items)
     end
