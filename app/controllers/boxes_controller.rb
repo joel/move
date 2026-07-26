@@ -322,7 +322,11 @@ class BoxesController < MoveScopedController
 
   #: () -> untyped
   def box_show_view
-    scope = authorized_scope(@box.items).in_box
+    scope = authorized_scope(@box.items)
+    # Removed items ride along ONLY while unpacking — the in-place checklist
+    # (#727) renders them as checked chips/cards. Every other status keeps the
+    # in-box-only grid (an `unpacked` box stays the badge-only summary).
+    scope = scope.in_box unless @box.unpacking?
     items = scope.ordered.to_a
     # Generated images are item images, not gallery photos — they render through
     # ItemCard, never as a photo card. Excluding them here makes a generated item

@@ -80,10 +80,24 @@ module DemoData
       threshold = @move.auto_confirm_threshold.to_f
       photos_by_included_box.each do |box_number, photos|
         box = @move.boxes.find_by(number: box_number)
-        next unless box&.media&.none?
+        next unless box
 
-        photos.each { |photo| build_photo(box, photo, threshold) }
+        existing = seeded_slugs(box)
+        photos.reject { |photo| existing.include?(photo[:slug]) }
+              .each { |photo| build_photo(box, photo, threshold) }
       end
+    end
+
+    # Per-slug idempotency (#727 — was per-box): a newly-catalogued photo now
+    # reaches an already-seeded dev box on plain re-seed, while a slug already
+    # attached is never duplicated. One set-based query per box — the blob
+    # filename carries the slug in both the real-JPEG and icon-fallback paths
+    # (SeedData.image_attachable), the same key the db/seeds.rb upgrade pass
+    # matches on.
+    def seeded_slugs(box)
+      box.media.joins(image_attachment: :blob)
+         .pluck(ActiveStorage::Blob.arel_table[:filename])
+         .to_set { |filename| filename.to_s.sub(/\.[^.]+\z/, "") }
     end
 
     def photos_by_included_box

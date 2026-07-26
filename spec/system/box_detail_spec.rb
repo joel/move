@@ -138,4 +138,34 @@ RSpec.describe "Box detail & lifecycle" do
     expect(page).to have_text("Box #001")
     expect(page).to have_no_css("a[aria-label='#{I18n.t("boxes.show.nav.previous")}']")
   end
+
+  # The in-place unpacking checklist (#727) on the no-JS surface: each button_to
+  # submits and follows the HTML redirect back to the box detail.
+  it "toggles items and unpacks whole photos in place while the box is unpacking" do
+    box = create(:box, :with_room, move:, number: "7", status: "unpacking")
+    photo = create(:media, move:, box:)
+    create(:item, move:, box:, source_media: photo, name: "Plates")
+    lamp = create(:item, :manual, move:, box:, name: "Lamp")
+
+    visit move_box_path(move, box)
+    expect(page).to have_text(I18n.t("boxes.contents.unpacked_count", count: 0, total: 2))
+
+    # Chip toggle: mark the photo item unpacked, badge appears, then restore it.
+    click_button "Plates"
+    expect(page).to have_text(I18n.t("boxes.contents.unpacked_count", count: 1, total: 2))
+    expect(page).to have_text(I18n.t("boxes.gallery.unpacked"))
+    click_button "Plates"
+    expect(page).to have_text(I18n.t("boxes.contents.unpacked_count", count: 0, total: 2))
+
+    # Photo-level unpack: one tap removes every in-box item of the photo.
+    click_button I18n.t("boxes.contents.unpack_photo")
+    expect(page).to have_text(I18n.t("boxes.contents.unpacked_count", count: 1, total: 2))
+
+    # Standalone card toggle — scoped to the card (the manage sheet's box-level
+    # "Mark unpacked" transition shares the label).
+    within("##{Components::Boxes::ItemCard.dom_id(lamp)}") do
+      click_button I18n.t("boxes.contents.mark_unpacked")
+    end
+    expect(page).to have_text(I18n.t("boxes.contents.unpacked_count", count: 2, total: 2))
+  end
 end

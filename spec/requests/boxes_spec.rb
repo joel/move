@@ -1081,4 +1081,76 @@ RSpec.describe "Boxes" do
       expect(response).to have_http_status(:forbidden)
     end
   end
+
+  describe "in-place unpacking grid (#727)" do
+    it "renders chip toggles, the unpack-photo control and the progress header while unpacking" do
+      box = create(:box, :with_room, move:, number: "7", status: "unpacking")
+      photo = create(:media, move:, box:)
+      plates = create(:item, move:, box:, source_media: photo, name: "Plates")
+      mugs = create(:item, move:, box:, source_media: photo, name: "Mugs", presence_state: "removed")
+      create(:item, :manual, move:, box:, name: "Lamp")
+
+      get move_box_path(move, box)
+
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("boxes.contents.unpacked_count", count: 1, total: 3))
+        # In-box chip is a mark-unpacked toggle; removed chip is a restore toggle.
+        expect(response.body).to include(move_box_unpacking_remove_path(move, box, plates))
+        expect(response.body).to include(move_box_unpacking_restore_path(move, box, mugs))
+        expect(response.body).to include(%(name="origin" value="box"))
+        # The photo still has an in-box item, so the photo-level unpack renders.
+        expect(response.body).to include(move_box_unpacking_photo_remove_path(move, box, media_id: photo.id))
+        # Standalone card toggle.
+        expect(response.body).to include(I18n.t("boxes.contents.mark_unpacked"))
+        # The tile alone carries the review link; no form ever nests in an anchor.
+        expect(Capybara.string(response.body)).to have_css("a[href*='review']")
+        expect(Capybara.string(response.body)).to have_no_css("a form")
+        expect(Capybara.string(response.body)).to have_no_css("a a")
+      end
+    end
+
+    it "hides the unpack-photo control once every item of the photo is removed" do
+      box = create(:box, :with_room, move:, number: "7", status: "unpacking")
+      photo = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: photo, name: "Plates", presence_state: "removed")
+
+      get move_box_path(move, box)
+
+      expect(response.body).not_to include(move_box_unpacking_photo_remove_path(move, box, media_id: photo.id))
+      expect(response.body).to include(I18n.t("boxes.gallery.unpacked"))
+    end
+
+    it "shows checked states without any toggle forms on an archived move" do
+      archived = create(:move, :archived, created_by: user)
+      box = create(:box, :with_room, move: archived, number: "7", status: "unpacking")
+      photo = create(:media, move: archived, box:)
+      create(:item, move: archived, box:, source_media: photo, name: "Plates", presence_state: "removed")
+      create(:item, move: archived, box:, source_media: photo, name: "Mugs")
+
+      get move_box_path(archived, box)
+
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("boxes.contents.unpacked_count", count: 1, total: 2))
+        expect(response.body).not_to include(move_box_unpacking_photo_remove_path(archived, box, media_id: photo.id))
+        expect(response.body).not_to include(%(name="origin" value="box"))
+        expect(response.body).not_to include(I18n.t("boxes.contents.unpack_photo"))
+      end
+    end
+
+    it "keeps the packing grid unchanged: no removed items, no toggles, plain count" do
+      box = create(:box, :with_room, move:, number: "7", status: "packing")
+      photo = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: photo, name: "Plates")
+      create(:item, move:, box:, source_media: photo, name: "Ghost", presence_state: "removed")
+
+      get move_box_path(move, box)
+
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("boxes.contents.count", count: 1))
+        expect(response.body).not_to include("Ghost")
+        expect(response.body).not_to include(I18n.t("boxes.contents.unpack_photo"))
+        expect(response.body).not_to include(%(name="origin" value="box"))
+      end
+    end
+  end
 end

@@ -223,4 +223,120 @@ RSpec.describe "Unpacking" do
       expect(item.reload.presence_state).to eq("in_box")
     end
   end
+
+  describe "PATCH .../unpacking/photos/:media_id/remove (#727)" do
+    it "marks all the photo's still-in-box items removed and redirects to the box detail" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      plates = create(:item, move:, box:, source_media: photo, name: "Plates")
+      mugs = create(:item, move:, box:, source_media: photo, name: "Mugs")
+      moved = create(:item, move:, box: create(:box, move:), source_media: photo, name: "Kettle")
+
+      patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id)
+
+      expect(response).to redirect_to(move_box_path(move, box))
+      aggregate_failures do
+        expect(plates.reload.presence_state).to eq("removed")
+        expect(mugs.reload.presence_state).to eq("removed")
+        expect(moved.reload.presence_state).to eq("in_box")
+      end
+    end
+
+    it "streams the photo card + contents header in place, never the checklist sections" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: photo, name: "Plates")
+
+      patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id), as: :turbo_stream
+
+      expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+      expect(response.body)
+        .to include(%(target="#{Components::Boxes::PhotoCard.dom_id(photo)}"))
+        .and include(%(target="#{Components::Boxes::ContentsHeader::ID}"))
+      expect(response.body).not_to include(Components::Unpacking::RemainingSection::ID)
+      expect(response.body).not_to include(Components::Unpacking::ProgressCard::ID)
+    end
+
+    it "refuses outside an active unpacking checklist" do
+      box = create(:box, :with_room, move:, status: "in_transit")
+      photo = create(:media, move:, box:)
+      item = create(:item, move:, box:, source_media: photo, name: "Plates")
+
+      patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id)
+
+      expect(response).to redirect_to(move_box_unpacking_path(move, box))
+      expect(item.reload.presence_state).to eq("in_box")
+    end
+
+    it "404s for a generated media id (never a photo card)" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      generated = create(:media, move:, box:, captured_via: "generated")
+
+      patch move_box_unpacking_photo_remove_path(move, box, media_id: generated.id)
+
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+
+  describe "origin=box toggles (#727 — B1 grid)" do
+    it "streams the photo card + header for a photo item's remove, not the checklist" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      item = create(:item, move:, box:, source_media: photo, name: "Plates")
+
+      patch move_box_unpacking_remove_path(move, box, item, params: { origin: "box" }), as: :turbo_stream
+
+      expect(response.body)
+        .to include(%(target="#{Components::Boxes::PhotoCard.dom_id(photo)}"))
+        .and include(%(target="#{Components::Boxes::ContentsHeader::ID}"))
+      # The card replace morphs so a keyboard user's focus survives the toggle.
+      expect(response.body).to include(%(method="morph"))
+      expect(response.body).not_to include(Components::Unpacking::UnpackedSection::ID)
+      expect(item.reload.presence_state).to eq("removed")
+    end
+
+    it "re-streams the review badge when a toggle changes the unreviewed count (Codex #728)" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      pending = create(:item, move:, box:, source_media: photo, name: "Plates", review_state: "pending_review")
+
+      patch move_box_unpacking_remove_path(move, box, pending, params: { origin: "box" }), as: :turbo_stream
+
+      expect(response.body)
+        .to include(%(target="#{Components::BoxReviewBadge::ID}"))
+        .and include(I18n.t("boxes.show.review_complete"))
+    end
+
+    it "streams the standalone item card for a manual item's restore" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box:, name: "Lamp", presence_state: "removed")
+
+      patch move_box_unpacking_restore_path(move, box, item, params: { origin: "box" }), as: :turbo_stream
+
+      expect(response.body)
+        .to include(%(target="#{Components::Boxes::ItemCard.dom_id(item)}"))
+        .and include(%(target="#{Components::Boxes::ContentsHeader::ID}"))
+      expect(item.reload.presence_state).to eq("in_box")
+    end
+
+    it "falls back to a box-detail redirect for plain HTML" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box:, name: "Lamp")
+
+      patch move_box_unpacking_remove_path(move, box, item, params: { origin: "box" })
+
+      expect(response).to redirect_to(move_box_path(move, box))
+    end
+
+    it "keeps the checklist stream shape when no origin is sent" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      item = create(:item, move:, box:, presence_state: "in_box")
+      create(:item, move:, box:, presence_state: "in_box")
+
+      patch move_box_unpacking_remove_path(move, box, item), as: :turbo_stream
+
+      expect(response.body).to include(Components::Unpacking::ProgressCard::ID)
+      expect(response.body).not_to include(Components::Boxes::ContentsHeader::ID)
+    end
+  end
 end

@@ -11,6 +11,10 @@ module Components
     REVIEWED_TINT = "bg-accent-sage/15 text-accent-sage hover:bg-accent-sage/25"
     PENDING_TINT = "bg-tertiary/15 text-tertiary hover:bg-tertiary/25"
 
+    # Stable target: unreviewed counts only in-box items, so the B1 unpacking
+    # toggles (#727) re-stream this badge alongside the card they touched.
+    ID = "box-review-badge"
+
     #: (move: untyped, box: untyped, pending_count: untyped) -> void
     def initialize(move:, box:, pending_count:)
       @move = move
@@ -21,7 +25,8 @@ module Components
     #: () -> void
     def view_template
       reviewed = @pending_count.zero?
-      a(href: move_box_review_path(@move, @box),
+      a(id: ID,
+        href: move_box_review_path(@move, @box),
         class: "inline-flex items-center gap-1.5 rounded-full px-3 py-1 " \
                "text-label-caps uppercase transition #{reviewed ? REVIEWED_TINT : PENDING_TINT}") do
         if reviewed

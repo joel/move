@@ -99,6 +99,9 @@ Rails.application.routes.draw do
       patch "unpacking/reopen", to: "unpacking#reopen", as: :unpacking_reopen
       patch "unpacking/items/:item_id/remove", to: "unpacking#remove", as: :unpacking_remove
       patch "unpacking/items/:item_id/restore", to: "unpacking#restore", as: :unpacking_restore
+      # B1's photo-level "Unpack photo" (#727): one tap marks all the photo's
+      # still-in-box items removed.
+      patch "unpacking/photos/:media_id/remove", to: "unpacking#remove_photo", as: :unpacking_photo_remove
     end
     # E2 — QR scanner (live camera + manual entry) and token resolution, both in
     # the Move app shell. Resolution looks the box up by qr_token across the

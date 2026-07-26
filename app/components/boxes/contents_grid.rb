@@ -4,17 +4,14 @@ module Components
   module Boxes
     # D1 — the unified box-contents grid: ONE surface replacing the old split of a
     # photo gallery + a separate items list. Each captured photo is a single card
-    # (the image + the names recognised in it as chips); each manually-added item
-    # with no photo is a placeholder card. The Item model is the invisible backbone
+    # (Components::Boxes::PhotoCard — the image + the names recognised in it as
+    # chips); each manually-added item with no photo is a placeholder card
+    # (Components::Boxes::ItemCard). The Item model is the invisible backbone
     # (search/manifest/labels still read it) — it's just never shown as its own list.
     #
-    # A photo card links where the gallery used to: the per-photo review walk when
-    # it produced items, the recovery screen for a settled-orphan photo, else a
-    # plain tile. A standalone card (manual item, or one moved in from another
-    # box's photo) links to the item detail. Photos lead (most-recent capture
-    # first), then standalone cards (most-recent first).
+    # Photos lead (most-recent capture first), then standalone cards (most-recent
+    # first).
     class ContentsGrid < Components::Base
-      CHIP_CAP = 4 # name chips shown per photo card before collapsing to "+N more"
       # Above-the-fold cards load eagerly — two mobile rows / one sm row; the
       # photos render before standalone items, so indexing the media loop is
       # sufficient (#673).
@@ -27,16 +24,21 @@ module Components
       # @rbs reviewable_media_ids: untyped
       # @rbs recoverable_media_ids: untyped
       # @rbs unpacked_media_ids: untyped
+      # @rbs editable: bool
       # @rbs return: void
       def initialize(move:, box:, media:, items:, reviewable_media_ids: [],
-                     recoverable_media_ids: [], unpacked_media_ids: [])
+                     recoverable_media_ids: [], unpacked_media_ids: [], editable: false)
         @move = move
         @box = box
         @media = media # recent_first, blobs preloaded
-        @items = items # all in-box items
+        @items = items # all in-box items (removed ride along while unpacking, #727)
         @reviewable_media_ids = reviewable_media_ids.to_set
         @recoverable_media_ids = recoverable_media_ids.to_set
         @unpacked_media_ids = unpacked_media_ids.to_set
+        # In-place checklist mode (#727): checked states render for anyone
+        # viewing an unpacking box; the toggles need an editable Move too.
+        @unpacking = box.unpacking?
+        @interactive = @unpacking && editable
         # In-box items grouped by their source photo (only this box's photos are
         # rendered as cards).
         @items_by_media = items.group_by(&:source_media_id)
@@ -49,8 +51,13 @@ module Components
 
       #: () -> void
       def view_template
-        section(class: "flex flex-col gap-stack-gap") do
-          header
+        # `refocus` restores focus to the tapped toggle after its card is
+        # re-streamed (#727) — button ids are stable across presence flips.
+        section(class: "flex flex-col gap-stack-gap", data: { controller: "refocus" }) do
+          render Components::Boxes::ContentsHeader.new(
+            total: @items.size,
+            unpacked: @unpacking ? @items.count(&:removed?) : nil
+          )
           any_cards? ? grid : empty
         end
       end
@@ -63,24 +70,19 @@ module Components
       end
 
       #: () -> untyped
-      def header
-        div(class: "flex items-center justify-between px-2") do
-          h3(class: "text-headline-md text-text-warm") { I18n.t("boxes.contents.title") }
-          span(class: "text-label-caps uppercase text-muted") do
-            I18n.t("boxes.contents.count", count: item_count)
-          end
-        end
-      end
-
-      #: () -> untyped
-      def item_count
-        @items.size
-      end
-
-      #: () -> untyped
       def grid
         div(class: "grid grid-cols-2 gap-3 sm:grid-cols-3") do
-          @media.each_with_index { |media, index| photo_card(media, eager: index < EAGER_TILES) }
+          @media.each_with_index do |media, index|
+            render Components::Boxes::PhotoCard.new(
+              move: @move, box: @box, media: media,
+              items: @items_by_media[media.id] || [],
+              reviewable: @reviewable_media_ids.include?(media.id),
+              recoverable: @recoverable_media_ids.include?(media.id),
+              unpacked: @unpacked_media_ids.include?(media.id),
+              eager: index < EAGER_TILES,
+              unpacking: @unpacking, interactive: @interactive
+            )
+          end
           # Standalone items most-recent first (items arrive created-ascending).
           # The eager index CONTINUES across them: when the box has fewer than
           # EAGER_TILES photos, image-backed item cards fill the first visible
@@ -88,110 +90,10 @@ module Components
           @standalone_items.reverse_each.with_index(@media.size) do |item, index|
             render Components::Boxes::ItemCard.new(
               item: item, move: @move, image_ready: @move.image_generation_ready?,
-              eager: index < EAGER_TILES
+              eager: index < EAGER_TILES, unpacking: @interactive
             )
           end
         end
-      end
-
-      # A photo card. Tappable only when it has somewhere to go (review/recovery);
-      # a still-processing or settled-empty photo is a plain, inert tile.
-
-      #: (untyped media, ?eager: bool) -> untyped
-      def photo_card(media, eager: false)
-        href = photo_href(media)
-        attrs = href ? { href: href } : {}
-        tag = href ? :a : :div
-        public_send(tag, class: card_classes(interactive: href.present?), **attrs) do
-          tile(media, eager:)
-          names_caption(@items_by_media[media.id] || [])
-        end
-      end
-
-      # The names recognised in this photo, as wrapping chips (capped). A photo with
-      # no in-box items (processing, or its items moved/unpacked away) shows just the
-      # image + any badge — no speculative caption.
-
-      #: (untyped items) -> untyped
-      def names_caption(items)
-        return unless items.any?
-
-        div(class: "flex flex-wrap gap-1 p-2") do
-          items.first(CHIP_CAP).each { |item| name_chip(item.name) }
-          name_chip(I18n.t("boxes.contents.more", count: items.size - CHIP_CAP)) if items.size > CHIP_CAP
-        end
-      end
-
-      #: (untyped label) -> untyped
-      def name_chip(label)
-        span(class: "inline-flex max-w-full items-center truncate rounded-full bg-surface-container-high " \
-                    "px-2.5 py-1 text-label-caps uppercase text-on-surface-variant") { label }
-      end
-
-      #: (untyped media, ?eager: bool) -> untyped
-      def tile(media, eager: false)
-        div(class: tile_classes) do
-          image(media, eager:)
-          unpacked_badge(media)
-          recovery_badge(media)
-        end
-      end
-
-      #: (untyped media, ?eager: bool) -> untyped
-      def image(media, eager: false)
-        if media.image_displayable?
-          render Components::Ui::BlurUpImage.new(
-            src: MediaVariants::TransformUrl.for(media, :thumb), lqip: media.image_lqip,
-            loading: eager ? "eager" : "lazy", decoding: "async",
-            img_class: "h-full w-full object-cover transition group-hover:scale-105"
-          )
-        elsif media.image_unavailable?
-          render Components::Icons::ImageOff.new(css: "h-7 w-7")
-        else
-          render Components::Icons::Camera.new(css: "h-7 w-7")
-        end
-      end
-
-      #: (untyped media) -> untyped
-      def unpacked_badge(media)
-        return unless @unpacked_media_ids.include?(media.id)
-
-        span(class: "absolute left-1.5 top-1.5 z-10 inline-flex items-center gap-1 rounded-full " \
-                    "bg-accent-sage/90 px-2 py-0.5 text-label-caps uppercase text-page") do
-          render Components::Icons::Check.new(css: "h-3 w-3")
-          plain I18n.t("boxes.gallery.unpacked")
-        end
-      end
-
-      #: (untyped media) -> untyped
-      def recovery_badge(media)
-        return unless @recoverable_media_ids.include?(media.id)
-
-        span(class: "absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center " \
-                    "rounded-full bg-error/90 text-on-error") do
-          render Components::Icons::Alert.new(css: "h-3.5 w-3.5")
-        end
-      end
-
-      #: (untyped media) -> untyped
-      def photo_href(media)
-        if @reviewable_media_ids.include?(media.id)
-          move_box_review_photo_path(@move, @box, media_id: media.id)
-        elsif @recoverable_media_ids.include?(media.id)
-          move_box_recovery_photo_path(@move, @box, media_id: media.id)
-        end
-      end
-
-      #: (interactive: untyped) -> String
-      def card_classes(interactive:)
-        base = "group flex flex-col overflow-hidden rounded-card border border-card-border bg-card"
-        interactive ? "#{base} transition hover:border-accent-sage hover:bg-surface-container-high" : base
-      end
-
-      #: () -> String
-      def tile_classes
-        "relative flex aspect-square items-center justify-center overflow-hidden " \
-          "bg-surface-container-high text-muted"
       end
 
       #: () -> untyped
