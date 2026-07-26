@@ -1,5 +1,6 @@
 import Swiper from "swiper"
 import { Thumbs, FreeMode, Zoom, Keyboard, A11y } from "swiper"
+import { format } from "lightbox/format"
 
 // Mobile gallery viewer (#604) — a fullscreen thumbs-gallery
 // (https://swiperjs.com/demos#thumbs-gallery). On touch / coarse-pointer devices
@@ -69,6 +70,14 @@ export class ThumbsViewer {
     })
 
     overlay.appendChild(this.buildChrome())
+
+    // The active photo's items as seeded-search chips (#724) — between the
+    // chrome and the main image, rebuilt per slide by syncChrome. Hidden (not
+    // empty-rendered) for item-less photos.
+    this.itemsRow = el("div", {
+      class: "move-gallery__items relative z-20 hidden flex-nowrap gap-2 overflow-x-auto px-4 pb-2"
+    })
+    overlay.appendChild(this.itemsRow)
 
     // Main image swiper — fills the space between chrome and thumbs.
     this.mainEl = el("div", { class: "move-gallery__main swiper relative z-10 min-h-0 w-full flex-1" })
@@ -240,6 +249,25 @@ export class ThumbsViewer {
     this.caption.textContent = slide.caption || ""
     this.counter.textContent = format(this.labels.counter, { index: i + 1, total: this.slides.length })
     if (slide.href) this.viewBox.setAttribute("href", slide.href)
+    const items = slide.items || []
+    this.itemsRow.replaceChildren(...items.map((item) => this.itemChip(item)))
+    this.itemsRow.classList.toggle("hidden", items.length === 0)
+    this.itemsRow.classList.toggle("flex", items.length > 0)
+  }
+
+  // Same pill recipe as the view-box chip. Plain anchors — Turbo owns the
+  // click and the controller's turbo:before-cache teardown strips the overlay.
+  // Item names are user data: textContent, never innerHTML.
+  itemChip(item) {
+    const chip = el("a", {
+      class: "move-gallery__item shrink-0 rounded-full bg-card px-3 py-1.5 text-label-caps uppercase text-text-warm",
+      href: item.url
+    })
+    chip.textContent = item.name
+    const label = format(this.labels.itemSearch, { name: item.name })
+    chip.title = label
+    chip.setAttribute("aria-label", label)
+    return chip
   }
 
   onKeydown(event) {
@@ -314,13 +342,6 @@ function el(tag, attrs = {}) {
     else node.setAttribute(key, value)
   }
   return node
-}
-
-// Minimal {key} interpolation for the localized counter template. Uses {key}
-// (not I18n's %{key}) so the server-side I18n.t never tries to interpolate the
-// template it hands to the client.
-function format(template, values) {
-  return String(template).replace(/\{(\w+)\}/g, (_, key) => (key in values ? values[key] : `{${key}}`))
 }
 
 const closeIcon =

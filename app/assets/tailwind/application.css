@@ -704,6 +704,57 @@
   /* No custom arrow gating: PhotoSwipe hides `.pswp__button--arrow` on touch
    * devices and reveals them when a mouse is used (.pswp--touch /
    * .pswp--has_mouse) — the behaviour we want, owned by the library. */
+
+  /* Seeded-search item chips (#724) — a bottom row of the current photo's
+   * items, registered like the caption above. Qualified with the `.pswp`
+   * ancestor for the same reason as the caption (the ui-visible rule resets
+   * pointer-events at 0,2,0 — Codex #599): the ROW stays transparent to
+   * pointers so it never swallows a swipe starting near the bottom edge; only
+   * the anchors themselves are interactive. */
+  .pswp .pswp__move-items {
+    position: absolute;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    left: 16px;
+    right: 16px;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: 8px;
+    overflow-x: auto;
+    pointer-events: none;
+  }
+
+  .pswp .pswp__move-items[hidden] {
+    display: none;
+  }
+
+  /* The pill recipe restated for every interactive state (the #599 lesson —
+   * a single-state rule collapses under the imported stylesheet's compound
+   * selectors). Anchors re-enable pointer-events so chips stay tappable
+   * inside the transparent row. */
+  .pswp .pswp__move-items a,
+  .pswp .pswp__move-items a:hover,
+  .pswp .pswp__move-items a:focus,
+  .pswp .pswp__move-items a:active {
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--c-page) 70%, transparent);
+    backdrop-filter: blur(8px);
+    color: var(--c-text-warm);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    line-height: 1.5rem;
+    pointer-events: auto;
+    transition: background-color 150ms ease-out;
+  }
+
+  .pswp .pswp__move-items a:hover,
+  .pswp .pswp__move-items a:focus {
+    background: var(--c-page);
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────────

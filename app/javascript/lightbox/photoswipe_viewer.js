@@ -1,4 +1,5 @@
 import PhotoSwipeLightbox from "photoswipe/lightbox"
+import { format } from "lightbox/format"
 
 // Desktop gallery viewer — the PhotoSwipe 5 integration (#598/#599), extracted
 // verbatim from lightbox_controller.js into a strategy the controller lazily
@@ -65,6 +66,7 @@ export class PhotoSwipeViewer {
       element: slide.tile,
       caption: slide.caption,
       href: slide.href,
+      items: slide.items || [],
       tile: slide.tile
     }
   }
@@ -144,7 +146,36 @@ export class PhotoSwipeViewer {
           update()
         }
       })
+
+      // The photo's items as seeded-search chips (#724), following the current
+      // slide. Hidden entirely for item-less photos.
+      pswp.ui.registerElement({
+        name: "move-items",
+        appendTo: "root",
+        onInit: (el) => {
+          const update = () => {
+            const items = dataFor().items || []
+            el.replaceChildren(...items.map((item) => this.itemChip(item)))
+            el.hidden = items.length === 0
+          }
+          pswp.on("change", update)
+          update()
+        }
+      })
     })
+  }
+
+  // Chips are plain anchors — Turbo owns the click and the controller's
+  // turbo:before-cache teardown strips the viewer on navigation. Item names are
+  // user data: build via textContent, never innerHTML.
+  itemChip(item) {
+    const chip = document.createElement("a")
+    chip.href = item.url
+    chip.textContent = item.name
+    const label = format(this.labels.itemSearch, { name: item.name })
+    chip.title = label
+    chip.setAttribute("aria-label", label)
+    return chip
   }
 
   // turbo:before-cache — Turbo must never snapshot an open viewer (PhotoSwipe

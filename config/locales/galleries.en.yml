@@ -33,6 +33,9 @@ en:
         # %{...} — so I18n never tries to interpolate it here.
         dialog: "Photo viewer"
         counter: "{index} of {total}"
+        # Accessible label for an item chip; {name} is filled in on the client
+        # per chip, so it uses {name} — NOT I18n's %{...} — like counter above.
+        item_search: "Search for “{name}”"
       empty:
         title: "No photos yet"
         description: "Photos you capture while packing boxes will appear here."

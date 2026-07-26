@@ -60,7 +60,8 @@ module Components
           error: I18n.t("galleries.index.lightbox.error"),
           viewBox: I18n.t("galleries.index.lightbox.view_box"),
           dialog: I18n.t("galleries.index.lightbox.dialog"),
-          counter: I18n.t("galleries.index.lightbox.counter")
+          counter: I18n.t("galleries.index.lightbox.counter"),
+          itemSearch: I18n.t("galleries.index.lightbox.item_search")
         }
       end
     end
