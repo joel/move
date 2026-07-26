@@ -62,7 +62,7 @@ class UnpackingController < MoveScopedController
   #: () -> untyped
   def remove_photo
     Items::MarkPhotoRemoved.new.call(box: @box, media: @media, actor: current_user)
-    respond_with_streams([contents_header_stream, photo_card_stream(@media)],
+    respond_with_streams([contents_header_stream, review_badge_stream, photo_card_stream(@media)],
                          redirect: move_box_path(@move, @box))
   end
 
@@ -168,8 +168,24 @@ class UnpackingController < MoveScopedController
   #: () -> untyped
   def respond_from_box
     media = @box.media.ready.not_generated.find_by(id: @item.source_media_id)
-    streams = [contents_header_stream, media ? photo_card_stream(media) : item_card_stream]
+    streams = [contents_header_stream, review_badge_stream,
+               media ? photo_card_stream(media) : item_card_stream]
     respond_with_streams(streams, redirect: move_box_path(@move, @box))
+  end
+
+  # Item.unreviewed counts in-box items only, so toggling an unreviewed item's
+  # presence changes the badge (Codex #728). Turbo ignores the replace when the
+  # box has no walkable photo (the badge simply isn't in the DOM).
+
+  #: () -> untyped
+  def review_badge_stream
+    turbo_stream.replace(
+      Components::BoxReviewBadge::ID,
+      view_context.render(Components::BoxReviewBadge.new(
+                            move: @move, box: @box,
+                            pending_count: authorized_scope(@box.items).unreviewed.count
+                          ))
+    )
   end
 
   #: () -> untyped

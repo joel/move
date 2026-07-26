@@ -293,6 +293,18 @@ RSpec.describe "Unpacking" do
       expect(item.reload.presence_state).to eq("removed")
     end
 
+    it "re-streams the review badge when a toggle changes the unreviewed count (Codex #728)" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      pending = create(:item, move:, box:, source_media: photo, name: "Plates", review_state: "pending_review")
+
+      patch move_box_unpacking_remove_path(move, box, pending, params: { origin: "box" }), as: :turbo_stream
+
+      expect(response.body)
+        .to include(%(target="#{Components::BoxReviewBadge::ID}"))
+        .and include(I18n.t("boxes.show.review_complete"))
+    end
+
     it "streams the standalone item card for a manual item's restore" do
       box = create(:box, :with_room, move:, status: "unpacking")
       item = create(:item, :manual, move:, box:, name: "Lamp", presence_state: "removed")
