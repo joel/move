@@ -196,6 +196,18 @@ RSpec.describe "Galleries" do
       expect(tile["data-items"]).to be_nil
     end
 
+    it "dedupes same-named items so every chip is a distinct search" do
+      box = create(:box, move:, number: "6")
+      media = create(:media, move:, box:)
+      3.times { create(:item, move:, box:, source_media: media, name: "Book") }
+      create(:item, move:, box:, source_media: media, name: "Lamp")
+
+      get move_gallery_path(move)
+
+      payload = JSON.parse(Capybara.string(response.body).find("button[data-lightbox-target='tile']")["data-items"])
+      expect(payload.pluck("name")).to contain_exactly("Book", "Lamp")
+    end
+
     it "caps the chip payload at six oldest-first items and excludes removed ones" do
       box = create(:box, move:, number: "6")
       media = create(:media, move:, box:)

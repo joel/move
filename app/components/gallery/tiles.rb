@@ -136,27 +136,36 @@ module Components
         chips.empty? ? {} : { items: chips.to_json }
       end
 
-      # One windowed query for the whole page: kept, still-in-box items ranked
-      # per photo (id breaks created_at ties from batch materialization) and
-      # capped at MAX_ITEM_CHIPS **in SQL**, so a photo with many items never
-      # inflates the page load (a preloaded has_many can't carry a per-parent
-      # LIMIT — Rails silently ignores it). group_by here runs on the already-
-      # bounded in-memory rows.
+      # One query for the whole page, fully bounded in SQL: kept, still-in-box
+      # items are deduped to one representative per (photo, name) — identical
+      # names would render identical seeded-search chips, crowding distinct ones
+      # out of the cap — then ranked per photo (id breaks created_at ties from
+      # batch materialization) and capped at MAX_ITEM_CHIPS, so a photo with
+      # many items never inflates the page load (a preloaded has_many can't
+      # carry a per-parent LIMIT — Rails silently ignores it). group_by here
+      # runs on the already-bounded in-memory rows.
 
       #: () -> Hash[untyped, Array[untyped]]
       def chips_by_media
         @chips_by_media ||= if @media.empty?
                               {}
                             else
-                              ranked = Item.in_box.where(source_media_id: @media.map(&:id)).select(
-                                Arel.sql("items.*, ROW_NUMBER() OVER (PARTITION BY source_media_id " \
-                                         "ORDER BY created_at, id) AS chip_rank")
-                              )
-                              Item.from(ranked, :items)
+                              Item.from(ranked_chip_items, :items)
                                   .where(Arel.sql("chip_rank <= #{MAX_ITEM_CHIPS}"))
                                   .order(:created_at, :id)
                                   .group_by(&:source_media_id)
                             end
+      end
+
+      #: () -> untyped
+      def ranked_chip_items
+        deduped = Item.in_box.where(source_media_id: @media.map(&:id))
+                      .select(Arel.sql("DISTINCT ON (source_media_id, name) items.*"))
+                      .order(Arel.sql("source_media_id, name, created_at, id"))
+        Item.from(deduped, :items).select(
+          Arel.sql("items.*, ROW_NUMBER() OVER (PARTITION BY source_media_id " \
+                   "ORDER BY created_at, id) AS chip_rank")
+        )
       end
 
       # Real slide dimensions when blob analysis has them. The dataset contract
