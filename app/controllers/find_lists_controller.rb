@@ -26,7 +26,16 @@ class FindListsController < MoveScopedController
   #: () -> untyped
   def pin
     FindLists::Pin.new.call(move: @move, user: current_user, item: @item)
-    respond_with_streams(toggle_streams(pinned: true), redirect: move_find_list_path(@move))
+    # A pin lands off-screen (the list page) — UX rule 1 wants a LINKING
+    # confirmation (Codex #733): the toast carries a View-list action.
+    # flash.now scopes it to the stream render; the HTML fallback needs none —
+    # its redirect lands ON the list.
+    flash.now[:action_href] = move_find_list_path(@move)
+    flash.now[:action_label] = t("find_lists.flash.view")
+    respond_with_streams(toggle_streams(pinned: true),
+                         redirect: move_find_list_path(@move), toast: true) do
+      [:notice, t("find_lists.flash.pinned", name: @item.name)]
+    end
   end
 
   # DELETE /moves/:move_id/find_list/items/:item_id

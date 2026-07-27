@@ -14,29 +14,46 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   connect() {
     this.pendingId = null
-    this.containerId = null
+    this.ancestorIds = []
     this.onSubmitStart = (event) => {
       const submitter = event.detail?.formSubmission?.submitter
       if (!submitter?.id || !this.element.contains(event.target)) return
       this.pendingId = submitter.id
-      // Fallback anchor: the card the control lives in. A successful bulk
-      // "Unpack photo" removes its own button, so focus must land on the
-      // nearest surviving control (e.g. the first restore chip) instead.
-      this.containerId = submitter.closest("[id^='box_photo_'], [id^='box_item_']")?.id ?? null
+      // Fallback anchors: every identified ancestor, nearest first. Whichever
+      // survives the stream hosts focus when the submitter itself was removed
+      // — a bulk "Unpack photo" removes its own button (card survives), a
+      // find-list row unpin removes the whole row (the list wrapper survives).
+      this.ancestorIds = []
+      let node = submitter.parentElement?.closest("[id]") ?? null
+      while (node && this.element.contains(node)) {
+        this.ancestorIds.push(node.id)
+        node = node.parentElement?.closest("[id]") ?? null
+      }
     }
     this.onSubmitEnd = () => {
       const id = this.pendingId
-      const containerId = this.containerId
+      const ancestorIds = this.ancestorIds
       this.pendingId = null
-      this.containerId = null
+      this.ancestorIds = []
       if (!id) return
-      // Streams render synchronously on message receipt; the double rAF waits
-      // out the current frame so the swapped/morphed node is in the DOM.
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        const target = document.getElementById(id) ||
-          document.getElementById(containerId ?? "")?.querySelector("button, a[href]")
-        target?.focus()
-      }))
+      // turbo:submit-end can fire BEFORE the response's streams render: a
+      // morph preserves whatever we focus (node identity survives), but a
+      // replace swaps the node out from under an early focus and drops it to
+      // <body>. Watch the render window (~6 frames) and re-focus with fresh
+      // lookups ONLY while focus is actually lost (on <body> or a detached
+      // node) — a user who tabs or clicks onto a live element mid-window is
+      // never overridden (Codex #733).
+      const attempt = (triesLeft) => {
+        const active = document.activeElement
+        const focusLost = !active || active === document.body || !active.isConnected
+        if (focusLost) {
+          const host = ancestorIds.map((aid) => document.getElementById(aid)).find(Boolean)
+          const target = document.getElementById(id) || host?.querySelector("button, a[href]")
+          target?.focus()
+        }
+        if (triesLeft > 0) requestAnimationFrame(() => attempt(triesLeft - 1))
+      }
+      requestAnimationFrame(() => requestAnimationFrame(() => attempt(6)))
     }
     document.addEventListener("turbo:submit-start", this.onSubmitStart)
     document.addEventListener("turbo:submit-end", this.onSubmitEnd)

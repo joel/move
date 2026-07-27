@@ -20,6 +20,8 @@ en:
         description: "Search for something you need, then tap + on a result to build your picking list."
         cta: "Search your move"
     flash:
+      pinned: "Pinned “%{name}” to your find list"
+      view: "View list"
       cleared:
         one: "Cleared 1 found item"
         other: "Cleared %{count} found items"

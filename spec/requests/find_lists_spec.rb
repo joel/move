@@ -61,7 +61,7 @@ RSpec.describe "FindLists" do
   end
 
   describe "POST/DELETE pin toggles" do
-    it "pins over turbo_stream, replacing both toggle variants, the pill and the list" do
+    it "pins over turbo_stream, replacing both toggle variants, the pill and the list, with a toast" do
       box = create(:box, move:)
       item = create(:item, move:, box:, name: "Kettle")
 
@@ -74,7 +74,22 @@ RSpec.describe "FindLists" do
         expect(response.body).to include(%(target="#{Components::FindLists::SearchLink::ID}"))
         expect(response.body).to include(%(target="#{Components::FindLists::List::ID}"))
         expect(response.body).to include(I18n.t("find_lists.search_link", count: 1))
+        # UX rule 1: the pin lands off-screen, so it confirms with a LINKING toast.
+        expect(response.body).to include(I18n.t("find_lists.flash.pinned", name: "Kettle"))
+        expect(response.body).to include(I18n.t("find_lists.flash.view"))
       end
+    end
+
+    it "keeps the pinned toggle state on an item update validation re-render (Codex #733)" do
+      box = create(:box, move:)
+      item = create(:item, :manual, move:, box:, name: "Kettle")
+      create(:find_list_entry, move:, user:, item:)
+
+      patch move_item_path(move, item), params: { item: { name: "" } }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include(I18n.t("find_lists.toggle.on_list"))
+      expect(response.body).not_to include(I18n.t("find_lists.toggle.add_short"))
     end
 
     it "unpins over turbo_stream and falls back to a list redirect for HTML" do
