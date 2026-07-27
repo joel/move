@@ -11,19 +11,21 @@ module FindLists
     #: (move: untyped, user: untyped, item: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, user:, item:)
       yield ensure_writable(move)
-      yield ensure_pinned(move, user, item)
-      # Both guards run under the row lock (with_lock reloads and clears the
-      # association cache, so item.box is a fresh read):
+      # Every data guard runs under the item row lock (with_lock reloads and
+      # clears the association cache, so pin, box, and presence are all fresh
+      # post-lock reads):
+      # - pin guard: catches an unpin committed before the lock was acquired.
       # - box guard: an `unpacked` box is terminal — restoring into it would
       #   leave a "done" box holding an item (the inconsistency the
       #   checklist's require_active_checklist rejects; reopen first). The Row
       #   hides Restore on such rows, so only a stale form or a direct call
-      #   gets here. In-lock, a completion committed before we acquired the
-      #   lock is caught; one still in flight when we commit is a known
-      #   residual shared with the checklist's own fence-then-act shape
-      #   (follow-up: TransitionStatus lock ordering).
+      #   gets here.
       # - replay guard: idempotent like Pin/Unpin, atomically (see MarkFound).
+      # A cross-row write (unpin, box completion) whose commit is still in
+      # flight when this transaction commits is the accepted fence residual
+      # shared by this family of guards, checklist included (#737).
       item.with_lock do
+        yield ensure_pinned(move, user, item)
         yield ensure_box_active(item)
         return Success(item) unless item.removed?
 
