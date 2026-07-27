@@ -17,6 +17,19 @@ RSpec.describe FindLists::Restore do
     expect(item.reload.presence_state).to eq("in_box")
   end
 
+  it "is idempotent — a replayed submit on an already-in-box item emits no second event" do
+    box = create(:box, move:, status: "unpacking")
+    item = create(:item, move:, box:, name: "Face Cream")
+    create(:find_list_entry, move:, user:, item:)
+
+    allow(Rails.event).to receive(:notify)
+    result = described_class.new.call(move:, user:, item:)
+
+    expect(result).to be_success
+    expect(item.reload.presence_state).to eq("in_box")
+    expect(Rails.event).not_to have_received(:notify)
+  end
+
   it "refuses an unpinned item" do
     box = create(:box, move:)
     item = create(:item, move:, box:, name: "Face Cream", presence_state: "removed")

@@ -12,6 +12,10 @@ module FindLists
     def call(move:, user:, item:)
       yield ensure_writable(move)
       yield ensure_pinned(move, user, item)
+      # Idempotent like Pin/Unpin: a replayed submit is the same outcome and
+      # emits no second item.restored.
+      return Success(item) unless item.removed?
+
       yield Items::RestoreToBox.new.call(item: item, actor: user)
       Success(item)
     end
