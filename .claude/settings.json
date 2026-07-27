@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"PostToolUse\\\",\\\"additionalContext\\\":\\\"Plan approved. Execute it by invoking the /execution-plan skill (Skill tool: execution-plan), passing the approved plan as input - do NOT drive the issue/branch/PR/review loop manually. The skill owns the full delivery loop, including Codex convergence: comment @codex review after EVERY fix push, and only merge on the literal clean-verdict comment (starts with: Codex Review: Didnt find any major issues) or an explicit on-thread diminishing-returns exit. Silence is never clean.\\\"}}\""
+          }
+        ]
+      }
+    ]
+  }
+}
