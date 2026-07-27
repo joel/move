@@ -16,12 +16,15 @@ module FindLists
     def call(move:, user:, item:)
       yield ensure_writable(move)
       yield ensure_pinned(move, user, item)
-      # Idempotent like Pin/Unpin: a replayed submit (two tabs both showing
-      # the Found control) is the same outcome — and emits no second
-      # item.removed for the activity feed / subscribers to double-count.
-      return Success(item) if item.removed?
+      # Idempotent like Pin/Unpin, atomically: with_lock reloads under FOR
+      # UPDATE, so of two concurrent submits (two tabs both showing Found)
+      # exactly one delegates — the loser re-reads `removed` and no-ops,
+      # emitting no second item.removed for the feed/subscribers.
+      item.with_lock do
+        return Success(item) if item.removed?
 
-      yield Items::MarkRemoved.new.call(item: item, actor: user, allow_any_phase: true)
+        yield Items::MarkRemoved.new.call(item: item, actor: user, allow_any_phase: true)
+      end
       Success(item)
     end
 

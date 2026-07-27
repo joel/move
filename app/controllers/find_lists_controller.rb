@@ -115,10 +115,11 @@ class FindListsController < MoveScopedController
   #: (untyped result) -> untyped
   def respond_to_found_toggle(result)
     case result
-    in Dry::Monads::Success(_) | Dry::Monads::Failure(:not_pinned)
-      # :not_pinned = a stale form (unpinned on another device) or a crafted
-      # URL — nothing mutated; re-rendering reality makes a stale row
-      # disappear, which is the same response the success needs.
+    in Dry::Monads::Success(_) | Dry::Monads::Failure(:not_pinned) | Dry::Monads::Failure(:box_unpacked)
+      # :not_pinned / :box_unpacked = a stale form (unpinned or the box
+      # completed on another device) or a crafted URL — nothing mutated;
+      # re-rendering reality makes the stale row/control disappear, which is
+      # the same response the success needs.
       respond_with_streams([list_stream], redirect: move_find_list_path(@move))
     in Dry::Monads::Failure(_)
       # Unreachable in practice (require_writable_move! fences archived; the

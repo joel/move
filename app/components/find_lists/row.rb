@@ -32,7 +32,7 @@ module Components
           render Components::Ui::SwipeActions.new(
             css: "rounded-card border border-card-border bg-card",
             content_css: "flex items-center gap-3 p-3",
-            leading: (found_action if @editable),
+            leading: (found_action if @editable && !restore_blocked?),
             trailing: unpin_action
           ) do
             item_link
@@ -47,6 +47,15 @@ module Components
       #: () -> bool
       def found?
         @item.removed?
+      end
+
+      # An `unpacked` box is terminal: restoring into it would leave a "done"
+      # box holding an item, so a found row there offers only unpin (the
+      # action refuses too — FindLists::Restore's :box_unpacked guard).
+
+      #: () -> bool
+      def restore_blocked?
+        found? && @item.box.unpacked?
       end
 
       #: () -> untyped
@@ -128,7 +137,7 @@ module Components
       #: () -> untyped
       def inline_actions
         div(class: "hidden shrink-0 items-center gap-1 lg:flex") do
-          found_toggle_control if @editable
+          found_toggle_control if @editable && !restore_blocked?
           unpin_control
         end
       end

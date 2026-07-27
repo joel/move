@@ -78,6 +78,19 @@ RSpec.describe "FindLists" do
       expect(response.body).not_to include(move_find_list_mark_found_path(move, item_id: item.id))
     end
 
+    it "offers only unpin on a found row whose box is already unpacked" do
+      box = create(:box, move:, status: "unpacked")
+      item = create(:item, move:, box:, name: "Lamp", presence_state: "removed")
+      create(:find_list_entry, move:, user:, item:)
+
+      get move_find_list_path(move)
+
+      aggregate_failures do
+        expect(response.body).not_to include(move_find_list_restore_path(move, item_id: item.id))
+        expect(response.body).to include(move_find_list_unpin_path(move, item_id: item.id))
+      end
+    end
+
     it "hides the found controls from a viewer but keeps unpin (personal row)" do
       viewer = create(:user)
       create(:move_membership, move:, user: viewer, role: "viewer")
@@ -292,6 +305,19 @@ RSpec.describe "FindLists" do
       patch move_find_list_restore_path(move, item_id: item.id), as: :turbo_stream
 
       expect(item.reload.presence_state).to eq("removed")
+    end
+
+    it "never restores into an unpacked box (stale form), streaming the current list" do
+      box = create(:box, move:, status: "unpacked")
+      item = create(:item, move:, box:, name: "Face Cream", presence_state: "removed")
+      create(:find_list_entry, move:, user:, item:)
+
+      patch move_find_list_restore_path(move, item_id: item.id), as: :turbo_stream
+
+      aggregate_failures do
+        expect(item.reload.presence_state).to eq("removed")
+        expect(response.body).to include(%(target="#{Components::FindLists::List::ID}"))
+      end
     end
   end
 

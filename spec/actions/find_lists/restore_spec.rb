@@ -38,6 +38,15 @@ RSpec.describe FindLists::Restore do
     expect(item.reload.presence_state).to eq("removed")
   end
 
+  it "refuses restoring into a terminal unpacked box" do
+    box = create(:box, move:, status: "unpacked")
+    item = create(:item, move:, box:, name: "Face Cream", presence_state: "removed")
+    create(:find_list_entry, move:, user:, item:)
+
+    expect(described_class.new.call(move:, user:, item:)).to eq(Dry::Monads::Failure(:box_unpacked))
+    expect(item.reload.presence_state).to eq("removed")
+  end
+
   it "fails :move_archived on an archived move even when the pin is absent (guard order)" do
     archived = create(:move, :archived, created_by: user)
     item = create(:item, move: archived, box: create(:box, move: archived),
