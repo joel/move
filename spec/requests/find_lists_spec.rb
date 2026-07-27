@@ -74,8 +74,9 @@ RSpec.describe "FindLists" do
         expect(response.body).to include(%(target="#{Components::FindLists::SearchLink::ID}"))
         expect(response.body).to include(%(target="#{Components::FindLists::List::ID}"))
         expect(response.body).to include(I18n.t("find_lists.search_link", count: 1))
-        # UX rule 1: the pin lands off-screen, so it confirms with a toast.
+        # UX rule 1: the pin lands off-screen, so it confirms with a LINKING toast.
         expect(response.body).to include(I18n.t("find_lists.flash.pinned", name: "Kettle"))
+        expect(response.body).to include(I18n.t("find_lists.flash.view"))
       end
     end
 

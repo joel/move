@@ -39,12 +39,18 @@ export default class extends Controller {
       // turbo:submit-end can fire BEFORE the response's streams render: a
       // morph preserves whatever we focus (node identity survives), but a
       // replace swaps the node out from under an early focus and drops it to
-      // <body>. Re-assert across the render window with fresh lookups each
-      // frame (~6 frames ≈ 100ms) so the last assertion lands on the final DOM.
+      // <body>. Watch the render window (~6 frames) and re-focus with fresh
+      // lookups ONLY while focus is actually lost (on <body> or a detached
+      // node) — a user who tabs or clicks onto a live element mid-window is
+      // never overridden (Codex #733).
       const attempt = (triesLeft) => {
-        const host = ancestorIds.map((aid) => document.getElementById(aid)).find(Boolean)
-        const target = document.getElementById(id) || host?.querySelector("button, a[href]")
-        target?.focus()
+        const active = document.activeElement
+        const focusLost = !active || active === document.body || !active.isConnected
+        if (focusLost) {
+          const host = ancestorIds.map((aid) => document.getElementById(aid)).find(Boolean)
+          const target = document.getElementById(id) || host?.querySelector("button, a[href]")
+          target?.focus()
+        }
         if (triesLeft > 0) requestAnimationFrame(() => attempt(triesLeft - 1))
       }
       requestAnimationFrame(() => requestAnimationFrame(() => attempt(6)))
