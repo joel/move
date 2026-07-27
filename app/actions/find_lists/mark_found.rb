@@ -5,13 +5,16 @@ module FindLists
   # in-place "Found" control. The pin guard is the point (Codex #736): the
   # find-list route bypasses the box-phase guard because "I am retrieving this
   # pinned item", so the bypass must be exactly that narrow — an unpinned item
-  # keeps the normal phase-guarded endpoints. Delegates to Items::MarkRemoved,
-  # which owns the writable-Move invariant and emits item.removed; no
-  # find_list.* event on top — the delegated item event is the domain fact
-  # (the MarkPhotoRemoved "no new event type" precedent).
+  # keeps the normal phase-guarded endpoints. ensure_writable leads (the
+  # standard first step for a mutating action, against the SUPPLIED move) so a
+  # direct caller on an archived Move gets :move_archived, not :not_pinned;
+  # the delegated Items::MarkRemoved re-checks it against item.move and emits
+  # item.removed — no find_list.* event on top (the delegated item event is
+  # the domain fact; the MarkPhotoRemoved "no new event type" precedent).
   class MarkFound < BaseAction
     #: (move: untyped, user: untyped, item: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, user:, item:)
+      yield ensure_writable(move)
       yield ensure_pinned(move, user, item)
       yield Items::MarkRemoved.new.call(item: item, actor: user, allow_any_phase: true)
       Success(item)

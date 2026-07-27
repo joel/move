@@ -36,12 +36,13 @@ RSpec.describe FindLists::MarkFound do
     expect(item.reload.presence_state).to eq("in_box")
   end
 
-  it "fails on an archived move (the delegated writable invariant)" do
+  it "fails :move_archived on an archived move even when the pin is absent (guard order)" do
     archived = create(:move, :archived, created_by: user)
     item = create(:item, move: archived, box: create(:box, move: archived), name: "Face Cream")
-    create(:find_list_entry, move: archived, user:, item:)
 
-    expect(described_class.new.call(move: archived, user:, item:)).to be_failure
+    result = described_class.new.call(move: archived, user:, item:)
+
+    expect(result).to eq(Dry::Monads::Failure(:move_archived))
     expect(item.reload.presence_state).to eq("in_box")
   end
 end

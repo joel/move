@@ -24,4 +24,13 @@ RSpec.describe FindLists::Restore do
     expect(described_class.new.call(move:, user:, item:)).to eq(Dry::Monads::Failure(:not_pinned))
     expect(item.reload.presence_state).to eq("removed")
   end
+
+  it "fails :move_archived on an archived move even when the pin is absent (guard order)" do
+    archived = create(:move, :archived, created_by: user)
+    item = create(:item, move: archived, box: create(:box, move: archived),
+                         name: "Face Cream", presence_state: "removed")
+
+    expect(described_class.new.call(move: archived, user:, item:)).to eq(Dry::Monads::Failure(:move_archived))
+    expect(item.reload.presence_state).to eq("removed")
+  end
 end
