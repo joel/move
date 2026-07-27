@@ -13,10 +13,11 @@ module Components
 
       ID = "find-list"
 
-      #: (move: untyped, entries: untyped) -> void
-      def initialize(move:, entries:)
+      #: (move: untyped, entries: untyped, editable: untyped) -> void
+      def initialize(move:, entries:, editable:)
         @move = move
         @entries = entries.to_a
+        @editable = editable
         @found = @entries.count { |entry| entry.item.removed? }
       end
 
@@ -68,7 +69,9 @@ module Components
             render Components::Icons::ChevronRight.new(css: "h-4 w-4 text-muted")
           end
           ul(class: "flex flex-col gap-2") do
-            entries.each { |entry| render Components::FindLists::Row.new(move: @move, entry: entry) }
+            entries.each do |entry|
+              render Components::FindLists::Row.new(move: @move, entry: entry, editable: @editable)
+            end
           end
         end
       end

@@ -4,21 +4,24 @@
 # house with a box-grouped picking list that strikes itself off as items get
 # unpacked. Personal rows only — every query is keyed (move, current_user), so
 # members never see each other's pins, and there is deliberately NO writable-
-# Move gate: a viewer helping unpack and an archived Move's members may pin
-# (the actions document the same decision). Membership is still enforced by
-# MoveScopedController's Move scoping (non-members 404). Thin: load, call the
-# action, stream.
+# Move gate on the pin rows: a viewer helping unpack and an archived Move's
+# members may pin (the actions document the same decision). The exception is
+# mark_found/restore (#735) — those flip the shared Item's presence, so they
+# take the standard writable gate like every other Item mutation. Membership is
+# still enforced by MoveScopedController's Move scoping (non-members 404).
+# Thin: load, call the action, stream.
 class FindListsController < MoveScopedController
   include TurboStreamable
 
   before_action { Current.nav_section = :search }
-  before_action :set_item, only: %i[pin unpin]
+  before_action :set_item, only: %i[pin unpin mark_found restore]
+  before_action :require_writable_move!, only: %i[mark_found restore]
 
   # GET /moves/:move_id/find_list
 
   #: () -> untyped
   def show
-    render Views::FindLists::Show.new(move: @move, entries: rollup)
+    render Views::FindLists::Show.new(move: @move, entries: rollup, editable: editable_move?)
   end
 
   # POST /moves/:move_id/find_list/items/:item_id
@@ -44,6 +47,31 @@ class FindListsController < MoveScopedController
   def unpin
     FindLists::Unpin.new.call(move: @move, user: current_user, item: @item)
     respond_with_streams(toggle_streams(pinned: false), redirect: move_find_list_path(@move))
+  end
+
+  # PATCH /moves/:move_id/find_list/items/:item_id/found
+  # Marks the pinned item unpacked in place. allow_any_phase: find-list
+  # retrieval happens regardless of the box's lifecycle — a sealed box gets
+  # opened to grab one item (the C2 review walk's bypass, destination-side).
+  # Result deliberately unmatched: require_writable_move! fences
+  # :move_archived, allow_any_phase removes :wrong_phase, and the single-column
+  # presence update cannot fail validation — the same fire-and-forget both
+  # existing MarkRemoved stream callers use. No toast: the row striking, the
+  # Found chip, and the summary count ARE the feedback (checklist precedent).
+
+  #: () -> untyped
+  def mark_found
+    Items::MarkRemoved.new.call(item: @item, actor: current_user, allow_any_phase: true)
+    respond_with_streams([list_stream], redirect: move_find_list_path(@move))
+  end
+
+  # PATCH /moves/:move_id/find_list/items/:item_id/restore — the undo
+  # (Items::RestoreToBox carries no phase guard).
+
+  #: () -> untyped
+  def restore
+    Items::RestoreToBox.new.call(item: @item, actor: current_user)
+    respond_with_streams([list_stream], redirect: move_find_list_path(@move))
   end
 
   # DELETE /moves/:move_id/find_list/found
@@ -95,7 +123,8 @@ class FindListsController < MoveScopedController
   def list_stream
     turbo_stream.replace(
       Components::FindLists::List::ID,
-      view_context.render(Components::FindLists::List.new(move: @move, entries: rollup))
+      view_context.render(Components::FindLists::List.new(move: @move, entries: rollup,
+                                                          editable: editable_move?))
     )
   end
 
@@ -111,5 +140,13 @@ class FindListsController < MoveScopedController
     @item = @move.items.find(params.expect(:item_id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
+  end
+
+  # Archived-Move redirect target (require_writable_move!) — back to the
+  # (read-only) find list rather than the boxes home.
+
+  #: () -> String
+  def read_only_redirect_path
+    move_find_list_path(@move)
   end
 end
