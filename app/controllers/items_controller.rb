@@ -17,8 +17,7 @@ class ItemsController < MoveScopedController
     render Views::Items::Show.new(
       move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
       editable: editable_move?, photo_siblings: photo_siblings(@item),
-      find_list_pinned: FindListEntry.exists?(move_id: @move.id, user_id: current_user.id,
-                                              item_id: @item.id)
+      find_list_pinned: find_list_pinned?
     )
   end
 
@@ -99,11 +98,14 @@ class ItemsController < MoveScopedController
                  status: :unprocessable_content
         end
         # update is editor-gated (require_writable_move!), so re-render the editable
-        # form (not the read-only view) to show the validation errors.
+        # form (not the read-only view) to show the validation errors. Pin state
+        # rides along exactly as in #show — omitting it flipped a pinned item's
+        # toggle back to "Add to find list" (Codex #733).
         format.html do
           render Views::Items::Show.new(
             move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-            editable: true, photo_siblings: photo_siblings(@item)
+            editable: true, photo_siblings: photo_siblings(@item),
+            find_list_pinned: find_list_pinned?
           ), status: :unprocessable_content
         end
       end
@@ -284,6 +286,14 @@ class ItemsController < MoveScopedController
     return 0 unless item.created_via == "recognition" && item.source_media_id
 
     @move.items.in_box.where(source_media_id: item.source_media_id).where.not(id: item.id).count
+  end
+
+  # Whether the caller pinned this item onto their find list (#730) — shared by
+  # the show render and update's validation re-render.
+
+  #: () -> bool
+  def find_list_pinned?
+    FindListEntry.exists?(move_id: @move.id, user_id: current_user.id, item_id: @item.id)
   end
 
   #: () -> untyped

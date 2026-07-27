@@ -26,7 +26,12 @@ class FindListsController < MoveScopedController
   #: () -> untyped
   def pin
     FindLists::Pin.new.call(move: @move, user: current_user, item: @item)
-    respond_with_streams(toggle_streams(pinned: true), redirect: move_find_list_path(@move))
+    # A pin lands off-screen (the list page) — UX rule 1 wants a linking
+    # confirmation, not just the pill bump (Codex #733).
+    respond_with_streams(toggle_streams(pinned: true),
+                         redirect: move_find_list_path(@move), toast: true) do
+      [:notice, t("find_lists.flash.pinned", name: @item.name)]
+    end
   end
 
   # DELETE /moves/:move_id/find_list/items/:item_id

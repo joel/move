@@ -14,27 +14,33 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   connect() {
     this.pendingId = null
-    this.containerId = null
+    this.ancestorIds = []
     this.onSubmitStart = (event) => {
       const submitter = event.detail?.formSubmission?.submitter
       if (!submitter?.id || !this.element.contains(event.target)) return
       this.pendingId = submitter.id
-      // Fallback anchor: the card the control lives in. A successful bulk
-      // "Unpack photo" removes its own button, so focus must land on the
-      // nearest surviving control (e.g. the first restore chip) instead.
-      this.containerId = submitter.closest("[id^='box_photo_'], [id^='box_item_']")?.id ?? null
+      // Fallback anchors: every identified ancestor, nearest first. Whichever
+      // survives the stream hosts focus when the submitter itself was removed
+      // — a bulk "Unpack photo" removes its own button (card survives), a
+      // find-list row unpin removes the whole row (the list wrapper survives).
+      this.ancestorIds = []
+      let node = submitter.parentElement?.closest("[id]") ?? null
+      while (node && this.element.contains(node)) {
+        this.ancestorIds.push(node.id)
+        node = node.parentElement?.closest("[id]") ?? null
+      }
     }
     this.onSubmitEnd = () => {
       const id = this.pendingId
-      const containerId = this.containerId
+      const ancestorIds = this.ancestorIds
       this.pendingId = null
-      this.containerId = null
+      this.ancestorIds = []
       if (!id) return
       // Streams render synchronously on message receipt; the double rAF waits
       // out the current frame so the swapped/morphed node is in the DOM.
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        const target = document.getElementById(id) ||
-          document.getElementById(containerId ?? "")?.querySelector("button, a[href]")
+        const host = ancestorIds.map((aid) => document.getElementById(aid)).find(Boolean)
+        const target = document.getElementById(id) || host?.querySelector("button, a[href]")
         target?.focus()
       }))
     }
