@@ -50,28 +50,21 @@ class FindListsController < MoveScopedController
   end
 
   # PATCH /moves/:move_id/find_list/items/:item_id/found
-  # Marks the pinned item unpacked in place. allow_any_phase: find-list
-  # retrieval happens regardless of the box's lifecycle — a sealed box gets
-  # opened to grab one item (the C2 review walk's bypass, destination-side).
-  # Result deliberately unmatched: require_writable_move! fences
-  # :move_archived, allow_any_phase removes :wrong_phase, and the single-column
-  # presence update cannot fail validation — the same fire-and-forget both
-  # existing MarkRemoved stream callers use. No toast: the row striking, the
+  # Marks the pinned item unpacked in place. The action guards the pin (its
+  # phase bypass is only as wide as "retrieving this pinned item" — Codex
+  # #736) and delegates to Items::MarkRemoved. No toast: the row striking, the
   # Found chip, and the summary count ARE the feedback (checklist precedent).
 
   #: () -> untyped
   def mark_found
-    Items::MarkRemoved.new.call(item: @item, actor: current_user, allow_any_phase: true)
-    respond_with_streams([list_stream], redirect: move_find_list_path(@move))
+    respond_to_found_toggle(FindLists::MarkFound.new.call(move: @move, user: current_user, item: @item))
   end
 
-  # PATCH /moves/:move_id/find_list/items/:item_id/restore — the undo
-  # (Items::RestoreToBox carries no phase guard).
+  # PATCH /moves/:move_id/find_list/items/:item_id/restore — the undo.
 
   #: () -> untyped
   def restore
-    Items::RestoreToBox.new.call(item: @item, actor: current_user)
-    respond_with_streams([list_stream], redirect: move_find_list_path(@move))
+    respond_to_found_toggle(FindLists::Restore.new.call(move: @move, user: current_user, item: @item))
   end
 
   # DELETE /moves/:move_id/find_list/found
@@ -117,6 +110,22 @@ class FindListsController < MoveScopedController
       Components::FindLists::SearchLink::ID,
       view_context.render(Components::FindLists::SearchLink.new(move: @move, count: count))
     )
+  end
+
+  #: (untyped result) -> untyped
+  def respond_to_found_toggle(result)
+    case result
+    in Dry::Monads::Success(_) | Dry::Monads::Failure(:not_pinned)
+      # :not_pinned = a stale form (unpinned on another device) or a crafted
+      # URL — nothing mutated; re-rendering reality makes a stale row
+      # disappear, which is the same response the success needs.
+      respond_with_streams([list_stream], redirect: move_find_list_path(@move))
+    in Dry::Monads::Failure(_)
+      # Unreachable in practice (require_writable_move! fences archived; the
+      # presence flip cannot fail validation) — kept so a raced archive
+      # degrades to a friendly redirect instead of a NoMatchingPatternError.
+      redirect_to move_find_list_path(@move), alert: t("moves.archived_alert")
+    end
   end
 
   #: () -> untyped

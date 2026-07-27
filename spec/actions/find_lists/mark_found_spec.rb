@@ -1,0 +1,47 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+
+RSpec.describe FindLists::MarkFound do
+  let(:user) { create(:user) }
+  let(:move) { create(:move, created_by: user) }
+
+  it "marks a pinned item removed even on a sealed box (the retrieval bypass)" do
+    box = create(:box, move:, status: "sealed")
+    item = create(:item, move:, box:, name: "Face Cream")
+    create(:find_list_entry, move:, user:, item:)
+
+    result = described_class.new.call(move:, user:, item:)
+
+    expect(result).to be_success
+    expect(item.reload.presence_state).to eq("removed")
+  end
+
+  it "refuses an unpinned item so the phase bypass stays pin-scoped" do
+    box = create(:box, move:, status: "sealed")
+    item = create(:item, move:, box:, name: "Face Cream")
+
+    result = described_class.new.call(move:, user:, item:)
+
+    expect(result).to eq(Dry::Monads::Failure(:not_pinned))
+    expect(item.reload.presence_state).to eq("in_box")
+  end
+
+  it "does not honour another user's pin" do
+    box = create(:box, move:, status: "sealed")
+    item = create(:item, move:, box:, name: "Face Cream")
+    create(:find_list_entry, move:, user: create(:user), item:)
+
+    expect(described_class.new.call(move:, user:, item:)).to eq(Dry::Monads::Failure(:not_pinned))
+    expect(item.reload.presence_state).to eq("in_box")
+  end
+
+  it "fails on an archived move (the delegated writable invariant)" do
+    archived = create(:move, :archived, created_by: user)
+    item = create(:item, move: archived, box: create(:box, move: archived), name: "Face Cream")
+    create(:find_list_entry, move: archived, user:, item:)
+
+    expect(described_class.new.call(move: archived, user:, item:)).to be_failure
+    expect(item.reload.presence_state).to eq("in_box")
+  end
+end

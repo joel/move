@@ -273,6 +273,26 @@ RSpec.describe "FindLists" do
 
       expect(response).to have_http_status(:not_found)
     end
+
+    # Codex #736: the phase bypass is justified by "retrieving this pinned
+    # item", so an unpinned item (stale form or crafted URL) must not flip —
+    # the response just re-renders reality.
+    it "never marks an unpinned item, streaming the current list instead" do
+      box = create(:box, move:, status: "sealed")
+      item = create(:item, move:, box:, name: "Face Cream")
+
+      patch move_find_list_mark_found_path(move, item_id: item.id), as: :turbo_stream
+
+      aggregate_failures do
+        expect(item.reload.presence_state).to eq("in_box")
+        expect(response.body).to include(%(target="#{Components::FindLists::List::ID}"))
+      end
+
+      item.update!(presence_state: "removed")
+      patch move_find_list_restore_path(move, item_id: item.id), as: :turbo_stream
+
+      expect(item.reload.presence_state).to eq("removed")
+    end
   end
 
   describe "DELETE /moves/:move_id/find_list/found" do
