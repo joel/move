@@ -8,6 +8,12 @@ en:
       remove: "Remove %{name} from your find list"
       add_short: "Add to find list"
       on_list: "On your find list"
+    row:
+      mark_found: "Mark %{name} as found"
+      found_short: "Found"
+      restore: "Return %{name} to its box"
+      restore_short: "Restore"
+      remove_short: "Remove"
     show:
       title: "Find list"
       subtitle: "Your pinned items, grouped by the boxes to open."

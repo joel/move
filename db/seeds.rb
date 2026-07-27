@@ -402,7 +402,9 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   # Clear found demo immediately. Manual-item names lead because recorded
   # recognition replaces authored photo-item names; find_by + guard keeps the
   # block resilient either way. Idempotent via the unique (move, user, item)
-  # triple.
+  # triple. The in-place controls (#735) demo out of the box too: swipe (or the
+  # desktop toggle) on "Bath Towels" (sealed box) showcases the phase bypass,
+  # and struck "Reading Glasses" showcases Restore.
   if FindListEntry.where(move: move, user_id: owner.id).none?
     ["Reading Glasses", "Bedside Lamp", "Bath Towels", "Wine Glasses"].each do |name|
       item = move.items.find_by(name: name)

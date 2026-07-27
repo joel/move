@@ -48,6 +48,65 @@ RSpec.describe "FindLists" do
         .and include(move_search_path(move))
     end
 
+    # Row-control rendering is asserted here rather than in an isolated
+    # component spec — the repo convention for button_to-bearing components.
+    it "offers the swipe and inline found controls to an editor" do
+      box = create(:box, move:)
+      item = create(:item, move:, box:, name: "Lamp")
+      create(:find_list_entry, move:, user:, item:)
+
+      get move_find_list_path(move)
+
+      aggregate_failures do
+        expect(response.body).to include("swipe-actions")
+        expect(response.body).to include(move_find_list_mark_found_path(move, item_id: item.id))
+        expect(response.body).to include("find-list-swipe-found-#{item.id}")
+          .and include("find-list-row-found-#{item.id}")
+        expect(response.body).to include("find-list-swipe-unpin-#{item.id}")
+          .and include("find-list-row-unpin-#{item.id}")
+      end
+    end
+
+    it "flips the found control to restore on a struck row" do
+      box = create(:box, move:)
+      item = create(:item, move:, box:, name: "Lamp", presence_state: "removed")
+      create(:find_list_entry, move:, user:, item:)
+
+      get move_find_list_path(move)
+
+      expect(response.body).to include(move_find_list_restore_path(move, item_id: item.id))
+      expect(response.body).not_to include(move_find_list_mark_found_path(move, item_id: item.id))
+    end
+
+    it "offers only unpin on a found row whose box is already unpacked" do
+      box = create(:box, move:, status: "unpacked")
+      item = create(:item, move:, box:, name: "Lamp", presence_state: "removed")
+      create(:find_list_entry, move:, user:, item:)
+
+      get move_find_list_path(move)
+
+      aggregate_failures do
+        expect(response.body).not_to include(move_find_list_restore_path(move, item_id: item.id))
+        expect(response.body).to include(move_find_list_unpin_path(move, item_id: item.id))
+      end
+    end
+
+    it "hides the found controls from a viewer but keeps unpin (personal row)" do
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+      box = create(:box, move:)
+      item = create(:item, move:, box:, name: "Lamp")
+      create(:find_list_entry, move:, user: viewer, item:)
+
+      get move_find_list_path(move)
+
+      aggregate_failures do
+        expect(response.body).not_to include(move_find_list_mark_found_path(move, item_id: item.id))
+        expect(response.body).to include(move_find_list_unpin_path(move, item_id: item.id))
+      end
+    end
+
     it "never shows another user's entries" do
       other = create(:user)
       box = create(:box, move:)
@@ -147,6 +206,118 @@ RSpec.describe "FindLists" do
       post move_find_list_pin_path(archived, item_id: item.id)
 
       expect(FindListEntry.where(move: archived, user_id: user.id, item:)).to exist
+    end
+  end
+
+  describe "PATCH mark found / restore" do
+    it "marks a pinned item found over turbo_stream even on a sealed box" do
+      box = create(:box, move:, status: "sealed")
+      item = create(:item, move:, box:, name: "Face Cream")
+      create(:find_list_entry, move:, user:, item:)
+
+      patch move_find_list_mark_found_path(move, item_id: item.id), as: :turbo_stream
+
+      aggregate_failures do
+        expect(item.reload.presence_state).to eq("removed")
+        expect(response.body).to include(%(target="#{Components::FindLists::List::ID}"))
+        expect(response.body).to include("line-through").and include(I18n.t("find_lists.show.found"))
+        expect(response.body).to include(I18n.t("find_lists.show.found_count", found: 1, total: 1))
+      end
+    end
+
+    it "restores a found item back into its box" do
+      box = create(:box, move:, status: "unpacking")
+      item = create(:item, move:, box:, name: "Face Cream", presence_state: "removed")
+      create(:find_list_entry, move:, user:, item:)
+
+      patch move_find_list_restore_path(move, item_id: item.id), as: :turbo_stream
+
+      aggregate_failures do
+        expect(item.reload.presence_state).to eq("in_box")
+        expect(response.body).to include(%(target="#{Components::FindLists::List::ID}"))
+        expect(response.body).not_to include("line-through")
+      end
+    end
+
+    it "falls back to a list redirect for HTML" do
+      box = create(:box, move:)
+      item = create(:item, move:, box:, name: "Face Cream")
+      create(:find_list_entry, move:, user:, item:)
+
+      patch move_find_list_mark_found_path(move, item_id: item.id)
+
+      expect(response).to redirect_to(move_find_list_path(move))
+      expect(item.reload.presence_state).to eq("removed")
+    end
+
+    it "refuses a viewer (shared-Item mutation, unlike the personal pin)" do
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+      box = create(:box, move:)
+      item = create(:item, move:, box:, name: "Face Cream")
+      create(:find_list_entry, move:, user: viewer, item:)
+
+      patch move_find_list_mark_found_path(move, item_id: item.id)
+
+      expect(response).to have_http_status(:forbidden)
+      expect(item.reload.presence_state).to eq("in_box")
+    end
+
+    it "redirects with the read-only alert on an archived move" do
+      archived = create(:move, :archived, created_by: user)
+      item = create(:item, move: archived, box: create(:box, move: archived), name: "Face Cream")
+      create(:find_list_entry, move: archived, user:, item:)
+
+      patch move_find_list_mark_found_path(archived, item_id: item.id)
+
+      aggregate_failures do
+        expect(response).to redirect_to(move_find_list_path(archived))
+        expect(flash[:alert]).to eq(I18n.t("moves.archived_alert"))
+        expect(item.reload.presence_state).to eq("in_box")
+      end
+    end
+
+    it "404s a foreign item" do
+      foreign_move = create(:move, created_by: create(:user))
+      foreign_item = create(:item, move: foreign_move, box: create(:box, move: foreign_move))
+
+      patch move_find_list_mark_found_path(move, item_id: foreign_item.id)
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    # Codex #736: the phase bypass is justified by "retrieving this pinned
+    # item", so an unpinned item (stale form or crafted URL) must not flip —
+    # the response just re-renders reality.
+    it "never marks an unpinned item, streaming the current list instead" do
+      box = create(:box, move:, status: "sealed")
+      item = create(:item, move:, box:, name: "Face Cream")
+
+      patch move_find_list_mark_found_path(move, item_id: item.id), as: :turbo_stream
+
+      aggregate_failures do
+        expect(item.reload.presence_state).to eq("in_box")
+        expect(response.body).to include(%(target="#{Components::FindLists::List::ID}"))
+      end
+
+      item.update!(presence_state: "removed")
+      patch move_find_list_restore_path(move, item_id: item.id), as: :turbo_stream
+
+      expect(item.reload.presence_state).to eq("removed")
+    end
+
+    it "never restores into an unpacked box (stale form), streaming the current list" do
+      box = create(:box, move:, status: "unpacked")
+      item = create(:item, move:, box:, name: "Face Cream", presence_state: "removed")
+      create(:find_list_entry, move:, user:, item:)
+
+      patch move_find_list_restore_path(move, item_id: item.id), as: :turbo_stream
+
+      aggregate_failures do
+        expect(item.reload.presence_state).to eq("removed")
+        expect(response.body).to include(%(target="#{Components::FindLists::List::ID}"))
+      end
     end
   end
 

@@ -40,6 +40,31 @@ RSpec.describe "Find list flow" do
     expect(page).to have_text(I18n.t("find_lists.show.empty.title"))
   end
 
+  # #735 — the in-place loop: mark found (phase bypass — the box is sealed),
+  # restore via the same stable-id toggle, then unpin through the swipe-layer
+  # form (rack_test ignores the lg: CSS split, so every control is clickable).
+  it "marks an item found from the list, restores it, and unpins via the swipe control" do
+    box = create(:box, move:, number: "12", status: "sealed")
+    item = create(:item, :manual, move:, box:, name: "Bath Towels")
+    create(:find_list_entry, move:, user:, item:)
+
+    visit move_find_list_path(move)
+    find("#find-list-row-found-#{item.id}").click
+
+    expect(page).to have_text(I18n.t("find_lists.show.found_count", found: 1, total: 1))
+    expect(item.reload.presence_state).to eq("removed")
+
+    find("#find-list-row-found-#{item.id}").click # the same stable id now restores
+
+    expect(page).to have_text(I18n.t("find_lists.show.found_count", found: 0, total: 1))
+    expect(item.reload.presence_state).to eq("in_box")
+
+    find("#find-list-swipe-unpin-#{item.id}").click
+
+    expect(page).to have_text(I18n.t("find_lists.show.empty.title"))
+    expect(FindListEntry.where(move:, user_id: user.id)).to be_empty
+  end
+
   it "pins and unpins from the item detail page" do
     box = create(:box, move:, number: "5")
     item = create(:item, :manual, move:, box:, name: "Desk Lamp")

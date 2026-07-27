@@ -5,7 +5,22 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
-## [Unreleased]
+## [v0.109.0] — 2026-07-27
+
+### Added
+- **Mark items unpacked right on the find list.** Each pinned row now acts on
+  itself: on mobile, swipe to reveal Found (mark the item unpacked — works
+  even on a still-sealed box) and Remove (unpin); on desktop the same controls
+  sit inline. A found row flips to Restore for one-tap undo, keyboard focus
+  survives the update, and viewers/archived moves stay read-only (#735).
+
+## [v0.108.1] — 2026-07-27
+
+### Fixed
+- **Find-list review-round fixes.** Post-merge Codex findings on the find list
+  addressed (#734).
+
+## [v0.108.0] — 2026-07-26
 
 ### Added
 - **A personal find list.** While searching, pin any result (or an item from

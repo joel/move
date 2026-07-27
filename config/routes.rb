@@ -138,6 +138,13 @@ Rails.application.routes.draw do
     post "find_list/items/:item_id", to: "find_lists#pin", as: :find_list_pin
     delete "find_list/items/:item_id", to: "find_lists#unpin", as: :find_list_unpin
     delete "find_list/found", to: "find_lists#clear_found", as: :find_list_clear_found
+    # Mark a pinned item unpacked (and undo) right on the list. Retrieval
+    # happens regardless of the box's lifecycle (a sealed box gets opened to
+    # grab one item), so mark_found bypasses MarkRemoved's phase guard — see
+    # FindListsController. These mutate the shared Item, so unlike the personal
+    # pin rows they sit behind the writable-Move gate.
+    patch "find_list/items/:item_id/found", to: "find_lists#mark_found", as: :find_list_mark_found
+    patch "find_list/items/:item_id/restore", to: "find_lists#restore", as: :find_list_restore
     # Gallery — browse every captured (and AI-generated) photo across the whole
     # Move in one recent-first grid, filterable by room. Read-only; reached from
     # the Menu hub. A tile opens a client-side lightbox (the :detail variant).
