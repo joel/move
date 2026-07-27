@@ -36,13 +36,18 @@ export default class extends Controller {
       this.pendingId = null
       this.ancestorIds = []
       if (!id) return
-      // Streams render synchronously on message receipt; the double rAF waits
-      // out the current frame so the swapped/morphed node is in the DOM.
-      requestAnimationFrame(() => requestAnimationFrame(() => {
+      // turbo:submit-end can fire BEFORE the response's streams render: a
+      // morph preserves whatever we focus (node identity survives), but a
+      // replace swaps the node out from under an early focus and drops it to
+      // <body>. Re-assert across the render window with fresh lookups each
+      // frame (~6 frames ≈ 100ms) so the last assertion lands on the final DOM.
+      const attempt = (triesLeft) => {
         const host = ancestorIds.map((aid) => document.getElementById(aid)).find(Boolean)
         const target = document.getElementById(id) || host?.querySelector("button, a[href]")
         target?.focus()
-      }))
+        if (triesLeft > 0) requestAnimationFrame(() => attempt(triesLeft - 1))
+      }
+      requestAnimationFrame(() => requestAnimationFrame(() => attempt(6)))
     }
     document.addEventListener("turbo:submit-start", this.onSubmitStart)
     document.addEventListener("turbo:submit-end", this.onSubmitEnd)
