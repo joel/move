@@ -219,6 +219,8 @@ RSpec.describe "FindLists" do
 
       aggregate_failures do
         expect(item.reload.presence_state).to eq("removed")
+        # #738: retrieving from a sealed box opens it for unpacking.
+        expect(box.reload.status).to eq("unpacking")
         expect(response.body).to include(%(target="#{Components::FindLists::List::ID}"))
         expect(response.body).to include("line-through").and include(I18n.t("find_lists.show.found"))
         expect(response.body).to include(I18n.t("find_lists.show.found_count", found: 1, total: 1))

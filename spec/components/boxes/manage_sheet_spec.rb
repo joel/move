@@ -31,6 +31,21 @@ RSpec.describe "Box detail — Manage sheet", type: :request do
     end
   end
 
+  # #738: a sealed box can open straight for unpacking — the sheet derives its
+  # rows from available_transitions, and the row must carry the generic
+  # transition label, not "Reopen" (that copy fits only unpacked → unpacking).
+  it "offers a sealed box the direct unpacking transition" do
+    box = create(:box, :with_room, move:, number: "2", status: "sealed")
+
+    get move_box_path(move, box)
+
+    aggregate_failures do
+      expect(response.body).to include(I18n.t("boxes.actions.unpacking"))
+      expect(response.body).to include(I18n.t("boxes.actions.unseal"))
+      expect(response.body).not_to include(I18n.t("boxes.actions.reopen"))
+    end
+  end
+
   # The fragile control moved out of the sheet onto the box header (#610); its
   # assertions live in spec/requests/boxes_spec.rb under "box detail — fragile mark".
 

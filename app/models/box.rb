@@ -20,13 +20,17 @@ class Box < ApplicationRecord
   # Lifecycle per Domain Spec §5.2: packing -> sealed -> in_transit ->
   # unpacking -> unpacked. A sealed box can be unsealed; an unpacked box can be
   # re-opened back to unpacking (D10 celebration "Undo" / reopen — items are
-  # restored individually, the reopen never auto-restores). Transitions are
-  # applied by app/actions/boxes/transition_status.rb, which also enforces the
-  # seal-requires-room guard and the unpacked cascade (in-box items -> removed).
+  # restored individually, the reopen never auto-restores); a sealed box can
+  # open straight for unpacking (#738 — transit tracking is optional: the box
+  # is physically opened at the destination whether or not anyone recorded
+  # in_transit; this edge also powers the find-list mark-found auto-open).
+  # Transitions are applied by app/actions/boxes/transition_status.rb, which
+  # also enforces the seal-requires-room guard and the unpacked cascade
+  # (in-box items -> removed).
   STATUSES = %w[packing sealed in_transit unpacking unpacked].freeze
   TRANSITIONS = {
     "packing" => %w[sealed],
-    "sealed" => %w[packing in_transit],
+    "sealed" => %w[packing in_transit unpacking],
     "in_transit" => %w[unpacking],
     "unpacking" => %w[unpacked],
     "unpacked" => %w[unpacking]

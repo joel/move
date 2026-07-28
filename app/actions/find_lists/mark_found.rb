@@ -26,12 +26,29 @@ module FindLists
         yield ensure_pinned(move, user, item)
         return Success(item) if item.removed?
 
+        yield open_box_for_unpacking(item.box, user)
         yield Items::MarkRemoved.new.call(item: item, actor: user, allow_any_phase: true)
       end
       Success(item)
     end
 
     private
+
+    # Retrieving an item from a sealed/in-transit box means the box was just
+    # physically opened at the destination — reflect that (#738): transition
+    # it to `unpacking` (Boxes::TransitionStatus re-validates, re-checks
+    # ensure_writable, and emits box.status_changed, so the auto-open lands in
+    # the activity feed). A `packing` box is origin-side and deliberately NOT
+    # fast-forwarded; `unpacking`/`unpacked` are already open. Sits after the
+    # replay guard, so a replayed submit never re-transitions; Restore never
+    # auto-reverts (reopen semantics — box status is a user call).
+
+    #: (untyped box, untyped user) -> Dry::Monads::Result[untyped, untyped]
+    def open_box_for_unpacking(box, user)
+      return Success() unless %w[sealed in_transit].include?(box.status)
+
+      Boxes::TransitionStatus.new.call(box: box, to: "unpacking", actor: user)
+    end
 
     #: (untyped move, untyped user, untyped item) -> Dry::Monads::Result[untyped, untyped]
     def ensure_pinned(move, user, item)
