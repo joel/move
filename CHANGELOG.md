@@ -5,6 +5,15 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.110.0] — 2026-07-28
+
+### Changed
+- **Finding an item opens its box.** Marking a find-list item as found in a
+  sealed or in-transit box now transitions that box to unpacking automatically
+  — the box was just physically opened, so its checklist and progress reflect
+  it. Sealed boxes can also start unpacking directly from the box page's
+  Manage sheet (#738).
+
 ## [v0.109.0] — 2026-07-27
 
 ### Added

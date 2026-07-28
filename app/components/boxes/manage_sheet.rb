@@ -176,7 +176,10 @@ module Components
         when "packing" then I18n.t("boxes.actions.unseal")
         when "in_transit" then I18n.t("boxes.actions.in_transit")
         when "unpacked" then I18n.t("boxes.actions.unpacked")
-        when "unpacking" then I18n.t("boxes.actions.reopen")
+        # "Reopen" only fits a box that was open (unpacked → unpacking); a
+        # sealed box opening straight for unpacking (#738) gets the generic
+        # transition label.
+        when "unpacking" then @box.unpacked? ? I18n.t("boxes.actions.reopen") : I18n.t("boxes.actions.unpacking")
         end
       end
 

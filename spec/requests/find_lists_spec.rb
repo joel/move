@@ -219,6 +219,12 @@ RSpec.describe "FindLists" do
 
       aggregate_failures do
         expect(item.reload.presence_state).to eq("removed")
+        # #738: retrieving from a sealed box opens it for unpacking, and the
+        # off-screen secondary mutation surfaces with a linking toast.
+        expect(box.reload.status).to eq("unpacking")
+        expect(response.body).to include(I18n.t("find_lists.flash.box_opened", number: box.number))
+        expect(response.body).to include(I18n.t("find_lists.flash.view_box"))
+        expect(response.body).to include(move_box_path(move, box))
         expect(response.body).to include(%(target="#{Components::FindLists::List::ID}"))
         expect(response.body).to include("line-through").and include(I18n.t("find_lists.show.found"))
         expect(response.body).to include(I18n.t("find_lists.show.found_count", found: 1, total: 1))
@@ -248,6 +254,21 @@ RSpec.describe "FindLists" do
 
       expect(response).to redirect_to(move_find_list_path(move))
       expect(item.reload.presence_state).to eq("removed")
+    end
+
+    it "carries the box-opened linking toast across the no-JS redirect" do
+      box = create(:box, move:, status: "sealed")
+      item = create(:item, move:, box:, name: "Face Cream")
+      create(:find_list_entry, move:, user:, item:)
+
+      patch move_find_list_mark_found_path(move, item_id: item.id)
+      follow_redirect!
+
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("find_lists.flash.box_opened", number: box.number))
+        expect(response.body).to include(I18n.t("find_lists.flash.view_box"))
+        expect(response.body).to include(move_box_path(move, box))
+      end
     end
 
     it "refuses a viewer (shared-Item mutation, unlike the personal pin)" do

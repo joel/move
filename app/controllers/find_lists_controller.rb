@@ -52,12 +52,28 @@ class FindListsController < MoveScopedController
   # PATCH /moves/:move_id/find_list/items/:item_id/found
   # Marks the pinned item unpacked in place. The action guards the pin (its
   # phase bypass is only as wide as "retrieving this pinned item" — Codex
-  # #736) and delegates to Items::MarkRemoved. No toast: the row striking, the
-  # Found chip, and the summary count ARE the feedback (checklist precedent).
+  # #736) and delegates to Items::MarkRemoved. The strike itself needs no
+  # toast (the row striking, the Found chip, and the summary count ARE the
+  # feedback — checklist precedent), but when the action ALSO auto-opened the
+  # box (#738) that secondary mutation is off-screen, so it surfaces with a
+  # linking toast (UX rule 1 — the pin toast's pattern).
 
   #: () -> untyped
   def mark_found
-    respond_to_found_toggle(FindLists::MarkFound.new.call(move: @move, user: current_user, item: @item))
+    case result = FindLists::MarkFound.new.call(move: @move, user: current_user, item: @item)
+    in Dry::Monads::Success({ opened_box: Box => box })
+      # The link must survive BOTH paths: flash.now scopes it to the stream
+      # render, while the no-JS fallback REDIRECTS — there it rides the
+      # persistent flash for exactly one request (Codex #739).
+      link_flash = request.format.turbo_stream? ? flash.now : flash
+      link_flash[:action_href] = move_box_path(@move, box)
+      link_flash[:action_label] = t("find_lists.flash.view_box")
+      respond_with_streams([list_stream], redirect: move_find_list_path(@move), toast: true) do
+        [:notice, t("find_lists.flash.box_opened", number: box.number)]
+      end
+    else
+      respond_to_found_toggle(result)
+    end
   end
 
   # PATCH /moves/:move_id/find_list/items/:item_id/restore — the undo.

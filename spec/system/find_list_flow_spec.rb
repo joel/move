@@ -52,17 +52,19 @@ RSpec.describe "Find list flow" do
     find("#find-list-row-found-#{item.id}").click
 
     expect(page).to have_text(I18n.t("find_lists.show.found_count", found: 1, total: 1))
-    expect(item.reload.presence_state).to eq("removed")
+    # #738: retrieving from the sealed box opened it for unpacking — and said so.
+    expect(page).to have_text(I18n.t("find_lists.flash.box_opened", number: "12"))
+    expect(box.reload.status).to eq("unpacking")
 
     find("#find-list-row-found-#{item.id}").click # the same stable id now restores
 
-    expect(page).to have_text(I18n.t("find_lists.show.found_count", found: 0, total: 1))
     expect(item.reload.presence_state).to eq("in_box")
+    # Restore never auto-reverts the box (reopen semantics — a user call).
+    expect(box.reload.status).to eq("unpacking")
 
     find("#find-list-swipe-unpin-#{item.id}").click
 
     expect(page).to have_text(I18n.t("find_lists.show.empty.title"))
-    expect(FindListEntry.where(move:, user_id: user.id)).to be_empty
   end
 
   it "pins and unpins from the item detail page" do

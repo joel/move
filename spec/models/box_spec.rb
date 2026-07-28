@@ -52,7 +52,10 @@ RSpec.describe Box do
 
     it "exposes the valid transitions for the current status" do
       expect(build(:box, status: "packing").available_transitions).to eq(%w[sealed])
-      expect(build(:box, status: "sealed").available_transitions).to eq(%w[packing in_transit])
+      # sealed → unpacking (#738): a sealed box can open at the destination
+      # without recording transit; also powers the find-list auto-open.
+      expect(build(:box, status: "sealed").available_transitions).to eq(%w[packing in_transit unpacking])
+      expect(build(:box, status: "sealed")).to be_can_transition_to("unpacking")
       # An unpacked box can be re-opened back to unpacking (D10 "Undo" / reopen).
       expect(build(:box, status: "unpacked").available_transitions).to eq(%w[unpacking])
       expect(build(:box, status: "packing")).to be_can_transition_to("sealed")

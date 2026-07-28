@@ -6,15 +6,68 @@ RSpec.describe FindLists::MarkFound do
   let(:user) { create(:user) }
   let(:move) { create(:move, created_by: user) }
 
-  it "marks a pinned item removed even on a sealed box (the retrieval bypass)" do
+  it "marks a pinned item removed on a sealed box and opens the box for unpacking" do
     box = create(:box, move:, status: "sealed")
     item = create(:item, move:, box:, name: "Face Cream")
     create(:find_list_entry, move:, user:, item:)
 
     result = described_class.new.call(move:, user:, item:)
 
-    expect(result).to be_success
-    expect(item.reload.presence_state).to eq("removed")
+    aggregate_failures do
+      expect(result).to be_success
+      expect(result.value![:opened_box]).to eq(box)
+      expect(item.reload.presence_state).to eq("removed")
+      expect(box.reload.status).to eq("unpacking")
+    end
+  end
+
+  it "opens an in-transit box for unpacking too" do
+    box = create(:box, move:, status: "in_transit")
+    item = create(:item, move:, box:, name: "Face Cream")
+    create(:find_list_entry, move:, user:, item:)
+
+    expect(described_class.new.call(move:, user:, item:).value![:opened_box]).to eq(box)
+    expect(box.reload.status).to eq("unpacking")
+  end
+
+  it "never fast-forwards an origin-side packing box" do
+    box = create(:box, move:, status: "packing")
+    item = create(:item, move:, box:, name: "Face Cream")
+    create(:find_list_entry, move:, user:, item:)
+
+    result = described_class.new.call(move:, user:, item:)
+
+    aggregate_failures do
+      expect(result.value![:opened_box]).to be_nil
+      expect(item.reload.presence_state).to eq("removed")
+      expect(box.reload.status).to eq("packing")
+    end
+  end
+
+  # A crash between the two committed steps leaves the item found with the box
+  # still closed; the open runs on the replay path too, so re-submitting
+  # repairs the torn state instead of no-opping past it (Codex #739).
+  it "self-heals a found item whose sealed box never opened" do
+    box = create(:box, move:, status: "sealed")
+    item = create(:item, move:, box:, name: "Face Cream", presence_state: "removed")
+    create(:find_list_entry, move:, user:, item:)
+
+    result = described_class.new.call(move:, user:, item:)
+
+    aggregate_failures do
+      expect(result.value![:opened_box]).to eq(box)
+      expect(box.reload.status).to eq("unpacking")
+      expect(item.reload.presence_state).to eq("removed")
+    end
+  end
+
+  it "reports no opened box when the box is already unpacking" do
+    box = create(:box, move:, status: "unpacking")
+    item = create(:item, move:, box:, name: "Face Cream")
+    create(:find_list_entry, move:, user:, item:)
+
+    expect(described_class.new.call(move:, user:, item:).value![:opened_box]).to be_nil
+    expect(box.reload.status).to eq("unpacking")
   end
 
   it "is idempotent — a replayed submit on an already-found item emits no second event" do
