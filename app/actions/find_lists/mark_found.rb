@@ -28,16 +28,17 @@ module FindLists
       # is the accepted fence residual shared by this family of guards (#737).
       item.with_lock do
         yield ensure_pinned(move, user, item)
-        return Success(item: item, opened_box: nil) if item.removed?
-
-        yield Items::MarkRemoved.new.call(item: item, actor: user, allow_any_phase: true)
+        yield Items::MarkRemoved.new.call(item: item, actor: user, allow_any_phase: true) unless item.removed?
       end
       # The box open runs AFTER the item transaction commits, in its own
       # box-locked transaction — this action never holds item + box locks at
       # once, so it cannot form a lock-order cycle against TransitionStatus's
-      # box→items completion cascade (Codex #739 R2). If the open fails or the
-      # process dies between the two steps, the item stays found and the box
-      # stays closed — the pre-#738 outcome, recoverable manually.
+      # box→items completion cascade (Codex #739 R2). The two steps are each
+      # idempotent and the open runs on the replay path too, so the pair is
+      # SELF-HEALING rather than atomic: a crash between them leaves the item
+      # found with the box closed, and the next submit repairs it (the
+      # already-`unpacking` no-op keeps genuine replays event-free). True
+      # cross-mutation atomicity needs the #737 cross-flow lock ordering.
       opened_box = yield open_box_for_unpacking(item.box, user)
       Success(item: item, opened_box: opened_box)
     end

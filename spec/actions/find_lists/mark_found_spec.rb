@@ -44,6 +44,23 @@ RSpec.describe FindLists::MarkFound do
     end
   end
 
+  # A crash between the two committed steps leaves the item found with the box
+  # still closed; the open runs on the replay path too, so re-submitting
+  # repairs the torn state instead of no-opping past it (Codex #739).
+  it "self-heals a found item whose sealed box never opened" do
+    box = create(:box, move:, status: "sealed")
+    item = create(:item, move:, box:, name: "Face Cream", presence_state: "removed")
+    create(:find_list_entry, move:, user:, item:)
+
+    result = described_class.new.call(move:, user:, item:)
+
+    aggregate_failures do
+      expect(result.value![:opened_box]).to eq(box)
+      expect(box.reload.status).to eq("unpacking")
+      expect(item.reload.presence_state).to eq("removed")
+    end
+  end
+
   it "reports no opened box when the box is already unpacking" do
     box = create(:box, move:, status: "unpacking")
     item = create(:item, move:, box:, name: "Face Cream")
