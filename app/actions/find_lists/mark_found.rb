@@ -12,9 +12,14 @@ module FindLists
   # item.removed — no find_list.* event on top (the delegated item event is
   # the domain fact; the MarkPhotoRemoved "no new event type" precedent).
   class MarkFound < BaseAction
+    # Returns Success(item:, opened_box:) — opened_box is the Box when this
+    # call auto-opened it (the controller surfaces that secondary mutation
+    # with a linking toast, UX rule 1), else nil.
+
     #: (move: untyped, user: untyped, item: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, user:, item:)
       yield ensure_writable(move)
+      opened_box = nil
       # Every data guard runs under the item row lock (with_lock reloads, so
       # all reads are post-lock): the pin re-read catches an unpin committed
       # before the lock was acquired, and the presence re-read makes exactly
@@ -24,12 +29,12 @@ module FindLists
       # is the accepted fence residual shared by this family of guards (#737).
       item.with_lock do
         yield ensure_pinned(move, user, item)
-        return Success(item) if item.removed?
+        return Success(item: item, opened_box: nil) if item.removed?
 
-        yield open_box_for_unpacking(item.box, user)
+        opened_box = yield open_box_for_unpacking(item.box, user)
         yield Items::MarkRemoved.new.call(item: item, actor: user, allow_any_phase: true)
       end
-      Success(item)
+      Success(item: item, opened_box: opened_box)
     end
 
     private
@@ -42,12 +47,25 @@ module FindLists
     # fast-forwarded; `unpacking`/`unpacked` are already open. Sits after the
     # replay guard, so a replayed submit never re-transitions; Restore never
     # auto-reverts (reopen semantics — box status is a user call).
+    #
+    # The status check + transition run under the BOX row lock: two items of
+    # the same box marked found concurrently serialize here — the loser
+    # re-reads `unpacking` and no-ops, so box.status_changed emits exactly
+    # once (the item locks alone cannot serialize a shared-box write). Lock
+    # order (item → box) matches the write order the delegated update always
+    # had; cross-flow ordering vs the completion cascade stays #737.
+    # Returns the box when it transitioned, else nil.
 
     #: (untyped box, untyped user) -> Dry::Monads::Result[untyped, untyped]
     def open_box_for_unpacking(box, user)
-      return Success() unless %w[sealed in_transit].include?(box.status)
+      box.with_lock do
+        return Success(nil) unless %w[sealed in_transit].include?(box.status)
 
-      Boxes::TransitionStatus.new.call(box: box, to: "unpacking", actor: user)
+        case Boxes::TransitionStatus.new.call(box: box, to: "unpacking", actor: user)
+        in Dry::Monads::Success(_) then Success(box)
+        in Dry::Monads::Failure => failure then failure
+        end
+      end
     end
 
     #: (untyped move, untyped user, untyped item) -> Dry::Monads::Result[untyped, untyped]

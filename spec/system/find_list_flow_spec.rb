@@ -52,8 +52,8 @@ RSpec.describe "Find list flow" do
     find("#find-list-row-found-#{item.id}").click
 
     expect(page).to have_text(I18n.t("find_lists.show.found_count", found: 1, total: 1))
-    expect(item.reload.presence_state).to eq("removed")
-    # #738: retrieving from the sealed box opened it for unpacking.
+    # #738: retrieving from the sealed box opened it for unpacking — and said so.
+    expect(page).to have_text(I18n.t("find_lists.flash.box_opened", number: "12"))
     expect(box.reload.status).to eq("unpacking")
 
     find("#find-list-row-found-#{item.id}").click # the same stable id now restores

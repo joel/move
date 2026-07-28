@@ -28,6 +28,8 @@ en:
     flash:
       pinned: "Pinned “%{name}” to your find list"
       view: "View list"
+      box_opened: "Opened Box %{number} for unpacking"
+      view_box: "View box"
       cleared:
         one: "Cleared 1 found item"
         other: "Cleared %{count} found items"

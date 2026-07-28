@@ -15,6 +15,7 @@ RSpec.describe FindLists::MarkFound do
 
     aggregate_failures do
       expect(result).to be_success
+      expect(result.value![:opened_box]).to eq(box)
       expect(item.reload.presence_state).to eq("removed")
       expect(box.reload.status).to eq("unpacking")
     end
@@ -25,7 +26,7 @@ RSpec.describe FindLists::MarkFound do
     item = create(:item, move:, box:, name: "Face Cream")
     create(:find_list_entry, move:, user:, item:)
 
-    expect(described_class.new.call(move:, user:, item:)).to be_success
+    expect(described_class.new.call(move:, user:, item:).value![:opened_box]).to eq(box)
     expect(box.reload.status).to eq("unpacking")
   end
 
@@ -34,9 +35,22 @@ RSpec.describe FindLists::MarkFound do
     item = create(:item, move:, box:, name: "Face Cream")
     create(:find_list_entry, move:, user:, item:)
 
-    expect(described_class.new.call(move:, user:, item:)).to be_success
-    expect(item.reload.presence_state).to eq("removed")
-    expect(box.reload.status).to eq("packing")
+    result = described_class.new.call(move:, user:, item:)
+
+    aggregate_failures do
+      expect(result.value![:opened_box]).to be_nil
+      expect(item.reload.presence_state).to eq("removed")
+      expect(box.reload.status).to eq("packing")
+    end
+  end
+
+  it "reports no opened box when the box is already unpacking" do
+    box = create(:box, move:, status: "unpacking")
+    item = create(:item, move:, box:, name: "Face Cream")
+    create(:find_list_entry, move:, user:, item:)
+
+    expect(described_class.new.call(move:, user:, item:).value![:opened_box]).to be_nil
+    expect(box.reload.status).to eq("unpacking")
   end
 
   it "is idempotent — a replayed submit on an already-found item emits no second event" do
