@@ -19,7 +19,6 @@ module FindLists
     #: (move: untyped, user: untyped, item: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, user:, item:)
       yield ensure_writable(move)
-      opened_box = nil
       # Every data guard runs under the item row lock (with_lock reloads, so
       # all reads are post-lock): the pin re-read catches an unpin committed
       # before the lock was acquired, and the presence re-read makes exactly
@@ -31,9 +30,15 @@ module FindLists
         yield ensure_pinned(move, user, item)
         return Success(item: item, opened_box: nil) if item.removed?
 
-        opened_box = yield open_box_for_unpacking(item.box, user)
         yield Items::MarkRemoved.new.call(item: item, actor: user, allow_any_phase: true)
       end
+      # The box open runs AFTER the item transaction commits, in its own
+      # box-locked transaction — this action never holds item + box locks at
+      # once, so it cannot form a lock-order cycle against TransitionStatus's
+      # box→items completion cascade (Codex #739 R2). If the open fails or the
+      # process dies between the two steps, the item stays found and the box
+      # stays closed — the pre-#738 outcome, recoverable manually.
+      opened_box = yield open_box_for_unpacking(item.box, user)
       Success(item: item, opened_box: opened_box)
     end
 
@@ -51,9 +56,7 @@ module FindLists
     # The status check + transition run under the BOX row lock: two items of
     # the same box marked found concurrently serialize here — the loser
     # re-reads `unpacking` and no-ops, so box.status_changed emits exactly
-    # once (the item locks alone cannot serialize a shared-box write). Lock
-    # order (item → box) matches the write order the delegated update always
-    # had; cross-flow ordering vs the completion cascade stays #737.
+    # once (the item locks alone cannot serialize a shared-box write).
     # Returns the box when it transitioned, else nil.
 
     #: (untyped box, untyped user) -> Dry::Monads::Result[untyped, untyped]

@@ -62,8 +62,12 @@ class FindListsController < MoveScopedController
   def mark_found
     case result = FindLists::MarkFound.new.call(move: @move, user: current_user, item: @item)
     in Dry::Monads::Success({ opened_box: Box => box })
-      flash.now[:action_href] = move_box_path(@move, box)
-      flash.now[:action_label] = t("find_lists.flash.view_box")
+      # The link must survive BOTH paths: flash.now scopes it to the stream
+      # render, while the no-JS fallback REDIRECTS — there it rides the
+      # persistent flash for exactly one request (Codex #739).
+      link_flash = request.format.turbo_stream? ? flash.now : flash
+      link_flash[:action_href] = move_box_path(@move, box)
+      link_flash[:action_label] = t("find_lists.flash.view_box")
       respond_with_streams([list_stream], redirect: move_find_list_path(@move), toast: true) do
         [:notice, t("find_lists.flash.box_opened", number: box.number)]
       end

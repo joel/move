@@ -256,6 +256,21 @@ RSpec.describe "FindLists" do
       expect(item.reload.presence_state).to eq("removed")
     end
 
+    it "carries the box-opened linking toast across the no-JS redirect" do
+      box = create(:box, move:, status: "sealed")
+      item = create(:item, move:, box:, name: "Face Cream")
+      create(:find_list_entry, move:, user:, item:)
+
+      patch move_find_list_mark_found_path(move, item_id: item.id)
+      follow_redirect!
+
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("find_lists.flash.box_opened", number: box.number))
+        expect(response.body).to include(I18n.t("find_lists.flash.view_box"))
+        expect(response.body).to include(move_box_path(move, box))
+      end
+    end
+
     it "refuses a viewer (shared-Item mutation, unlike the personal pin)" do
       viewer = create(:user)
       create(:move_membership, move:, user: viewer, role: "viewer")
