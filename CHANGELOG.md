@@ -5,6 +5,16 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.111.0] — 2026-07-31
+
+### Added
+- **Pin items to your find list right from a closed box.** Browsing a sealed
+  or in-transit box now shows the find-list "+" on every item — as a chip on
+  photo cards and an icon on standalone item cards — so planning what to
+  retrieve happens where you're already looking. Pins stay personal to each
+  member (viewers included), and every surface — search, item detail, the box
+  grid, and the list — updates together the moment you pin or unpin (#747).
+
 ## [v0.110.0] — 2026-07-28
 
 ### Changed
