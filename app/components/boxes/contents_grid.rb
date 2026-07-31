@@ -25,9 +25,12 @@ module Components
       # @rbs recoverable_media_ids: untyped
       # @rbs unpacked_media_ids: untyped
       # @rbs editable: bool
+      # @rbs pinnable: bool
+      # @rbs pinned_item_ids: untyped
       # @rbs return: void
       def initialize(move:, box:, media:, items:, reviewable_media_ids: [],
-                     recoverable_media_ids: [], unpacked_media_ids: [], editable: false)
+                     recoverable_media_ids: [], unpacked_media_ids: [], editable: false,
+                     pinnable: false, pinned_item_ids: Set.new)
         @move = move
         @box = box
         @media = media # recent_first, blobs preloaded
@@ -39,6 +42,12 @@ module Components
         # viewing an unpacking box; the toggles need an editable Move too.
         @unpacking = box.unpacking?
         @interactive = @unpacking && editable
+        # Find-list pin mode (#747): a closed box's cards carry the per-item
+        # pin toggle. Independent of `editable` — viewers may pin (personal
+        # rows only), and mutually exclusive with @unpacking by the state
+        # machine (closed ∌ unpacking).
+        @pinnable = pinnable
+        @pinned_item_ids = pinned_item_ids
         # In-box items grouped by their source photo (only this box's photos are
         # rendered as cards).
         @items_by_media = items.group_by(&:source_media_id)
@@ -80,7 +89,8 @@ module Components
               recoverable: @recoverable_media_ids.include?(media.id),
               unpacked: @unpacked_media_ids.include?(media.id),
               eager: index < EAGER_TILES,
-              unpacking: @unpacking, interactive: @interactive
+              unpacking: @unpacking, interactive: @interactive,
+              pinnable: @pinnable, pinned_item_ids: @pinned_item_ids
             )
           end
           # Standalone items most-recent first (items arrive created-ascending).
@@ -90,7 +100,8 @@ module Components
           @standalone_items.reverse_each.with_index(@media.size) do |item, index|
             render Components::Boxes::ItemCard.new(
               item: item, move: @move, image_ready: @move.image_generation_ready?,
-              eager: index < EAGER_TILES, unpacking: @interactive
+              eager: index < EAGER_TILES, unpacking: @interactive,
+              pinnable: @pinnable, pinned: @pinned_item_ids.include?(item.id)
             )
           end
         end

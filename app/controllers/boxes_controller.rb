@@ -351,7 +351,20 @@ class BoxesController < MoveScopedController
     review_media_ids = @box.media.not_generated
                            .where(id: @box.items.where.not(source_media_id: nil).select(:source_media_id))
                            .ids
+    # The find-list pin renders while the box is physically shut (#747) —
+    # browsing a closed box is retrieval planning. Personal rows, keyed to the
+    # current user (same pluck as SearchesController); guarded so every other
+    # status pays no query. Deliberately NOT gated on editable_move? — viewers
+    # may pin (FindLists::Pin documents the decision).
+    pinnable = @box.closed?
+    pinned_item_ids = if pinnable
+                        FindListEntry.where(move_id: @move.id, user_id: current_user.id)
+                                     .joins(:item).pluck(:item_id).to_set
+                      else
+                        Set.new
+                      end
     Views::Boxes::Show.new(
+      pinnable: pinnable, pinned_item_ids: pinned_item_ids,
       move: @move, box: @box, items: items,
       # The detail nav's box-to-box walk (#694) — ordered [id, number] pairs,
       # recomputed on `transition` re-streams like the rest of this context.
