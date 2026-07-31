@@ -63,7 +63,7 @@ module FindLists
     #: (untyped box, untyped user) -> Dry::Monads::Result[untyped, untyped]
     def open_box_for_unpacking(box, user)
       box.with_lock do
-        return Success(nil) unless %w[sealed in_transit].include?(box.status)
+        return Success(nil) unless box.closed?
 
         case Boxes::TransitionStatus.new.call(box: box, to: "unpacking", actor: user)
         in Dry::Monads::Success(_) then Success(box)

@@ -135,6 +135,15 @@ class Box < ApplicationRecord
     !packing?
   end
 
+  # Physically shut (sealed or in transit) — the states where browsing the
+  # contents means planning retrieval, so the find-list pin renders (#747),
+  # and exactly the set FindLists::MarkFound auto-opens (#738).
+
+  #: () -> bool
+  def closed?
+    sealed? || status == "in_transit"
+  end
+
   # Capture into a sealed (closed) box is blocked until it is unsealed (§5.2).
 
   #: () -> bool
