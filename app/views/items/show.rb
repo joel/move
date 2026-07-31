@@ -153,7 +153,7 @@ module Views
             icon: Components::Icons::Search
           )
           render Components::FindLists::Toggle.new(
-            move: @move, item: @item, pinned: @find_list_pinned, labeled: true
+            move: @move, item: @item, pinned: @find_list_pinned, variant: :labeled
           )
         end
       end

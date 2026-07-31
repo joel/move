@@ -19,7 +19,7 @@ module Components
 
   module FindLists
     class Toggle
-      def self.dom_id: (untyped item, ?labeled: bool) -> String
+      def self.dom_id: (untyped item, ?variant: Symbol) -> String
     end
 
     class Row

@@ -120,7 +120,7 @@ RSpec.describe "FindLists" do
   end
 
   describe "POST/DELETE pin toggles" do
-    it "pins over turbo_stream, replacing both toggle variants, the pill and the list, with a toast" do
+    it "pins over turbo_stream, replacing every toggle variant, the pill and the list, with a toast" do
       box = create(:box, move:)
       item = create(:item, move:, box:, name: "Kettle")
 
@@ -129,7 +129,8 @@ RSpec.describe "FindLists" do
       aggregate_failures do
         expect(FindListEntry.where(move:, user_id: user.id, item:)).to exist
         expect(response.body).to include(%(target="#{Components::FindLists::Toggle.dom_id(item)}"))
-        expect(response.body).to include(%(target="#{Components::FindLists::Toggle.dom_id(item, labeled: true)}"))
+        expect(response.body).to include(%(target="#{Components::FindLists::Toggle.dom_id(item, variant: :labeled)}"))
+        expect(response.body).to include(%(target="#{Components::FindLists::Toggle.dom_id(item, variant: :chip)}"))
         expect(response.body).to include(%(target="#{Components::FindLists::SearchLink::ID}"))
         expect(response.body).to include(%(target="#{Components::FindLists::List::ID}"))
         expect(response.body).to include(I18n.t("find_lists.search_link", count: 1))
