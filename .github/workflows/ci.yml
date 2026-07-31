@@ -126,6 +126,19 @@ jobs:
         with:
           bundler-cache: true
       -
+        # activestorage >= 8.1.3.1 loads the variant processor while the app
+        # boots (the CVE-2026 transformation-allowlist fix), and ruby-vips
+        # dlopens libvips.so.42 at require time — so the boot this job pays
+        # for db:create/schema:load now needs libvips like the `test` job
+        # (which also needs the HEIF decoders; boot alone does not).
+        name: "Install libvips (app boot loads the variant processor)"
+        run: |
+          sudo apt-get update
+          # Noble renamed libvips42 -> libvips42t64 (t64 transition); fall back
+          # for runner images that still use the old name.
+          sudo apt-get install -y --no-install-recommends libvips42t64 \
+            || sudo apt-get install -y --no-install-recommends libvips42
+      -
         name: "Prepare DB (Packwerk boots the app, which introspects the schema)"
         run: bin/rails db:create db:schema:load
       -
