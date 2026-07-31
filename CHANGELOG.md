@@ -5,6 +5,15 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.112.0] — 2026-07-31
+
+### Added
+- **Pin items from the review screen too.** A closed box's per-photo review
+  walk — the place its contents are browsed item by item — now shows the
+  find-list "+" on every row, completing the closed-box pinning surface that
+  v0.111.0 started on the contents grid. Same rules: personal per member,
+  viewers included, live-synced across search, box, review and the list (#749).
+
 ## [v0.111.0] — 2026-07-31
 
 ### Added
