@@ -31,6 +31,12 @@ module TurboStreamable
   def respond_with_streams: (untyped streams, redirect: untyped, ?toast: untyped, ?status: Symbol) -> untyped
 end
 
+module FindListPinnable
+  def pinnable?: () -> bool
+
+  def pinned_item_ids: () -> untyped
+end
+
 # ── View concerns (app/views/layouts) ──
 module Views
   module Layouts

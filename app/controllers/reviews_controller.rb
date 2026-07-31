@@ -8,6 +8,8 @@
 # "Ignore" advances without changing state. Runs inside an Organization tenant
 # schema. Thin: authorize, call the action, render/redirect.
 class ReviewsController < MoveScopedController
+  include FindListPinnable
+
   # ?queue=move flips the photo screen into the Move-wide review-queue walk
   # (#654): Next crosses box boundaries, advancing strictly forward in capture
   # order through photos still holding an unreviewed co-located item, and Finish
@@ -50,8 +52,8 @@ class ReviewsController < MoveScopedController
       move: @move, box: @box, media: @media, items: photo_items(@media),
       position: position_of(@media, walk), total: walk.size,
       next_media: next_media, editable: editable_move?,
-      move_boxes: other_boxes, pending_review: pending_review?,
-      advance_href: advance_href_for(next_media), mark_href: mark_href,
+      move_boxes: other_boxes, pending_review: pending_review?, pinnable: pinnable?,
+      pinned_item_ids: pinned_item_ids, advance_href: advance_href_for(next_media), mark_href: mark_href,
       # The nav arrows (#699) walk the same stable list positionally — prev
       # reaches already-marked photos; nil at a boundary disables the arrow.
       prev_href: nav_href_for(prev_before(@media, walk)),
@@ -209,7 +211,7 @@ class ReviewsController < MoveScopedController
       next_media: next_media,
       editable: editable_move?, move_boxes: other_boxes,
       queue: true, queue_remaining: forward_scope(pending_remaining).count,
-      pending_review: pending_review?,
+      pending_review: pending_review?, pinnable: pinnable?, pinned_item_ids: pinned_item_ids,
       advance_href: advance_href_for(next_media), mark_href: mark_href,
       # The nav arrows (#699): prev = nearest NEWER still-pending photo — a
       # marked photo has left the pending set ("marked is done"), an ignored
@@ -351,7 +353,8 @@ class ReviewsController < MoveScopedController
       Components::Reviews::ItemList::ID,
       view_context.render(Components::Reviews::ItemList.new(
                             move: @move, box: @box, media: @media, items: items, editable: editable_move?,
-                            highlight_id: highlight_id, queue: queue_mode?
+                            highlight_id: highlight_id, queue: queue_mode?,
+                            pinnable: pinnable?, pinned_item_ids: pinned_item_ids
                           ))
     )
   end

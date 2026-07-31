@@ -19,9 +19,22 @@ module Components
       # flash a ring (UX rule #1) via the shared `highlight` Stimulus controller.
       # queue: the Move-wide walk (#654) — the remove URL carries ?queue=move so
       # its no-JS fallback redirects back into the walk (rename never navigates).
+      # pinnable/pinned (#749, closed box): the find-list pin toggle in the row —
+      # personal state, deliberately not editable-gated (viewers pin), and NOT in
+      # the swipe layers so it stays reachable on touch without a gesture.
 
-      #: (move: untyped, box: untyped, media: untyped, item: untyped, editable: untyped, ?highlight: untyped, ?queue: untyped) -> void
-      def initialize(move:, box:, media:, item:, editable:, highlight: false, queue: false)
+      # @rbs move: untyped
+      # @rbs box: untyped
+      # @rbs media: untyped
+      # @rbs item: untyped
+      # @rbs editable: untyped
+      # @rbs highlight: untyped
+      # @rbs queue: untyped
+      # @rbs pinnable: bool
+      # @rbs pinned: bool
+      # @rbs return: void
+      def initialize(move:, box:, media:, item:, editable:, highlight: false, queue: false,
+                     pinnable: false, pinned: false)
         @move = move
         @box = box
         @media = media
@@ -29,6 +42,8 @@ module Components
         @editable = editable
         @highlight = highlight
         @queue = queue
+        @pinnable = pinnable
+        @pinned = pinned
       end
 
       # Below lg the pencil/× are swipe-revealed (Ui::SwipeActions layers);
@@ -48,6 +63,7 @@ module Components
             name_field
             confidence_line
           end
+          pin_toggle if @pinnable
           row_actions if @editable
         end
       end
@@ -94,6 +110,17 @@ module Components
           else
             span(class: "text-label-caps uppercase text-muted") { I18n.t("reviews.photo.added") }
           end
+        end
+      end
+
+      # The find-list pin (#749) — the shared icon Toggle, whose dom_id is what
+      # FindListsController's toggle streams already target, so pin/unpin from
+      # any surface flips this row's control in place.
+
+      #: () -> untyped
+      def pin_toggle
+        div(class: "shrink-0") do
+          render Components::FindLists::Toggle.new(move: @move, item: @item, pinned: @pinned)
         end
       end
 

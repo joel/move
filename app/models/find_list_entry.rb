@@ -24,4 +24,13 @@ class FindListEntry < ApplicationRecord
       .includes(item: [{ box: :room }, { source_media: { image_attachment: :blob } }])
       .order(Arel.sql("boxes.number::bigint"), "items.name")
   }
+
+  # The user's pinned item ids for a Move, as a membership set — what the pin
+  # toggles on search (#730), the box grid (#747) and the review rows (#749)
+  # render against. :item join (kept scope): dangling pins never count.
+
+  #: (move: untyped, user: untyped) -> untyped
+  def self.pinned_item_ids_for(move:, user:)
+    where(move_id: move.id, user_id: user.id).joins(:item).pluck(:item_id).to_set
+  end
 end

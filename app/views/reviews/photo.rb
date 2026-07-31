@@ -30,10 +30,12 @@ module Views
       # @rbs mark_href: untyped
       # @rbs prev_href: untyped
       # @rbs next_href: untyped
+      # @rbs pinnable: bool
+      # @rbs pinned_item_ids: untyped
       # @rbs return: void
       def initialize(move:, box:, media:, items:, position:, total:, next_media:, editable: false, move_boxes: [],
                      queue: false, queue_remaining: nil, pending_review: false, advance_href: nil, mark_href: nil,
-                     prev_href: nil, next_href: nil)
+                     prev_href: nil, next_href: nil, pinnable: false, pinned_item_ids: Set.new)
         @move = move
         @box = box
         @media = media
@@ -62,6 +64,10 @@ module Views
         # disabled arrow; both nil (single-photo walk) hides the pair.
         @prev_href = prev_href
         @next_href = next_href
+        # Find-list pin mode (#749): the photo's box is closed, so each row
+        # carries the pin toggle. pinned_item_ids = the CURRENT USER's pins.
+        @pinnable = pinnable
+        @pinned_item_ids = pinned_item_ids
       end
 
       #: () -> void
@@ -200,7 +206,8 @@ module Views
       #: () -> untyped
       def list
         render Components::Reviews::ItemList.new(
-          move: @move, box: @box, media: @media, items: @items, editable: @editable, queue: @queue
+          move: @move, box: @box, media: @media, items: @items, editable: @editable, queue: @queue,
+          pinnable: @pinnable, pinned_item_ids: @pinned_item_ids
         )
       end
 
