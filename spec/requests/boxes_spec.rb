@@ -1153,4 +1153,87 @@ RSpec.describe "Boxes" do
       end
     end
   end
+
+  describe "find-list pin on the box contents grid (#747)" do
+    it "renders pin toggles on a sealed box: chips on photo cards, an icon overlay on standalone cards" do
+      box = create(:box, :with_room, move:, number: "7", status: "sealed")
+      photo = create(:media, move:, box:)
+      plates = create(:item, move:, box:, source_media: photo, name: "Plates")
+      lamp = create(:item, :manual, move:, box:, name: "Lamp")
+
+      get move_box_path(move, box)
+
+      aggregate_failures do
+        expect(response.body).to include(%(id="#{Components::FindLists::Toggle.dom_id(plates, variant: :chip)}"))
+        expect(response.body).to include(%(id="#{Components::FindLists::Toggle.dom_id(lamp)}"))
+        expect(response.body).to include(move_find_list_pin_path(move, item_id: plates.id))
+        expect(response.body).to include(move_find_list_pin_path(move, item_id: lamp.id))
+        # The tile alone carries the review link; no form ever nests in an anchor.
+        expect(Capybara.string(response.body)).to have_css("a[href*='review']")
+        expect(Capybara.string(response.body)).to have_no_css("a form")
+        expect(Capybara.string(response.body)).to have_no_css("a a")
+      end
+    end
+
+    it "renders the pinned state for the current user's existing pins" do
+      box = create(:box, :with_room, move:, number: "7", status: "in_transit")
+      photo = create(:media, move:, box:)
+      plates = create(:item, move:, box:, source_media: photo, name: "Plates")
+      create(:find_list_entry, move:, user:, item: plates)
+
+      get move_box_path(move, box)
+
+      # NB: the pin and unpin routes share one URL string (POST vs DELETE), so
+      # pinned-vs-not must be asserted on the rendered labels, never the paths.
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("find_lists.toggle.remove", name: "Plates"))
+        expect(response.body).not_to include(I18n.t("find_lists.toggle.add", name: "Plates"))
+      end
+    end
+
+    it "does not treat another member's pin as pinned" do
+      other = create(:user)
+      create(:move_membership, move:, user: other, role: "contributor")
+      box = create(:box, :with_room, move:, number: "7", status: "sealed")
+      plates = create(:item, move:, box:, source_media: create(:media, move:, box:), name: "Plates")
+      create(:find_list_entry, move:, user: other, item: plates)
+
+      get move_box_path(move, box)
+
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("find_lists.toggle.add", name: "Plates"))
+        expect(response.body).not_to include(I18n.t("find_lists.toggle.remove", name: "Plates"))
+      end
+    end
+
+    it "renders no pin toggles while packing or unpacking (unpack toggles own that surface)" do
+      packing = create(:box, :with_room, move:, number: "7", status: "packing")
+      create(:item, move:, box: packing, source_media: create(:media, move:, box: packing), name: "Plates")
+
+      get move_box_path(move, packing)
+      expect(response.body).not_to include("find-list-toggle")
+
+      unpacking = create(:box, :with_room, move:, number: "8", status: "unpacking")
+      mugs = create(:item, move:, box: unpacking, source_media: create(:media, move:, box: unpacking), name: "Mugs")
+
+      get move_box_path(move, unpacking)
+
+      aggregate_failures do
+        expect(response.body).to include(move_box_unpacking_remove_path(move, unpacking, mugs))
+        expect(response.body).not_to include("find-list-toggle")
+      end
+    end
+
+    it "renders working pin toggles for a viewer (personal rows need no editable move)" do
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+      box = create(:box, :with_room, move:, number: "7", status: "sealed")
+      plates = create(:item, move:, box:, source_media: create(:media, move:, box:), name: "Plates")
+
+      get move_box_path(move, box)
+
+      expect(response.body).to include(move_find_list_pin_path(move, item_id: plates.id))
+    end
+  end
 end

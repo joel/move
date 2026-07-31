@@ -24,10 +24,21 @@ module Components
       # Restore) for the box-detail grid while the box is actively unpacking on
       # an editable Move; the removed-state display (check badge + note) keys
       # off the item itself, so a viewer sees the truth without the controls.
+      # `pinnable:`/`pinned:` (#747, closed box) overlay the find-list pin
+      # toggle — personal state, deliberately not editable-gated (viewers pin).
 
-      #: (item: untyped, move: untyped, ?image_ready: untyped, ?generating: untyped, ?failed: untyped, ?eager: bool, ?unpacking: bool) -> void
+      # @rbs item: untyped
+      # @rbs move: untyped
+      # @rbs image_ready: untyped
+      # @rbs generating: untyped
+      # @rbs failed: untyped
+      # @rbs eager: bool
+      # @rbs unpacking: bool
+      # @rbs pinnable: bool
+      # @rbs pinned: bool
+      # @rbs return: void
       def initialize(item:, move:, image_ready: false, generating: false, failed: false, eager: false,
-                     unpacking: false)
+                     unpacking: false, pinnable: false, pinned: false)
         @item = item
         @move = move
         @image_ready = image_ready
@@ -40,6 +51,8 @@ module Components
         # viewport, where lazy loads immediately anyway.
         @eager = eager
         @unpacking = unpacking
+        @pinnable = pinnable
+        @pinned = pinned
       end
 
       #: () -> void
@@ -51,6 +64,7 @@ module Components
           end
           generate_control if show_generate?
           unpacking_control if @unpacking
+          pin_control if @pinnable
         end
       end
 
@@ -192,9 +206,29 @@ module Components
         end
       end
 
+      # The find-list pin (#747) — the shared Toggle overlaying the tile's free
+      # top-right corner (the unpacked badge owns the left), a SIBLING of the
+      # card's anchor like generate_control (a form never nests in a link).
+      # The icon variant's dom_id is what FindListsController's toggle streams
+      # already target, so pin/unpin from any surface flips it in place.
+      # Accepted #747 edge: the shared image-generation broadcast re-renders
+      # this card WITHOUT pin state (one payload to every subscriber — it
+      # cannot know the viewer), so a card swapped by a completed generation
+      # on a closed box loses its "+" until reload. Rare overlap.
+
+      #: () -> untyped
+      def pin_control
+        div(class: "absolute right-1.5 top-1.5 z-10") do
+          render Components::FindLists::Toggle.new(move: @move, item: @item, pinned: @pinned)
+        end
+      end
+
+      # `relative` anchors the pin overlay to the card (the tile's corner —
+      # the tile is the card's first child, so card-relative == tile-relative).
+
       #: () -> String
       def card_classes
-        "group flex flex-col overflow-hidden rounded-card border border-card-border bg-card " \
+        "group relative flex flex-col overflow-hidden rounded-card border border-card-border bg-card " \
           "transition hover:border-accent-sage hover:bg-surface-container-high"
       end
 

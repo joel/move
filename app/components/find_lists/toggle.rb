@@ -2,32 +2,46 @@
 
 module Components
   module FindLists
-    # The pin/unpin control for one item (#730). Two variants share one
-    # component: the compact icon overlay on search result cards and the
-    # labeled row button on item detail. Each carries a stable per-item DOM id
-    # (per variant) so one stream response can swap whichever variant is on the
-    # page — Turbo no-ops the replace for the absent one — and a stable BUTTON
-    # id so the refocus controller keeps keyboard focus across the swap.
+    # The pin/unpin control for one item (#730). Three variants share one
+    # component: the compact icon overlay on search result cards (and the box
+    # contents grid's standalone item cards, #747), the labeled row button on
+    # item detail, and the name chip on the box contents grid's photo cards
+    # (#747). Each carries a stable per-item DOM id (per variant) so one
+    # stream response can swap whichever variants are on the page — Turbo
+    # no-ops the replace for the absent ones — and a stable BUTTON id so the
+    # refocus controller keeps keyboard focus across the swap.
     class Toggle < Components::Base
       include Phlex::Rails::Helpers::ButtonTo
 
+      VARIANTS = %i[icon labeled chip].freeze
+
       # @rbs skip
-      def self.dom_id(item, labeled: false)
-        labeled ? "find-list-toggle-labeled-#{item.id}" : "find-list-toggle-#{item.id}"
+      def self.dom_id(item, variant: :icon)
+        case variant
+        when :labeled then "find-list-toggle-labeled-#{item.id}"
+        when :chip then "find-list-toggle-chip-#{item.id}"
+        else "find-list-toggle-#{item.id}"
+        end
       end
 
-      #: (move: untyped, item: untyped, pinned: bool, ?labeled: bool) -> void
-      def initialize(move:, item:, pinned:, labeled: false)
+      #: (move: untyped, item: untyped, pinned: bool, ?variant: Symbol) -> void
+      def initialize(move:, item:, pinned:, variant: :icon)
+        raise ArgumentError, "unknown variant #{variant.inspect}" unless VARIANTS.include?(variant)
+
         @move = move
         @item = item
         @pinned = pinned
-        @labeled = labeled
+        @variant = variant
       end
 
       #: () -> void
       def view_template
-        div(id: self.class.dom_id(@item, labeled: @labeled), class: @labeled ? nil : "contents") do
-          @labeled ? labeled_button : icon_button
+        div(id: self.class.dom_id(@item, variant: @variant), class: @variant == :labeled ? nil : "contents") do
+          case @variant
+          when :labeled then labeled_button
+          when :chip then chip_button
+          else icon_button
+          end
         end
       end
 
@@ -79,6 +93,40 @@ module Components
                  "bg-transparent text-text-warm hover:bg-surface-container-high"
                end
         "inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold transition #{tint}"
+      end
+
+      # The photo-card chip (#747) — shaped like PhotoCard's name chips so it
+      # sits in the same flex-wrap row (the wrapping <form> gets
+      # display:contents, exactly like the unpacking chip toggles).
+
+      #: () -> untyped
+      def chip_button
+        button_to(path, method: @pinned ? :delete : :post, form: { class: "contents" },
+                        id: "find-list-toggle-chip-btn-#{@item.id}", class: chip_classes,
+                        aria: { label: label }, title: label) do
+          chip_icon
+          span(class: "truncate") { @item.name }
+        end
+      end
+
+      #: () -> String
+      def chip_classes
+        tint = if @pinned
+                 "bg-accent-sage/90 text-page hover:bg-accent-sage"
+               else
+                 "bg-surface-container-high text-on-surface-variant hover:text-accent-sage"
+               end
+        "inline-flex max-w-full items-center gap-1 truncate rounded-full px-2.5 py-1 " \
+          "text-label-caps uppercase transition #{tint}"
+      end
+
+      #: () -> untyped
+      def chip_icon
+        if @pinned
+          render Components::Icons::Check.new(css: "h-3 w-3 shrink-0")
+        else
+          render Components::Icons::Plus.new(css: "h-3 w-3 shrink-0")
+        end
       end
 
       #: () -> untyped

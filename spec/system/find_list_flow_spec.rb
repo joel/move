@@ -67,6 +67,31 @@ RSpec.describe "Find list flow" do
     expect(page).to have_text(I18n.t("find_lists.show.empty.title"))
   end
 
+  # #747 — pinning while browsing a closed box's contents: the photo card's
+  # chip and the standalone card's icon overlay both drive the same toggle.
+  it "pins and unpins from a sealed box's contents grid" do
+    box = create(:box, move:, number: "9", status: "sealed")
+    photo = create(:media, move:, box:)
+    create(:item, move:, box:, source_media: photo, name: "Plates")
+    lamp = create(:item, :manual, move:, box:, name: "Desk Lamp")
+
+    visit move_box_path(move, box)
+    find("#find-list-toggle-chip-btn-#{box.items.find_by!(name: "Plates").id}").click
+
+    # No-JS fallback lands on the list with the pin present.
+    expect(page).to have_text(I18n.t("find_lists.show.title"))
+    expect(page).to have_text("Plates")
+
+    visit move_box_path(move, box)
+    find("#find-list-toggle-btn-#{lamp.id}").click
+    expect(FindListEntry.where(move:, user_id: user.id).count).to eq(2)
+
+    # The same controls unpin: chip and icon both render the pinned state.
+    visit move_box_path(move, box)
+    find("#find-list-toggle-btn-#{lamp.id}").click
+    expect(FindListEntry.where(move:, user_id: user.id, item: lamp)).to be_empty
+  end
+
   it "pins and unpins from the item detail page" do
     box = create(:box, move:, number: "5")
     item = create(:item, :manual, move:, box:, name: "Desk Lamp")

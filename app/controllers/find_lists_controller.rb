@@ -97,25 +97,20 @@ class FindListsController < MoveScopedController
   private
 
   # ONE response serves every surface the toggle can live on (search card,
-  # item detail, the list page, the search pill): Turbo silently no-ops a
-  # replace whose target is absent, so no origin params are needed. Each render
-  # is a few personal rows — cheap.
+  # item detail, the box contents grid — icon on standalone cards, chip on
+  # photo cards (#747) — the list page, the search pill): Turbo silently
+  # no-ops a replace whose target is absent, so no origin params are needed.
+  # Each render is a few personal rows — cheap.
 
   #: (pinned: bool) -> Array[untyped]
   def toggle_streams(pinned:)
-    [
+    Components::FindLists::Toggle::VARIANTS.map do |variant|
       turbo_stream.replace(
-        Components::FindLists::Toggle.dom_id(@item),
-        view_context.render(Components::FindLists::Toggle.new(move: @move, item: @item, pinned: pinned))
-      ),
-      turbo_stream.replace(
-        Components::FindLists::Toggle.dom_id(@item, labeled: true),
+        Components::FindLists::Toggle.dom_id(@item, variant: variant),
         view_context.render(Components::FindLists::Toggle.new(move: @move, item: @item, pinned: pinned,
-                                                              labeled: true))
-      ),
-      search_link_stream,
-      list_stream
-    ]
+                                                              variant: variant))
+      )
+    end + [search_link_stream, list_stream]
   end
 
   #: () -> untyped

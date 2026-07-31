@@ -25,6 +25,8 @@ module Components
       # never nest inside an anchor), chips show checked state, and — with
       # `interactive:` (editable Move, box actively unpacking) — chips become
       # remove/restore toggles and the card gains the "Unpack photo" row.
+      # `pinnable:` (#747, closed box — mutually exclusive with unpacking)
+      # reuses the same split layout, chips becoming find-list pin toggles.
 
       # @rbs move: untyped
       # @rbs box: untyped
@@ -36,9 +38,12 @@ module Components
       # @rbs eager: bool
       # @rbs unpacking: bool
       # @rbs interactive: bool
+      # @rbs pinnable: bool
+      # @rbs pinned_item_ids: untyped
       # @rbs return: void
       def initialize(move:, box:, media:, items:, reviewable: false, recoverable: false,
-                     unpacked: false, eager: false, unpacking: false, interactive: false)
+                     unpacked: false, eager: false, unpacking: false, interactive: false,
+                     pinnable: false, pinned_item_ids: Set.new)
         @move = move
         @box = box
         @media = media
@@ -49,11 +54,13 @@ module Components
         @eager = eager
         @unpacking = unpacking
         @interactive = interactive
+        @pinnable = pinnable
+        @pinned_item_ids = pinned_item_ids # the CURRENT USER's pins (personal rows)
       end
 
       #: () -> void
       def view_template
-        return unpacking_card if @unpacking
+        return split_card if @unpacking || @pinnable
 
         href = photo_href
         attrs = href ? { href: href } : {}
@@ -67,11 +74,14 @@ module Components
 
       private
 
-      # Unpacking layout: root div, tile-only anchor, chip toggles + the
-      # photo-level unpack row as siblings of the link.
+      # Split layout (unpacking #727 / pinnable #747): root div, tile-only
+      # anchor, chip toggles + the photo-level unpack row as siblings of the
+      # link — the chips' button_to forms must never nest inside the
+      # review/recovery anchor. unpack_control self-guards on @interactive,
+      # so a merely-pinnable card renders no unpack row.
 
       #: () -> untyped
-      def unpacking_card
+      def split_card
         href = photo_href
         div(id: self.class.dom_id(@media), class: card_classes(interactive: href.present?)) do
           href ? a(href: href, class: "block") { tile } : tile
@@ -96,6 +106,7 @@ module Components
 
       #: (untyped item) -> untyped
       def item_chip(item)
+        return pin_chip(item) if @pinnable
         return name_chip(item.name, checked: item.removed?) unless @interactive
 
         if item.removed?
@@ -111,6 +122,18 @@ module Components
             chip_body(item.name, checked: false)
           end
         end
+      end
+
+      # The find-list pin as a chip (#747) — the shared Toggle component, so
+      # FindListsController's one stream response flips it in place on
+      # pin/unpin from any surface.
+
+      #: (untyped item) -> untyped
+      def pin_chip(item)
+        render Components::FindLists::Toggle.new(
+          move: @move, item: item,
+          pinned: @pinned_item_ids.include?(item.id), variant: :chip
+        )
       end
 
       # A chip-shaped button_to; the wrapping <form> gets display:contents so
@@ -151,7 +174,9 @@ module Components
       end
 
       # "+N more" — while unpacking it links to the full checklist (the capped
-      # chips can hide toggleable items); otherwise the inert count.
+      # chips can hide toggleable items); otherwise the inert count. Stays
+      # inert while pinnable too (accepted #747 limitation): items past the
+      # cap remain pinnable from search and item detail.
 
       #: () -> untyped
       def overflow_chip

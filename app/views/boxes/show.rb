@@ -29,10 +29,12 @@ module Views
       # @rbs recoverable_media_ids: untyped
       # @rbs unpacked_media_ids: untyped
       # @rbs boxes: untyped
+      # @rbs pinnable: bool
+      # @rbs pinned_item_ids: untyped
       # @rbs return: void
       def initialize(move:, box:, items: [], media: [], editable: false, pending_count: 0,
                      reviewable: false, reviewable_media_ids: [], recoverable_media_ids: [],
-                     unpacked_media_ids: [], boxes: [])
+                     unpacked_media_ids: [], boxes: [], pinnable: false, pinned_item_ids: Set.new)
         @move = move
         @box = box
         @items = items
@@ -52,6 +54,11 @@ module Views
         @reviewable_media_ids = reviewable_media_ids
         # Orphaned-but-settled photos that link to the recovery screen.
         @recoverable_media_ids = recoverable_media_ids
+        # Find-list pin mode (#747): the box is closed (sealed/in transit), so
+        # the grid's cards render the per-item pin toggle. Personal state —
+        # pinned_item_ids is the CURRENT USER's pins only.
+        @pinnable = pinnable
+        @pinned_item_ids = pinned_item_ids
       end
 
       #: () -> void
@@ -99,7 +106,7 @@ module Views
           move: @move, box: @box, media: @media, items: @items,
           reviewable_media_ids: @reviewable_media_ids,
           recoverable_media_ids: @recoverable_media_ids, unpacked_media_ids: @unpacked_media_ids,
-          editable: @editable
+          editable: @editable, pinnable: @pinnable, pinned_item_ids: @pinned_item_ids
         )
       end
 
