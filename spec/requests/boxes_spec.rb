@@ -1183,9 +1183,11 @@ RSpec.describe "Boxes" do
 
       get move_box_path(move, box)
 
+      # NB: the pin and unpin routes share one URL string (POST vs DELETE), so
+      # pinned-vs-not must be asserted on the rendered labels, never the paths.
       aggregate_failures do
-        expect(response.body).to include(move_find_list_unpin_path(move, item_id: plates.id))
         expect(response.body).to include(I18n.t("find_lists.toggle.remove", name: "Plates"))
+        expect(response.body).not_to include(I18n.t("find_lists.toggle.add", name: "Plates"))
       end
     end
 
@@ -1198,8 +1200,10 @@ RSpec.describe "Boxes" do
 
       get move_box_path(move, box)
 
-      expect(response.body).to include(move_find_list_pin_path(move, item_id: plates.id))
-      expect(response.body).not_to include(move_find_list_unpin_path(move, item_id: plates.id))
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("find_lists.toggle.add", name: "Plates"))
+        expect(response.body).not_to include(I18n.t("find_lists.toggle.remove", name: "Plates"))
+      end
     end
 
     it "renders no pin toggles while packing or unpacking (unpack toggles own that surface)" do
