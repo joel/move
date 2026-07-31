@@ -354,6 +354,66 @@ RSpec.describe "Per-photo review" do
     end
   end
 
+  describe "find-list pin on review rows (#749)" do
+    it "renders the pin toggle per row on a sealed box, reflecting the current user's pins" do
+      sealed = create(:box, :sealed, move:)
+      photo = create(:media, move:, box: sealed)
+      lamp = create(:item, move:, box: sealed, source_media: photo, name: "Lamp",
+                           review_state: "pending_review")
+      desk = create(:item, move:, box: sealed, source_media: photo, name: "Desk",
+                           review_state: "pending_review")
+      create(:find_list_entry, move:, user:, item: desk)
+
+      get move_box_review_photo_path(move, sealed, photo)
+
+      # Pin vs unpin share one URL string (POST vs DELETE), so state is
+      # asserted on the rendered labels, never the path helpers.
+      aggregate_failures do
+        expect(response.body).to include(%(id="#{Components::FindLists::Toggle.dom_id(lamp)}"))
+        expect(response.body).to include(I18n.t("find_lists.toggle.add", name: "Lamp"))
+        expect(response.body).to include(I18n.t("find_lists.toggle.remove", name: "Desk"))
+      end
+    end
+
+    it "renders no pin toggles while the box is packing" do
+      detected(name: "Lamp")
+
+      get move_box_review_photo_path(move, box, media)
+
+      expect(response.body).not_to include("find-list-toggle")
+    end
+
+    it "renders working pin toggles for a viewer (personal rows need no editable move)" do
+      viewer = create(:user)
+      create(:move_membership, move:, user: viewer, role: "viewer")
+      stub_current_user(viewer)
+      sealed = create(:box, :sealed, move:)
+      photo = create(:media, move:, box: sealed)
+      create(:item, move:, box: sealed, source_media: photo, name: "Lamp",
+                    review_state: "pending_review")
+
+      get move_box_review_photo_path(move, sealed, photo)
+
+      expect(response.body).to include(I18n.t("find_lists.toggle.add", name: "Lamp"))
+    end
+
+    it "keeps pin state on the post-add list stream" do
+      sealed = create(:box, :sealed, move:)
+      photo = create(:media, move:, box: sealed)
+      desk = create(:item, move:, box: sealed, source_media: photo, name: "Desk",
+                           review_state: "pending_review")
+      create(:find_list_entry, move:, user:, item: desk)
+
+      post move_box_review_add_item_path(move, sealed, photo),
+           params: { item: { name: "Mug" } }, as: :turbo_stream
+
+      aggregate_failures do
+        expect(response.body).to include(I18n.t("find_lists.toggle.remove", name: "Desk"))
+        expect(response.body).to include(I18n.t("find_lists.toggle.add", name: "Mug"))
+      end
+    end
+  end
+
   describe "PATCH .../review/photo/:media_id/move (#317)" do
     it "renders the move control on the photo page when another box exists" do
       detected(name: "Lamp")

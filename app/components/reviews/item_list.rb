@@ -14,9 +14,21 @@ module Components
       # previously-empty photo, flag that one row so it scrolls into view + rings.
       # queue: the Move-wide walk (#654) — row mutation URLs carry ?queue=move so
       # the no-JS fallbacks redirect back into the walk, not box mode.
+      # pinnable/pinned_item_ids: the find-list pin on each row (#749, closed
+      # box) — personal state, not editable-gated (viewers pin).
 
-      #: (move: untyped, box: untyped, media: untyped, items: untyped, editable: untyped, ?highlight_id: untyped, ?queue: untyped) -> void
-      def initialize(move:, box:, media:, items:, editable:, highlight_id: nil, queue: false)
+      # @rbs move: untyped
+      # @rbs box: untyped
+      # @rbs media: untyped
+      # @rbs items: untyped
+      # @rbs editable: untyped
+      # @rbs highlight_id: untyped
+      # @rbs queue: untyped
+      # @rbs pinnable: bool
+      # @rbs pinned_item_ids: untyped
+      # @rbs return: void
+      def initialize(move:, box:, media:, items:, editable:, highlight_id: nil, queue: false,
+                     pinnable: false, pinned_item_ids: Set.new)
         @move = move
         @box = box
         @media = media
@@ -24,11 +36,15 @@ module Components
         @editable = editable
         @highlight_id = highlight_id
         @queue = queue
+        @pinnable = pinnable
+        @pinned_item_ids = pinned_item_ids
       end
 
       #: () -> void
       def view_template
-        div(id: ID) do
+        # `refocus` keeps keyboard focus on a pin toggle across its stream swap
+        # (#749) — the same convention as the search and box-contents grids.
+        div(id: ID, data: { controller: "refocus" }) do
           if @items.empty?
             empty_state
           else
@@ -36,7 +52,8 @@ module Components
               @items.each do |item|
                 render Components::Reviews::ItemRow.new(
                   move: @move, box: @box, media: @media, item:,
-                  editable: @editable, highlight: item.id == @highlight_id, queue: @queue
+                  editable: @editable, highlight: item.id == @highlight_id, queue: @queue,
+                  pinnable: @pinnable, pinned: @pinned_item_ids.include?(item.id)
                 )
               end
             end

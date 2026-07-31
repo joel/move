@@ -92,6 +92,22 @@ RSpec.describe "Find list flow" do
     expect(FindListEntry.where(move:, user_id: user.id, item: lamp)).to be_empty
   end
 
+  # #749 — the review walk lists a photo's items in full, so a closed box's
+  # rows carry the same pin toggle as the contents grid.
+  it "pins from a sealed box's review screen" do
+    box = create(:box, move:, number: "4", status: "sealed")
+    photo = create(:media, move:, box:)
+    item = create(:item, move:, box:, source_media: photo, name: "Blender",
+                         review_state: "pending_review")
+
+    visit move_box_review_photo_path(move, box, photo)
+    find("#find-list-toggle-btn-#{item.id}").click
+
+    # No-JS fallback lands on the list with the pin present.
+    expect(page).to have_text(I18n.t("find_lists.show.title"))
+    expect(FindListEntry.where(move:, user_id: user.id, item:)).to exist
+  end
+
   it "pins and unpins from the item detail page" do
     box = create(:box, move:, number: "5")
     item = create(:item, :manual, move:, box:, name: "Desk Lamp")
