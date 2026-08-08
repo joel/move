@@ -5,6 +5,17 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.113.0] — 2026-08-08
+
+### Added
+- **Boxes finish themselves.** Unpacking a box's last item now completes the
+  box automatically — ticking the final checklist item lands on the
+  celebration, the box grid and item page confirm with an "unpacked" toast,
+  and marking the only pinned item of a sealed box as Found takes it all the
+  way to unpacked in one tap. Undo (reopen) still works and never
+  re-completes an emptied box; restoring into an already-completed box is now
+  refused with a "reopen to restore" path instead (#755).
+
 ## [v0.112.0] — 2026-07-31
 
 ### Added
