@@ -33,5 +33,19 @@ module Boxes
         end
       end
     end
+
+    # The secondary-mutation form (#756 R4): the caller's primary item write
+    # is already committed and its event fired, so a completion Failure (an
+    # archived-Move race — the only reachable one) must never convert that
+    # operation into an error; the next unpack self-heals. Returns the Box
+    # when this call completed it, else nil (Success(nil) and Failure fold).
+
+    #: (box: untyped, actor: untyped) -> untyped
+    def self.completed_box(box:, actor:)
+      case new.call(box: box, actor: actor)
+      in Dry::Monads::Success(completed) then completed
+      else nil
+      end
+    end
   end
 end

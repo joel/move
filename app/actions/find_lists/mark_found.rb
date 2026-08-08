@@ -46,9 +46,10 @@ module FindLists
       # cross-mutation atomicity needs the #737 cross-flow lock ordering.
       opened_box = yield open_box_for_unpacking(item.box, user)
       # Sequential box-locked steps, never overlapping with an item lock (#739
-      # R2 ordering) — CompleteIfEmpty re-checks state under its own lock.
-      completed_box = yield Boxes::CompleteIfEmpty.new.call(box: item.box, actor: user)
-      Success(item: item, opened_box: opened_box, completed_box: completed_box)
+      # R2 ordering) — CompleteIfEmpty re-checks state under its own lock, and
+      # its secondary-mutation form never fails the committed find (#756 R4).
+      Success(item: item, opened_box: opened_box,
+              completed_box: Boxes::CompleteIfEmpty.completed_box(box: item.box, actor: user))
     end
 
     private

@@ -31,9 +31,9 @@ module Items
       items.each { |item| yield MarkRemoved.new.call(item: item, actor: actor) }
       # The bulk counterpart of Items::Unpack (#755): unpacking the box's last
       # photo completes the box — owned here, not by the adapter, so the rule
-      # cannot drift. Post-loop, own box lock (#739 R2 ordering).
-      completed_box = yield Boxes::CompleteIfEmpty.new.call(box: box, actor: actor)
-      Success(items: items, completed_box: completed_box)
+      # cannot drift. Post-loop, own box lock (#739 R2); completed_box never
+      # fails the already-committed removals (#756 R4).
+      Success(items: items, completed_box: Boxes::CompleteIfEmpty.completed_box(box: box, actor: actor))
     end
 
     private

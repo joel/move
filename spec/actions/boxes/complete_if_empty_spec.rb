@@ -55,6 +55,20 @@ RSpec.describe Boxes::CompleteIfEmpty do
     expect(box.reload.status).to eq("unpacked")
   end
 
+  it ".completed_box folds not-applicable AND failures to nil (secondary-mutation form, #756 R4)" do
+    aggregate_failures do
+      packing = create(:box, :with_room, move:, status: "packing")
+      expect(described_class.completed_box(box: packing, actor:)).to be_nil
+
+      archived = create(:move, :archived, created_by: actor)
+      archived_box = create(:box, :with_room, move: archived, status: "unpacking")
+      expect(described_class.completed_box(box: archived_box, actor:)).to be_nil
+
+      empty = create(:box, :with_room, move:, status: "unpacking")
+      expect(described_class.completed_box(box: empty, actor:)).to eq(empty)
+    end
+  end
+
   it "passes a TransitionStatus failure through (archived move)" do
     archived = create(:move, :archived, created_by: actor)
     box = create(:box, :with_room, move: archived, status: "unpacking")

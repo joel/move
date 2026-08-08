@@ -8,7 +8,9 @@ module Items
   # Success(item:, completed_box:) — completed_box is the Box when THIS call
   # completed it, else nil (callers deciding page shape should still read the
   # box's reality afterwards: the loser of a concurrent last-item race gets
-  # nil while the box is nonetheless unpacked).
+  # nil while the box is nonetheless unpacked). The completion is a SECONDARY
+  # mutation — its failure never converts the committed removal into an error
+  # (#756 R4; CompleteIfEmpty.completed_box owns that fold).
   #
   # The two deliberate non-callers: FindLists::MarkFound (its pin-scoped phase
   # bypass and auto-open interleave the same steps itself) and the review
@@ -19,9 +21,7 @@ module Items
     #: (item: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:)
       yield MarkRemoved.new.call(item: item, actor: actor)
-      # Post-item-commit, own box lock (#739 R2 ordering — see CompleteIfEmpty).
-      completed_box = yield Boxes::CompleteIfEmpty.new.call(box: item.box, actor: actor)
-      Success(item: item, completed_box: completed_box)
+      Success(item: item, completed_box: Boxes::CompleteIfEmpty.completed_box(box: item.box, actor: actor))
     end
   end
 end
