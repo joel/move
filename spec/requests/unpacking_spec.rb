@@ -366,7 +366,9 @@ RSpec.describe "Unpacking" do
       box = create(:box, :with_room, move:, status: "unpacking")
       photo = create(:media, move:, box:)
       pending = create(:item, move:, box:, source_media: photo, name: "Plates", review_state: "pending_review")
-      create(:item, move:, box:, source_media: photo, name: "Mugs") # more remain — no auto-complete (#755)
+      # Confirmed (the factory default is pending_review, which would keep the
+      # badge pending) — present only so the box doesn't auto-complete (#755).
+      create(:item, move:, box:, source_media: photo, name: "Mugs", review_state: "confirmed")
 
       patch move_box_unpacking_remove_path(move, box, pending, params: { origin: "box" }), as: :turbo_stream
 

@@ -9,12 +9,27 @@ module Items
     #: (item: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:)
       yield ensure_writable(item.move)
+      yield ensure_box_active(item)
       yield persist(item)
       yield emit_event(item, actor)
       Success(item)
     end
 
     private
+
+    # An `unpacked` box is terminal — restoring into it would contradict the
+    # completed lifecycle (the celebration, the grid's summary), which matters
+    # more now that emptying a box auto-completes it (#755/#756 Codex): the
+    # very response that completes the box re-renders the item's controls.
+    # Reopen the box first (unpacked -> unpacking), then restore — the same
+    # rule FindLists::Restore already enforces with this failure.
+
+    #: (untyped item) -> Dry::Monads::Result[untyped, untyped]
+    def ensure_box_active(item)
+      return Failure(:box_unpacked) if item.box.unpacked?
+
+      Success()
+    end
 
     #: (untyped item) -> Dry::Monads::Result[untyped, untyped]
     def persist(item)

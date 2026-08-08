@@ -411,6 +411,31 @@ RSpec.describe "Items" do
       end
     end
 
+    it "offers the reopen link (not a dead Restore) after the completing removal, and refuses a stale restore (#756)" do
+      box = create(:box, move:, status: "unpacking", number: "7")
+      item = create(:item, :manual, move:, box:)
+
+      patch mark_removed_move_item_path(move, item), as: :turbo_stream
+
+      aggregate_failures do
+        # The very response that completed the box must not render a Restore
+        # that would contradict it — it renders the reopen link instead.
+        expect(response.body).to include(I18n.t("items.show.reopen_to_restore"))
+          .and include(move_box_unpacking_path(move, box))
+        expect(response.body).not_to include(I18n.t("items.show.restore"))
+      end
+
+      # A stale/direct restore on the completed box is refused, nothing mutates.
+      patch restore_move_item_path(move, item), as: :turbo_stream
+
+      aggregate_failures do
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include(I18n.t("items.restore.box_unpacked"))
+        expect(item.reload.presence_state).to eq("removed")
+        expect(box.reload.status).to eq("unpacked")
+      end
+    end
+
     it "carries the box-unpacked linking toast across the no-JS redirect (#755)" do
       box = create(:box, move:, status: "unpacking", number: "7")
       item = create(:item, :manual, move:, box:)

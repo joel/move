@@ -158,13 +158,9 @@ class ItemsController < MoveScopedController
     in Dry::Monads::Success(_)
       removed_response
     in Dry::Monads::Failure(:wrong_phase)
-      respond_with_streams([], redirect: item_path, toast: true, status: :unprocessable_content) do
-        [:alert, t(".wrong_phase")]
-      end
+      presence_alert(t(".wrong_phase"))
     in Dry::Monads::Failure(_)
-      respond_with_streams([], redirect: item_path, toast: true, status: :unprocessable_content) do
-        [:alert, t(".failed")]
-      end
+      presence_alert(t(".failed"))
     end
   end
 
@@ -172,8 +168,17 @@ class ItemsController < MoveScopedController
 
   #: () -> untyped
   def restore
-    Items::RestoreToBox.new.call(item: @item, actor: current_user)
-    respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".restored")] }
+    case Items::RestoreToBox.new.call(item: @item, actor: current_user)
+    in Dry::Monads::Success(_)
+      respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".restored")] }
+    in Dry::Monads::Failure(:box_unpacked)
+      # A stale form on a since-completed box (#756 Codex): nothing mutated —
+      # re-render reality (the controls swap Restore for the reopen link) and
+      # say why.
+      presence_alert(t(".box_unpacked"), streams: presence_streams)
+    in Dry::Monads::Failure(_)
+      presence_alert(t(".failed"))
+    end
   end
 
   # POST /moves/:move_id/items/:id/generate_image (#416)
@@ -241,6 +246,16 @@ class ItemsController < MoveScopedController
   #: () -> String
   def item_path
     move_item_path(@move, @item)
+  end
+
+  # The presence-flip alert (non-2xx toast; streams only when the DOM should
+  # re-render reality — e.g. the stale-restore refusal swaps in the reopen link).
+
+  #: (String message, ?streams: Array[untyped]) -> untyped
+  def presence_alert(message, streams: [])
+    respond_with_streams(streams, redirect: item_path, toast: true, status: :unprocessable_content) do
+      [:alert, message]
+    end
   end
 
   # The mark_removed success response (#755): removing the box's last item
