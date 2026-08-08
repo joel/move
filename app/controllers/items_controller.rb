@@ -157,10 +157,14 @@ class ItemsController < MoveScopedController
     # Items::Unpack owns the pair: MarkRemoved + the last-item auto-complete
     # (#755/#756 — the lifecycle rule lives in the action, not per adapter).
     case Items::Unpack.new.call(item: @item, actor: current_user)
-    in Dry::Monads::Success({ completed_box: Box => box })
-      removed_response(completed_box: box)
     in Dry::Monads::Success(_)
-      removed_response
+      # Toast from the box's post-action REALITY, not from whether THIS
+      # request won the completion race (#756 R7) — the loser gets
+      # completed_box nil while the box is nonetheless unpacked, and the
+      # linking completion toast must still render (same rule as every
+      # other adapter).
+      box = @item.box.reload
+      removed_response(completed_box: box.unpacked? ? box : nil)
     in Dry::Monads::Failure(:wrong_phase)
       presence_alert(t(".wrong_phase"))
     in Dry::Monads::Failure(_)

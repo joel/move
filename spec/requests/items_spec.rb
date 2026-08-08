@@ -436,6 +436,23 @@ RSpec.describe "Items" do
       end
     end
 
+    it "derives the toast from the box's reality when this request lost the completion race (#756 R7)" do
+      box = create(:box, move:, status: "unpacking", number: "7")
+      item = create(:item, :manual, move:, box:)
+      raced = instance_double(Items::Unpack)
+      allow(Items::Unpack).to receive(:new).and_return(raced)
+      allow(raced).to receive(:call) do
+        item.update!(presence_state: "removed")
+        box.update!(status: "unpacked") # the concurrent winner completed the box
+        Dry::Monads::Success(item: item, completed_box: nil)
+      end
+
+      patch mark_removed_move_item_path(move, item), as: :turbo_stream
+
+      expect(response.body).to include(I18n.t("items.mark_removed.box_unpacked", number: "7"))
+      expect(response.body).not_to include(I18n.t("items.mark_removed.removed"))
+    end
+
     it "carries the box-unpacked linking toast across the no-JS redirect (#755)" do
       box = create(:box, move:, status: "unpacking", number: "7")
       item = create(:item, :manual, move:, box:)
