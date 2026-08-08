@@ -539,6 +539,41 @@ it can and reports the skipped numbers + reason rather than failing the batch. A
 counts/filtering are SQL — `move.boxes.group(:status).count` for the distribution,
 `where(status:)` for the source set (AGENTS.md §1 #5). No schema change.
 
+### 4c. Last-item auto-complete (#755)
+
+Unpacking a box's **last in-box item automatically completes the box**
+(`unpacking → unpacked`) — the explicit "Mark box unpacked" CTA remains for
+completing a box with items still listed. The rule lives in the **actions**, not
+per adapter, so no surface can drift:
+
+- `Items::Unpack` = `Items::MarkRemoved` + `Boxes::CompleteIfEmpty` — used by
+  the checklist tap, the box-grid chip, item detail, and the MCP
+  `mark_unpacked` tool. `Items::MarkPhotoRemoved` (bulk "Unpack photo") runs
+  the same completion after its loop. `FindLists::MarkFound` sequences it after
+  its auto-open (a one-item **sealed** box goes `sealed → unpacking → unpacked`
+  in one "Found" tap — two honest `box.status_changed` events, one deduped
+  toast). The review walk's mis-detection removal deliberately does **not**
+  complete (packing-phase cleanup), and reopen never re-completes an emptied
+  box.
+- `Boxes::CompleteIfEmpty` re-checks `unpacking? && items.in_box.none?` under
+  the **box lock** (box-first — the same order as the completion cascade and
+  `Items::RestoreToBox`'s guard, so restores and completions serialize and an
+  in_box item can never land inside an `unpacked` box). Two racing last-item
+  removals emit exactly one event; the race loser's response follows the box's
+  reality (a page-level redirect, not stale checklist streams).
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  packing --> sealed: seal
+  sealed --> in_transit: send
+  sealed --> unpacking: open / Found auto-open (#738)
+  in_transit --> unpacking: open
+  unpacking --> unpacked: mark box unpacked (CTA)
+  unpacking --> unpacked: last item unpacked (auto, #755)
+  unpacked --> unpacking: reopen (Undo — never auto-recompletes)
+```
+
 ---
 
 ## 5. Why this shape (the two forks we evaluated)

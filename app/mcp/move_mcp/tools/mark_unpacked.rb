@@ -19,15 +19,14 @@ module MoveMcp
         item = find_item(server_context, item_id)
         return error_response("No item #{item_id} in this move.") if item.nil?
 
-        result = ::Items::MarkRemoved.new.call(item: item, actor: actor(server_context))
+        # Items::Unpack owns the pair: MarkRemoved + the last-item
+        # auto-complete, so this tool can't drift from the web surfaces.
+        result = ::Items::Unpack.new.call(item: item, actor: actor(server_context))
         return failure_response(result.failure) if result.failure?
 
         audit(server_context, item_id: item.id)
-        # A completion failure must not fail the tool — the removal succeeded;
-        # Success(nil) / Failure both read as "box not completed".
-        completed = ::Boxes::CompleteIfEmpty.new.call(box: item.box, actor: actor(server_context))
         data_response(item: item_json(item.reload),
-                      box_completed: completed.success? && !completed.value!.nil?)
+                      box_completed: !result.value![:completed_box].nil?)
       end
     end
   end

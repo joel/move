@@ -200,9 +200,9 @@ RSpec.describe "Unpacking" do
       item = create(:item, move:, box:, presence_state: "in_box")
       create(:item, move:, box:, presence_state: "in_box")
       # Simulate losing the completion race: the concurrent winner transitions
-      # the box, so this request's CompleteIfEmpty re-reads `unpacked` and
-      # returns Success(nil) — the response must still be the redirect, never
-      # checklist streams for a terminal box.
+      # the box, so this request's CompleteIfEmpty (inside Items::Unpack)
+      # re-reads `unpacked` and returns Success(nil) — the response must still
+      # be the redirect, never checklist streams for a terminal box.
       loser = instance_double(Boxes::CompleteIfEmpty)
       allow(Boxes::CompleteIfEmpty).to receive(:new).and_return(loser)
       allow(loser).to receive(:call) do |box:, **|
@@ -213,6 +213,23 @@ RSpec.describe "Unpacking" do
       patch move_box_unpacking_remove_path(move, box, item), as: :turbo_stream
 
       expect(response).to redirect_to(move_box_unpacking_path(move, box))
+    end
+
+    it "redirects a restore that raced a completion instead of streaming success (#756 R3)" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      item = create(:item, move:, box:, presence_state: "removed")
+      create(:item, move:, box:, presence_state: "in_box")
+      # The box completed between require_active_checklist and the box-locked
+      # guard — the action refuses; success streams would strip a row the DB
+      # still holds.
+      raced = instance_double(Items::RestoreToBox)
+      allow(Items::RestoreToBox).to receive(:new).and_return(raced)
+      allow(raced).to receive(:call).and_return(Dry::Monads::Failure(:box_unpacked))
+
+      patch move_box_unpacking_restore_path(move, box, item), as: :turbo_stream
+
+      expect(response).to redirect_to(move_box_unpacking_path(move, box))
+      expect(item.reload.presence_state).to eq("removed")
     end
 
     it "leaves the box unpacking while other items remain (streams as before)" do

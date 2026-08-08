@@ -61,6 +61,25 @@ RSpec.describe Items::MarkPhotoRemoved do
     expect(item.reload.presence_state).to eq("in_box")
   end
 
+  it "completes the box when the photo held its last items (#755)" do
+    photo = create(:media, move:, box:)
+    create(:item, :confirmed, move:, box:, source_media: photo, name: "Plates")
+
+    result = described_class.new.call(box:, media: photo, actor:)
+
+    expect(result.value![:completed_box]).to eq(box)
+    expect(box.reload.status).to eq("unpacked")
+  end
+
+  it "reports no completion while other items remain" do
+    photo = create(:media, move:, box:)
+    create(:item, :confirmed, move:, box:, source_media: photo, name: "Plates")
+    create(:item, :confirmed, move:, box:, name: "Lamp")
+
+    expect(described_class.new.call(box:, media: photo, actor:).value![:completed_box]).to be_nil
+    expect(box.reload.status).to eq("unpacking")
+  end
+
   it "emits one item.removed event per item it removes" do
     photo = create(:media, move:, box:)
     create(:item, :confirmed, move:, box:, source_media: photo, name: "Plates")

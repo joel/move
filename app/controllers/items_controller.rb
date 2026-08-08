@@ -154,7 +154,11 @@ class ItemsController < MoveScopedController
 
   #: () -> untyped
   def mark_removed
-    case Items::MarkRemoved.new.call(item: @item, actor: current_user)
+    # Items::Unpack owns the pair: MarkRemoved + the last-item auto-complete
+    # (#755/#756 — the lifecycle rule lives in the action, not per adapter).
+    case Items::Unpack.new.call(item: @item, actor: current_user)
+    in Dry::Monads::Success({ completed_box: Box => box })
+      removed_response(completed_box: box)
     in Dry::Monads::Success(_)
       removed_response
     in Dry::Monads::Failure(:wrong_phase)
@@ -259,21 +263,22 @@ class ItemsController < MoveScopedController
   end
 
   # The mark_removed success response (#755): removing the box's last item
-  # auto-completes it. The item page stays put either way (presence streams);
-  # the completion is off-screen, so it surfaces with a LINKING toast (UX rule
-  # 1 — the find-list box_opened pattern), replacing the plain removed toast,
-  # never stacking two. flash.now scopes the link to the stream render; the
-  # no-JS fallback REDIRECTS, so there it rides the persistent flash.
+  # auto-completes it (Items::Unpack). The item page stays put either way
+  # (presence streams — they re-read the box, so a completed box's controls
+  # render the reopen link); the completion is off-screen, so it surfaces
+  # with a LINKING toast (UX rule 1 — the find-list box_opened pattern),
+  # replacing the plain removed toast, never stacking two. flash.now scopes
+  # the link to the stream render; the no-JS fallback REDIRECTS, so there it
+  # rides the persistent flash.
 
-  #: () -> untyped
-  def removed_response
-    completed = Boxes::CompleteIfEmpty.new.call(box: @item.box, actor: current_user)
-    if completed in Dry::Monads::Success(Box => box)
+  #: (?completed_box: untyped) -> untyped
+  def removed_response(completed_box: nil)
+    if completed_box
       link_flash = request.format.turbo_stream? ? flash.now : flash
-      link_flash[:action_href] = move_box_path(@move, box)
+      link_flash[:action_href] = move_box_path(@move, completed_box)
       link_flash[:action_label] = t(".view_box")
       respond_with_streams(presence_streams, redirect: item_path, toast: true) do
-        [:notice, t(".box_unpacked", number: box.number)]
+        [:notice, t(".box_unpacked", number: completed_box.number)]
       end
     else
       respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".removed")] }

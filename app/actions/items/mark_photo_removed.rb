@@ -29,7 +29,11 @@ module Items
       items = box.items.in_box.where(source_media_id: media.id)
                  .includes(:move, :box).order(:created_at, :id).to_a
       items.each { |item| yield MarkRemoved.new.call(item: item, actor: actor) }
-      Success(items)
+      # The bulk counterpart of Items::Unpack (#755): unpacking the box's last
+      # photo completes the box — owned here, not by the adapter, so the rule
+      # cannot drift. Post-loop, own box lock (#739 R2 ordering).
+      completed_box = yield Boxes::CompleteIfEmpty.new.call(box: box, actor: actor)
+      Success(items: items, completed_box: completed_box)
     end
 
     private

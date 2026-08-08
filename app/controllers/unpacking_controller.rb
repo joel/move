@@ -36,11 +36,13 @@ class UnpackingController < MoveScopedController
 
   #: () -> untyped
   def remove
-    Items::MarkRemoved.new.call(item: @item, actor: current_user)
-    # Ticking the last item completes the box (#755). The response is a full
-    # navigation either way — the celebration (checklist) or the unpacked box
-    # summary (grid origin) are page-level changes no region stream expresses.
-    if box_auto_completed?
+    # Items::Unpack owns the pair: MarkRemoved + the last-item auto-complete
+    # (#755/#756 — the lifecycle rule lives in the action, not per adapter).
+    Items::Unpack.new.call(item: @item, actor: current_user)
+    # The response is a full navigation when the box completed — the
+    # celebration (checklist) or the unpacked box summary (grid origin) are
+    # page-level changes no region stream expresses.
+    if box_completed?
       return redirect_to(move_box_path(@move, @box), notice: t("unpacking.flash.completed")) if box_origin?
 
       return redirect_to(move_box_unpacking_path(@move, @box))
@@ -55,11 +57,20 @@ class UnpackingController < MoveScopedController
 
   #: () -> untyped
   def restore
-    Items::RestoreToBox.new.call(item: @item, actor: current_user)
-    return respond_from_box if box_origin?
+    case Items::RestoreToBox.new.call(item: @item, actor: current_user)
+    in Dry::Monads::Success(_)
+      return respond_from_box if box_origin?
 
-    respond_with_streams(move_item_streams(from: :unpacked, to: :remaining),
-                         redirect: move_box_unpacking_path(@move, @box))
+      respond_with_streams(move_item_streams(from: :unpacked, to: :remaining),
+                           redirect: move_box_unpacking_path(@move, @box))
+    in Dry::Monads::Failure(:box_unpacked)
+      # The box completed between require_active_checklist and the box-locked
+      # guard (#756 R3): nothing mutated — success streams would strip a row
+      # the DB still holds. Land on the surface that shows the terminal state.
+      redirect_to box_origin? ? move_box_path(@move, @box) : move_box_unpacking_path(@move, @box)
+    in Dry::Monads::Failure(_)
+      redirect_to move_box_unpacking_path(@move, @box), alert: t("unpacking.not_available")
+    end
   end
 
   # PATCH /moves/:move_id/boxes/:box_id/unpacking/photos/:media_id/remove
@@ -69,10 +80,10 @@ class UnpackingController < MoveScopedController
 
   #: () -> untyped
   def remove_photo
+    # MarkPhotoRemoved owns its completion (the bulk counterpart of
+    # Items::Unpack); unpacking the last photo redirects like the last chip.
     Items::MarkPhotoRemoved.new.call(box: @box, media: @media, actor: current_user)
-    # Unpacking the last photo completes the box (#755) — same page-level
-    # redirect as the grid's last item chip.
-    return redirect_to(move_box_path(@move, @box), notice: t("unpacking.flash.completed")) if box_auto_completed?
+    return redirect_to(move_box_path(@move, @box), notice: t("unpacking.flash.completed")) if box_completed?
 
     respond_with_streams([contents_header_stream, review_badge_stream, photo_card_stream(@media)],
                          redirect: move_box_path(@move, @box))
@@ -105,21 +116,16 @@ class UnpackingController < MoveScopedController
 
   private
 
-  # The last-item auto-complete (#755), run unconditionally after a removal
-  # (a replayed remove self-heals; a wrong_phase removal leaves the box
-  # non-unpacking, so the action no-ops). The response then follows the box's
-  # REALITY, not whether THIS request won the completion race (#756 P2): the
-  # loser of two concurrent last-item removals gets Success(nil) — the
-  # post-lock re-read saw `unpacked` — but its checklist/grid streams would
-  # render an active surface for a terminal box, so it must redirect just the
-  # same. CompleteIfEmpty's with_lock reloaded @box, so the read is fresh; a
-  # completion Failure after a successful removal leaves the box non-unpacked
-  # and falls through to the normal response.
+  # The response follows the box's REALITY after the unpack ran, not whether
+  # THIS request won the completion race (#756 P2): the loser of two
+  # concurrent last-item removals gets completed_box nil — the post-lock
+  # re-read saw `unpacked` — but its checklist/grid streams would render an
+  # active surface for a terminal box, so it must redirect just the same.
+  # Reload: the action completed via @item.box, a different AR object.
 
   #: () -> bool
-  def box_auto_completed?
-    Boxes::CompleteIfEmpty.new.call(box: @box, actor: current_user)
-    @box.unpacked?
+  def box_completed?
+    @box.reload.unpacked?
   end
 
   # The surgical Turbo Stream array for moving an item between the two checklist
