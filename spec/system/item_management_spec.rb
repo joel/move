@@ -91,6 +91,7 @@ RSpec.describe "Manual add & item detail" do
   it "marks unpacked then restores an item (presence axis)" do
     unpacking = create(:box, move:, number: "3", room: kitchen, status: "unpacking")
     item = create(:item, :manual, move:, box: unpacking)
+    create(:item, :manual, move:, box: unpacking) # more remain — no auto-complete (#755)
 
     visit move_item_path(move, item)
     click_button I18n.t("items.show.mark_unpacked")
@@ -98,5 +99,20 @@ RSpec.describe "Manual add & item detail" do
 
     click_button I18n.t("items.show.restore")
     expect(item.reload.presence_state).to eq("in_box")
+  end
+
+  # #755/#756 — unpacking the box's LAST item completes the box; the item page
+  # then offers the reopen link instead of a contradicting Restore.
+  it "swaps Restore for the reopen link when unpacking the last item completes the box" do
+    unpacking = create(:box, move:, number: "3", room: kitchen, status: "unpacking")
+    item = create(:item, :manual, move:, box: unpacking)
+
+    visit move_item_path(move, item)
+    click_button I18n.t("items.show.mark_unpacked")
+
+    expect(item.reload.presence_state).to eq("removed")
+    expect(unpacking.reload.status).to eq("unpacked")
+    expect(page).to have_link(I18n.t("items.show.reopen_to_restore"))
+    expect(page).to have_no_button(I18n.t("items.show.restore"))
   end
 end

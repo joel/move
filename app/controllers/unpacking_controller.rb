@@ -107,13 +107,19 @@ class UnpackingController < MoveScopedController
 
   # The last-item auto-complete (#755), run unconditionally after a removal
   # (a replayed remove self-heals; a wrong_phase removal leaves the box
-  # non-unpacking, so the action no-ops). The pattern-match-as-boolean folds
-  # Success(nil) AND Failure into "not completed" — a completion failure after
-  # a successful removal is benign and falls through to the normal response.
+  # non-unpacking, so the action no-ops). The response then follows the box's
+  # REALITY, not whether THIS request won the completion race (#756 P2): the
+  # loser of two concurrent last-item removals gets Success(nil) — the
+  # post-lock re-read saw `unpacked` — but its checklist/grid streams would
+  # render an active surface for a terminal box, so it must redirect just the
+  # same. CompleteIfEmpty's with_lock reloaded @box, so the read is fresh; a
+  # completion Failure after a successful removal leaves the box non-unpacked
+  # and falls through to the normal response.
 
   #: () -> bool
   def box_auto_completed?
-    Boxes::CompleteIfEmpty.new.call(box: @box, actor: current_user) in Dry::Monads::Success(Box)
+    Boxes::CompleteIfEmpty.new.call(box: @box, actor: current_user)
+    @box.unpacked?
   end
 
   # The surgical Turbo Stream array for moving an item between the two checklist

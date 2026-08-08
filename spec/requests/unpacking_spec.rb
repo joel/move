@@ -195,6 +195,26 @@ RSpec.describe "Unpacking" do
       expect(box.reload.status).to eq("unpacked")
     end
 
+    it "redirects even when a concurrent request already completed the box (race loser, #756 P2)" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      item = create(:item, move:, box:, presence_state: "in_box")
+      create(:item, move:, box:, presence_state: "in_box")
+      # Simulate losing the completion race: the concurrent winner transitions
+      # the box, so this request's CompleteIfEmpty re-reads `unpacked` and
+      # returns Success(nil) — the response must still be the redirect, never
+      # checklist streams for a terminal box.
+      loser = instance_double(Boxes::CompleteIfEmpty)
+      allow(Boxes::CompleteIfEmpty).to receive(:new).and_return(loser)
+      allow(loser).to receive(:call) do |box:, **|
+        box.update!(status: "unpacked")
+        Dry::Monads::Success(nil)
+      end
+
+      patch move_box_unpacking_remove_path(move, box, item), as: :turbo_stream
+
+      expect(response).to redirect_to(move_box_unpacking_path(move, box))
+    end
+
     it "leaves the box unpacking while other items remain (streams as before)" do
       box = create(:box, :with_room, move:, status: "unpacking")
       item = create(:item, move:, box:, presence_state: "in_box")
