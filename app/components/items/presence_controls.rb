@@ -55,16 +55,19 @@ module Components
       end
 
       # The remove control's meaning depends on where the box is in its lifecycle.
-      # A *removed* item always offers Restore-to-box — that presence inverse is its
-      # only C3 undo, regardless of phase. Otherwise: while unpacking/unpacked,
-      # removing means "physically taken out" (presence → removed, reversible);
-      # while *packing*, the item was added by mistake — Delete it. A sealed /
-      # in-transit box is closed: no removal control — unseal it to edit contents.
+      # A *removed* item offers Restore-to-box — its only C3 undo — except on a
+      # completed (`unpacked`) box, where restoring would contradict the terminal
+      # state (Items::RestoreToBox refuses it): there the control is a link to
+      # the unpacking surface, whose Undo reopens the box (#756 Codex).
+      # Otherwise: while unpacking/unpacked, removing means "physically taken
+      # out" (presence → removed, reversible); while *packing*, the item was
+      # added by mistake — Delete it. A sealed / in-transit box is closed: no
+      # removal control — unseal it to edit contents.
 
       #: () -> untyped
       def presence_control
         if @item.removed?
-          restore_to_box_control
+          @item.box.unpacked? ? reopen_to_restore_link : restore_to_box_control
         elsif @item.box.unpacking? || @item.box.unpacked?
           mark_unpacked_control
         elsif @item.box.packing?
@@ -78,6 +81,13 @@ module Components
           I18n.t("items.show.restore"), restore_move_item_path(@move, @item),
           method: :patch, class: ghost_button
         )
+      end
+
+      #: () -> untyped
+      def reopen_to_restore_link
+        a(href: view_context.move_box_unpacking_path(@move, @item.box), class: ghost_button) do
+          plain I18n.t("items.show.reopen_to_restore")
+        end
       end
 
       #: () -> untyped

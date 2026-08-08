@@ -28,6 +28,7 @@ en:
       mark_unpacked: "Mark unpacked"
       mark_unpacked_confirm: "Mark this item as unpacked from its box?"
       restore: "Restore to box"
+      reopen_to_restore: "Reopen box to restore"
       # Packing phase: the item was added by mistake — delete it (and its orphaned
       # photo). Restorable from the activity feed.
       delete: "Delete from box"
@@ -61,10 +62,14 @@ en:
       failed: "Could not move the item."
     mark_removed:
       removed: "Item marked as removed."
+      box_unpacked: "Box %{number} unpacked"
+      view_box: "View box"
       wrong_phase: "This box isn’t being unpacked yet — you can’t mark items unpacked."
       failed: "Could not update this item."
     restore:
       restored: "Item restored to its box."
+      box_unpacked: "This box is already unpacked — reopen it to restore items."
+      failed: "Could not restore this item."
     destroy:
       deleted: "%{name} was deleted."
       delete_failed: "Could not delete this item."

@@ -214,6 +214,7 @@ RSpec.describe "FindLists" do
     it "marks a pinned item found over turbo_stream even on a sealed box" do
       box = create(:box, move:, status: "sealed")
       item = create(:item, move:, box:, name: "Face Cream")
+      create(:item, move:, box:, name: "Towels") # more remain — open only, no auto-complete (#755)
       create(:find_list_entry, move:, user:, item:)
 
       patch move_find_list_mark_found_path(move, item_id: item.id), as: :turbo_stream
@@ -229,6 +230,39 @@ RSpec.describe "FindLists" do
         expect(response.body).to include(%(target="#{Components::FindLists::List::ID}"))
         expect(response.body).to include("line-through").and include(I18n.t("find_lists.show.found"))
         expect(response.body).to include(I18n.t("find_lists.show.found_count", found: 1, total: 1))
+      end
+    end
+
+    it "derives the toast from the box's reality when the opener lost the completion race (#756 R6)" do
+      box = create(:box, move:, status: "sealed")
+      item = create(:item, move:, box:, name: "Face Cream")
+      create(:find_list_entry, move:, user:, item:)
+      raced = instance_double(FindLists::MarkFound)
+      allow(FindLists::MarkFound).to receive(:new).and_return(raced)
+      allow(raced).to receive(:call) do
+        box.update!(status: "unpacked") # a concurrent found completed the box this tap opened
+        Dry::Monads::Success(item: item, opened_box: box, completed_box: nil)
+      end
+
+      patch move_find_list_mark_found_path(move, item_id: item.id), as: :turbo_stream
+
+      expect(response.body).to include(I18n.t("find_lists.flash.box_unpacked", number: box.number))
+      expect(response.body).not_to include(I18n.t("find_lists.flash.box_opened", number: box.number))
+    end
+
+    it "marks the box unpacked when the found item was its last (#755) — one toast, the terminal fact" do
+      box = create(:box, move:, status: "sealed")
+      item = create(:item, move:, box:, name: "Face Cream")
+      create(:find_list_entry, move:, user:, item:)
+
+      patch move_find_list_mark_found_path(move, item_id: item.id), as: :turbo_stream
+
+      aggregate_failures do
+        expect(box.reload.status).to eq("unpacked")
+        expect(response.body).to include(I18n.t("find_lists.flash.box_unpacked", number: box.number))
+        expect(response.body).not_to include(I18n.t("find_lists.flash.box_opened", number: box.number))
+        expect(response.body).to include(I18n.t("find_lists.flash.view_box"))
+        expect(response.body).to include(move_box_path(move, box))
       end
     end
 
@@ -260,6 +294,7 @@ RSpec.describe "FindLists" do
     it "carries the box-opened linking toast across the no-JS redirect" do
       box = create(:box, move:, status: "sealed")
       item = create(:item, move:, box:, name: "Face Cream")
+      create(:item, move:, box:, name: "Towels") # more remain — open only, no auto-complete (#755)
       create(:find_list_entry, move:, user:, item:)
 
       patch move_find_list_mark_found_path(move, item_id: item.id)

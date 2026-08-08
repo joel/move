@@ -46,6 +46,7 @@ RSpec.describe "Find list flow" do
   it "marks an item found from the list, restores it, and unpins via the swipe control" do
     box = create(:box, move:, number: "12", status: "sealed")
     item = create(:item, :manual, move:, box:, name: "Bath Towels")
+    create(:item, :manual, move:, box:, name: "Hand Towels") # more remain — no auto-complete (#755)
     create(:find_list_entry, move:, user:, item:)
 
     visit move_find_list_path(move)

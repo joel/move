@@ -193,10 +193,32 @@ RSpec.describe "MCP endpoint" do
     it "marks an item removed from its box (unpacking)" do
       box = create(:box, move:, number: 6, status: "unpacking")
       item = create(:item, move:, box:, name: "Plate")
+      create(:item, move:, box:, name: "Bowl") # more remain — no auto-complete (#755)
 
-      tool_call("mark_unpacked", { item_id: item.id })
+      body = tool_call("mark_unpacked", { item_id: item.id })
 
       expect(item.reload.presence_state).to eq("removed")
+      expect(body.dig("result", "structuredContent", "box_completed")).to be(false)
+      expect(box.reload.status).to eq("unpacking")
+    end
+
+    it "auto-completes the box when the last item is unpacked (#755)" do
+      box = create(:box, move:, number: 6, status: "unpacking")
+      item = create(:item, move:, box:, name: "Plate")
+
+      body = tool_call("mark_unpacked", { item_id: item.id })
+
+      expect(body.dig("result", "structuredContent", "box_completed")).to be(true)
+      expect(box.reload.status).to eq("unpacked")
+    end
+
+    it "reports the box's reality on a replay — even when this call didn't win the completion (#756 R5)" do
+      box = create(:box, move:, number: 6, status: "unpacked")
+      item = create(:item, move:, box:, name: "Plate", presence_state: "removed")
+
+      body = tool_call("mark_unpacked", { item_id: item.id })
+
+      expect(body.dig("result", "structuredContent", "box_completed")).to be(true)
     end
 
     it "refuses to mark_unpacked while the box is still packing" do

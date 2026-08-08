@@ -52,6 +52,30 @@ RSpec.describe "Unpacking mode" do
     expect(page).to have_text(I18n.t("unpacking.remaining_title"))
   end
 
+  # #755 — checking the last item off completes the box by itself.
+  it "auto-completes the box when the last item is checked off, and Undo does not re-complete" do
+    box = create(:box, :with_room, move:, number: "7", status: "unpacking")
+    create(:item, move:, box:, name: "Ceramic Plates", presence_state: "in_box")
+    create(:item, move:, box:, name: "Glass Bowls", presence_state: "removed")
+
+    visit move_box_unpacking_path(move, box)
+    click_button "Ceramic Plates"
+
+    # No manual "Mark box unpacked" tap — the celebration renders directly.
+    expect(page).to have_text(I18n.t("unpacking.done_title"))
+    expect(box.reload.status).to eq("unpacked")
+
+    # Undo reopens; the emptied box stays open — completion never runs on reopen.
+    click_button I18n.t("unpacking.undo")
+    expect(page).to have_text(I18n.t("unpacking.remaining_title"))
+    expect(box.reload.status).to eq("unpacking")
+
+    # Restoring an item still works on the reopened checklist.
+    click_button "Glass Bowls"
+    expect(box.items.in_box.count).to eq(1)
+    expect(box.reload.status).to eq("unpacking")
+  end
+
   it "is read-only on an archived move" do
     archived = create(:move, :archived, created_by: user)
     box = create(:box, :with_room, move: archived, number: "7", status: "unpacking")

@@ -29,6 +29,7 @@ en:
       pinned: "Pinned “%{name}” to your find list"
       view: "View list"
       box_opened: "Opened Box %{number} for unpacking"
+      box_unpacked: "Box %{number} unpacked"
       view_box: "View box"
       cleared:
         one: "Cleared 1 found item"

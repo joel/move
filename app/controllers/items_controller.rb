@@ -154,17 +154,21 @@ class ItemsController < MoveScopedController
 
   #: () -> untyped
   def mark_removed
-    case Items::MarkRemoved.new.call(item: @item, actor: current_user)
+    # Items::Unpack owns the pair: MarkRemoved + the last-item auto-complete
+    # (#755/#756 — the lifecycle rule lives in the action, not per adapter).
+    case Items::Unpack.new.call(item: @item, actor: current_user)
     in Dry::Monads::Success(_)
-      respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".removed")] }
+      # Toast from the box's post-action REALITY, not from whether THIS
+      # request won the completion race (#756 R7) — the loser gets
+      # completed_box nil while the box is nonetheless unpacked, and the
+      # linking completion toast must still render (same rule as every
+      # other adapter).
+      box = @item.box.reload
+      removed_response(completed_box: box.unpacked? ? box : nil)
     in Dry::Monads::Failure(:wrong_phase)
-      respond_with_streams([], redirect: item_path, toast: true, status: :unprocessable_content) do
-        [:alert, t(".wrong_phase")]
-      end
+      presence_alert(t(".wrong_phase"))
     in Dry::Monads::Failure(_)
-      respond_with_streams([], redirect: item_path, toast: true, status: :unprocessable_content) do
-        [:alert, t(".failed")]
-      end
+      presence_alert(t(".failed"))
     end
   end
 
@@ -172,8 +176,17 @@ class ItemsController < MoveScopedController
 
   #: () -> untyped
   def restore
-    Items::RestoreToBox.new.call(item: @item, actor: current_user)
-    respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".restored")] }
+    case Items::RestoreToBox.new.call(item: @item, actor: current_user)
+    in Dry::Monads::Success(_)
+      respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".restored")] }
+    in Dry::Monads::Failure(:box_unpacked)
+      # A stale form on a since-completed box (#756 Codex): nothing mutated —
+      # re-render reality (the controls swap Restore for the reopen link) and
+      # say why.
+      presence_alert(t(".box_unpacked"), streams: presence_streams)
+    in Dry::Monads::Failure(_)
+      presence_alert(t(".failed"))
+    end
   end
 
   # POST /moves/:move_id/items/:id/generate_image (#416)
@@ -241,6 +254,39 @@ class ItemsController < MoveScopedController
   #: () -> String
   def item_path
     move_item_path(@move, @item)
+  end
+
+  # The presence-flip alert (non-2xx toast; streams only when the DOM should
+  # re-render reality — e.g. the stale-restore refusal swaps in the reopen link).
+
+  #: (String message, ?streams: Array[untyped]) -> untyped
+  def presence_alert(message, streams: [])
+    respond_with_streams(streams, redirect: item_path, toast: true, status: :unprocessable_content) do
+      [:alert, message]
+    end
+  end
+
+  # The mark_removed success response (#755): removing the box's last item
+  # auto-completes it (Items::Unpack). The item page stays put either way
+  # (presence streams — they re-read the box, so a completed box's controls
+  # render the reopen link); the completion is off-screen, so it surfaces
+  # with a LINKING toast (UX rule 1 — the find-list box_opened pattern),
+  # replacing the plain removed toast, never stacking two. flash.now scopes
+  # the link to the stream render; the no-JS fallback REDIRECTS, so there it
+  # rides the persistent flash.
+
+  #: (?completed_box: untyped) -> untyped
+  def removed_response(completed_box: nil)
+    if completed_box
+      link_flash = request.format.turbo_stream? ? flash.now : flash
+      link_flash[:action_href] = move_box_path(@move, completed_box)
+      link_flash[:action_label] = t(".view_box")
+      respond_with_streams(presence_streams, redirect: item_path, toast: true) do
+        [:notice, t(".box_unpacked", number: completed_box.number)]
+      end
+    else
+      respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".removed")] }
+    end
   end
 
   # Streams for a presence flip (mark_removed / restore): the overlay badges (the
