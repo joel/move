@@ -162,10 +162,14 @@ RSpec.describe "Box detail & lifecycle" do
     expect(page).to have_text(I18n.t("boxes.contents.unpacked_count", count: 1, total: 2))
 
     # Standalone card toggle — scoped to the card (the manage sheet's box-level
-    # "Mark unpacked" transition shares the label).
+    # "Mark unpacked" transition shares the label). It is the LAST in-box item,
+    # so the box auto-completes (#755) and the redirect lands on the unpacked
+    # box detail with the completion toast.
     within("##{Components::Boxes::ItemCard.dom_id(lamp)}") do
       click_button I18n.t("boxes.contents.mark_unpacked")
     end
-    expect(page).to have_text(I18n.t("boxes.contents.unpacked_count", count: 2, total: 2))
+    # The completion toast doubles as the status assertion — it only renders
+    # when the auto-complete transitioned the box.
+    expect(page).to have_text(I18n.t("unpacking.flash.completed"))
   end
 end

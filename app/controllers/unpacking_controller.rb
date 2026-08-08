@@ -37,6 +37,14 @@ class UnpackingController < MoveScopedController
   #: () -> untyped
   def remove
     Items::MarkRemoved.new.call(item: @item, actor: current_user)
+    # Ticking the last item completes the box (#755). The response is a full
+    # navigation either way — the celebration (checklist) or the unpacked box
+    # summary (grid origin) are page-level changes no region stream expresses.
+    if box_auto_completed?
+      return redirect_to(move_box_path(@move, @box), notice: t("unpacking.flash.completed")) if box_origin?
+
+      return redirect_to(move_box_unpacking_path(@move, @box))
+    end
     return respond_from_box if box_origin?
 
     respond_with_streams(move_item_streams(from: :remaining, to: :unpacked),
@@ -62,6 +70,10 @@ class UnpackingController < MoveScopedController
   #: () -> untyped
   def remove_photo
     Items::MarkPhotoRemoved.new.call(box: @box, media: @media, actor: current_user)
+    # Unpacking the last photo completes the box (#755) — same page-level
+    # redirect as the grid's last item chip.
+    return redirect_to(move_box_path(@move, @box), notice: t("unpacking.flash.completed")) if box_auto_completed?
+
     respond_with_streams([contents_header_stream, review_badge_stream, photo_card_stream(@media)],
                          redirect: move_box_path(@move, @box))
   end
@@ -92,6 +104,17 @@ class UnpackingController < MoveScopedController
   end
 
   private
+
+  # The last-item auto-complete (#755), run unconditionally after a removal
+  # (a replayed remove self-heals; a wrong_phase removal leaves the box
+  # non-unpacking, so the action no-ops). The pattern-match-as-boolean folds
+  # Success(nil) AND Failure into "not completed" — a completion failure after
+  # a successful removal is benign and falls through to the normal response.
+
+  #: () -> bool
+  def box_auto_completed?
+    Boxes::CompleteIfEmpty.new.call(box: @box, actor: current_user) in Dry::Monads::Success(Box)
+  end
 
   # The surgical Turbo Stream array for moving an item between the two checklist
   # sections (remove: remaining→unpacked, restore: unpacked→remaining). Symmetric:

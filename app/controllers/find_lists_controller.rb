@@ -61,16 +61,13 @@ class FindListsController < MoveScopedController
   #: () -> untyped
   def mark_found
     case result = FindLists::MarkFound.new.call(move: @move, user: current_user, item: @item)
+    # Hash patterns match subsets, so branch ORDER is the toast dedupe (#755):
+    # when one tap both opened and completed the box (one-item sealed box),
+    # "unpacked" supersedes "opened" — one toast, the terminal fact.
+    in Dry::Monads::Success({ completed_box: Box => box })
+      respond_with_box_toast(box, t("find_lists.flash.box_unpacked", number: box.number))
     in Dry::Monads::Success({ opened_box: Box => box })
-      # The link must survive BOTH paths: flash.now scopes it to the stream
-      # render, while the no-JS fallback REDIRECTS — there it rides the
-      # persistent flash for exactly one request (Codex #739).
-      link_flash = request.format.turbo_stream? ? flash.now : flash
-      link_flash[:action_href] = move_box_path(@move, box)
-      link_flash[:action_label] = t("find_lists.flash.view_box")
-      respond_with_streams([list_stream], redirect: move_find_list_path(@move), toast: true) do
-        [:notice, t("find_lists.flash.box_opened", number: box.number)]
-      end
+      respond_with_box_toast(box, t("find_lists.flash.box_opened", number: box.number))
     else
       respond_to_found_toggle(result)
     end
@@ -121,6 +118,21 @@ class FindListsController < MoveScopedController
       Components::FindLists::SearchLink::ID,
       view_context.render(Components::FindLists::SearchLink.new(move: @move, count: count))
     )
+  end
+
+  # The secondary-box-mutation toast (auto-open #738 / auto-complete #755).
+  # The link must survive BOTH paths: flash.now scopes it to the stream
+  # render, while the no-JS fallback REDIRECTS — there it rides the
+  # persistent flash for exactly one request (Codex #739).
+
+  #: (untyped box, String message) -> untyped
+  def respond_with_box_toast(box, message)
+    link_flash = request.format.turbo_stream? ? flash.now : flash
+    link_flash[:action_href] = move_box_path(@move, box)
+    link_flash[:action_label] = t("find_lists.flash.view_box")
+    respond_with_streams([list_stream], redirect: move_find_list_path(@move), toast: true) do
+      [:notice, message]
+    end
   end
 
   #: (untyped result) -> untyped

@@ -4,10 +4,12 @@ module MoveMcp
   module Tools
     # Marks an item as unpacked (removed from its box) via Items::MarkRemoved —
     # the per-item unpacking action (D10/E3). The item is resolved through the
-    # token's Move, so it cannot belong to another Move.
+    # token's Move, so it cannot belong to another Move. Unpacking the box's
+    # last item auto-completes the box (#755) — reported as box_completed.
     class MarkUnpacked < Base
       tool_name "mark_unpacked"
-      description "Mark an item as unpacked (removed from its box)."
+      description "Mark an item as unpacked (removed from its box). " \
+                  "Unpacking the box's last item also marks the box unpacked (box_completed: true)."
       input_schema(
         properties: { item_id: { type: "string", description: "The item id (uuid) to mark unpacked." } },
         required: ["item_id"]
@@ -21,7 +23,11 @@ module MoveMcp
         return failure_response(result.failure) if result.failure?
 
         audit(server_context, item_id: item.id)
-        data_response(item: item_json(item.reload))
+        # A completion failure must not fail the tool — the removal succeeded;
+        # Success(nil) / Failure both read as "box not completed".
+        completed = ::Boxes::CompleteIfEmpty.new.call(box: item.box, actor: actor(server_context))
+        data_response(item: item_json(item.reload),
+                      box_completed: completed.success? && !completed.value!.nil?)
       end
     end
   end

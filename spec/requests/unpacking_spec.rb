@@ -130,15 +130,80 @@ RSpec.describe "Unpacking" do
       expect(response.body).not_to include(I18n.t("unpacking.all_clear_title"))
     end
 
-    it "flips the remaining section to the all-clear empty state when the last item is removed" do
+    # Removing the LAST item no longer streams the all-clear state — it
+    # auto-completes the box and lands on the celebration (#755, below). The
+    # all-clear remaining section is still reachable on a reopened box:
+    it "renders the all-clear remaining state on a reopened box's checklist" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      create(:item, move:, box:, presence_state: "removed")
+
+      get move_box_unpacking_path(move, box)
+
+      expect(response.body).to include(I18n.t("unpacking.all_clear_title"))
+    end
+  end
+
+  describe "last-item auto-complete (#755)" do
+    it "completes the box and redirects to the celebration when the last checklist item is removed" do
       box = create(:box, :with_room, move:, status: "unpacking")
       item = create(:item, move:, box:, presence_state: "in_box")
 
       patch move_box_unpacking_remove_path(move, box, item), as: :turbo_stream
 
-      expect(response.body)
-        .to include(%(action="replace" target="#{Components::Unpacking::RemainingSection::ID}"))
-        .and include(I18n.t("unpacking.all_clear_title"))
+      expect(response).to redirect_to(move_box_unpacking_path(move, box))
+      expect(box.reload.status).to eq("unpacked")
+
+      follow_redirect!
+      expect(response.body).to include(I18n.t("unpacking.done_title"))
+    end
+
+    it "completes and redirects to the box detail with a toast for the grid's last chip" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      item = create(:item, move:, box:, source_media: photo, name: "Plates")
+
+      patch move_box_unpacking_remove_path(move, box, item, params: { origin: "box" }), as: :turbo_stream
+
+      aggregate_failures do
+        expect(response).to redirect_to(move_box_path(move, box))
+        expect(flash[:notice]).to eq(I18n.t("unpacking.flash.completed"))
+        expect(box.reload.status).to eq("unpacked")
+      end
+    end
+
+    it "completes when the last photo is bulk-unpacked" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: photo, name: "Plates")
+
+      patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id), as: :turbo_stream
+
+      aggregate_failures do
+        expect(response).to redirect_to(move_box_path(move, box))
+        expect(flash[:notice]).to eq(I18n.t("unpacking.flash.completed"))
+        expect(box.reload.status).to eq("unpacked")
+      end
+    end
+
+    it "self-heals: a replayed remove on an emptied-but-open box still completes it" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      item = create(:item, move:, box:, presence_state: "removed")
+
+      patch move_box_unpacking_remove_path(move, box, item), as: :turbo_stream
+
+      expect(response).to redirect_to(move_box_unpacking_path(move, box))
+      expect(box.reload.status).to eq("unpacked")
+    end
+
+    it "leaves the box unpacking while other items remain (streams as before)" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      item = create(:item, move:, box:, presence_state: "in_box")
+      create(:item, move:, box:, presence_state: "in_box")
+
+      patch move_box_unpacking_remove_path(move, box, item), as: :turbo_stream
+
+      expect(response).to have_http_status(:ok)
+      expect(box.reload.status).to eq("unpacking")
     end
   end
 
@@ -246,6 +311,7 @@ RSpec.describe "Unpacking" do
       box = create(:box, :with_room, move:, status: "unpacking")
       photo = create(:media, move:, box:)
       create(:item, move:, box:, source_media: photo, name: "Plates")
+      create(:item, :manual, move:, box:, name: "Lamp") # more remain — no auto-complete (#755)
 
       patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id), as: :turbo_stream
 
@@ -283,6 +349,7 @@ RSpec.describe "Unpacking" do
       box = create(:box, :with_room, move:, status: "unpacking")
       photo = create(:media, move:, box:)
       item = create(:item, move:, box:, source_media: photo, name: "Plates")
+      create(:item, move:, box:, source_media: photo, name: "Mugs") # more remain — no auto-complete (#755)
 
       patch move_box_unpacking_remove_path(move, box, item, params: { origin: "box" }), as: :turbo_stream
 
@@ -299,6 +366,7 @@ RSpec.describe "Unpacking" do
       box = create(:box, :with_room, move:, status: "unpacking")
       photo = create(:media, move:, box:)
       pending = create(:item, move:, box:, source_media: photo, name: "Plates", review_state: "pending_review")
+      create(:item, move:, box:, source_media: photo, name: "Mugs") # more remain — no auto-complete (#755)
 
       patch move_box_unpacking_remove_path(move, box, pending, params: { origin: "box" }), as: :turbo_stream
 
@@ -322,6 +390,7 @@ RSpec.describe "Unpacking" do
     it "falls back to a box-detail redirect for plain HTML" do
       box = create(:box, :with_room, move:, status: "unpacking")
       item = create(:item, :manual, move:, box:, name: "Lamp")
+      create(:item, :manual, move:, box:, name: "Fan") # more remain — no auto-complete (#755)
 
       patch move_box_unpacking_remove_path(move, box, item, params: { origin: "box" })
 

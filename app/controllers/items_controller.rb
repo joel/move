@@ -156,7 +156,7 @@ class ItemsController < MoveScopedController
   def mark_removed
     case Items::MarkRemoved.new.call(item: @item, actor: current_user)
     in Dry::Monads::Success(_)
-      respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".removed")] }
+      removed_response
     in Dry::Monads::Failure(:wrong_phase)
       respond_with_streams([], redirect: item_path, toast: true, status: :unprocessable_content) do
         [:alert, t(".wrong_phase")]
@@ -241,6 +241,28 @@ class ItemsController < MoveScopedController
   #: () -> String
   def item_path
     move_item_path(@move, @item)
+  end
+
+  # The mark_removed success response (#755): removing the box's last item
+  # auto-completes it. The item page stays put either way (presence streams);
+  # the completion is off-screen, so it surfaces with a LINKING toast (UX rule
+  # 1 — the find-list box_opened pattern), replacing the plain removed toast,
+  # never stacking two. flash.now scopes the link to the stream render; the
+  # no-JS fallback REDIRECTS, so there it rides the persistent flash.
+
+  #: () -> untyped
+  def removed_response
+    completed = Boxes::CompleteIfEmpty.new.call(box: @item.box, actor: current_user)
+    if completed in Dry::Monads::Success(Box => box)
+      link_flash = request.format.turbo_stream? ? flash.now : flash
+      link_flash[:action_href] = move_box_path(@move, box)
+      link_flash[:action_label] = t(".view_box")
+      respond_with_streams(presence_streams, redirect: item_path, toast: true) do
+        [:notice, t(".box_unpacked", number: box.number)]
+      end
+    else
+      respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".removed")] }
+    end
   end
 
   # Streams for a presence flip (mark_removed / restore): the overlay badges (the

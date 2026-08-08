@@ -253,6 +253,9 @@ RSpec.describe "Per-photo review" do
 
       expect(item.reload.presence_state).to eq("removed")
       expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
+      # Removing the box's only detection during packing is mis-detection
+      # cleanup — it must never auto-complete the box (#755).
+      expect(box.reload.status).to eq("packing")
     end
 
     it "keeps an emptied photo in the walk so later photos can't be skipped" do

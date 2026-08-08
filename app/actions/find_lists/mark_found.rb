@@ -12,9 +12,14 @@ module FindLists
   # item.removed — no find_list.* event on top (the delegated item event is
   # the domain fact; the MarkPhotoRemoved "no new event type" precedent).
   class MarkFound < BaseAction
-    # Returns Success(item:, opened_box:) — opened_box is the Box when this
-    # call auto-opened it (the controller surfaces that secondary mutation
-    # with a linking toast, UX rule 1), else nil.
+    # Returns Success(item:, opened_box:, completed_box:) — opened_box is the
+    # Box when this call auto-opened it, completed_box the Box when marking
+    # this item found emptied and auto-completed it (#755); the controller
+    # surfaces whichever secondary mutation fired with a linking toast (UX
+    # rule 1 — completed wins the toast when both fire), else nil. A one-item
+    # sealed box goes sealed → unpacking → unpacked in this one call: two
+    # honest box.status_changed events, deliberately not collapsed (each is a
+    # real transition the activity feed should show).
 
     #: (move: untyped, user: untyped, item: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, user:, item:)
@@ -40,7 +45,10 @@ module FindLists
       # already-`unpacking` no-op keeps genuine replays event-free). True
       # cross-mutation atomicity needs the #737 cross-flow lock ordering.
       opened_box = yield open_box_for_unpacking(item.box, user)
-      Success(item: item, opened_box: opened_box)
+      # Sequential box-locked steps, never overlapping with an item lock (#739
+      # R2 ordering) — CompleteIfEmpty re-checks state under its own lock.
+      completed_box = yield Boxes::CompleteIfEmpty.new.call(box: item.box, actor: user)
+      Success(item: item, opened_box: opened_box, completed_box: completed_box)
     end
 
     private

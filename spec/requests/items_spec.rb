@@ -322,7 +322,9 @@ RSpec.describe "Items" do
 
   describe "PATCH mark_removed / restore" do
     it "toggles presence without changing review state (unpacking box)" do
-      item = create(:item, :manual, move:, box: create(:box, move:, status: "unpacking"))
+      box = create(:box, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box:)
+      create(:item, :manual, move:, box:) # more remain — no auto-complete (#755)
 
       patch mark_removed_move_item_path(move, item)
       expect(item.reload.presence_state).to eq("removed")
@@ -346,7 +348,9 @@ RSpec.describe "Items" do
 
   describe "PATCH mark_removed / restore as Turbo Stream (no reload)" do
     it "streams the badges + footer controls when marking an item removed" do
-      item = create(:item, :manual, move:, box: create(:box, move:, status: "unpacking"))
+      box = create(:box, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box:)
+      create(:item, :manual, move:, box:) # more remain — no auto-complete (#755)
 
       patch mark_removed_move_item_path(move, item), as: :turbo_stream
 
@@ -388,6 +392,35 @@ RSpec.describe "Items" do
 
       expect(response.body).to include(%(action="replace" target="#{Components::Items::GroupRail::ID}"))
       expect(response.body).not_to include(I18n.t("items.show.same_group")) # rail emptied
+    end
+
+    it "swaps the toast to a linking box-unpacked toast when the last item completes the box (#755)" do
+      box = create(:box, move:, status: "unpacking", number: "7")
+      item = create(:item, :manual, move:, box:)
+
+      patch mark_removed_move_item_path(move, item), as: :turbo_stream
+
+      aggregate_failures do
+        expect(box.reload.status).to eq("unpacked")
+        expect(response.body)
+          .to include(%(action="replace" target="#{Components::Items::StateBadges::ID}"))
+          .and include(I18n.t("items.mark_removed.box_unpacked", number: "7"))
+          .and include(I18n.t("items.mark_removed.view_box"))
+          .and include(move_box_path(move, box))
+        expect(response.body).not_to include(I18n.t("items.mark_removed.removed"))
+      end
+    end
+
+    it "carries the box-unpacked linking toast across the no-JS redirect (#755)" do
+      box = create(:box, move:, status: "unpacking", number: "7")
+      item = create(:item, :manual, move:, box:)
+
+      patch mark_removed_move_item_path(move, item)
+      follow_redirect!
+
+      expect(response.body)
+        .to include(I18n.t("items.mark_removed.box_unpacked", number: "7"))
+        .and include(I18n.t("items.mark_removed.view_box"))
     end
 
     it "streams an alert toast (no DOM change) when mark_removed hits the wrong phase" do

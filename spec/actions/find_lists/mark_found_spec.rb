@@ -9,6 +9,7 @@ RSpec.describe FindLists::MarkFound do
   it "marks a pinned item removed on a sealed box and opens the box for unpacking" do
     box = create(:box, move:, status: "sealed")
     item = create(:item, move:, box:, name: "Face Cream")
+    create(:item, move:, box:, name: "Towels") # more remain — open only, no auto-complete
     create(:find_list_entry, move:, user:, item:)
 
     result = described_class.new.call(move:, user:, item:)
@@ -16,6 +17,7 @@ RSpec.describe FindLists::MarkFound do
     aggregate_failures do
       expect(result).to be_success
       expect(result.value![:opened_box]).to eq(box)
+      expect(result.value![:completed_box]).to be_nil
       expect(item.reload.presence_state).to eq("removed")
       expect(box.reload.status).to eq("unpacking")
     end
@@ -24,6 +26,7 @@ RSpec.describe FindLists::MarkFound do
   it "opens an in-transit box for unpacking too" do
     box = create(:box, move:, status: "in_transit")
     item = create(:item, move:, box:, name: "Face Cream")
+    create(:item, move:, box:, name: "Towels")
     create(:find_list_entry, move:, user:, item:)
 
     expect(described_class.new.call(move:, user:, item:).value![:opened_box]).to eq(box)
@@ -44,10 +47,11 @@ RSpec.describe FindLists::MarkFound do
     end
   end
 
-  # A crash between the two committed steps leaves the item found with the box
-  # still closed; the open runs on the replay path too, so re-submitting
-  # repairs the torn state instead of no-opping past it (Codex #739).
-  it "self-heals a found item whose sealed box never opened" do
+  # A crash between the committed steps leaves the item found with the box
+  # still closed; the open AND the completion run on the replay path too, so
+  # re-submitting repairs the torn state all the way to its terminal form
+  # (Codex #739 / #755) — here the found item was the box's only content.
+  it "self-heals a found item whose sealed box never opened, through to completion" do
     box = create(:box, move:, status: "sealed")
     item = create(:item, move:, box:, name: "Face Cream", presence_state: "removed")
     create(:find_list_entry, move:, user:, item:)
@@ -56,7 +60,8 @@ RSpec.describe FindLists::MarkFound do
 
     aggregate_failures do
       expect(result.value![:opened_box]).to eq(box)
-      expect(box.reload.status).to eq("unpacking")
+      expect(result.value![:completed_box]).to eq(box)
+      expect(box.reload.status).to eq("unpacked")
       expect(item.reload.presence_state).to eq("removed")
     end
   end
@@ -64,15 +69,17 @@ RSpec.describe FindLists::MarkFound do
   it "reports no opened box when the box is already unpacking" do
     box = create(:box, move:, status: "unpacking")
     item = create(:item, move:, box:, name: "Face Cream")
+    create(:item, move:, box:, name: "Towels")
     create(:find_list_entry, move:, user:, item:)
 
     expect(described_class.new.call(move:, user:, item:).value![:opened_box]).to be_nil
     expect(box.reload.status).to eq("unpacking")
   end
 
-  it "is idempotent — a replayed submit on an already-found item emits no second event" do
+  it "is idempotent — a replayed submit on an already-found item emits no second item event" do
     box = create(:box, move:, status: "unpacking")
     item = create(:item, move:, box:, name: "Face Cream", presence_state: "removed")
+    create(:item, move:, box:, name: "Towels") # keeps the box non-empty: no completion events either
     create(:find_list_entry, move:, user:, item:)
 
     allow(Rails.event).to receive(:notify)
@@ -81,6 +88,44 @@ RSpec.describe FindLists::MarkFound do
     expect(result).to be_success
     expect(item.reload.presence_state).to eq("removed")
     expect(Rails.event).not_to have_received(:notify)
+  end
+
+  # #755 — marking the last item found completes the box.
+
+  it "completes a one-item unpacking box and reports completed_box" do
+    box = create(:box, move:, status: "unpacking")
+    item = create(:item, move:, box:, name: "Face Cream")
+    create(:find_list_entry, move:, user:, item:)
+
+    allow(Rails.event).to receive(:notify)
+    result = described_class.new.call(move:, user:, item:)
+
+    aggregate_failures do
+      expect(result.value![:opened_box]).to be_nil
+      expect(result.value![:completed_box]).to eq(box)
+      expect(box.reload.status).to eq("unpacked")
+      expect(Rails.event).to have_received(:notify)
+        .with("box.status_changed", hash_including(to: "unpacked")).once
+    end
+  end
+
+  it "opens AND completes a one-item sealed box in one call (two honest transitions)" do
+    box = create(:box, move:, status: "sealed")
+    item = create(:item, move:, box:, name: "Face Cream")
+    create(:find_list_entry, move:, user:, item:)
+
+    allow(Rails.event).to receive(:notify)
+    result = described_class.new.call(move:, user:, item:)
+
+    aggregate_failures do
+      expect(result.value![:opened_box]).to eq(box)
+      expect(result.value![:completed_box]).to eq(box)
+      expect(box.reload.status).to eq("unpacked")
+      expect(Rails.event).to have_received(:notify)
+        .with("box.status_changed", hash_including(to: "unpacking")).once
+      expect(Rails.event).to have_received(:notify)
+        .with("box.status_changed", hash_including(to: "unpacked")).once
+    end
   end
 
   it "refuses an unpinned item so the phase bypass stays pin-scoped" do

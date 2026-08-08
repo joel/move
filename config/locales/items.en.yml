@@ -61,6 +61,8 @@ en:
       failed: "Could not move the item."
     mark_removed:
       removed: "Item marked as removed."
+      box_unpacked: "Box %{number} unpacked"
+      view_box: "View box"
       wrong_phase: "This box isn’t being unpacked yet — you can’t mark items unpacked."
       failed: "Could not update this item."
     restore:
