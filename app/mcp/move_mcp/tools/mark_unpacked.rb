@@ -25,8 +25,11 @@ module MoveMcp
         return failure_response(result.failure) if result.failure?
 
         audit(server_context, item_id: item.id)
-        data_response(item: item_json(item.reload),
-                      box_completed: !result.value![:completed_box].nil?)
+        item.reload # also clears the association cache — the box read below is fresh
+        # box_completed reports the box's post-action REALITY, not whether this
+        # invocation won a concurrent completion race (#756 R5) — the model
+        # needs the lifecycle truth, same rule as the web surfaces.
+        data_response(item: item_json(item), box_completed: item.box.unpacked?)
       end
     end
   end

@@ -212,6 +212,15 @@ RSpec.describe "MCP endpoint" do
       expect(box.reload.status).to eq("unpacked")
     end
 
+    it "reports the box's reality on a replay — even when this call didn't win the completion (#756 R5)" do
+      box = create(:box, move:, number: 6, status: "unpacked")
+      item = create(:item, move:, box:, name: "Plate", presence_state: "removed")
+
+      body = tool_call("mark_unpacked", { item_id: item.id })
+
+      expect(body.dig("result", "structuredContent", "box_completed")).to be(true)
+    end
+
     it "refuses to mark_unpacked while the box is still packing" do
       box = create(:box, move:, number: 7, status: "packing")
       item = create(:item, move:, box:, name: "Plate")
