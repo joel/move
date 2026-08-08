@@ -233,6 +233,23 @@ RSpec.describe "FindLists" do
       end
     end
 
+    it "derives the toast from the box's reality when the opener lost the completion race (#756 R6)" do
+      box = create(:box, move:, status: "sealed")
+      item = create(:item, move:, box:, name: "Face Cream")
+      create(:find_list_entry, move:, user:, item:)
+      raced = instance_double(FindLists::MarkFound)
+      allow(FindLists::MarkFound).to receive(:new).and_return(raced)
+      allow(raced).to receive(:call) do
+        box.update!(status: "unpacked") # a concurrent found completed the box this tap opened
+        Dry::Monads::Success(item: item, opened_box: box, completed_box: nil)
+      end
+
+      patch move_find_list_mark_found_path(move, item_id: item.id), as: :turbo_stream
+
+      expect(response.body).to include(I18n.t("find_lists.flash.box_unpacked", number: box.number))
+      expect(response.body).not_to include(I18n.t("find_lists.flash.box_opened", number: box.number))
+    end
+
     it "marks the box unpacked when the found item was its last (#755) — one toast, the terminal fact" do
       box = create(:box, move:, status: "sealed")
       item = create(:item, move:, box:, name: "Face Cream")

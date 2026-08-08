@@ -67,7 +67,11 @@ class FindListsController < MoveScopedController
     in Dry::Monads::Success({ completed_box: Box => box })
       respond_with_box_toast(box, t("find_lists.flash.box_unpacked", number: box.number))
     in Dry::Monads::Success({ opened_box: Box => box })
-      respond_with_box_toast(box, t("find_lists.flash.box_opened", number: box.number))
+      # The opener can lose the completion race to a concurrent found (#756
+      # R6) — derive the toast from the box's post-action reality, like every
+      # other adapter: the terminal fact beats "opened".
+      message = box.reload.unpacked? ? t("find_lists.flash.box_unpacked", number: box.number) : t("find_lists.flash.box_opened", number: box.number)
+      respond_with_box_toast(box, message)
     else
       respond_to_found_toggle(result)
     end
