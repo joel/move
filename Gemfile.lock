@@ -535,7 +535,7 @@ GEM
     rexml (3.4.4)
     roda (3.106.0)
       rack
-    rodauth (2.44.0)
+    rodauth (2.45.0)
       roda (>= 2.6.0)
       sequel (>= 4)
     rodauth-model (0.5.0)
@@ -543,7 +543,7 @@ GEM
     rodauth-omniauth (0.6.2)
       omniauth (~> 2.0)
       rodauth (~> 2.36)
-    rodauth-rails (2.2.0)
+    rodauth-rails (2.2.1)
       railties (>= 5.2)
       roda (~> 3.76)
       rodauth (~> 2.36)
@@ -644,7 +644,7 @@ GEM
       bigdecimal
       concurrent-ruby (~> 1.0, >= 1.0.2)
       logger
-    sequel (5.106.0)
+    sequel (5.107.0)
       bigdecimal
     sequel-activerecord_connection (2.0.1)
       activerecord (>= 5.1)
