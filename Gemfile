@@ -90,7 +90,7 @@ group :development do
   # Operator CLI for the encrypted-DB-backups accessory [https://kamal-backup.dev].
   # PINNED — bump together with the image tag in config/deploy.yml, then reboot
   # the accessory. See doc/project/backups.md (#536).
-  gem "kamal-backup", "0.4.1", require: false
+  gem "kamal-backup", "0.5.2", require: false
 
   # Component browser / preview environment for the Phlex Ui::* kit, mounted at
   # /lookbook in development only (see doc/project/component-previews.md).
