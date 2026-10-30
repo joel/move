@@ -58,9 +58,8 @@ module Clusters
 
     #: (untyped move_id) -> void
     def release(move_id)
-      # rubocop:disable Rails/SkipsModelValidations -- undo of the atomic claim.
+      # rubocop:disable-next Rails/SkipsModelValidations -- undo of the atomic claim.
       ClusterState.where(move_id: move_id).update_all(refresh_pending: false)
-      # rubocop:enable Rails/SkipsModelValidations
     end
 
     # The whole debounce protocol in ONE atomic statement: creates the state

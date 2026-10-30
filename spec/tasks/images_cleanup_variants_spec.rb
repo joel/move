@@ -8,7 +8,7 @@ require "rake"
 # Apartment-excluded (shared public schema), so the task runs once against the
 # current schema — no per-tenant switch.
 RSpec.describe "images:cleanup_variants", type: :task do
-  # rubocop:disable RSpec/BeforeAfterAll -- one-time rake-task load, not test state
+  # rubocop:disable-next RSpec/BeforeAfterAll -- one-time rake-task load, not test state
   before(:all) do
     Rake.application = Rake::Application.new
     # Pass an empty `loaded` list (not the default `$"`) so the rakefile is
@@ -18,7 +18,6 @@ RSpec.describe "images:cleanup_variants", type: :task do
     Rake.application.rake_require("tasks/images", [Rails.root.join("lib").to_s], [])
     Rake::Task.define_task(:environment)
   end
-  # rubocop:enable RSpec/BeforeAfterAll
 
   let(:task) { Rake::Task["images:cleanup_variants"] }
 
