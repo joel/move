@@ -7,13 +7,12 @@ require "rake"
 # the tenant list to it — the per-tenant Apartment::Tenant.switch is exercised by
 # the iteration, switching into the schema where the test fixtures live.
 RSpec.describe "images:optimize", type: :task do
-  # rubocop:disable RSpec/BeforeAfterAll -- one-time rake-task load, not test state
+  # rubocop:disable-next RSpec/BeforeAfterAll -- one-time rake-task load, not test state
   before(:all) do
     Rake.application = Rake::Application.new
     Rake.application.rake_require("tasks/images", [Rails.root.join("lib").to_s])
     Rake::Task.define_task(:environment)
   end
-  # rubocop:enable RSpec/BeforeAfterAll
 
   let(:task) { Rake::Task["images:optimize"] }
 
