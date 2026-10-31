@@ -13,11 +13,10 @@ class RodauthMain < Rodauth::Rails::Auth
       false
     end
 
-    # rubocop:disable Naming/AccessorMethodName -- get_password_hash is a Rodauth API method name
+    # rubocop:disable-next Naming/AccessorMethodName -- get_password_hash is a Rodauth API method name
     def get_password_hash
       nil
     end
-    # rubocop:enable Naming/AccessorMethodName
 
     # Name a newly registered passkey: prefer the name the user typed,
     # else resolve it from the authenticator's AAGUID, else guess from

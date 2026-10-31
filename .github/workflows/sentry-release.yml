@@ -69,7 +69,7 @@ jobs:
 
       - name: Finalize Sentry release
         if: steps.creds.outputs.present == 'true'
-        uses: getsentry/action-release@ff07929a6537bac57790c3451cf4d364aca38528 # v3
+        uses: getsentry/action-release@e6703d0b00208e0b3687ba660d18ab5af7892821 # v3
         with:
           environment: production
           release: ${{ github.event.workflow_run.head_sha }}

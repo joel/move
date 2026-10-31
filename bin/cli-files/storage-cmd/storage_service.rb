@@ -241,14 +241,13 @@ module AppCLI
       # Returns the HTTP status string (e.g. "200") or nil if curl
       # could not connect. The "%{http_code}" is curl's own format
       # syntax, not a Ruby format string.
-      # rubocop:disable Style/FormatStringToken
+      # rubocop:disable-next Style/FormatStringToken
       def curl_status(args)
         runner.capture(
           %(curl -s -o /dev/null -w "%{http_code}" #{args}),
           quiet: true
         )&.strip
       end
-      # rubocop:enable Style/FormatStringToken
 
       def success_code?(code)
         code.to_s.match?(/\A2\d\d\z/)
