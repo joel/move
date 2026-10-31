@@ -113,3 +113,7 @@ RSpec/DescribeClass:
       - Exclude
   Exclude:
     - 'spec/architecture/**/*'
+# Tests run jobs with the :inline adapter, so specs stub `perform_later` and
+# assert `have_received`; `have_enqueued_job` needs the :test adapter.
+RSpecRails/ReceivePerformLater:
+  Enabled: false
