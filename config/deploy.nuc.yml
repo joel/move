@@ -1,0 +1,35 @@
+# Kamal destination: NUC (home server) — parallel/migration target for prod.
+# Usage: bin/kamal <cmd> -d nuc     (see MOVE-MIGRATION.md in the NucBox repo)
+# Deep-merged over config/deploy.yml. SSH goes over the tailnet; port 2222 is
+# the key-only OpenSSH fallback (22 is intercepted by Tailscale SSH).
+servers:
+  web:
+    - 100.93.123.100
+
+ssh:
+  user: deploy
+  port: 2222
+  # net-ssh matches ~/.ssh/config by hostname; the IP has no Host block, so
+  # name the key explicitly.
+  keys:
+    - ~/.ssh/joel_nucbox_ed25519
+
+# Box rule on the NUC: no container publishes a host port. cloudflared (on the
+# same `kamal` Docker network) reaches kamal-proxy by container name, so the
+# proxy publishes NOTHING on the host.
+proxy:
+  run:
+    publish: false
+
+env:
+  clear:
+    # Cutover 2026-08-23: this destination IS prod now — jobs run here.
+    # (During the rehearsal this was false to avoid double-running jobs/mail
+    # against the Vultr prod.)
+    SOLID_QUEUE_IN_PUMA: true
+
+accessories:
+  db:
+    host: 100.93.123.100
+  backup:
+    host: 100.93.123.100
