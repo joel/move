@@ -1,7 +1,7 @@
 # Backups: scheduled encrypted DB backups (kamal-backup → restic → Cloudflare R2)
 
 Production data protection for the primary database (#536). A dedicated Kamal
-accessory ([`kamal-backup`](https://kamal-backup.dev), pinned `0.4.0`) runs a
+accessory ([`kamal-backup`](https://kamal-backup.dev), pinned `1.1.0`) runs a
 scheduler loop that `pg_dump`s `move_production` once a day and streams the dump
 into an **encrypted, deduplicated [restic](https://restic.net) repository** on
 Cloudflare R2 — offsite, off-provider, with retention, integrity checks, restore
@@ -28,7 +28,7 @@ flowchart LR
   subgraph host["Prod host (65.20.110.89)"]
     APP["move-web (Rails)"]
     DB[("move-db<br/>Postgres 18<br/>move_production<br/>+ tenant schemas")]
-    BK["move-backup accessory<br/>ghcr.io/crmne/kamal-backup:0.4.0<br/>kamal-backup schedule (1d)"]
+    BK["move-backup accessory<br/>ghcr.io/crmne/kamal-backup:1.1.0<br/>kamal-backup schedule (1d)"]
     ST[("move_backup_state volume<br/>/var/lib/kamal-backup<br/>check + drill evidence")]
     BK -->|"pg_dump --format=custom<br/>(kamal docker network)"| DB
     BK --- ST
@@ -43,8 +43,8 @@ flowchart LR
 | Piece | Where | Notes |
 |---|---|---|
 | Backup settings | [`config/kamal-backup.yml`](../../config/kamal-backup.yml) | app/database/restic/schedule/retention. Mounted read-only into the accessory via Kamal `files:`. |
-| Accessory | [`config/deploy.yml`](../../config/deploy.yml) `accessories.backup` | Image **pinned `0.4.0`** — bump together with the Gemfile gem pin, then `kamal accessory reboot backup`. |
-| Operator CLI | `Gemfile` `group :development` | `gem "kamal-backup", "0.4.0", require: false` — remote commands fail fast on gem↔accessory version drift. |
+| Accessory | [`config/deploy.yml`](../../config/deploy.yml) `accessories.backup` | Image **pinned `1.1.0`** — bump together with the Gemfile gem pin, then `kamal accessory reboot backup`. |
+| Operator CLI | `Gemfile` `group :development` | `gem "kamal-backup", "1.1.0", require: false` — remote commands fail fast on gem↔accessory version drift. |
 | Secrets | [`.kamal/secrets`](../../.kamal/secrets) + Doppler `move/prd` | 4 required values (below); synced to GitHub Actions for the deploy guard. |
 | Deploy guard | [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) | The 4 secrets are in the job `env:` **and** the required-secrets fail-fast loop. |
 

@@ -209,7 +209,7 @@ accessories:
   # skips a running container); ALWAYS `kamal-backup validate` first (Kamal
   # happily boots with empty secrets).
   backup:
-    image: ghcr.io/crmne/kamal-backup:0.4.0
+    image: ghcr.io/crmne/kamal-backup:1.1.0
     # SSH target = raw origin IP (see servers.web note).
     host: 65.20.110.89
     files:
