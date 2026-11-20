@@ -209,8 +209,8 @@ accessories:
   # Settings in config/kamal-backup.yml (mounted below); runbooks + gotchas in
   # doc/project/backups.md — in particular: image tag moves in LOCKSTEP with the
   # Gemfile's kamal-backup pin; changes here need a manual
-  # `kamal accessory reboot backup` (deploys don't touch accessories, `boot`
-  # skips a running container); ALWAYS `kamal-backup validate` first (Kamal
+  # `kamal accessory reboot -d nuc backup` (deploys don't touch accessories, `boot`
+  # skips a running container); ALWAYS `kamal-backup validate -d nuc` first (Kamal
   # happily boots with empty secrets).
   backup:
     image: ghcr.io/crmne/kamal-backup:1.1.0

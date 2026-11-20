@@ -236,7 +236,7 @@ and no deploy** (#232):
 
 Switch back to **Off** any time to drop to the network-free `fake` embedder (a
 reindex moves the stored vectors back into the fake space). To reindex every tenant
-from the CLI (e.g. after a bulk change): `kamal app exec --reuse 'bin/rails search:reindex'`.
+from the CLI (e.g. after a bulk change): `kamal app exec -d nuc --reuse 'bin/rails search:reindex'`.
 
 ## Accepted image formats
 
