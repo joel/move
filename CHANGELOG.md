@@ -5,6 +5,19 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.113.1] — 2026-11-20
+
+### Security
+- **Patched vulnerable dependencies.** Rails 8.1.4.1 (incl. a Critical Active
+  Storage advisory), Rodauth 2.51.0, Rack 3.2.8, Puma 8.1.2, msgpack, Nokogiri,
+  Loofah, rails-html-sanitizer, Addressable and OmniAuth are on their fixed
+  versions; the dependency audit is clean again (#820).
+
+### Fixed
+- **Signed-in sign-in links.** Requesting or opening a sign-in link while
+  already signed in (including via "stay signed in") no longer errors after
+  the Rodauth upgrade (#820).
+
 ## [v0.113.0] — 2026-08-08
 
 ### Added
