@@ -4,13 +4,18 @@ service: move
 # Name of the container image.
 image: joelazemar/move
 
-# Deploy to these servers.
-# SSH target = the raw origin IP, not a Cloudflare-proxied hostname (proxied
-# records resolve to Cloudflare IPs, which do not accept SSH). Confirm this is
-# the server's real IP with port 22 reachable.
+# Every deploy must name a destination. Production is the NUC home server
+# (`-d nuc`, config/deploy.nuc.yml: hosts, SSH port/key, proxy). This base file
+# deliberately carries NO host: the old Vultr origin (65.20.110.89) was
+# decommissioned at the 2026-08-23 cutover and the IP no longer belongs to us,
+# so a bare `kamal deploy` must fail instead of SSHing a stranger's box (#824).
+require_destination: true
+
+# Hosts live in the destination file. SSH targets are raw IPs, never a
+# Cloudflare-proxied hostname (proxied records resolve to Cloudflare, which does
+# not accept SSH).
 servers:
-  web:
-    - 65.20.110.89
+  web: []
   # job:
   #   hosts:
   #     - workeverywhere.app
@@ -181,8 +186,7 @@ accessories:
     # accessory image change needs a manual `kamal accessory` cutover (an app
     # deploy does NOT reboot accessories). See new-app-recipe.md.
     image: pgvector/pgvector:pg18
-    # SSH target = raw origin IP (see servers.web note).
-    host: 65.20.110.89
+    # host: set per destination (config/deploy.<destination>.yml).
     env:
       clear:
         POSTGRES_DB: move_production
@@ -210,8 +214,7 @@ accessories:
   # happily boots with empty secrets).
   backup:
     image: ghcr.io/crmne/kamal-backup:1.1.0
-    # SSH target = raw origin IP (see servers.web note).
-    host: 65.20.110.89
+    # host: set per destination (config/deploy.<destination>.yml).
     files:
       - config/kamal-backup.yml:/app/config/kamal-backup.yml:ro
     env:

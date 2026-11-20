@@ -84,13 +84,20 @@ jobs:
       # RAILS_MASTER_KEY / POSTGRES_PASSWORD / ... (#200). Guard here, not in the
       # dotenv-parsed secrets file, where a standalone check can't live safely.
       - name: Verify required deploy secrets are present
+        # Step-scoped: the tailnet + SSH credentials are checked here but are NOT
+        # in the job env, so later (third-party) steps only get them as inputs.
+        env:
+          TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           missing=()
           for s in KAMAL_REGISTRY_PASSWORD RAILS_MASTER_KEY POSTGRES_PASSWORD \
                    NOTIF_MAIL_USERNAME NOTIF_MAIL_PASSWORD STORAGE_ACCESS_KEY_ID \
                    STORAGE_SECRET_ACCESS_KEY R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY \
                    R2_ENDPOINT MEDIA_TRANSFORM_SECRET RESTIC_REPOSITORY RESTIC_PASSWORD \
-                   AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+                   AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY \
+                   TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET SSH_PRIVATE_KEY; do
             [ -n "${!s}" ] || missing+=("$s")
           done
           if [ ${#missing[@]} -ne 0 ]; then
@@ -115,15 +122,30 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Add deploy host to known_hosts
-        # Kamal SSHes to the raw origin IP (servers.web in deploy.yml). Never scan
-        # move-easy.org — it is Cloudflare-proxied and does not answer SSH.
+      # Production is the NUC home server (config/deploy.nuc.yml), reachable only
+      # over the tailnet: an ephemeral node tagged `tag:ci`, which the tailnet ACL
+      # limits to the NUC's key-only OpenSSH on 100.93.123.100:2222 (#824).
+      - name: Join the tailnet
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Pin the deploy host key
+        # PINNED, never ssh-keyscan: trusting whatever key answers is how the old
+        # workflow kept offering the deploy key to a decommissioned IP after the
+        # cutover (#824). Rotate this line deliberately if the NUC is rebuilt:
+        #   ssh-keyscan -p 2222 -t ed25519 100.93.123.100   (verify the
+        #   fingerprint on the box: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub)
+        # ED25519 SHA256:y7yMEX1IIN3UHDaw5iSMZgKpv7ge/eXXgjzLaqBUzUE
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -t rsa,ecdsa,ed25519 65.20.110.89 >> ~/.ssh/known_hosts
+          echo '[100.93.123.100]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEZQ2NowDDWbU73iF1pZFPVTl1V0vIqClQ1ylw+PnkEl' >> ~/.ssh/known_hosts
 
       - name: Deploy
-        run: bin/kamal deploy
+        # -d nuc is mandatory: config/deploy.yml sets require_destination.
+        run: bin/kamal deploy -d nuc
 
 # Sentry release finalization lives in its OWN workflow
 # (.github/workflows/sentry-release.yml, workflow_run on Deploy): it must not
