@@ -3,10 +3,16 @@
 A reproducible runbook for building/deploying a **multi-tenant, subdomain-per-org
 Rails app** like Move ("WPA" = web product app). Distilled from the Move v0.2
 build + production cutover to `move-easy.org`. Commands assume a Debian/Ubuntu
-origin (Vultr) and Cloudflare-managed DNS.
+origin (originally a Vultr VPS; Move prod has run on a NUC home server over
+Tailscale since 2026-08-23 — see architecture.md "Deploy path") and
+Cloudflare-managed DNS.
 
 > Read alongside [`architecture.md`](architecture.md) (the diagrams) and the
 > root [`AGENTS.md`](../../AGENTS.md) §1 (engineering conventions).
+>
+> **`-d <dest>`** in the commands below is your Kamal destination (the
+> `config/deploy.<dest>.yml` file; Move uses `nuc`). With `require_destination:
+> true` (§ below) every Kamal and kamal-backup command needs it.
 
 ---
 
@@ -134,8 +140,8 @@ accessories:
 ```
 postgres:18+ refuses to start against an old-style cluster at
 `/var/lib/postgresql/data` — mount the **parent**. One-time cutover (destroys
-data): `kamal accessory remove db` → clear the host data dir → `kamal accessory
-boot db` → `kamal app exec --reuse 'bin/rails db:prepare'`.
+data): `kamal accessory remove -d <dest> db` → clear the host data dir → `kamal accessory
+boot -d <dest> db` → `kamal app exec -d <dest> --reuse 'bin/rails db:prepare'`.
 
 ---
 
@@ -168,7 +174,7 @@ synced env values, while a local deploy always reads from the Doppler CLI
 (never the ambient shell/`.env`, so a stale export can't shadow Doppler; local
 deploys need Doppler auth). The Deploy workflow whitelists each secret in its
 `env:` block — add new ones there, and remember a rotated secret only reaches the
-running container on the next `kamal deploy` (not `kamal app start/stop`).
+running container on the next `kamal deploy -d <dest>` (not `kamal app start/stop -d <dest>`).
 
 **SSH key for CI:** Doppler `SSH_PRIVATE_KEY` must be the **private key authorized
 for `deploy@<origin>`**. Verify by fingerprint, not by eyeballing the PEM
@@ -177,6 +183,18 @@ for `deploy@<origin>`**. Verify by fingerprint, not by eyeballing the PEM
 ssh-keygen -lf <(doppler secrets get SSH_PRIVATE_KEY --plain -p <app> -c prd)
 ssh-keygen -lf ~/.ssh/<your_key>      # fingerprints must match
 ```
+
+**CI over a tailnet (origin not on the public internet):** join with
+`tailscale/github-action` (OAuth client scoped to `auth_keys`, tag `tag:ci`;
+ACL lets `tag:ci` reach only the origin's SSH port). **Pin** the origin host key
+in the workflow, never `ssh-keyscan` it in CI:
+```bash
+ssh-keyscan -p <port> -t ed25519 <origin-ip>                 # the line to pin
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub             # ON the box: must match
+```
+Set `require_destination: true` in `config/deploy.yml` and keep hosts only in
+`config/deploy.<dest>.yml`, so a stale default host can never be deployed to
+(#824: CI kept targeting the decommissioned VPS IP for 3 months).
 
 ---
 
@@ -431,8 +449,8 @@ To enable it in production:
    (synced into GitHub Actions secrets for Kamal). They are listed in
    `config/deploy.yml` (`env.secret`) and `.kamal/secrets`; until set they
    resolve to empty, which just keeps the feature hidden.
-3. **Redeploy** (`kamal deploy`, or merge any commit) so the new secret env is
-   baked into the container — a bare `kamal app start` keeps the old env.
+3. **Redeploy** (`kamal deploy -d <dest>`, or merge any commit) so the new secret env is
+   baked into the container — a bare `kamal app start -d <dest>` keeps the old env.
 4. **Verify** on `https://move-easy.org`: the button + One Tap appear; a new
    Google account signs in, gets a personal org, and lands on its subdomain.
    Also confirm an org subdomain's `/login` shows a Google **link** that routes
@@ -517,10 +535,10 @@ To enable in production:
 1. **Sentry** → create a Rails project, copy its DSN.
 2. **Doppler** (`move/prd`) → add `SENTRY_DSN` (synced into GitHub Actions
    secrets for Kamal). Until set it resolves to empty, which keeps the SDK off.
-3. **Redeploy** (`kamal deploy`, or merge any commit) so the env is baked in —
-   a bare `kamal app start` keeps the old env.
+3. **Redeploy** (`kamal deploy -d <dest>`, or merge any commit) so the env is baked in —
+   a bare `kamal app start -d <dest>` keeps the old env.
 4. **Verify**: trigger a test event on the prod console —
-   `kamal app exec -i --reuse 'bin/rails runner "Sentry.capture_message(%q(deploy smoke)); Sentry.close"'`
+   `kamal app exec -d <dest> -i --reuse 'bin/rails runner "Sentry.capture_message(%q(deploy smoke)); Sentry.close"'`
    — and confirm it appears in the Sentry project (`Sentry.close` flushes the
    async worker before the process exits).
 
@@ -556,8 +574,8 @@ Full architecture + runbooks: [`backups.md`](backups.md). The reproducible setup
    workflow env + required-secrets guard; verify `gh secret list` shows them
    **before** merging.
 5. **Rollout** (an app deploy never boots accessories):
-   `bundle exec kamal-backup validate` (the only gate that catches empty secrets —
-   Kamal boots fine with `""`) → `kamal accessory boot backup` → logs →
+   `bundle exec kamal-backup validate -d <dest>` (the only gate that catches empty secrets —
+   Kamal boots fine with `""`) → `kamal accessory boot -d <dest> backup` → logs →
    `backup --force` → `list` → `check` → `evidence` → a restore drill
    (`drill production` into a scratch DB inside the accessory, or `drill local`
    onto the dev machine — see [`backups.md`](backups.md)).
@@ -665,11 +683,11 @@ mandatory post-upload step (re-sniff, **strip EXIF/GPS**, size-cap, transcode) a
 | `missing attribute 'roles_mask'` 500 after DB wipe | stale Puma schema cache | restart the app container |
 | Deploy didn't run after merge | `[skip ci]`/marker in squash message | repo squash setting + commit-msg hook (§5) |
 | `pg_dump: server version mismatch` | client 17 vs server 18 | `postgresql-client-18` (§2) |
-| backup accessory crash-loops with restic auth/repo errors right after boot | Kamal 2.12 swallows secret command-substitution failures — a missing Doppler value boots the container with `""` | `bundle exec kamal-backup validate` before every accessory boot/reboot (§6e) |
-| `kamal-backup` remote commands fail with a version-mismatch error | local gem and accessory image drifted (e.g. a gem-only bump) | pin both to the same version, bump together, `kamal accessory reboot backup` (§6e) |
-| edited `config/kamal-backup.yml` but the accessory ignores it | `accessory boot` skips a running container; app deploys never touch accessories | `kamal accessory reboot backup` re-uploads `files:` + re-pulls the image |
+| backup accessory crash-loops with restic auth/repo errors right after boot | Kamal 2.12 swallows secret command-substitution failures — a missing Doppler value boots the container with `""` | `bundle exec kamal-backup validate -d <dest>` before every accessory boot/reboot (§6e) |
+| `kamal-backup` remote commands fail with a version-mismatch error | local gem and accessory image drifted (e.g. a gem-only bump) | pin both to the same version, bump together, `kamal accessory reboot -d <dest> backup` (§6e) |
+| edited `config/kamal-backup.yml` but the accessory ignores it | `accessory boot` skips a running container; app deploys never touch accessories | `kamal accessory reboot -d <dest> backup` re-uploads `files:` + re-pulls the image |
 | dev seed user in prod | `db:seed` ran on fresh prod DB | guard `db/seeds.rb` against `Rails.env.production?` |
-| `PG::ForeignKeyViolation` writing a tenant table whose FK points at empty `public.X` | deploy ran only `db:prepare`; it migrates `public` programmatically and never fires Apartment's `db:migrate` Rake-task enhancement, so existing tenant schemas stay frozen and unqualified writes fall through `search_path` to `public` | entrypoint runs `db:prepare && db:migrate` (the Rake task → `apartment:migrate`); repair existing prod with `kamal app exec --reuse "bin/rails apartment:migrate"` |
+| `PG::ForeignKeyViolation` writing a tenant table whose FK points at empty `public.X` | deploy ran only `db:prepare`; it migrates `public` programmatically and never fires Apartment's `db:migrate` Rake-task enhancement, so existing tenant schemas stay frozen and unqualified writes fall through `search_path` to `public` | entrypoint runs `db:prepare && db:migrate` (the Rake task → `apartment:migrate`); repair existing prod with `kamal app exec -d <dest> --reuse "bin/rails apartment:migrate"` |
 | `type "<tenant>.vector" does not exist` creating/cloning a tenant | the `vector` extension (+ `*_ops` opclasses) live in `public`; Apartment rewrites `public.X`→`<tenant>.X` on clone | add `vector vector_cosine_ops gin_trgm_ops` to `config.pg_excluded_names` (like `citext`) |
 | `template database … has a collation version mismatch` after swapping to `pgvector/pgvector:pg18` | the pgvector image ships an older glibc (2.36) than stock `postgres:18` (2.41); a volume created by stock 18 mismatches | dev: reinit the data volume fresh. prod cutover: `ALTER DATABASE <db> REFRESH COLLATION VERSION;` (+ `REINDEX DATABASE`) **or** dump/restore into a fresh cluster — do this during the `kamal accessory` cutover |
 | pgvector search returns nothing in prod after deploy | accessory still on plain `postgres:18` (app deploy doesn't reboot accessories) | manual `kamal accessory` cutover to `pgvector/pgvector:pg18`, then `bin/rails db:migrate` |

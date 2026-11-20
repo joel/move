@@ -20,7 +20,7 @@ showed broken-image icons in the gallery, on two boxes:
 ## Resolution status: RESOLVED ✅ (verified 2026-07-01)
 
 The data was repaired and then **verified healthy fleet-wide** by direct inspection of
-production storage + the Active Storage tables (`kamal app exec … bin/rails runner`):
+production storage + the Active Storage tables (`kamal app exec -d nuc … bin/rails runner`):
 
 | Check | Result |
 |---|---|
@@ -95,7 +95,7 @@ and heal:
 
 ```bash
 # Repair every tenant: rebuild any variant whose file is missing from storage.
-mise x -- kamal app exec -i --reuse 'bin/rails images:repair'
+mise x -- kamal app exec -d nuc -i --reuse 'bin/rails images:repair'
 ```
 
 To audit without changing anything, iterate `ActiveStorage::VariantRecord` per tenant

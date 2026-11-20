@@ -25,7 +25,7 @@ ever sees ciphertext.
 
 ```mermaid
 flowchart LR
-  subgraph host["Prod host (65.20.110.89)"]
+  subgraph host["Prod host (NUC, 100.93.123.100)"]
     APP["move-web (Rails)"]
     DB[("move-db<br/>Postgres 18<br/>move_production<br/>+ tenant schemas")]
     BK["move-backup accessory<br/>ghcr.io/crmne/kamal-backup:1.1.0<br/>kamal-backup schedule (1d)"]
@@ -43,7 +43,7 @@ flowchart LR
 | Piece | Where | Notes |
 |---|---|---|
 | Backup settings | [`config/kamal-backup.yml`](../../config/kamal-backup.yml) | app/database/restic/schedule/retention. Mounted read-only into the accessory via Kamal `files:`. |
-| Accessory | [`config/deploy.yml`](../../config/deploy.yml) `accessories.backup` | Image **pinned `1.1.0`** — bump together with the Gemfile gem pin, then `kamal accessory reboot backup`. |
+| Accessory | [`config/deploy.yml`](../../config/deploy.yml) `accessories.backup` | Image **pinned `1.1.0`** — bump together with the Gemfile gem pin, then `kamal accessory reboot -d nuc backup`. |
 | Operator CLI | `Gemfile` `group :development` | `gem "kamal-backup", "1.1.0", require: false` — remote commands fail fast on gem↔accessory version drift. |
 | Secrets | [`.kamal/secrets`](../../.kamal/secrets) + Doppler `move/prd` | 4 required values (below); synced to GitHub Actions for the deploy guard. |
 | Deploy guard | [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) | The 4 secrets are in the job `env:` **and** the required-secrets fail-fast loop. |
@@ -94,17 +94,17 @@ resolve secrets through `.kamal/secrets` → Doppler, same rule as local deploys
 # POSTGRES_PASSWORD, plus config mistakes. NOTE: it does NOT check the AWS_* pair
 # (plain runtime env for restic) — the first `backup --force` is the end-to-end
 # proof of the R2 credentials; the CI deploy guard alarms on a broken sync.
-mise x -- bundle exec kamal-backup validate
+mise x -- bundle exec kamal-backup validate -d nuc
 
 # First boot (and after a server rebuild):
-mise x -- bin/kamal accessory boot backup      # takes the deploy lock — not mid-deploy
-mise x -- bin/kamal accessory logs backup      # expect the scheduler loop, no crash-loop
+mise x -- bin/kamal accessory boot -d nuc backup      # takes the deploy lock — not mid-deploy
+mise x -- bin/kamal accessory logs -d nuc backup      # expect the scheduler loop, no crash-loop
 
 # Manual/forced backup + verification:
-mise x -- bundle exec kamal-backup backup --force
-mise x -- bundle exec kamal-backup list        # snapshots (tags app:move, type:database)
-mise x -- bundle exec kamal-backup check       # repository integrity (also runs after every backup)
-mise x -- bundle exec kamal-backup evidence    # redacted JSON: snapshots/check/drill/retention/versions
+mise x -- bundle exec kamal-backup backup -d nuc --force
+mise x -- bundle exec kamal-backup list -d nuc        # snapshots (tags app:move, type:database)
+mise x -- bundle exec kamal-backup check -d nuc       # repository integrity (also runs after every backup)
+mise x -- bundle exec kamal-backup evidence -d nuc    # redacted JSON: snapshots/check/drill/retention/versions
 
 # Retention (also applied automatically after each backup):
 mise x -- bundle exec kamal-backup prune
@@ -116,7 +116,7 @@ image tag, accessory env):
 
 - An app deploy **never** touches accessories, and `accessory boot` **skips** a
   running container — the only command that pushes a new config/image is
-  `mise x -- bin/kamal accessory reboot backup` (it re-uploads `files:` and
+  `mise x -- bin/kamal accessory reboot -d nuc backup` (it re-uploads `files:` and
   re-pulls the image). Run `validate` first.
 - **Version bumps move in lockstep**: the Gemfile pin and the `deploy.yml` image
   tag are the same version, bumped in the same commit, followed by an accessory
@@ -132,7 +132,7 @@ kamal-backup 0.4.0's restore/drill flow always runs a file-restore leg. With a
 DB-only config there is **no `type:files` snapshot**, so `… restore/drill …
 latest` raises `no restic snapshot found for type:files` — *after* the database
 was already restored (a mid-incident heart-stopper). An **explicit snapshot id**
-(from `kamal-backup list`) bypasses that resolution, and the file leg then
+(from `kamal-backup list -d nuc`) bypasses that resolution, and the file leg then
 no-ops: on production because the shared config has no `paths:`, and locally
 because the committed [`config/kamal-backup.local.yml`](../../config/kamal-backup.local.yml)
 pins `paths: []` (without it the CLI infers a `storage` path and fails).
@@ -147,8 +147,8 @@ The scratch DB must exist first (the gem's `pg_restore --dbname` doesn't create
 it):
 
 ```sh
-mise x -- bundle exec kamal-backup list                 # pick a snapshot id (NOT latest)
-mise x -- bin/kamal accessory exec -i --reuse backup bash
+mise x -- bundle exec kamal-backup list -d nuc                 # pick a snapshot id (NOT latest)
+mise x -- bin/kamal accessory exec -d nuc -i --reuse backup bash
 # … then inside the accessory container:
 export PGHOST=move-db PGUSER=move PGPASSWORD="$POSTGRES_PASSWORD"
 createdb move_drill
@@ -157,7 +157,7 @@ psql -d move_drill -tc 'select count(*) from organizations'          # public sc
 psql -d move_drill -tc "select count(*) from \"<tenant-slug>\".boxes" # tenant schemas too?
 dropdb move_drill
 exit
-mise x -- bundle exec kamal-backup evidence             # drill recorded
+mise x -- bundle exec kamal-backup evidence -d nuc             # drill recorded
 ```
 
 (Inside the container the CLI runs in direct mode: `move-db` resolves on the
@@ -175,7 +175,7 @@ Prereqs on the dev machine: `restic` **and** PostgreSQL 18 client tools
 with `bin/reset` / `bin/rails db:seed` if you were mid-work.
 
 ```sh
-mise x -- bundle exec kamal-backup list        # pick a snapshot id (NOT latest)
+mise x -- bundle exec kamal-backup list -d nuc        # pick a snapshot id (NOT latest)
 doppler run --project move --config prd \
   --only-secrets RESTIC_REPOSITORY,RESTIC_PASSWORD,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY -- \
   mise x -- bundle exec kamal-backup -c config/deploy.yml drill local <snapshot-id> \
@@ -202,7 +202,7 @@ tenant schemas did too.
 ### Production restore (data loss / bad migration)
 
 ```sh
-mise x -- bundle exec kamal-backup list                      # pick the snapshot id
+mise x -- bundle exec kamal-backup list -d nuc                      # pick the snapshot id
 mise x -- bundle exec kamal-backup -c config/deploy.yml restore production <snapshot-id>
 ```
 
@@ -220,13 +220,13 @@ consistency matters more than availability.
 ### Full disaster (new server)
 
 1. Rebuild the host per [`new-app-recipe.md`](new-app-recipe.md) (Kamal setup,
-   tunnel, `kamal accessory boot db`, deploy — the entrypoint's `db:prepare`
+   tunnel, `kamal accessory boot -d nuc db`, deploy — the entrypoint's `db:prepare`
    creates the four empty databases).
 2. Reconstruct secrets: Doppler still has all four; if Doppler itself is gone,
    the escrowed password-manager entry has `RESTIC_PASSWORD` + the repository
    URL, and R2 keys are re-issuable from the Cloudflare dashboard.
-3. `mise x -- bundle exec kamal-backup validate && mise x -- bin/kamal accessory boot backup`
-4. `mise x -- bundle exec kamal-backup list`, then
+3. `mise x -- bundle exec kamal-backup validate -d nuc && mise x -- bin/kamal accessory boot -d nuc backup`
+4. `mise x -- bundle exec kamal-backup list -d nuc`, then
    `mise x -- bundle exec kamal-backup -c config/deploy.yml restore production <snapshot-id>`
    (explicit id — `latest` fails in a DB-only setup, see the restore-runbook note).
 5. Smoke-test the auth journey and a tenant (AGENTS.md §5); media is a separate
@@ -241,7 +241,7 @@ consistency matters more than availability.
   A DB-only restore brings back items/rooms/recognition rows whose photos are
   broken if SeaweedFS lost data.
 - **No backup-failure alerting.** A failing scheduler only shows in
-  `kamal accessory logs backup` / a stale `kamal-backup list`. Options when this
+  `kamal accessory logs -d nuc backup` / a stale `kamal-backup list -d nuc`. Options when this
   earns its place: a Sentry cron check-in or a healthchecks.io ping around the
   backup command. Until then: run `list`/`evidence` when touching prod, and the
   restore drill periodically.
@@ -253,9 +253,9 @@ consistency matters more than availability.
 
 | Gotcha | Detail |
 |---|---|
-| Kamal boots with empty secrets | Kamal 2.12 ignores command-substitution exit codes in `.kamal/secrets` — a missing Doppler value becomes `""`, the container boots, restic crash-loops. `kamal-backup validate` is the gate; run it before every boot/reboot. (It doesn't cover `AWS_*` — the first `backup --force` proves those.) |
+| Kamal boots with empty secrets | Kamal 2.12 ignores command-substitution exit codes in `.kamal/secrets` — a missing Doppler value becomes `""`, the container boots, restic crash-loops. `kamal-backup validate -d nuc` is the gate; run it before every boot/reboot. (It doesn't cover `AWS_*` — the first `backup --force` proves those.) |
 | `restore`/`drill` with `latest` fail in this DB-only setup | The restore flow always resolves a `type:files` snapshot, which DB-only backups never create — `latest` raises *after* the DB restore already ran. Use an explicit snapshot id from `list`; `config/kamal-backup.local.yml` (`paths: []`) keeps the local file leg a no-op. |
-| `accessory boot` skips a running container | Config/image changes need `kamal accessory reboot backup`. App deploys never touch accessories (same as the `db` accessory). |
+| `accessory boot` skips a running container | Config/image changes need `kamal accessory reboot -d nuc backup`. App deploys never touch accessories (same as the `db` accessory). |
 | Gem↔image version drift | Remote CLI commands fail fast on mismatch. Pin both, bump together, reboot after. |
 | Secrets with spaces break local commands | kamal-backup Shellwords-parses `kamal secrets print`; a value with spaces truncates silently (accessory works, local commands get "wrong password"). Hex-only secrets avoid it. |
 | Local drill needs matching pg client | `pg_restore` older than the server's `pg_dump` 18 rejects the dump header. Install PostgreSQL 18 client tools locally. |

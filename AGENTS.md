@@ -300,7 +300,7 @@ When a PR receives code review comments (human **or** Codex):
 ### Deployment
 
 - `.github/workflows/deploy.yml` deploys to production (`move-easy.org`) via **Kamal** on **every push to `main`** (i.e. every merge).
-- Secrets come from **Doppler** (`move/prd`), synced into GitHub Actions secrets. `.kamal/secrets` is gated on `KAMAL_SECRETS_FROM_ENV` (set in the Deploy workflow): **CI** reads the synced env values; a **local** deploy ignores the ambient shell/`.env` and always reads from the Doppler CLI / `config/master.key` — so a stale exported secret can't shadow Doppler (local deploys therefore need Doppler auth). Force a rotated value live with a redeploy (`kamal deploy`); a `kamal app start/stop` only restarts the existing container with its baked-in env.
+- Secrets come from **Doppler** (`move/prd`), synced into GitHub Actions secrets. `.kamal/secrets` is gated on `KAMAL_SECRETS_FROM_ENV` (set in the Deploy workflow): **CI** reads the synced env values; a **local** deploy ignores the ambient shell/`.env` and always reads from the Doppler CLI / `config/master.key` — so a stale exported secret can't shadow Doppler (local deploys therefore need Doppler auth). Force a rotated value live with a redeploy (`kamal deploy -d nuc`); a `kamal app start/stop -d nuc` only restarts the existing container with its baked-in env.
 - Skip a deploy for a given commit with `[skip deploy]` in the commit **subject**. **Beware:** a squash-merge whose body quotes the literal `[skip deploy]` (for example, by referencing this document) will skip the deploy unintentionally.
 - **Never use `[skip ci]` / `[ci skip]` / `[no ci]` / `[skip actions]` in commit messages.** GitHub treats them anywhere in the message as a platform-level skip that suppresses **all** workflow runs for the push — including the deploy — and it **cannot** be overridden in workflow YAML. Docs are excluded from CI via `paths-ignore` in `ci.yml`, never via a marker. A `commit-msg` overcommit hook (`ForbidSkipMarkers`) rejects these locally.
 - **Recover a skipped deploy** by re-running it manually: `unset GITHUB_TOKEN && gh workflow run Deploy --ref main` (the deploy workflow has `workflow_dispatch`), or from the Actions tab.
@@ -348,10 +348,10 @@ cluster — only safe when there is no data to keep** (back up first otherwise, 
 use `pg_upgrade`). Run from a checkout with the merged `deploy.yml`:
 
 ```bash
-kamal accessory remove db          # stop/remove the old container…
+kamal accessory remove -d nuc db          # stop/remove the old container…
 # …then on the db host, ensure the accessory's bind-mounted `data` dir is empty
 # (Kamal may leave it): rm -rf the accessory data dir if so.
-kamal accessory boot db            # pull postgres:18, init the new layout fresh
+kamal accessory boot -d nuc db            # pull postgres:18, init the new layout fresh
 
 # verify
 docker exec <db-container> cat /var/lib/postgresql/18/docker/PG_VERSION   # => 18
@@ -359,7 +359,7 @@ docker exec <db-container> psql -U move -d move_production -c 'select version();
 
 # load the schema (creates move_production + cache/queue/cable, loads
 # structure.sql, migrates) — or just redeploy; the app entrypoint runs db:prepare
-kamal app exec --reuse 'bin/rails db:prepare'
+kamal app exec -d nuc --reuse 'bin/rails db:prepare'
 ```
 
 Then smoke-test the live auth journey at `https://move-easy.org` and
@@ -389,7 +389,7 @@ Run after a PR is merged to `main` and its `main` CI/Deploy run is green.
 
 - **`RailsSchemaUpToDate` false-positive when editing an already-applied migration** (recurring — D7 & D8): adding a *data-only* preflight/backfill step to a migration that already ran (so its version is in `schema_migrations`) leaves `db/structure.sql` unchanged, but the hook still flags it. Confirm with `bin/rails db:schema:dump` (no `structure.sql` diff), then commit with `SKIP=RailsSchemaUpToDate` and a footnote saying the dump is clean.
 
-- **Migrations that need a new DB capability (extension / accessory image) require a manual accessory cutover BEFORE merge.** A normal deploy runs `db:migrate` but does **not** reboot Kamal accessories, so e.g. a `CREATE EXTENSION vector` migration aborts the prod deploy unless the `db` accessory was first cut over (`kamal accessory reboot db` on the new image; `ALTER DATABASE … REFRESH COLLATION VERSION` if the image's glibc differs). Order: cut over → merge → deploy migrates cleanly. Full runbook + gotchas in `doc/project/new-app-recipe.md`.
+- **Migrations that need a new DB capability (extension / accessory image) require a manual accessory cutover BEFORE merge.** A normal deploy runs `db:migrate` but does **not** reboot Kamal accessories, so e.g. a `CREATE EXTENSION vector` migration aborts the prod deploy unless the `db` accessory was first cut over (`kamal accessory reboot -d nuc db` on the new image; `ALTER DATABASE … REFRESH COLLATION VERSION` if the image's glibc differs). Order: cut over → merge → deploy migrates cleanly. Full runbook + gotchas in `doc/project/new-app-recipe.md`.
 
 - **Do not use `[skip ci]` markers.** CI decides whether to run via `paths-ignore` in `.github/workflows/ci.yml` (`**/*.md`, `.claude/**` are ignored automatically). If a new path should be exempt from CI, add it to `paths-ignore` instead of relying on commit-message markers.
 
@@ -417,7 +417,7 @@ Run after a PR is merged to `main` and its `main` CI/Deploy run is green.
 
 - **Phlex blocks inline `on*` event handlers** (D11 — F1 role `<select>`). Rendering `select(onchange: "this.form.requestSubmit()")` — or any `onclick`/`oninput`/etc. — raises `Phlex::ArgumentError: Unsafe attribute name detected: onchange.` at render time (Phlex refuses the `UNSAFE_ATTRIBUTES` set as an XSS guard). Drive the behaviour from a **Stimulus controller** via `data-action` instead: `form_with(data: { controller: "auto-submit" })` + `select(data: { action: "change->auto-submit#submit" })`, with a controller whose `submit()` calls `this.element.requestSubmit()`. The new controller is stale in dev until `assets:precompile` + `bin/cli app restart` (importmap pin — same as the asset gotcha above). **A request spec can miss this** if the offending view branch never renders (D11's members index spec only had the admin's own *locked* row, so it never rendered the role `<select>` — the crash only surfaced in live `/product-review`); seed specs to hit **every** view branch and live-verify.
 
-- **Provisioning live prod demo data:** `db/seeds.rb` is guarded off in production (`return if Rails.env.production?`). To stand up a demo org/account on prod, mirror the seed body in a one-off, idempotent `runner` script and pipe it in: `mise x -- kamal app exec -i --reuse 'bin/rails runner -' < /tmp/script.rb`. Scope it to a single new org slug + a verified (`status: 2`) account so passwordless login works; never touch the real org. (D10 set up `jlstaar@gmail.com` → `demo.move-easy.org` — agent memory `prod-demo-account`.)
+- **Provisioning live prod demo data:** `db/seeds.rb` is guarded off in production (`return if Rails.env.production?`). To stand up a demo org/account on prod, mirror the seed body in a one-off, idempotent `runner` script and pipe it in: `mise x -- kamal app exec -d nuc -i --reuse 'bin/rails runner -' < /tmp/script.rb`. Scope it to a single new org slug + a verified (`status: 2`) account so passwordless login works; never touch the real org. (D10 set up `jlstaar@gmail.com` → `demo.move-easy.org` — agent memory `prod-demo-account`.)
 
 ---
 

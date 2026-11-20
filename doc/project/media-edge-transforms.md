@@ -135,7 +135,7 @@ browser downscales (capture_upload_ctlr)    <img src=media.move-easy.org/<size>/
   runs) so the controller still loads where the pin isn't precompiled.
 
 **Tooling (local, this repo's dev machine — see agent memory):**
-- `kamal app exec` needs **`-i`** to forward a piped `bin/rails runner -` script
+- `kamal app exec -d nuc` needs **`-i`** to forward a piped `bin/rails runner -` script
   (without it the runner reads empty stdin and runs nothing), and kamal writes exec
   output to **stderr** (`2>&1 | grep`).
 - Running `kamal` from the Mac needs the prod SSH key in the agent; `IdentitiesOnly
@@ -156,7 +156,7 @@ upload). In order:
    unknown key→404 `no-store`). Must be **live before** the Rails config that points
    at it ships (`MEDIA_TRANSFORM_HOST` in `deploy.yml` → merge auto-deploys).
 2. **Decommission:** merge → deploy → optional `images:cleanup_variants` on prod to
-   reclaim the old variant storage (idempotent; `kamal app exec -i --reuse`).
+   reclaim the old variant storage (idempotent; `kamal app exec -d nuc -i --reuse`).
 3. **Direct upload:** apply **R2 CORS** (allow `PUT` from apex + `*.move-easy.org`)
    → merge (safe anytime — captures fall back to server-proxied without CORS) →
    real-browser verify (PUT to `<account>.r2.cloudflarestorage.com` 200, form
@@ -167,7 +167,7 @@ upload). In order:
 - Worker: all 7 auth/transform/cache cases pass (hand-minted **and** a real
   prod-Rails-minted token → 200 `image/jpeg` from `server: cloudflare`).
 - Decommission: `rails_direct_uploads_path` gone in prod, `draw_routes=false`,
-  `direct_upload_enabled=true` (confirmed via `kamal app exec` runner).
+  `direct_upload_enabled=true` (confirmed via `kamal app exec -d nuc` runner).
 - **Sentry: clean.** Zero errors in the 6h spanning all three deploys. The only
   media-related unresolved issues were `ActiveStorage::Representations::ProxyController`
   `FileNotFoundError` / truncated-read (MOVE-APP-3/5, 2–3 days old) — the **old

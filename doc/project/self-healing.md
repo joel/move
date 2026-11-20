@@ -151,7 +151,7 @@ nothing merges).
 5. Close the halt issue to resume the pipeline.
 
 **Emergency rollback** (prod is broken now, can't wait for a revert deploy):
-`mise x -- kamal rollback <previous version>` from a local checkout — with the
+`mise x -- kamal rollback -d nuc <previous version>` from a local checkout — with the
 caveat that **the schema never rolls back** (the entrypoint runs
 `db:prepare && db:migrate` on boot), which is exactly why migrations are
 deny-listed for autofix PRs: an autofix rollback is always schema-safe.
