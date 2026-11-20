@@ -22,7 +22,7 @@ origin** — the tunnel dials out.
 flowchart LR
   U["Browser<br/>example.org<br/>*.example.org"] -->|HTTPS| CF["Cloudflare edge<br/>(TLS + wildcard cert + WAF)"]
   CF -->|"encrypted tunnel<br/>(outbound from origin)"| CFD["cloudflared<br/>(systemd, on origin)"]
-  subgraph ORIGIN["Vultr origin — inbound 80/443 CLOSED, only :22 + outbound"]
+  subgraph ORIGIN["Origin (NUC home server) — inbound 80/443 CLOSED, SSH only over the tailnet"]
     CFD -->|"http://ORIGIN_IP:80"| KP["kamal-proxy<br/>(ssl:false, forward ALL hosts)"]
     KP -->|HTTP| APP["Rails app (Puma)<br/>MoveTenantElevator sets the tenant"]
     APP --> PG[("PostgreSQL 18<br/>Kamal accessory")]
@@ -31,6 +31,13 @@ flowchart LR
   classDef closed stroke-dasharray:4 3;
   class ORIGIN closed;
 ```
+
+> **Origin moved 2026-08-23:** production runs on the NUC home server (Kamal
+> destination `nuc`, `config/deploy.nuc.yml`), not the old Vultr box. On the NUC
+> kamal-proxy publishes **no** host port; `cloudflared` reaches it by container
+> name on the `kamal` Docker network. SSH is key-only OpenSSH on
+> `100.93.123.100:2222`, reachable **only over Tailscale**. The `ORIGIN_IP:80`
+> wiring below is the original single-VPS recipe. See **Deploy path** below.
 
 Key points:
 - **kamal-proxy serves HTTP only** and forwards *every* host (no `host:` filter).
@@ -729,3 +736,24 @@ sequenceDiagram
 ```
 
 _Last updated: 2026-06-09._
+
+
+## Deploy path (CI → NUC)
+
+```mermaid
+flowchart LR
+  GH["GitHub Actions<br/>Deploy (push to main)"] -->|"tailscale/github-action<br/>ephemeral node, tag:ci"| TS["Tailnet"]
+  TS -->|"SSH :2222<br/>pinned host key"| NUC["NUC: deploy@100.93.123.100"]
+  GH -->|"kamal deploy -d nuc<br/>(image push)"| REG["Container registry"]
+  REG --> NUC
+```
+
+- `config/deploy.yml` sets `require_destination: true` and carries **no host**,
+  so a bare `kamal deploy` fails. Every deploy names a destination; prod is `-d nuc`.
+- CI joins the tailnet as an **ephemeral `tag:ci` node**. The tailnet ACL lets
+  that tag reach only `100.93.123.100:2222`.
+- The NUC host key is **pinned** in `.github/workflows/deploy.yml` and is never
+  `ssh-keyscan`-ed. Trust-on-first-use is how the workflow kept offering the deploy
+  key to the decommissioned Vultr IP for months after the cutover (#824).
+- Secrets (Doppler `move/prd` → GitHub): `SSH_PRIVATE_KEY` (a CI key in the NUC
+  `deploy` user's `authorized_keys`), `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`.

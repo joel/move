@@ -25,7 +25,7 @@ ever sees ciphertext.
 
 ```mermaid
 flowchart LR
-  subgraph host["Prod host (65.20.110.89)"]
+  subgraph host["Prod host (NUC, 100.93.123.100)"]
     APP["move-web (Rails)"]
     DB[("move-db<br/>Postgres 18<br/>move_production<br/>+ tenant schemas")]
     BK["move-backup accessory<br/>ghcr.io/crmne/kamal-backup:1.1.0<br/>kamal-backup schedule (1d)"]

@@ -3,7 +3,9 @@
 A reproducible runbook for building/deploying a **multi-tenant, subdomain-per-org
 Rails app** like Move ("WPA" = web product app). Distilled from the Move v0.2
 build + production cutover to `move-easy.org`. Commands assume a Debian/Ubuntu
-origin (Vultr) and Cloudflare-managed DNS.
+origin (originally a Vultr VPS; Move prod has run on a NUC home server over
+Tailscale since 2026-08-23 — see architecture.md "Deploy path") and
+Cloudflare-managed DNS.
 
 > Read alongside [`architecture.md`](architecture.md) (the diagrams) and the
 > root [`AGENTS.md`](../../AGENTS.md) §1 (engineering conventions).
@@ -177,6 +179,18 @@ for `deploy@<origin>`**. Verify by fingerprint, not by eyeballing the PEM
 ssh-keygen -lf <(doppler secrets get SSH_PRIVATE_KEY --plain -p <app> -c prd)
 ssh-keygen -lf ~/.ssh/<your_key>      # fingerprints must match
 ```
+
+**CI over a tailnet (origin not on the public internet):** join with
+`tailscale/github-action` (OAuth client scoped to `auth_keys`, tag `tag:ci`;
+ACL lets `tag:ci` reach only the origin's SSH port). **Pin** the origin host key
+in the workflow, never `ssh-keyscan` it in CI:
+```bash
+ssh-keyscan -p <port> -t ed25519 <origin-ip>                 # the line to pin
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub             # ON the box: must match
+```
+Set `require_destination: true` in `config/deploy.yml` and keep hosts only in
+`config/deploy.<dest>.yml`, so a stale default host can never be deployed to
+(#824: CI kept targeting the decommissioned VPS IP for 3 months).
 
 ---
 
