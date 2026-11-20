@@ -536,7 +536,7 @@ GEM
     rexml (3.4.4)
     roda (3.106.0)
       rack
-    rodauth (2.45.0)
+    rodauth (2.51.0)
       roda (>= 2.6.0)
       sequel (>= 4)
     rodauth-model (0.5.0)

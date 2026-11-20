@@ -84,3 +84,32 @@ remembered account.
 Seeded/fixture users default to `status = 1` and therefore can't log in. Set
 `status = 2` (verified/open) to make them sign-in-able. In specs, the test-only
 `/test/login` route (see `TestSessionsController`) opens the account for you.
+
+### 6. Rodauth 2.47+ account-reload check and token-in-session (#820)
+
+**Symptom.** After bumping Rodauth past 2.47, a *signed-in* user who requests
+or consumes a sign-in link (`POST /login`, `/email-auth-request`,
+`/email-auth`, `/verify-account`) gets a 500:
+`Rodauth::Error: account retrieved multiple times during rodauth route,
+original retrieval type: session, new retrieval type: login`.
+
+**Root cause.** Rodauth now records *how* the account was loaded in a request
+and raises when the route re-loads it a different way. Several things load it
+**by session** before the route's own lookup: the orphaned-session guard in
+`RodauthApp` (gotcha 1), the `Current.user` before_action (`rails_account` —
+rodauth-rails runs controller callbacks *inside* the route), and remember-me's
+`load_memory` (deadline extension while signed in; auto-login from the cookie).
+We leave `already_logged_in` unset, so signed-in users can reach those routes.
+
+**Fix (in place).** `account_reload` in `RodauthMain` lets a session-loaded
+account be re-resolved by the route (the pre-2.47 behaviour); every other
+reload keeps Rodauth's default. Covered by
+`spec/requests/rodauth_logged_in_routes_spec.rb` (session, remember-deadline,
+and remember-auto-login contexts). Don't "fix" it by making individual loaders
+stateless — `load_memory` is Rodauth's own and would still trip it.
+
+**Also since 2.47:** non-JSON POSTs to token routes ignore a `key` form param;
+the key must come from the session, set by the emailed link's GET (which then
+redirects to strip it). Request specs must `get` the link and `follow_redirect!`
+before `post "/email-auth"` / `"/verify-account"` — posting `key:` directly now
+fails as "invalid key".

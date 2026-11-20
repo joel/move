@@ -14,6 +14,22 @@ class RodauthMain < Rodauth::Rails::Auth
 
       db Sequel.postgres(extensions: :activerecord_connection, keep_reference: false)
 
+      # Rodauth 2.47+ raises "account retrieved multiple times during rodauth
+      # route" when a route re-loads the account in a different way than it was
+      # first loaded. Several things load it BY SESSION before the route's own
+      # lookup runs: the orphaned-session guard (RodauthApp), the Current.user
+      # before_action (rails_account — rodauth-rails runs controller callbacks
+      # inside the route), and remember-me's load_memory (deadline extension;
+      # auto-login from the cookie). We leave `already_logged_in` unset, so a
+      # signed-in user can still request or consume a sign-in link, and the
+      # route then re-loads by login or key — a 500 without this (#820).
+      # Allow exactly that: a session-loaded account re-resolved by the route
+      # (the pre-2.47 behaviour). Any other reload keeps Rodauth's default
+      # (warn on same type, raise otherwise).
+      account_reload do |current_type, new_type|
+        super(current_type, new_type) unless current_type == :session
+      end
+
       # Schema-qualify every Rodauth table to `public`. Rodauth shares the
       # ActiveRecord connection (sequel-activerecord_connection), whose
       # search_path Apartment switches per tenant. These key tables have no AR

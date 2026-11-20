@@ -76,8 +76,13 @@ RSpec.describe "Invitation token carry through auth (D14)" do
     # …then they abandon and later sign in normally (no invite token). Rather
     # than strand them orgless, after_login provisions their personal org.
     post "/email-auth-request", params: { email: "newbie@example.com" }
-    key = Rack::Utils.parse_query(URI.parse(link_from_last_mail).query)["key"]
-    post "/email-auth", params: { key: key }
+    # Follow the emailed link like a browser: its GET stashes the key in the
+    # session, which the confirm POST reads (Rodauth 2.47+ refuses a key sent as
+    # a plain form param on a non-JSON POST — #820).
+    auth_path = URI.parse(link_from_last_mail).then { |u| "#{u.path}?#{u.query}" }
+    get auth_path
+    follow_redirect!
+    post "/email-auth"
 
     expect(OrganizationMembership.exists?(user_id: user.id)).to be(true)
   end
@@ -96,8 +101,9 @@ RSpec.describe "Invitation token carry through auth (D14)" do
     follow_redirect! # same clean-URL redirect as verify-account
     expect(response.body).to include(hidden_token_field)
 
-    key = Rack::Utils.parse_query(URI.parse(auth_link).query)["key"]
-    post "/email-auth", params: { key: key, invite_token: raw_token }
+    # The key rides in the session from the GET above (Rodauth 2.47+ ignores a
+    # key sent as a plain form param — #820); only the invite token is posted.
+    post "/email-auth", params: { invite_token: raw_token }
 
     expect(response).to redirect_to("/invitations?token=#{raw_token}")
   end
