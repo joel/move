@@ -12,16 +12,18 @@ module AppCLI
       desc "install", "Render the Traefik config and ensure the TLS certificates"
       delegate :install, to: :router
 
-      desc "start", "Start move-router (HTTPS edge on the edge IP)"
-      delegate :start, to: :router
+      desc "start [ENV]", "Start move-router, routing the app of ENV (default dev)"
+      def start(env = nil)
+        router(env).start
+      end
 
       desc "stop", "Stop move-router"
       delegate :stop, to: :router
 
-      desc "restart", "Restart move-router (reloads re-issued certs)"
-      def restart
-        router.stop
-        router.start
+      desc "restart [ENV]", "Restart move-router (reloads re-issued certs)"
+      def restart(env = nil)
+        router(env).stop
+        router(env).start
       end
 
       desc "logs", "View move-router logs"
@@ -46,8 +48,8 @@ module AppCLI
 
       private
 
-      def router
-        @router ||= RouterService.new(shell: self)
+      def router(env = nil)
+        @router ||= RouterService.new(shell: self, env: env)
       end
     end
   end

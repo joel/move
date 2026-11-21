@@ -18,12 +18,17 @@ module AppCLI
       PROBE_HOST = "#{APP_NAME}.#{Edge::DOMAIN}".freeze
       NSS_DB = "sql:#{File.join(Dir.home, ".pki/nssdb")}".freeze
       NSS_NICKNAME = "Move #{Edge::DOMAIN} dev CA".freeze
+      NSS_DIR = File.join(Dir.home, ".pki/nssdb").freeze
+      QUIET = { out: File::NULL, err: File::NULL }.freeze
 
-      def initialize(shell:, certs: CertificateStore.new, config: RouterConfig.new)
+      # env picks the app upstream (move-app-dev or move-app-prod) and the extra
+      # network the router must join to reach it; mail/storage stay on the dev one.
+      def initialize(shell:, env: nil, certs: CertificateStore.new, config: nil)
         @runner = CommandRunner.new(shell: shell)
         @shell = shell
+        @env_config = EnvConfig.new(env)
         @certs = certs
-        @config = config
+        @config = config || RouterConfig.new(app_upstream: "http://#{@env_config.app_container}:9292")
       end
 
       def install
@@ -40,10 +45,14 @@ module AppCLI
 
       def start
         build
-        return shell.say("Router already running.") if runner.container_running?(CONTAINER)
+        if runner.container_running?(CONTAINER)
+          join_app_network
+          return shell.say("Router already running (routes re-rendered for #{env_config.app_container}).")
+        end
 
         runner.run("docker rm -f #{CONTAINER}", allow_failure: true, quiet: true)
         runner.run(run_command)
+        join_app_network
         wait_for_ping
         shell.say("Router up: https://#{PROBE_HOST}")
         warn_untrusted
@@ -68,10 +77,10 @@ module AppCLI
 
       # Per-user trust in the NSS store Chrome/Chromium/Brave read. No sudo.
       def trust
-        raise Thor::Error, "certutil missing: sudo apt install libnss3-tools" unless system("which certutil >/dev/null")
+        raise Thor::Error, "certutil missing: sudo apt install libnss3-tools" unless system("which", "certutil", **QUIET)
 
         install
-        FileUtils.mkdir_p(File.join(Dir.home, ".pki/nssdb"))
+        ensure_nss_db
         runner.run(["certutil -d #{NSS_DB} -D -n #{Shellwords.escape(NSS_NICKNAME)} 2>/dev/null"],
                    allow_failure: true, quiet: true)
         runner.run(["certutil -d #{NSS_DB} -A -t C,, -n #{Shellwords.escape(NSS_NICKNAME)}",
@@ -80,7 +89,7 @@ module AppCLI
       end
 
       def trusted?
-        system("certutil -d #{NSS_DB} -L -n #{Shellwords.escape(NSS_NICKNAME)} >/dev/null 2>&1")
+        system("certutil", "-d", NSS_DB, "-L", "-n", NSS_NICKNAME, **QUIET)
       end
 
       # Full-edge verification, independent of DNS: container, certs, a real TLS
@@ -97,7 +106,24 @@ module AppCLI
 
       private
 
-      attr_reader :runner, :shell, :certs, :config
+      attr_reader :runner, :shell, :certs, :config, :env_config
+
+      # A pristine profile has no NSS database; certutil -A cannot create one.
+      def ensure_nss_db
+        FileUtils.mkdir_p(NSS_DIR)
+        return if File.exist?(File.join(NSS_DIR, "cert9.db"))
+
+        runner.run("certutil -d #{NSS_DB} -N --empty-password")
+      end
+
+      # The prod app lives on the suffixed network; mail/storage on the dev one.
+      def join_app_network
+        network = env_config.network_name
+        return if network == NETWORK_NAME
+
+        runner.ensure_network(network)
+        system("docker", "network", "connect", network, CONTAINER, **QUIET)
+      end
 
       def run_command
         [
@@ -114,7 +140,7 @@ module AppCLI
 
       def wait_for_ping(attempts: 20)
         attempts.times do
-          return if system("docker exec #{CONTAINER} traefik healthcheck --ping >/dev/null 2>&1")
+          return if system("docker", "exec", CONTAINER, "traefik", "healthcheck", "--ping", **QUIET)
 
           sleep(0.5)
         end

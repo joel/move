@@ -19,8 +19,9 @@ module AppCLI
       LEAF_CERT = "/certs/#{ZONE}.pem".freeze
       LEAF_KEY = "/certs/#{ZONE}-key.pem".freeze
 
-      def initialize(dir: Edge::ROUTER_DIR)
+      def initialize(dir: Edge::ROUTER_DIR, app_upstream: APP_UPSTREAM)
         @dir = dir
+        @app_upstream = app_upstream
       end
 
       def write!
@@ -75,7 +76,7 @@ module AppCLI
 
       def services
         {
-          "app" => balancer(APP_UPSTREAM),
+          "app" => balancer(@app_upstream),
           "mail" => balancer("http://mail:1080"),
           "storage" => balancer("http://seaweedfs:8888"),
           "bucket" => balancer("http://seaweedfs:8333")

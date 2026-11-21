@@ -17,7 +17,7 @@ module AppCLI
         @db = DbService.new(shell: shell, env: env)
         @storage = StorageService.new(shell: shell)
         @dns = DnsService.new(shell: shell)
-        @router = RouterService.new(shell: shell)
+        @router = RouterService.new(shell: shell, env: env)
       end
 
       # Active Storage points at SeaweedFS S3 in both dev and prod

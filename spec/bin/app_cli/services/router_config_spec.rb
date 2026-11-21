@@ -47,4 +47,9 @@ RSpec.describe AppCLI::Services::RouterConfig do
         .to eq(":443")
     end
   end
+
+  it "routes the app to the upstream of the selected environment" do
+    prod = described_class.new(app_upstream: "http://move-app-prod:9292")
+    expect(prod.services.dig("app", "loadBalancer", "servers", 0, "url")).to eq("http://move-app-prod:9292")
+  end
 end

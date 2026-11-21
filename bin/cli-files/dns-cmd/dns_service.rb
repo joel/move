@@ -102,7 +102,8 @@ module AppCLI
 
       def wait_until_answering(attempts: 20)
         attempts.times do
-          return if system("docker exec #{CONTAINER} nslookup #{PROBE_HOST} 127.0.0.1 >/dev/null 2>&1")
+          return if system("docker", "exec", CONTAINER, "nslookup", PROBE_HOST, "127.0.0.1",
+                           out: File::NULL, err: File::NULL)
 
           sleep(0.5)
         end
