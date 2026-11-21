@@ -26,4 +26,8 @@ RSpec.describe AppCLI::Services::DnsService do
   it "refuses to bootstrap on systemd without DNS delegates" do
     expect { dns.bootstrap_script(systemd: 255) }.to raise_error(Thor::Error, /needs 258/)
   end
+
+  it "refuses to bootstrap when the systemd version is unknown" do
+    expect { dns.bootstrap_script(systemd: nil) }.to raise_error(Thor::Error, /unknown/)
+  end
 end
