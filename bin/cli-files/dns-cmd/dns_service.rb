@@ -54,7 +54,16 @@ module AppCLI
       end
 
       # The one root-only step, printed for the developer to run.
-      def bootstrap_script
+      MIN_SYSTEMD = 258 # first release with /etc/systemd/dns-delegate.d
+
+      def bootstrap_script(systemd: systemd_version)
+        unless delegates_supported?(systemd)
+          raise Thor::Error, "systemd #{systemd} has no DNS delegates (needs #{MIN_SYSTEMD}+). " \
+                             "A resolved.conf.d drop-in is NOT a substitute: it merges into the one " \
+                             "global server list. Upgrade systemd, or point a single name at " \
+                             "#{Edge::IP} in /etc/hosts per host you need."
+        end
+
         <<~SH
           # Route *.#{Edge::DOMAIN} to move-dns (systemd-resolved DNS delegate).
           sudo mkdir -p #{File.dirname(Edge::DELEGATE_PATH)}
@@ -78,6 +87,7 @@ module AppCLI
         failures = []
         failures << "move-dns not running (bin/cli dns start)" unless runner.container_running?(CONTAINER)
         failures << "DNS delegate missing or stale (bin/cli dns bootstrap)" unless delegate_configured?
+        failures << "systemd #{systemd_version} ignores dns-delegate.d (needs #{MIN_SYSTEMD}+)" unless delegates_supported?
         failures << "#{PROBE_HOST} does not resolve to #{Edge::IP} via the system resolver" unless resolves?
         return shell.say("DNS OK: #{PROBE_HOST} -> #{Edge::IP}") if failures.empty?
 
@@ -88,6 +98,15 @@ module AppCLI
       private
 
       attr_reader :runner, :shell
+
+      def delegates_supported?(version = systemd_version)
+        version.nil? || version >= MIN_SYSTEMD
+      end
+
+      def systemd_version
+        out = runner.capture("systemctl --version", quiet: true).to_s
+        out[/\Asystemd (\d+)/, 1]&.to_i
+      end
 
       def run_command
         [

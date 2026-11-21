@@ -9,8 +9,10 @@ module AppCLI
     class RouterCommands < Thor
       include Thor::Actions
 
-      desc "install", "Render the Traefik config and ensure the TLS certificates"
-      delegate :install, to: :router
+      desc "install [ENV]", "Render the Traefik config for ENV (default dev) and ensure the certs"
+      def install(env = nil)
+        router(env).install
+      end
 
       desc "start [ENV]", "Start move-router, routing the app of ENV (default dev)"
       def start(env = nil)
@@ -43,7 +45,7 @@ module AppCLI
       desc "certs", "Ensure the TLS material (--rotate replaces the root CA)"
       method_option :rotate, type: :boolean, default: false
       def certs
-        options[:rotate] ? router.rotate_certs : router.install
+        options[:rotate] ? router.rotate_certs : router.ensure_certs
       end
 
       private

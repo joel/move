@@ -32,10 +32,18 @@ module AppCLI
         @config = config || RouterConfig.new(app_upstream: app_upstream)
       end
 
+      # Certs + routes. Only env-aware entry points (start/install [ENV]) call
+      # this: re-rendering routes for the default env would repoint a running
+      # prod router at the dev app.
       def install
+        ensure_certs
+        config.write!
+      end
+
+      def ensure_certs
         result = certs.ensure!
         shell.say("New root CA at #{certs.ca_cert_path} - run `bin/cli router trust`.") if result == :generated_all
-        config.write!
+        result
       end
 
       def build
@@ -82,7 +90,7 @@ module AppCLI
 
         # Certs only: re-rendering routes here would point a running prod router
         # back at the dev app.
-        certs.ensure!
+        ensure_certs
         ensure_nss_db
         runner.run(["certutil -d #{NSS_DB} -D -n #{Shellwords.escape(NSS_NICKNAME)} 2>/dev/null"],
                    allow_failure: true, quiet: true)

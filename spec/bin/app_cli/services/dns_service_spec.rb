@@ -17,9 +17,13 @@ RSpec.describe AppCLI::Services::DnsService do
   end
 
   it "prints a bootstrap script that writes the same delegate" do
-    expect(dns.bootstrap_script).to include(
+    expect(dns.bootstrap_script(systemd: 259)).to include(
       "printf '[Delegate]\\nDNS=127.0.0.2\\nDomains=~move-easy.docker\\n'",
       "/etc/systemd/dns-delegate.d/move-easy-docker.dns-delegate"
     )
+  end
+
+  it "refuses to bootstrap on systemd without DNS delegates" do
+    expect { dns.bootstrap_script(systemd: 255) }.to raise_error(Thor::Error, /needs 258/)
   end
 end
