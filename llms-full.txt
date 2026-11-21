@@ -60,7 +60,7 @@ The **MCP assistant** (`POST /mcp`, stateless JSON-RPC, per-Move Bearer token) r
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Language | **Ruby 4.0.5** | pinned via **mise** (`.ruby-version`); prefix commands with `mise x --` |
+| Language | **Ruby 4.0.10** | pinned via **mise** (`.ruby-version`); prefix commands with `mise x --` |
 | Framework | **Rails 8.1** (`~> 8.1.3`) | `schema_format :sql` → `db/structure.sql` (no `schema.rb`) |
 | DB | **PostgreSQL 18** + **pgvector** (`neighbor` gem) | pinned everywhere (dev/CI/prod); needs matching `pg_dump` for tenant cloning |
 | Views | **Phlex** (`phlex-rails ~> 2.0`) | server-side Ruby components; `application.html.erb` is unused — the real head is `Views::Layouts::ChromeHead` |
