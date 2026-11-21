@@ -5,6 +5,19 @@ merged PR) live on [GitHub Releases](https://github.com/joel/move/releases).
 This project adheres to [Semantic Versioning](https://semver.org) and the
 [Keep a Changelog](https://keepachangelog.com) format.
 
+## [v0.113.2] — 2026-11-21
+
+### Security
+- **Ruby 4.0.10.** Upgraded from Ruby 4.0.5, which has a critical remote
+  code execution vulnerability (CVE-2026-132825) (#826).
+
+### Fixed
+- **Deploys run again.** Production deploys from CI now reach the NUC over
+  the tailnet, with a pinned host key; the decommissioned Vultr host is
+  removed and every Kamal command names the `nuc` destination (#824).
+- **Boot on prism 2.x.** refract is on 1.2.0, so the app boots when newer
+  dependencies pull in prism 2.x (#829).
+
 ## [v0.113.1] — 2026-11-20
 
 ### Security
