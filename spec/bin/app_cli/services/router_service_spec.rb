@@ -24,4 +24,26 @@ RSpec.describe AppCLI::Services::RouterService do
     ENV["MOVE_APP_UPSTREAM"] = "http://host.docker.internal:3000"
     expect(upstream_for("prod")).to eq("http://host.docker.internal:3000")
   end
+
+  describe ".same_cert?" do
+    def self_signed
+      key = OpenSSL::PKey::RSA.new(2048)
+      cert = OpenSSL::X509::Certificate.new
+      cert.version = 2
+      cert.serial = rand(1..1_000_000)
+      cert.subject = cert.issuer = OpenSSL::X509::Name.parse("/CN=t")
+      cert.public_key = key.public_key
+      cert.not_before = Time.now.utc
+      cert.not_after = Time.now.utc + 60
+      cert.sign(key, OpenSSL::Digest.new("SHA256"))
+      cert.to_pem
+    end
+
+    it "treats a rotated CA under the same nickname as untrusted" do
+      current = self_signed
+      expect(described_class.same_cert?(current, current)).to be(true)
+      expect(described_class.same_cert?(self_signed, current)).to be(false)
+      expect(described_class.same_cert?("", current)).to be(false)
+    end
+  end
 end

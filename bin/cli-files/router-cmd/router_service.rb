@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 
+require "open3"
 require "openssl"
 require "socket"
 require_relative "../edge/edge"
@@ -88,8 +89,20 @@ module AppCLI
         shell.say("Trusted #{certs.ca_cert_path} for this user. Restart the browser.")
       end
 
+      # The nickname alone is not enough: after a CA rotation the NSS store can
+      # still hold the OLD cert under it. Compare the exported cert to ours.
       def trusted?
-        system("certutil", "-d", NSS_DB, "-L", "-n", NSS_NICKNAME, **QUIET)
+        pem, status = Open3.capture2("certutil", "-d", NSS_DB, "-L", "-n", NSS_NICKNAME, "-a",
+                                     err: File::NULL)
+        status.success? && self.class.same_cert?(pem, File.read(certs.ca_cert_path))
+      rescue Errno::ENOENT
+        false
+      end
+
+      def self.same_cert?(pem_a, pem_b)
+        OpenSSL::X509::Certificate.new(pem_a).to_der == OpenSSL::X509::Certificate.new(pem_b).to_der
+      rescue OpenSSL::X509::CertificateError
+        false
       end
 
       # Full-edge verification, independent of DNS: container, certs, a real TLS
