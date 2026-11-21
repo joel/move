@@ -80,7 +80,9 @@ module AppCLI
       def trust
         raise Thor::Error, "certutil missing: sudo apt install libnss3-tools" unless system("which", "certutil", **QUIET)
 
-        install
+        # Certs only: re-rendering routes here would point a running prod router
+        # back at the dev app.
+        certs.ensure!
         ensure_nss_db
         runner.run(["certutil -d #{NSS_DB} -D -n #{Shellwords.escape(NSS_NICKNAME)} 2>/dev/null"],
                    allow_failure: true, quiet: true)

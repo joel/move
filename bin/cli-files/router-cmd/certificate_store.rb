@@ -51,12 +51,14 @@ module AppCLI
         ensure!
       end
 
-      # :missing, :expiring, :foreign (not signed by our CA), :names_changed or :ok.
+      # :missing, :foreign (not signed by our CA), :key_mismatch, :names_changed,
+      # :expiring or :ok.
       def leaf_state
         cert = read_cert(cert_path)
         authority = ca
         return :missing if cert.nil? || authority.nil?
         return :foreign unless cert.verify(authority.public_key)
+        return :key_mismatch unless key_matches?(cert, key_path)
         return :names_changed unless leaf_names(cert).sort == LEAF_NAMES.sort
         return :expiring if cert.not_after - @clock.now < RENEW_WINDOW
 
@@ -71,9 +73,7 @@ module AppCLI
         cert = ca
         return false if cert.nil? || !File.file?(ca_key_path)
 
-        cert.check_private_key(OpenSSL::PKey.read(File.read(ca_key_path)))
-      rescue OpenSSL::PKey::PKeyError
-        false
+        key_matches?(cert, ca_key_path)
       end
 
       private
@@ -149,6 +149,14 @@ module AppCLI
         return [] unless san
 
         san.value.split(",").map { |entry| entry.strip.delete_prefix("DNS:") }
+      end
+
+      # Traefik needs the key on disk and paired with the cert; an interrupted
+      # write or a deleted/replaced key must trigger re-issue.
+      def key_matches?(cert, path)
+        File.file?(path) && cert.check_private_key(OpenSSL::PKey.read(File.read(path)))
+      rescue OpenSSL::PKey::PKeyError
+        false
       end
 
       def read_cert(path)

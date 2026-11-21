@@ -67,4 +67,14 @@ RSpec.describe AppCLI::Services::CertificateStore do
     expect(store.ensure!).to eq(:generated_all)
     expect(store.ca_usable?).to be(true)
   end
+
+  it "re-issues the leaf when its private key is missing or replaced" do
+    store.ensure!
+    File.delete(store.key_path)
+    expect(store.leaf_state).to eq(:key_mismatch)
+    expect(store.ensure!).to eq(:renewed_leaf)
+    File.write(store.key_path, OpenSSL::PKey::RSA.new(2048).to_pem)
+    expect(store.ensure!).to eq(:renewed_leaf)
+    expect(store.leaf_state).to eq(:ok)
+  end
 end
