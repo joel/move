@@ -465,14 +465,15 @@ admin. New-user email invitations are deferred.
 | Edge/TLS | Cloudflare Tunnel + `cloudflared` (origin) | `/etc/cloudflared/config.yml` → `http://ORIGIN_IP:80` |
 
 Local storage routing intentionally keeps the admin UI and bucket surface on
-different hosts:
+different hosts. Every local host goes through Move's own edge (move-dns +
+move-router on 127.0.0.2, see [`local-edge.md`](local-edge.md)):
 
 ```mermaid
 flowchart LR
-  B["Browser"] -->|"https://storage.move-easy.docker"| T["Traefik websecure"]
+  B["Browser"] -->|"https://storage.move-easy.docker"| T["move-router (Traefik, file provider)"]
   B -->|"https://bucket.move-easy.docker/&lt;key&gt;"| T
-  T -->|"move-seaweedfs-web"| UI["SeaweedFS filer Web UI<br/>:8888"]
-  T -->|"move-bucket + addPrefix /move"| S3["SeaweedFS S3 gateway<br/>:8333"]
+  T -->|"storage"| UI["SeaweedFS filer Web UI<br/>:8888"]
+  T -->|"bucket + addPrefix /move"| S3["SeaweedFS S3 gateway<br/>:8333"]
   S3 --> V["move bucket"]
 ```
 

@@ -17,9 +17,6 @@ module AppCLI
       WEB_UI_PORT = "8888".freeze
       DEV_MIN_FREE_SPACE = "100MiB".freeze
       DEV_VOLUME_SIZE_LIMIT_MB = "64".freeze
-      STORAGE_HOST = "storage.move-easy.docker".freeze
-      S3_ROUTER = "#{Services::APP_NAME}-seaweedfs-s3".freeze
-      WEB_UI_ROUTER = "#{Services::APP_NAME}-seaweedfs-web".freeze
       STORAGE_VOLUME = "#{Services::APP_NAME}-seaweedfs-data".freeze
       STORAGE_BUCKET = Services::APP_NAME
       SERVER_ARGS = [
@@ -31,14 +28,9 @@ module AppCLI
         "-master.volumePreallocate=false",
         "-master.volumeSizeLimitMB=#{DEV_VOLUME_SIZE_LIMIT_MB}"
       ].freeze
-      # Virtual-host bucket access: bucket.move-easy.docker/<key>
-      # resolves to the app bucket via a Traefik addPrefix
-      # middleware before it reaches the S3 gateway on :8333.
-      BUCKET_HOST = "bucket.move-easy.docker".freeze
-      BUCKET_ROUTER = "#{Services::APP_NAME}-bucket".freeze
-      BUCKET_MIDDLEWARE = "#{Services::APP_NAME}-bucket-prefix".freeze
+      # storage./bucket.move-easy.docker are routed by move-router (router_config.rb).
       # App origin allowed to direct-upload (dev).
-      APP_ORIGIN_HOST = "#{Services::APP_NAME}.#{Services::TRAEFIK_DOMAIN}".freeze
+      APP_ORIGIN_HOST = "#{Services::APP_NAME}.#{Services::DEV_DOMAIN}".freeze
 
       def initialize(shell:)
         @runner = CommandRunner.new(shell: shell)
@@ -164,27 +156,7 @@ module AppCLI
       private
 
       def runtime_config_current?
-        labels = container_labels
-        # Compare the Traefik Host(...) rules too, not just service/port/args — a
-        # domain rename (#360) changes only the host, so without this a stale
-        # container reports "current" and keeps routing the old host.
-        labels["traefik.http.routers.#{WEB_UI_ROUTER}.service"] == WEB_UI_ROUTER &&
-          labels["traefik.http.routers.#{WEB_UI_ROUTER}.rule"] == "Host(`#{STORAGE_HOST}`)" &&
-          labels["traefik.http.services.#{WEB_UI_ROUTER}.loadbalancer.server.port"] == WEB_UI_PORT &&
-          labels["traefik.http.routers.#{BUCKET_ROUTER}.service"] == S3_ROUTER &&
-          labels["traefik.http.routers.#{BUCKET_ROUTER}.rule"] == "Host(`#{BUCKET_HOST}`)" &&
-          labels["traefik.http.services.#{S3_ROUTER}.loadbalancer.server.port"] == S3_PORT &&
-          container_args == SERVER_ARGS
-      end
-
-      def container_labels
-        output = runner.capture(
-          "docker inspect #{STORAGE_CONTAINER} --format '{{ json .Config.Labels }}'",
-          quiet: true
-        )
-        JSON.parse(output.to_s)
-      rescue JSON::ParserError
-        {}
+        container_args == SERVER_ARGS
       end
 
       def container_args
@@ -279,29 +251,6 @@ module AppCLI
           "--publish #{WEB_UI_PORT}:8888",
           "--network #{Services::NETWORK_NAME}",
           "--volume #{STORAGE_VOLUME}:/data",
-          "--label traefik.enable=true",
-          # Web UI host for local inspection.
-          "--label 'traefik.http.routers.#{WEB_UI_ROUTER}.rule=" \
-          "Host(`#{STORAGE_HOST}`)'",
-          "--label traefik.http.routers.#{WEB_UI_ROUTER}.entrypoints=websecure",
-          "--label traefik.http.routers.#{WEB_UI_ROUTER}.tls=true",
-          "--label traefik.http.routers.#{WEB_UI_ROUTER}.service=#{WEB_UI_ROUTER}",
-          # Bucket host — bucket.move-easy.docker/<key> maps to the
-          # app bucket by prefixing the path before it reaches the
-          # (path-style) S3 gateway.
-          "--label 'traefik.http.routers.#{BUCKET_ROUTER}.rule=" \
-          "Host(`#{BUCKET_HOST}`)'",
-          "--label traefik.http.routers.#{BUCKET_ROUTER}.entrypoints=websecure",
-          "--label traefik.http.routers.#{BUCKET_ROUTER}.tls=true",
-          "--label traefik.http.routers.#{BUCKET_ROUTER}.service=#{S3_ROUTER}",
-          "--label traefik.http.routers.#{BUCKET_ROUTER}.middlewares=#{BUCKET_MIDDLEWARE}",
-          "--label traefik.http.middlewares.#{BUCKET_MIDDLEWARE}." \
-          "addprefix.prefix=/#{STORAGE_BUCKET}",
-          "--label traefik.http.services.#{S3_ROUTER}." \
-          "loadbalancer.server.port=8333",
-          "--label traefik.http.services.#{WEB_UI_ROUTER}." \
-          "loadbalancer.server.port=8888",
-          "--label traefik.docker.network=#{Services::NETWORK_NAME}",
           STORAGE_IMAGE,
           SERVER_ARGS.join(" ")
         ]

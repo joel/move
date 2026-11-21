@@ -1,46 +1,28 @@
 #!/usr/bin/env ruby
 
-require "json"
 require_relative "../services/helpers"
 
 module AppCLI
   module Services
     class MailService
       MAIL_CONTAINER = "mail".freeze
-      MAIL_IMAGE = "isms/mailcatcher:0.10.0".freeze
+      # The upstream author's image; the old isms/mailcatcher tag was a local V1 build.
+      MAIL_IMAGE = "sj26/mailcatcher:v0.10.0".freeze
       MAIL_PORT = "1080".freeze
-      MAIL_HOST = "mail.move-easy.docker".freeze
-      MAIL_ROUTER = "isms-mailcatcher".freeze
 
       def initialize(shell:)
         @runner = CommandRunner.new(shell: shell)
         @shell = shell
       end
 
-      # docker run --rm --detach \
-      #   --name mail \
-      #   --publish 1080:1080 \
-      #   --network network.docker-shared-services \
-      #   --label traefik.enable=true \
-      #   --label "traefik.http.routers.isms-mailcatcher.rule=Host(`mail.move-easy.docker`)" \
-      #   --label traefik.http.routers.isms-mailcatcher.entrypoints=websecure \
-      #   --label traefik.http.routers.isms-mailcatcher.tls=true \
-      #   --label traefik.http.services.isms-mailcatcher.loadbalancer.server.port=1080 \
-      #   --label traefik.docker.network=network.docker-shared-services \
-      #   isms/mailcatcher:0.10.0
+      # Routed at https://mail.move-easy.docker by move-router (router_config.rb).
       def start
         runner.ensure_network(Services::NETWORK_NAME)
 
         status = runner.container_status(MAIL_CONTAINER)
         if status == "running"
-          if mail_host_current?
-            shell.say("Mail service already running.")
-            return
-          end
-          # Stale Traefik host (e.g. a domain rename, #360) — recreate so it routes
-          # the current MAIL_HOST. The container runs with --rm, so stop removes it.
-          shell.say("Recreating mail service to apply updated host (#{MAIL_HOST}).")
-          runner.run("docker stop #{MAIL_CONTAINER}", allow_failure: true)
+          shell.say("Mail service already running.")
+          return
         elsif status != "missing"
           shell.say("Removing existing mail service container (status: #{status}).")
           runner.run("docker rm #{MAIL_CONTAINER}", allow_failure: true)
@@ -71,31 +53,12 @@ module AppCLI
 
       attr_reader :runner, :shell
 
-      # Whether the running container's Traefik Host rule already matches MAIL_HOST.
-      # A bare port/label compare would miss a host-only change (#360).
-      def mail_host_current?
-        output = runner.capture(
-          "docker inspect #{MAIL_CONTAINER} --format '{{ json .Config.Labels }}'",
-          quiet: true
-        )
-        labels = JSON.parse(output.to_s)
-        labels["traefik.http.routers.#{MAIL_ROUTER}.rule"] == "Host(`#{MAIL_HOST}`)"
-      rescue JSON::ParserError
-        false
-      end
-
       def mail_run_command
         [
           "docker run --rm --detach",
           "--name #{MAIL_CONTAINER}",
           "--publish #{MAIL_PORT}:1080",
           "--network #{Services::NETWORK_NAME}",
-          "--label traefik.enable=true",
-          "--label 'traefik.http.routers.#{MAIL_ROUTER}.rule=Host(`#{MAIL_HOST}`)'",
-          "--label traefik.http.routers.#{MAIL_ROUTER}.entrypoints=websecure",
-          "--label traefik.http.routers.#{MAIL_ROUTER}.tls=true",
-          "--label traefik.http.services.#{MAIL_ROUTER}.loadbalancer.server.port=1080",
-          "--label traefik.docker.network=#{Services::NETWORK_NAME}",
           MAIL_IMAGE
         ]
       end

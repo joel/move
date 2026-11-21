@@ -54,15 +54,7 @@ module AppCLI
       def start
         prepare
 
-        if runner.container_running?(env_config.app_container)
-          return shell.say("Application already running.") if app_traefik_host_current?
-
-          # Stale Traefik host (a domain rename, #362) — recreate so it routes the
-          # current host. `rm -f` removes it synchronously (the container is --rm,
-          # so a bare `stop` would remove it asynchronously and race the run below).
-          shell.say("Recreating app to apply updated host (#{env_config.traefik_host}).")
-          runner.run("docker rm -f #{env_config.app_container}", allow_failure: true)
-        end
+        return shell.say("Application already running.") if runner.container_running?(env_config.app_container)
 
         FileUtils.rm_f(File.join(AppCLI::ROOT, "tmp/pids/server.pid"))
 
@@ -70,11 +62,11 @@ module AppCLI
           [
             "docker run --rm --detach",
             "--name #{env_config.app_container}",
+            # Direct fallback; the browser path is https://move.move-easy.docker via move-router.
             "--publish 8080:9292",
             *network_flags,
             *app_env_flags,
             *app_volume_flags,
-            *traefik_flags,
             "#{env_config.app_image} bin/rails s -p 9292 -b 0.0.0.0"
           ]
         )
@@ -243,36 +235,6 @@ module AppCLI
 
       def network_flags
         ["--network #{env_config.network_name}"]
-      end
-
-      # Whether the running container's apex Traefik Host rule matches the current
-      # traefik_host. A bare running-check would miss a host-only change (#362).
-      def app_traefik_host_current?
-        runner.container_label(
-          env_config.app_container, "traefik.http.routers.#{env_config.traefik_router}.rule"
-        ) == "Host(`#{env_config.traefik_host}`)"
-      end
-
-      def traefik_flags
-        router = env_config.traefik_router
-        tenant_router = "#{router}-tenants"
-        escaped_domain = env_config.traefik_domain.gsub(".", "\\.")
-        # Low-priority catch-all for org subdomains (<slug>.<domain>). Priority 1
-        # keeps the exact Host() routers for the apex, mail and storage winning.
-        tenant_rule = "HostRegexp(`^[a-z0-9-]+\\.#{escaped_domain}$`)"
-        [
-          "--label traefik.enable=true",
-          "--label 'traefik.http.routers.#{router}.rule=Host(`#{env_config.traefik_host}`)'",
-          "--label traefik.http.routers.#{router}.entrypoints=websecure",
-          "--label traefik.http.routers.#{router}.tls=true",
-          "--label 'traefik.http.routers.#{tenant_router}.rule=#{tenant_rule}'",
-          "--label traefik.http.routers.#{tenant_router}.entrypoints=websecure",
-          "--label traefik.http.routers.#{tenant_router}.tls=true",
-          "--label traefik.http.routers.#{tenant_router}.priority=1",
-          "--label traefik.http.routers.#{tenant_router}.service=#{env_config.traefik_service}",
-          "--label traefik.http.services.#{env_config.traefik_service}.loadbalancer.server.port=9292",
-          "--label traefik.docker.network=#{env_config.network_name}"
-        ]
       end
 
       def copy_schema_from_container(container_name)

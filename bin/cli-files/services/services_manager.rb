@@ -4,16 +4,20 @@ require_relative "helpers"
 require_relative "../app-cmd/app_service"
 require_relative "../db-cmd/db_service"
 require_relative "../storage-cmd/storage_service"
+require_relative "../dns-cmd/dns_service"
+require_relative "../router-cmd/router_service"
 
 module AppCLI
   module Services
     class ServicesManager
-      attr_reader :app, :db, :storage
+      attr_reader :app, :db, :storage, :dns, :router
 
       def initialize(shell:, env: nil)
         @app = AppService.new(shell: shell, env: env)
         @db = DbService.new(shell: shell, env: env)
         @storage = StorageService.new(shell: shell)
+        @dns = DnsService.new(shell: shell)
+        @router = RouterService.new(shell: shell)
       end
 
       # Active Storage points at SeaweedFS S3 in both dev and prod
@@ -27,12 +31,18 @@ module AppCLI
       end
 
       def build_all
+        dns.build
+        router.build
         db.build
         storage.build
         app.build
       end
 
+      # The edge (dns + router) first: it only proxies, so it can come up before
+      # its upstreams exist.
       def start_all
+        dns.start
+        router.start
         db.start
         storage.start
         app.start
@@ -42,6 +52,8 @@ module AppCLI
         app.stop
         storage.stop
         db.stop
+        router.stop
+        dns.stop
       end
 
       def restart_all
