@@ -30,8 +30,8 @@ module AppCLI
       "postgresql" => 5432
     }.freeze
     MYSQL_CERT_DIR = File.expand_path("certs/mysql", AppCLI::ROOT)
-    TRAEFIK_ROUTER = "workeverywhere".freeze
-    TRAEFIK_DOMAIN = "move-easy.docker".freeze
+    # Local dev zone, served by move-dns + move-router (bin/cli-files/edge/).
+    DEV_DOMAIN = "move-easy.docker".freeze
     SUPPORTED_ENVS = {
       "dev" => "development",
       "development" => "development",
@@ -165,22 +165,6 @@ module AppCLI
         File.join(AppCLI::ROOT, "db", "#{env}.sqlite3")
       end
 
-      def traefik_host
-        "#{APP_NAME}.#{TRAEFIK_DOMAIN}"
-      end
-
-      def traefik_domain
-        TRAEFIK_DOMAIN
-      end
-
-      def traefik_router
-        TRAEFIK_ROUTER
-      end
-
-      def traefik_service
-        TRAEFIK_ROUTER
-      end
-
       private
 
       def suffix_name(base)
@@ -240,21 +224,6 @@ module AppCLI
 
       def container_running?(name)
         container_status(name) == "running"
-      end
-
-      # A single Docker/Traefik label value off a running container, or nil. Lets
-      # services detect a host-only config change (a domain rename) that a bare
-      # running-check would miss (#360/#362).
-      def container_label(name, key)
-        output, status = Open3.capture2e("docker", "inspect", "-f", "{{ json .Config.Labels }}", name)
-        return nil unless status.success?
-
-        # A container with no labels inspects as the JSON literal `null` →
-        # JSON.parse yields nil, so guard before indexing (a no-label container is
-        # then treated as stale and recreated, which is correct).
-        (JSON.parse(output) || {})[key]
-      rescue JSON::ParserError
-        nil
       end
 
       def ensure_network(name = NETWORK_NAME)

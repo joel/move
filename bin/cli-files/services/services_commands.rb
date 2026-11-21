@@ -11,6 +11,8 @@ module AppCLI
 
       desc "list", "List all services"
       def list
+        say("dns")
+        say("router")
         say("app")
         say("db")
         say("storage")
@@ -20,6 +22,8 @@ module AppCLI
       def status(env = nil)
         manager = manager(env)
         {
+          "#{Services::APP_NAME} DNS" => manager.dns.status,
+          "#{Services::APP_NAME} Router" => manager.router.status,
           "#{Services::APP_NAME} Db" => manager.db.status,
           "#{Services::APP_NAME} Storage" => manager.storage.status,
           "#{Services::APP_NAME} App" => manager.app.status
