@@ -28,7 +28,7 @@ module AppCLI
         @shell = shell
         @env_config = EnvConfig.new(env)
         @certs = certs
-        @config = config || RouterConfig.new(app_upstream: "http://#{@env_config.app_container}:9292")
+        @config = config || RouterConfig.new(app_upstream: app_upstream)
       end
 
       def install
@@ -107,6 +107,11 @@ module AppCLI
       private
 
       attr_reader :runner, :shell, :certs, :config, :env_config
+
+      # MOVE_APP_UPSTREAM (documented) wins over the env-derived container.
+      def app_upstream
+        ENV.fetch("MOVE_APP_UPSTREAM") { "http://#{env_config.app_container}:9292" }
+      end
 
       # A pristine profile has no NSS database; certutil -A cannot create one.
       def ensure_nss_db

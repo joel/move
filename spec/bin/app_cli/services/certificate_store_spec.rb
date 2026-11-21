@@ -53,4 +53,18 @@ RSpec.describe AppCLI::Services::CertificateStore do
     FileUtils.cp([other.ca_cert_path, other.ca_key_path], dir)
     expect(store.leaf_state).to eq(:foreign)
   end
+
+  it "regenerates the CA when its private key is missing" do
+    store.ensure!
+    File.delete(store.ca_key_path)
+    expect(store.ensure!).to eq(:generated_all)
+    expect(leaf.verify(store.ca.public_key)).to be(true)
+  end
+
+  it "regenerates the CA when its private key does not match" do
+    store.ensure!
+    File.write(store.ca_key_path, OpenSSL::PKey::RSA.new(2048).to_pem)
+    expect(store.ensure!).to eq(:generated_all)
+    expect(store.ca_usable?).to be(true)
+  end
 end

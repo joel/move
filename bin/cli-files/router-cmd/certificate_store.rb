@@ -35,16 +35,15 @@ module AppCLI
 
       # Idempotent. Returns :generated_all, :renewed_leaf or :present.
       def ensure!
-        if ca.nil?
+        unless ca_usable?
           generate_ca
           generate_leaf
-          :generated_all
-        elsif leaf_state != :ok
-          generate_leaf
-          :renewed_leaf
-        else
-          :present
+          return :generated_all
         end
+        return :present if leaf_state == :ok
+
+        generate_leaf
+        :renewed_leaf
       end
 
       def rotate!
@@ -65,6 +64,17 @@ module AppCLI
       end
 
       def ca = read_cert(ca_cert_path)
+
+      # The CA cert alone is not enough: an interrupted first run or a deleted /
+      # replaced key would leave leaves unsignable (or signed by the wrong key).
+      def ca_usable?
+        cert = ca
+        return false if cert.nil? || !File.file?(ca_key_path)
+
+        cert.check_private_key(OpenSSL::PKey.read(File.read(ca_key_path)))
+      rescue OpenSSL::PKey::PKeyError
+        false
+      end
 
       private
 
