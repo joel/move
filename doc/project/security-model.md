@@ -112,8 +112,12 @@ The headline boundaries an attacker probes:
    request/user context, and tag values **never** do. Hostile-payload specs pin
    the boundary (`spec/script/self_healing/sentry_fetch_spec.rb`). The pipeline's
    own control plane (`.github/**`, `script/**`) is deny-listed for autofix PRs,
-   the scorer always executes from `main`, and the fix agent holds no push
-   credential. See [`self-healing.md`](self-healing.md).
+   the scorer always executes from `main`, and the fix agent runs in its own
+   job that holds **no write-capable credential** — only a `contents: read`
+   token and the model API key; labelling, Sentry access, and App-token
+   publication live in separate jobs that never execute the agent's output, and
+   only data (a git bundle + assessment) crosses back (#571). See
+   [`self-healing.md`](self-healing.md#credential-boundary-571).
 
 ---
 
