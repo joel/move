@@ -24,57 +24,9 @@ jobs:
     # Allow opting out of a deploy for a given commit.
     if: "!contains(github.event.head_commit.message, '[skip deploy]')"
 
-    env:
-      # These are synced into GitHub Actions secrets by Doppler's GitHub
-      # integration. This flag tells `.kamal/secrets` to read them from the
-      # environment HERE (CI); every local deploy ignores the ambient shell/.env
-      # and reads straight from Doppler + config/master.key, so a stale exported
-      # value can never shadow the source of truth.
-      KAMAL_SECRETS_FROM_ENV: "1"
-      KAMAL_REGISTRY_PASSWORD: ${{ secrets.KAMAL_REGISTRY_PASSWORD }}
-      RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
-      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-      NOTIF_MAIL_USERNAME: ${{ secrets.NOTIF_MAIL_USERNAME }}
-      NOTIF_MAIL_PASSWORD: ${{ secrets.NOTIF_MAIL_PASSWORD }}
-      # move-app S3 identity for the shared SeaweedFS (Active Storage).
-      STORAGE_ACCESS_KEY_ID: ${{ secrets.STORAGE_ACCESS_KEY_ID }}
-      STORAGE_SECRET_ACCESS_KEY: ${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
-      # Cloudflare R2 — the production media store (#567). Required at deploy time
-      # (env.secret in deploy.yml); under KAMAL_SECRETS_FROM_ENV they must be
-      # exported here or .kamal/secrets resolves them to empty strings.
-      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-      # Cloudflare-edge media transform Worker HMAC secret (#572). Required at
-      # deploy time (env.secret in deploy.yml) — MEDIA_TRANSFORM_HOST is always set
-      # in prod (env.clear), so MediaVariants::TransformUrl raises without this.
-      # Under KAMAL_SECRETS_FROM_ENV it must be exported here or .kamal/secrets
-      # resolves it to empty. Same value as the Worker's `wrangler secret`. In the
-      # required-secrets guard below so the Worker cutover (secret synced
-      # Doppler->GitHub) is enforced before a deploy mints edge URLs.
-      MEDIA_TRANSFORM_SECRET: ${{ secrets.MEDIA_TRANSFORM_SECRET }}
-      # Encrypted DB backups (#536): restic repository URL + encryption password
-      # and the R2 bucket-scoped S3 token pair for the `backup` accessory
-      # (doc/project/backups.md). A deploy never touches accessories — the
-      # accessory reads these from Doppler at a manual boot/reboot — so their
-      # presence in the guard below is a sync-integrity alarm: a broken/renamed
-      # Doppler→GitHub mapping surfaces at the next deploy, not mid-incident.
-      RESTIC_REPOSITORY: ${{ secrets.RESTIC_REPOSITORY }}
-      RESTIC_PASSWORD: ${{ secrets.RESTIC_PASSWORD }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      # Google social sign-in. OPTIONAL — when the Doppler/GitHub secrets are
-      # absent these resolve to empty and the Google button/One Tap stay hidden,
-      # so they are intentionally NOT in the required-secrets guard below.
-      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-      # Sentry error monitoring (#528). OPTIONAL — when absent the SDK just
-      # stays disabled, so intentionally NOT in the required-secrets guard.
-      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-      # No OPENAI_API_KEY here: embeddings (#232) and recognition (#185) are both
-      # per-Move BYO, so the deploy injects no shared AI key (and it is no longer
-      # in Doppler). Its only consumer is the Release Bug Scan workflow, which
-      # reads a distinctly named CI-only repo secret (CODEX_OPENAI_API_KEY).
+    # NO job-level env: every step would inherit the production secrets,
+    # including the third-party actions below. They live on the two steps that
+    # need them (the secret check and Deploy) via the &deploy_secrets anchor (#834).
 
     steps:
       # Fail fast on a missing/empty secret before kamal runs. With
@@ -84,20 +36,64 @@ jobs:
       # RAILS_MASTER_KEY / POSTGRES_PASSWORD / ... (#200). Guard here, not in the
       # dotenv-parsed secrets file, where a standalone check can't live safely.
       - name: Verify required deploy secrets are present
-        # Step-scoped: the tailnet + SSH credentials are checked here but are NOT
-        # in the job env, so later (third-party) steps only get them as inputs.
-        env:
-          TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        env: &deploy_secrets
+          # These are synced into GitHub Actions secrets by Doppler's GitHub
+          # integration. This flag tells `.kamal/secrets` to read them from the
+          # environment HERE (CI); every local deploy ignores the ambient shell/.env
+          # and reads straight from Doppler + config/master.key, so a stale exported
+          # value can never shadow the source of truth.
+          KAMAL_SECRETS_FROM_ENV: "1"
+          KAMAL_REGISTRY_PASSWORD: ${{ secrets.KAMAL_REGISTRY_PASSWORD }}
+          RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          NOTIF_MAIL_USERNAME: ${{ secrets.NOTIF_MAIL_USERNAME }}
+          NOTIF_MAIL_PASSWORD: ${{ secrets.NOTIF_MAIL_PASSWORD }}
+          # move-app S3 identity for the shared SeaweedFS (Active Storage).
+          STORAGE_ACCESS_KEY_ID: ${{ secrets.STORAGE_ACCESS_KEY_ID }}
+          STORAGE_SECRET_ACCESS_KEY: ${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
+          # Cloudflare R2 — the production media store (#567). Required at deploy time
+          # (env.secret in deploy.yml); under KAMAL_SECRETS_FROM_ENV they must be
+          # exported here or .kamal/secrets resolves them to empty strings.
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          # Cloudflare-edge media transform Worker HMAC secret (#572). Required at
+          # deploy time (env.secret in deploy.yml) — MEDIA_TRANSFORM_HOST is always set
+          # in prod (env.clear), so MediaVariants::TransformUrl raises without this.
+          # Under KAMAL_SECRETS_FROM_ENV it must be exported here or .kamal/secrets
+          # resolves it to empty. Same value as the Worker's `wrangler secret`. In the
+          # required-secrets guard below so the Worker cutover (secret synced
+          # Doppler->GitHub) is enforced before a deploy mints edge URLs.
+          MEDIA_TRANSFORM_SECRET: ${{ secrets.MEDIA_TRANSFORM_SECRET }}
+          # Encrypted DB backups (#536): restic repository URL + encryption password
+          # and the R2 bucket-scoped S3 token pair for the `backup` accessory
+          # (doc/project/backups.md). A deploy never touches accessories — the
+          # accessory reads these from Doppler at a manual boot/reboot — so their
+          # presence in the guard below is a sync-integrity alarm: a broken/renamed
+          # Doppler→GitHub mapping surfaces at the next deploy, not mid-incident.
+          RESTIC_REPOSITORY: ${{ secrets.RESTIC_REPOSITORY }}
+          RESTIC_PASSWORD: ${{ secrets.RESTIC_PASSWORD }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # Google social sign-in. OPTIONAL — when the Doppler/GitHub secrets are
+          # absent these resolve to empty and the Google button/One Tap stay hidden,
+          # so they are intentionally NOT in the required-secrets guard below.
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          # Sentry error monitoring (#528). OPTIONAL — when absent the SDK just
+          # stays disabled, so intentionally NOT in the required-secrets guard.
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          # No OPENAI_API_KEY here: embeddings (#232) and recognition (#185) are both
+          # per-Move BYO, so the deploy injects no shared AI key (and it is no longer
+          # in Doppler). Its only consumer is the Release Bug Scan workflow, which
+          # reads a distinctly named CI-only repo secret (CODEX_OPENAI_API_KEY).
         run: |
           missing=()
           for s in KAMAL_REGISTRY_PASSWORD RAILS_MASTER_KEY POSTGRES_PASSWORD \
                    NOTIF_MAIL_USERNAME NOTIF_MAIL_PASSWORD STORAGE_ACCESS_KEY_ID \
                    STORAGE_SECRET_ACCESS_KEY R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY \
                    R2_ENDPOINT MEDIA_TRANSFORM_SECRET RESTIC_REPOSITORY RESTIC_PASSWORD \
-                   AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY \
-                   TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET SSH_PRIVATE_KEY; do
+                   AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
             [ -n "${!s}" ] || missing+=("$s")
           done
           if [ ${#missing[@]} -ne 0 ]; then
@@ -105,6 +101,36 @@ jobs:
             exit 1
           fi
           echo "All required deploy secrets are present."
+
+      # Separate guard for the connectivity credentials, so they stay OUT of the
+      # &deploy_secrets anchor: Kamal and its child processes never need the raw
+      # SSH key or the tailnet OAuth secret (they use the agent and the tailnet).
+      - name: Verify tailnet and SSH credentials are present
+        env:
+          TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          missing=()
+          for s in TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET SSH_PRIVATE_KEY; do
+            [ -n "${!s}" ] || missing+=("$s")
+          done
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing or empty deploy secrets: ${missing[*]}. Check the Doppler -> GitHub Actions sync (move/prd)."
+            exit 1
+          fi
+
+      # Production is the NUC home server (config/deploy.nuc.yml), reachable only
+      # over the tailnet: an ephemeral node tagged `tag:ci`, which the tailnet ACL
+      # limits to the NUC's key-only OpenSSH on 100.93.123.100:2222 (#824).
+      # Runs before checkout and the SSH agent, pinned by SHA, with no secrets in
+      # its env: it only ever sees the two OAuth inputs (#834).
+      - name: Join the tailnet
+        uses: tailscale/github-action@6cae46e2d796f265265cfcf628b72a32b4d7cade # v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
 
       - name: Checkout code
         uses: actions/checkout@v7
@@ -118,19 +144,9 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Set up SSH agent
-        uses: webfactory/ssh-agent@v0.10.0
+        uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      # Production is the NUC home server (config/deploy.nuc.yml), reachable only
-      # over the tailnet: an ephemeral node tagged `tag:ci`, which the tailnet ACL
-      # limits to the NUC's key-only OpenSSH on 100.93.123.100:2222 (#824).
-      - name: Join the tailnet
-        uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
 
       - name: Pin the deploy host key
         # PINNED, never ssh-keyscan: trusting whatever key answers is how the old
@@ -145,6 +161,7 @@ jobs:
 
       - name: Deploy
         # -d nuc is mandatory: config/deploy.yml sets require_destination.
+        env: *deploy_secrets
         run: bin/kamal deploy -d nuc
 
 # Sentry release finalization lives in its OWN workflow

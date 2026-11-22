@@ -187,7 +187,9 @@ ssh-keygen -lf ~/.ssh/<your_key>      # fingerprints must match
 **CI over a tailnet (origin not on the public internet):** join with
 `tailscale/github-action` (OAuth client scoped to `auth_keys`, tag `tag:ci`;
 ACL lets `tag:ci` reach only the origin's SSH port). **Pin** the origin host key
-in the workflow, never `ssh-keyscan` it in CI:
+in the workflow, never `ssh-keyscan` it in CI. Pin third-party actions by commit
+SHA, join the tailnet before loading the SSH key, and put production secrets on
+the deploy step only (a YAML anchor), never in the job-level `env` (#834):
 ```bash
 ssh-keyscan -p <port> -t ed25519 <origin-ip>                 # the line to pin
 ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub             # ON the box: must match
