@@ -109,7 +109,10 @@ Everything runs in containers, driven by `bin/cli` (Ruby is pinned via **mise** 
 Ruby commands with `mise x --`).
 
 ```bash
-bin/cli services start     # app + database + mail + storage
+bin/cli services start     # dns + router + app + database + storage
+bin/cli mail start
+bin/cli dns bootstrap      # once: prints the root-only resolver step
+bin/cli router trust       # once: trust the local dev CA, then restart the browser
 bin/rails db:seed          # demo org, a "Seattle Relocation" move, a demo account
 ```
 
