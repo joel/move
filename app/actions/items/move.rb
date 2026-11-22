@@ -12,11 +12,18 @@ module Items
   # gained an item). Callers read the source box's post-action reality to
   # surface the completion (it's a secondary mutation: Success(item) either way).
   class Move < BaseAction
+    include CurrentBoxLock
+
+    # FOR NO KEY UPDATE, not FOR UPDATE: the box_id write's FK check takes FOR
+    # KEY SHARE on the TARGET box, which FOR UPDATE blocks — two crossing
+    # moves (3→8 and 8→3) would deadlock. NO KEY UPDATE still conflicts with
+    # the FOR UPDATE of CompleteIfEmpty / RestoreToBox / another move.
+    SOURCE_LOCK = "FOR NO KEY UPDATE"
+
     #: (item: untyped, target_box: untyped, mover: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, target_box:, mover:)
       yield ensure_writable(item.move)
-      source = item.box
-      yield move_under_source_lock(item, source, target_box)
+      source = yield with_current_box_lock(item, lock: SOURCE_LOCK) { |box| locked_move(item, box, target_box) }
       yield emit_event(item, target_box, mover)
       Boxes::CompleteIfEmpty.completed_box(box: source, actor: mover)
       Success(item)
@@ -24,23 +31,18 @@ module Items
 
     private
 
-    # Box-first, like Items::RestoreToBox and TransitionStatus's unpacked
-    # cascade (#756 R2): the source lock serializes the move with a concurrent
-    # "mark box unpacked" (whose cascade may have just removed this item — the
-    # reload re-reads it) and with restores into the box. The completion runs
-    # AFTER this commits, in its own box lock (never while holding item locks).
-    # FOR NO KEY UPDATE, not FOR UPDATE: the box_id write's FK check takes FOR
-    # KEY SHARE on the TARGET box, which FOR UPDATE blocks — two crossing
-    # moves (3→8 and 8→3) would deadlock. NO KEY UPDATE still conflicts with
-    # the FOR UPDATE of CompleteIfEmpty / RestoreToBox / another move.
+    # Runs under the lock of the box the item is in NOW (CurrentBoxLock): that
+    # serializes the move with a concurrent "mark box unpacked" (whose cascade
+    # may have just removed this item), with restores, and with another move of
+    # the same item, which may have re-boxed it (#757 Codex R1). The box
+    # returned is the one the item actually left, so the completion, which runs
+    # AFTER this commits in its own box lock, checks the right box.
 
-    #: (untyped item, untyped source, untyped target_box) -> Dry::Monads::Result[untyped, untyped]
-    def move_under_source_lock(item, source, target_box)
-      source.with_lock("FOR NO KEY UPDATE") do
-        item.reload
-        yield validate(item, target_box)
-        persist(item, target_box)
-      end
+    #: (untyped item, untyped box, untyped target_box) -> Dry::Monads::Result[untyped, untyped]
+    def locked_move(item, box, target_box)
+      yield validate(item, target_box)
+      yield persist(item, target_box)
+      Success(box)
     end
 
     #: (untyped item, untyped target_box) -> Dry::Monads::Result[untyped, untyped]

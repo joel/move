@@ -148,6 +148,45 @@ RSpec.describe Items::Move do
       end
     end
 
+    describe "item re-boxed while waiting for the source lock (#757 Codex R1)" do
+      it "re-locks the item's CURRENT box and completes that box, not the stale one" do
+        stale = create(:box, move:, status: "unpacking")
+        current = create(:box, move:, status: "unpacking")
+        create(:item, :manual, move:, box: stale) # stale keeps an item: must stay put
+        item = create(:item, :manual, move:, box: stale)
+        move_while_waiting(item, current) # a concurrent move commits stale → current
+
+        result = nil
+        locks = box_locks_taken { result = described_class.new.call(item:, target_box: target, mover:) }
+
+        aggregate_failures do
+          expect(result).to be_success
+          expect(item.reload.box).to eq(target)
+          expect(current.reload.status).to eq("unpacked") # the box the item actually left
+          expect(stale.reload.status).to eq("unpacking")
+          expect(target.reload.status).to eq("unpacking")
+          # Box-first, retried on the current box; the completion re-locks it after commit.
+          expect(locks.first(2)).to eq([stale.id, current.id])
+          expect(locks).not_to include(target.id)
+        end
+      end
+
+      it "gives up after bounded retries without writing when the item keeps moving" do
+        source = create(:box, move:, status: "unpacking")
+        hops = create_list(:box, 3, move:, status: "unpacking")
+        item = create(:item, :manual, move:, box: source)
+        move_while_waiting(item, *hops, every_attempt: true)
+
+        result = described_class.new.call(item:, target_box: target, mover:)
+
+        aggregate_failures do
+          expect(result.failure).to eq(:box_changed)
+          expect(item.reload.box).to eq(hops.last) # only the simulated concurrent writes
+          expect([source, *hops].map { |b| b.reload.status }.uniq).to eq(["unpacking"])
+        end
+      end
+    end
+
     it "re-checks presence under the source box lock (a concurrent unpack-all wins)" do
       source = create(:box, move:, status: "unpacking")
       item = create(:item, :manual, move:, box: source)

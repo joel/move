@@ -12,25 +12,29 @@ module Items
   # discard commits as a secondary mutation (its failure never masks the
   # deletion; Success(item) either way).
   class Delete < BaseAction
+    include CurrentBoxLock
+
     #: (item: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:, source: :web)
-      batch_id = yield discard_under_box_lock(item, actor, source)
+      box, batch_id = yield with_current_box_lock(item) { |locked| locked_discard(item, locked, actor, source) }
       yield emit_event(item, actor, source, batch_id)
-      Boxes::CompleteIfEmpty.completed_box(box: item.box, actor: actor)
+      Boxes::CompleteIfEmpty.completed_box(box: box, actor: actor)
       Success(item)
     end
 
     private
 
-    # Box-first (#756 R2 — the order of Items::RestoreToBox and the unpacked
-    # cascade), so a delete serializes with a concurrent "mark box unpacked" and
-    # with restores; the completion re-locks the box after this commits.
+    # Runs under the lock of the box the item is in NOW (CurrentBoxLock), not
+    # the cached item.box: a concurrent move may have re-boxed the item while we
+    # waited (#757 Codex R1). The event's box_id and the completion then follow
+    # the box the item was actually deleted from. Box-first (#756 R2), so a
+    # delete serializes with "mark box unpacked" and with restores; the
+    # completion re-locks the box after this commits.
 
-    #: (untyped item, untyped actor, Symbol source) -> Dry::Monads::Result[untyped, untyped]
-    def discard_under_box_lock(item, actor, source)
-      item.box.with_lock do
-        Discards::Cascade.new.call(record: item, actor: actor, source: source)
-      end
+    #: (untyped item, untyped box, untyped actor, Symbol source) -> Dry::Monads::Result[untyped, untyped]
+    def locked_discard(item, box, actor, source)
+      batch_id = yield Discards::Cascade.new.call(record: item, actor: actor, source: source)
+      Success([box, batch_id])
     end
 
     #: (untyped item, untyped actor, Symbol source, untyped batch_id) -> Dry::Monads::Success[nil]

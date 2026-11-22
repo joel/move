@@ -592,7 +592,11 @@ per adapter, so no surface can drift:
   write commits (#757) — the destination is never completed; the item-detail
   move and the MCP `move_item` tool surface it (linking toast /
   `source_box_completed`). Both take the box lock first around their item write,
-  like `Items::RestoreToBox`. The review walk's mis-detection removal
+  like `Items::RestoreToBox`, via `Items::CurrentBoxLock`: lock the box the
+  item is in **now**, re-read the item under the lock, and retry against its
+  new box (bounded; `Failure(:box_changed)`) if a concurrent move re-boxed it
+  while we waited, so the write, event and completion all follow the box the
+  item actually left. The review walk's mis-detection removal
   deliberately does **not** complete (packing-phase cleanup), and reopen never
   re-completes an emptied box.
 - `Boxes::CompleteIfEmpty` re-checks `unpacking? && items.in_box.none?` under

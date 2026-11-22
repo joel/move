@@ -56,6 +56,39 @@ RSpec.describe Items::Delete do
       end
     end
 
+    it "deletes from, reports, and completes the item's CURRENT box when it moved while waiting (#757 Codex R1)" do
+      stale = create(:box, move:, status: "unpacking")
+      current = create(:box, move:, status: "unpacking")
+      create(:item, :manual, move:, box: stale)
+      item = create(:item, :manual, move:, box: stale)
+      move_while_waiting(item, current)
+      allow(Rails.event).to receive(:notify).and_call_original
+
+      locks = box_locks_taken { described_class.new.call(item:, actor:) }
+
+      aggregate_failures do
+        expect(Item.with_discarded.find(item.id)).to be_discarded
+        expect(current.reload.status).to eq("unpacked")
+        expect(stale.reload.status).to eq("unpacking")
+        expect(Rails.event).to have_received(:notify).with("item.deleted", hash_including(box_id: current.id))
+        expect(locks.first(2)).to eq([stale.id, current.id])
+      end
+    end
+
+    it "gives up after bounded retries without discarding when the item keeps moving" do
+      box = create(:box, move:, status: "unpacking")
+      hops = create_list(:box, 3, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box:)
+      move_while_waiting(item, *hops, every_attempt: true)
+
+      result = described_class.new.call(item:, actor:)
+
+      aggregate_failures do
+        expect(result.failure).to eq(:box_changed)
+        expect(Item.find(item.id)).not_to be_discarded
+      end
+    end
+
     it "preserves the committed deletion when the completion fails (#756 R4)" do
       box = create(:box, move:, status: "unpacking")
       item = create(:item, :manual, move:, box:)
