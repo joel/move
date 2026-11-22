@@ -25,6 +25,8 @@ class BaseAction
   # a generated image's media). With FOR UPDATE, a job holding a child row
   # while inserting an FK to the parent deadlocks against us. None of these
   # lockers changes the parent's key, so NO KEY UPDATE is sufficient.
+  # Exception: Boxes::CompleteIfEmpty keeps FOR UPDATE, because its emptiness
+  # check must exclude children ARRIVING (see there).
   PARENT_ROW_LOCK = "FOR NO KEY UPDATE"
 
   private

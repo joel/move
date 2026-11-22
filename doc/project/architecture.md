@@ -600,7 +600,11 @@ per adapter, so no surface can drift:
   cascade's root) is `FOR NO KEY UPDATE` (`BaseAction::PARENT_ROW_LOCK`): it
   still serializes all box-first paths, but never blocks the `FOR KEY SHARE`
   a concurrent child write's FK check takes on the box (re-boxing an item,
-  `GenerateImage` attaching media), which with `FOR UPDATE` deadlocks. The review walk's mis-detection removal
+  `GenerateImage` attaching media), which with `FOR UPDATE` deadlocks. The
+  one exception is `Boxes::CompleteIfEmpty`, which keeps `FOR UPDATE` so no
+  item can be moved or created **into** the box between its emptiness check
+  and the unpacked cascade. That can't deadlock: it only proceeds when the
+  box has no `in_box` rows to wait on. The review walk's mis-detection removal
   deliberately does **not** complete (packing-phase cleanup), and reopen never
   re-completes an emptied box.
 - `Boxes::CompleteIfEmpty` re-checks `unpacking? && items.in_box.none?` under
