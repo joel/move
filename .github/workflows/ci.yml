@@ -190,17 +190,13 @@ jobs:
         with:
           bundler-cache: true
       -
+        # RuboCop, its plugins, brakeman and bundle-audit all run from the
+        # bundle (bundler-cache above), never `gem install`: an unpinned
+        # install picks up the latest upstream release, so a new cop or check
+        # fails lint on every PR regardless of its diff (#601, #795). Version
+        # bumps arrive deliberately via Dependabot on Gemfile.lock instead.
         name: "Lint / rubocop"
-        run: |
-          gem install rubocop
-          gem install rubocop-performance
-          gem install rubocop-rake
-          gem install rubocop-rspec
-          gem install rubocop-rspec_rails
-          gem install rubocop-rails
-          gem install rubocop-capybara
-          gem install rubocop-factory_bot
-          rubocop --parallel
+        run: bundle exec rubocop --parallel
       -
         name: "Lint / erb_lint"
         run: bin/erb_lint --lint-all
@@ -228,11 +224,9 @@ jobs:
         run: bundle exec steep check --no-daemon --severity-level=error
       -
         name: "Security / brakeman"
-        run: |
-          gem install brakeman
-          brakeman --exit-on-warn --no-progress --color --output /dev/stdout
+        run: bundle exec brakeman --exit-on-warn --no-progress --color --output /dev/stdout
       -
+        # `--update` refreshes the advisory database (data), not the gem: the
+        # bundler-audit code itself stays at the Gemfile.lock version.
         name: "Security / bundle-audit"
-        run: |
-          gem install bundle-audit
-          bundle-audit check --update -v
+        run: bundle exec bundle-audit check --update -v
