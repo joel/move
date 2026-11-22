@@ -6,7 +6,7 @@ module MoveMcp
     # rejects a cross-Move target). Both records are resolved through the token's
     # Move, so neither can belong to another Move or Organization. Moving the
     # last in-box item out of an unpacking box completes that source box (#757)
-    # — reported as source_box_completed.
+    # — reported as source_box_completed (response contract: app/mcp/README.md).
     class MoveItem < Base
       tool_name "move_item"
       description "Move an item to another box in the same move. Moving the last item out of a box " \
