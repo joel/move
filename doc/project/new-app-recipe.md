@@ -218,6 +218,32 @@ Set `require_destination: true` in `config/deploy.yml` and keep hosts only in
   `gh` command in this repo.)
 - The Deploy workflow has `workflow_dispatch:` — recover a skipped deploy with
   `unset GITHUB_TOKEN && gh workflow run Deploy --ref main`.
+- **Run every lint/security tool from the locked bundle — never `gem install`
+  it in CI.** An unpinned `gem install rubocop` (or brakeman/bundle-audit) runs
+  the latest upstream release, so a new cop or check fails `lint` on every PR
+  regardless of its diff (#601, #795). Keep the tools in the Gemfile
+  (`rubocop` + its plugins, `erb_lint`, `brakeman`, `bundle-audit`, `steep`)
+  and let `setup-ruby` install the bundle once; the `lint` job in
+  `.github/workflows/ci.yml` is then:
+  ```yaml
+  - name: Install Ruby
+    uses: ruby/setup-ruby@v1
+    with:
+      bundler-cache: true
+  - name: "Lint / rubocop"
+    run: bundle exec rubocop --parallel
+  - name: "Lint / erb_lint"
+    run: bin/erb_lint --lint-all
+  - name: "Types / steep"
+    run: bundle exec steep check --no-daemon --severity-level=error
+  - name: "Security / brakeman"
+    run: bundle exec brakeman --exit-on-warn --no-progress --color --output /dev/stdout
+  - name: "Security / bundle-audit"
+    run: bundle exec bundle-audit check --update -v
+  ```
+  `bundle-audit --update` refreshes the advisory database (data), not the gem,
+  so same-day advisories still surface. Tool upgrades arrive deliberately as
+  `Gemfile.lock` bumps (Dependabot), and local `bundle exec` agrees with CI.
 - **Cache rule for workflows** (#845):
   - **Secret-holding jobs don't restore shared caches.** A job whose env or inputs
     carry deploy/API secrets (Deploy, Security Audit, Release Bug Scan, the
@@ -705,6 +731,7 @@ mandatory post-upload step (re-sniff, **strip EXIF/GPS**, size-cap, transcode) a
 | `proxy: Must set a host to enable automatic SSL` | `proxy.ssl` set without a host | `ssl: false` (tunnel does TLS) |
 | `missing attribute 'roles_mask'` 500 after DB wipe | stale Puma schema cache | restart the app container |
 | Deploy didn't run after merge | `[skip ci]`/marker in squash message | repo squash setting + commit-msg hook (§5) |
+| `lint` fails on every PR with offenses in untouched files | CI `gem install`ed an unpinned (newer) rubocop/plugin than `Gemfile.lock` | run lint/security tools via `bundle exec` from the bundle (§5) |
 | `pg_dump: server version mismatch` | client 17 vs server 18 | `postgresql-client-18` (§2) |
 | backup accessory crash-loops with restic auth/repo errors right after boot | Kamal 2.12 swallows secret command-substitution failures — a missing Doppler value boots the container with `""` | `bundle exec kamal-backup validate -d <dest>` before every accessory boot/reboot (§6e) |
 | `kamal-backup` remote commands fail with a version-mismatch error | local gem and accessory image drifted (e.g. a gem-only bump) | pin both to the same version, bump together, `kamal accessory reboot -d <dest> backup` (§6e) |
