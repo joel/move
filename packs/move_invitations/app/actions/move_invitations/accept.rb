@@ -105,13 +105,25 @@ module MoveInvitations
     # Idempotent org-join with the base role. find_or_create_by! + the unique
     # rescue covers both the sequential and the concurrent duplicate; the model's
     # own uniqueness validation raises RecordInvalid on the sequential path.
+    #
+    # Serialised against account deletion (#366): Accounts::Delete locks this
+    # same org row (`FOR UPDATE`), rechecks that the org is still solo, then
+    # drops its tenant. Taking the lock here means either our membership commits
+    # first (the deletion's recheck sees it and refuses) or we wait for the
+    # teardown and find the org gone — never a member joining a tenant that is
+    # being dropped. A savepoint, so a duplicate-key error rolls back only this.
 
     #: (untyped organization, untyped user) -> Dry::Monads::Result[untyped, untyped]
     def join_organization(organization, user)
-      OrganizationMembership.find_or_create_by!(organization: organization, user: user) do |m|
-        m.role = "member"
+      joined = OrganizationMembership.transaction(requires_new: true) do
+        next false unless Organization.lock.find_by(id: organization.id)
+
+        OrganizationMembership.find_or_create_by!(organization: organization, user: user) do |m|
+          m.role = "member"
+        end
+        true
       end
-      Success()
+      joined ? Success() : Failure(:gone)
     rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
       # A concurrent join (second tab) landed first; membership now exists.
       membership = OrganizationMembership.exists?(organization: organization, user: user)
