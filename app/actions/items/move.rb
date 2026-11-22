@@ -29,7 +29,10 @@ module Items
       moved = with_current_box_lock(item) { |box| locked_move(item, box, target_box) }
       source, was_unpacking = yield moved
       yield emit_event(item, target_box, mover)
-      Boxes::CompleteIfEmpty.completed_box(box: source, actor: mover)
+      # Only a box that was being unpacked when the item left it (read under
+      # the source lock) is eligible: a box opened AFTER we released the lock
+      # was deliberately opened empty and must stay open (#757 Codex R9).
+      Boxes::CompleteIfEmpty.completed_box(box: source, actor: mover) if was_unpacking
       Success(item: item, source_box: source, source_completed: was_unpacking && source.reload.unpacked?)
     end
 

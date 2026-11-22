@@ -17,12 +17,9 @@ module Items
     #: (item: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:, source: :web)
       yield ensure_writable(item.move) # first step: no lock taken on a read-only Move
-      box, batch_id, was_in_box = yield with_current_box_lock(item) { |locked| locked_discard(item, locked, actor, source) }
+      box, batch_id, emptied = yield with_current_box_lock(item) { |locked| locked_discard(item, locked, actor, source) }
       yield emit_event(item, actor, source, batch_id)
-      # Only deleting an IN-BOX item can empty the box: deleting an already
-      # removed one must not close a deliberately reopened empty box
-      # ("reopen never re-completes", #757 Codex R5).
-      Boxes::CompleteIfEmpty.completed_box(box: box, actor: actor) if was_in_box
+      Boxes::CompleteIfEmpty.completed_box(box: box, actor: actor) if emptied
       Success(item)
     end
 
@@ -34,12 +31,18 @@ module Items
     # the box the item was actually deleted from. Box-first (#756 R2), so a
     # delete serializes with "mark box unpacked" and with restores; the
     # completion re-locks the box after this commits.
+    #
+    # `emptied` gates the completion on state read UNDER the lock: only
+    # deleting an IN-BOX item of a box being UNPACKED can complete it. Deleting
+    # an already removed item must not close a deliberately reopened empty box
+    # ("reopen never re-completes", #757 Codex R5), and a box opened after we
+    # release the lock was opened empty on purpose (#757 Codex R9).
 
     #: (untyped item, untyped box, untyped actor, Symbol source) -> Dry::Monads::Result[untyped, untyped]
     def locked_discard(item, box, actor, source)
-      was_in_box = !item.removed? # presence as re-read under the lock
+      emptied = !item.removed? && box.unpacking?
       batch_id = yield Discards::Cascade.new.call(record: item, actor: actor, source: source)
-      Success([box, batch_id, was_in_box])
+      Success([box, batch_id, emptied])
     end
 
     #: (untyped item, untyped actor, Symbol source, untyped batch_id) -> Dry::Monads::Success[nil]

@@ -127,6 +127,20 @@ RSpec.describe Items::Delete do
       end
     end
 
+    it "never completes a box opened for unpacking after the item left it (#757 Codex R9)" do
+      box = create(:box, move:, status: "sealed")
+      item = create(:item, :manual, move:, box:)
+      allow(Rails.event).to receive(:notify).and_wrap_original do |original, name, *args, **kwargs|
+        # Between the lock release and the completion, another request opens the now-empty box.
+        box.reload.update!(status: "unpacking") if name == "item.deleted"
+        original.call(name, *args, **kwargs)
+      end
+
+      described_class.new.call(item:, actor:)
+
+      expect(box.reload.status).to eq("unpacking")
+    end
+
     it "gives up after bounded retries without discarding when the item keeps moving" do
       box = create(:box, move:, status: "unpacking")
       hops = create_list(:box, 3, move:, status: "unpacking")
