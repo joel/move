@@ -18,16 +18,15 @@ module Items
   class Move < BaseAction
     include CurrentBoxLock
 
-    # FOR NO KEY UPDATE, not FOR UPDATE: the box_id write's FK check takes FOR
-    # KEY SHARE on the TARGET box, which FOR UPDATE blocks — two crossing
-    # moves (3→8 and 8→3) would deadlock. NO KEY UPDATE still conflicts with
-    # the FOR UPDATE of CompleteIfEmpty / RestoreToBox / another move.
-    SOURCE_LOCK = "FOR NO KEY UPDATE"
+    # The source lock is BaseAction::PARENT_ROW_LOCK (CurrentBoxLock's
+    # default), FOR NO KEY UPDATE: the box_id write's FK check takes FOR KEY
+    # SHARE on the TARGET box, so two crossing moves (3→8 and 8→3) can't
+    # deadlock.
 
     #: (item: untyped, target_box: untyped, mover: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, target_box:, mover:)
       yield ensure_writable(item.move)
-      moved = with_current_box_lock(item, lock: SOURCE_LOCK) { |box| locked_move(item, box, target_box) }
+      moved = with_current_box_lock(item) { |box| locked_move(item, box, target_box) }
       source, was_unpacking = yield moved
       yield emit_event(item, target_box, mover)
       Boxes::CompleteIfEmpty.completed_box(box: source, actor: mover)

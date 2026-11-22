@@ -23,8 +23,10 @@ module Discards
         # a box delete would lock items then the box, the reverse of every
         # box-first path (TransitionStatus's cascade, RestoreToBox,
         # CompleteIfEmpty, Items::Move/Delete via CurrentBoxLock), and a
-        # concurrent move or unpack-all would deadlock with it.
-        record.lock!
+        # concurrent move or unpack-all would deadlock with it. NO KEY UPDATE
+        # (BaseAction::PARENT_ROW_LOCK) so a child holder's FK insert against
+        # the root (GenerateImage's media) can't deadlock it either (R8).
+        record.lock!(PARENT_ROW_LOCK)
         discard_node(record, batch_id: batch_id, parent: nil)
       end
       Success(batch_id)

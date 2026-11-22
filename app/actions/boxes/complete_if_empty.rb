@@ -24,7 +24,7 @@ module Boxes
 
     #: (box: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, actor:)
-      box.with_lock do
+      box.with_lock(PARENT_ROW_LOCK) do
         # The lock's re-read is unscoped: a box a concurrent Boxes::Delete
         # discarded is no longer anyone's to complete (#757 Codex R4).
         return Success(nil) if box.discarded?

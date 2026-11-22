@@ -596,7 +596,11 @@ per adapter, so no surface can drift:
   item is in **now**, re-read the item under the lock, and retry against its
   new box (bounded; `Failure(:box_changed)`) if a concurrent move re-boxed it
   while we waited, so the write, event and completion all follow the box the
-  item actually left. The review walk's mis-detection removal
+  item actually left. Every parent-first lock (box locks, the discard
+  cascade's root) is `FOR NO KEY UPDATE` (`BaseAction::PARENT_ROW_LOCK`): it
+  still serializes all box-first paths, but never blocks the `FOR KEY SHARE`
+  a concurrent child write's FK check takes on the box (re-boxing an item,
+  `GenerateImage` attaching media), which with `FOR UPDATE` deadlocks. The review walk's mis-detection removal
   deliberately does **not** complete (packing-phase cleanup), and reopen never
   re-completes an emptied box.
 - `Boxes::CompleteIfEmpty` re-checks `unpacking? && items.in_box.none?` under

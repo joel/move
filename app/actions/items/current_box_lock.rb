@@ -26,7 +26,7 @@ module Items
     private
 
     #: (untyped item, ?lock: untyped) { (untyped) -> untyped } -> untyped
-    def with_current_box_lock(item, lock: true)
+    def with_current_box_lock(item, lock: ::BaseAction::PARENT_ROW_LOCK)
       MAX_ATTEMPTS.times do
         # A concurrent Boxes::Delete may have discarded the box (and, via its
         # cascade, the item): Box's kept scope then hides it from the

@@ -104,7 +104,9 @@ RSpec.describe "Discards cascade" do # rubocop:disable RSpec/DescribeClass
         described_class.new.call(record: box, actor:)
       end
 
-      root_lock = statements.index { |sql| sql.include?('FROM "boxes"') && sql.include?("FOR UPDATE") }
+      # NO KEY UPDATE (BaseAction::PARENT_ROW_LOCK, Codex R8): a child holder's
+      # FK insert against the box (FOR KEY SHARE) must not deadlock with it.
+      root_lock = statements.index { |sql| sql.include?('FROM "boxes"') && sql.include?("FOR NO KEY UPDATE") }
       first_child_write = statements.index { |sql| sql.start_with?('UPDATE "items"') }
       expect(root_lock).to be < first_child_write
     end

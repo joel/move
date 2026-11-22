@@ -92,7 +92,7 @@ RSpec.describe Items::Delete do
       move_while_waiting(item, current)
       allow(Rails.event).to receive(:notify).and_call_original
 
-      locks = box_locks_taken { described_class.new.call(item:, actor:) }
+      locks = box_locks_taken(mode: /FOR NO KEY UPDATE/) { described_class.new.call(item:, actor:) }
 
       aggregate_failures do
         expect(Item.with_discarded.find(item.id)).to be_discarded

@@ -3,12 +3,12 @@
 # Lock-ordering helpers for the box-first races (#756 R2, #757 Codex R1).
 module BoxLockHelpers
   # The box ids row-locked (SELECT ... FOR [NO KEY] UPDATE on boxes) while the
-  # block runs, in order.
-  def box_locks_taken(&)
+  # block runs, in order. Pass `mode:` to capture only that lock strength.
+  def box_locks_taken(mode: /FOR (NO KEY )?UPDATE/, &)
     locked = []
     callback = lambda do |*, payload|
       sql = payload[:sql].to_s
-      next unless sql.include?('FROM "boxes"') && sql.match?(/FOR (NO KEY )?UPDATE/)
+      next unless sql.include?('FROM "boxes"') && sql.match?(mode)
 
       locked << Array(payload[:type_casted_binds]).first
     end

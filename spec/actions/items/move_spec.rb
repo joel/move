@@ -180,7 +180,8 @@ RSpec.describe Items::Move do
         move_while_waiting(item, current) # a concurrent move commits stale → current
 
         result = nil
-        locks = box_locks_taken { result = described_class.new.call(item:, target_box: target, mover:) }
+        mode = /FOR NO KEY UPDATE/
+        locks = box_locks_taken(mode:) { result = described_class.new.call(item:, target_box: target, mover:) }
 
         aggregate_failures do
           expect(result).to be_success
