@@ -5,9 +5,10 @@ run-name: Self-Healing - ${{ github.event_name }}
 # Loop A of the self-healing pipeline (doc/project/self-healing.md):
 # Sentry error issues -> public-safe GitHub issues -> agent fix PRs ->
 # deterministic scoring -> confidence-gated auto-merge -> the existing
-# deploy-on-merge -> post-deploy verification. Stages land incrementally;
-# this workflow currently implements TRIAGE only (observe-only: it opens
-# issues, nothing merges).
+# deploy-on-merge -> post-deploy verification. Jobs: gate -> triage ->
+# select -> prepare -> fix (the only job running model code) -> publish ->
+# score -> steward (merges only with SELF_HEALING_AUTONOMY_ENABLED), plus
+# verify.
 #
 # Safety engine:
 # - Kill switch: repo variable SELF_HEALING_ENABLED must be exactly 'true'.
@@ -34,6 +35,14 @@ on:
 
 # Jobs opt in to the narrowest permissions they need.
 permissions: {}
+
+# The autofix bot's git identity: commits made by the fix agent, and the
+# publish job's force-push guard, both derive from these. 300478077 is the
+# user id of `move-autofix[bot]` (the GitHub App's bot account), so commits
+# link to the App and get the standard `<id>+<login>` noreply email.
+env:
+  AUTOFIX_BOT_NAME: "move-autofix[bot]"
+  AUTOFIX_BOT_ID: "300478077"
 
 # One pipeline cycle at a time; never interrupt an in-flight cycle (a steward
 # mid-merge must not be cancelled).
@@ -213,9 +222,8 @@ jobs:
         run: jq . /tmp/candidates.json
 
   # Pick the open autofix issues that have not had a fix attempt yet (the
-  # `autofix:attempted` label marks an attempt BEFORE the agent runs, so a
-  # crashed attempt can never retry-loop every 30 minutes — a human removes
-  # the label to consciously retry).
+  # `autofix:attempted` label, set by `prepare` BEFORE the agent runs, is the
+  # retry-loop guard).
   select:
     runs-on: ubuntu-latest
     needs: [gate, triage]
@@ -262,17 +270,99 @@ jobs:
           echo "count=$(jq length <<< "$issues")" >> "$GITHUB_OUTPUT"
           jq . <<< "$issues"
 
-  # One fix attempt per selected issue. The agent diagnoses, writes a failing
-  # regression spec, fixes, self-assesses — with NO push credential and no
-  # network tools. A deterministic step then publishes the branch + PR with a
-  # GitHub App token (the App identity is what makes CI run on the PR).
-  fix:
+  # Fix attempts are split across THREE jobs so the job that runs
+  # model-generated code holds no write-capable credential (#571):
+  #
+  #   prepare  (no model code)  marks the attempts, stages whitelist-reduced
+  #                             context. Holds issues:write + the Sentry token.
+  #   fix      (MODEL CODE)     claude-code-action + `bundle exec rspec` on
+  #                             agent-written specs. contents:read only; its
+  #                             ONLY secrets are the model API key and that
+  #                             read-only GITHUB_TOKEN. Hands back DATA only:
+  #                             a git bundle + assessment.json artifact.
+  #   publish  (no model code)  fresh runner + pristine main checkout:
+  #                             validates the bundle, then pushes + opens the
+  #                             PR with the App token, or reports the failure.
+  #
+  # Why a job boundary and not a step boundary: the agent runs the specs it
+  # writes, i.e. arbitrary code on the runner. Anything that code can reach —
+  # the job's GITHUB_TOKEN, every secret the job references (the runner
+  # receives them up front), $GITHUB_ENV, .git/hooks and .git/config read by
+  # later steps — is the model's. Only a separate job on a fresh runner that
+  # never executes the agent's output is out of reach.
+  # spec/script/self_healing/workflow_spec.rb pins these invariants.
+  prepare:
     runs-on: ubuntu-latest
     needs: [gate, select]
     if: needs.gate.outputs.proceed == 'true' && needs.select.outputs.count != '0'
     permissions:
       contents: read
       issues: write
+    steps:
+      # The `autofix:attempted` label marks an attempt BEFORE the agent runs,
+      # so a crashed attempt can never retry-loop every 30 minutes — a human
+      # removes the label to consciously retry.
+      - name: Mark the attempts (retry-loop guard)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUES: ${{ needs.select.outputs.issues }}
+        run: |
+          set -euo pipefail
+          gh label create "autofix:attempted" --repo "$GITHUB_REPOSITORY" \
+            --color D4C5F9 --description "An automated fix attempt ran for this issue" --force
+          for number in $(jq -r '.[].number' <<< "$ISSUES"); do
+            gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --add-label "autofix:attempted"
+          done
+
+      - name: Checkout main (Sentry reducer)
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      # Sentry data enters ONLY through the whitelist reducer (trust boundary
+      # #5, security-model.md), and the Sentry token stays in this job — the
+      # fix job never references it.
+      - name: Stage whitelist-reduced context per issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SENTRY_AUTOFIX_TOKEN: ${{ secrets.SENTRY_AUTOFIX_TOKEN }}
+          SENTRY_ORG_SLUG: ${{ vars.SENTRY_ORG_SLUG }}
+          ISSUES: ${{ needs.select.outputs.issues }}
+        run: |
+          set -euo pipefail
+          for number in $(jq -r '.[].number' <<< "$ISSUES"); do
+            dir="$RUNNER_TEMP/autofix-context/$number"
+            mkdir -p "$dir"
+            gh issue view "$number" --repo "$GITHUB_REPOSITORY" \
+              --json title,body --jq '"# " + .title + "\n\n" + .body' > "$dir/issue.md"
+            sentry_issue_id=$(grep -oP '\| Sentry issue ID \| \K[0-9]+' "$dir/issue.md" || true)
+            if [ -n "$sentry_issue_id" ]; then
+              ruby script/self_healing/sentry_fetch.rb event \
+                --org "$SENTRY_ORG_SLUG" --issue-id "$sentry_issue_id" > "$dir/event.json"
+            else
+              echo '{}' > "$dir/event.json"
+            fi
+          done
+
+      - name: Hand the context to the fix job
+        uses: actions/upload-artifact@v7
+        with:
+          name: autofix-context
+          path: ${{ runner.temp }}/autofix-context
+          if-no-files-found: error
+          retention-days: 1
+
+  # One fix attempt per selected issue. The agent diagnoses, writes a failing
+  # regression spec, fixes, self-assesses — with a read-only token, no push
+  # credential, no gh, no network tools. NO write-capable secret may be
+  # referenced anywhere in this job (see the comment above `prepare`).
+  fix:
+    runs-on: ubuntu-latest
+    needs: [gate, select, prepare]
+    if: needs.gate.outputs.proceed == 'true' && needs.select.outputs.count != '0'
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -299,16 +389,6 @@ jobs:
       DB_HOST: localhost
       DB_PORT: 5432
     steps:
-      - name: Mark the attempt (retry-loop guard)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          gh label create "autofix:attempted" --repo "$GITHUB_REPOSITORY" \
-            --color D4C5F9 --description "An automated fix attempt ran for this issue" --force
-          gh issue edit "${{ matrix.issue.number }}" --repo "$GITHUB_REPOSITORY" \
-            --add-label "autofix:attempted"
-
       - name: Checkout main
         uses: actions/checkout@v7
         with:
@@ -333,28 +413,28 @@ jobs:
         run: bin/rails db:create db:schema:load
 
       # The agent's allowlist includes `git commit`, which needs an identity.
+      # The action sets the same identity from bot_name/bot_id below; this
+      # keeps it in place should that setup fail.
       - name: Configure git identity for the agent's commits
         run: |
-          git config user.name "move-autofix[bot]"
-          git config user.email "move-autofix[bot]@users.noreply.github.com"
+          git config user.name "$AUTOFIX_BOT_NAME"
+          git config user.email "${AUTOFIX_BOT_ID}+${AUTOFIX_BOT_NAME}@users.noreply.github.com"
 
-      - name: Stage whitelist-reduced context for the agent
+      - name: Download the staged context
+        uses: actions/download-artifact@v8
+        with:
+          name: autofix-context
+          path: ${{ runner.temp }}/autofix-context
+
+      - name: Place this issue's context for the agent
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SENTRY_AUTOFIX_TOKEN: ${{ secrets.SENTRY_AUTOFIX_TOKEN }}
-          SENTRY_ORG_SLUG: ${{ vars.SENTRY_ORG_SLUG }}
+          ISSUE_NUMBER: ${{ matrix.issue.number }}
         run: |
           set -euo pipefail
           mkdir -p tmp/autofix
-          gh issue view "${{ matrix.issue.number }}" --repo "$GITHUB_REPOSITORY" \
-            --json title,body --jq '"# " + .title + "\n\n" + .body' > tmp/autofix/issue.md
-          sentry_issue_id=$(grep -oP '\| Sentry issue ID \| \K[0-9]+' tmp/autofix/issue.md || true)
-          if [ -n "$sentry_issue_id" ]; then
-            ruby script/self_healing/sentry_fetch.rb event \
-              --org "$SENTRY_ORG_SLUG" --issue-id "$sentry_issue_id" > tmp/autofix/event.json
-          else
-            echo '{}' > tmp/autofix/event.json
-          fi
+          cp "$RUNNER_TEMP/autofix-context/$ISSUE_NUMBER/issue.md" \
+             "$RUNNER_TEMP/autofix-context/$ISSUE_NUMBER/event.json" tmp/autofix/
+          rm -rf "$RUNNER_TEMP/autofix-context"
 
       # The agent gets file tools + spec-running + local git only: no push
       # credential (persist-credentials: false above), no gh, no network.
@@ -366,11 +446,15 @@ jobs:
           # (its default when no token is given — it exchanges a GitHub OIDC
           # token for a Claude-App token, which we don't have installed and
           # which needs `id-token: write` we don't grant; it fails at startup
-          # in setupGitHubToken → getOidcToken). GITHUB_TOKEN is safe here: the
-          # agent's allowedTools have no `git push`, and a GITHUB_TOKEN push
-          # would not trigger workflows anyway — the deterministic App-token
-          # step below is what actually pushes the branch.
+          # in setupGitHubToken → getOidcToken). The action exports this token
+          # to the agent and embeds it in `origin`, so it MUST stay read-only:
+          # this job's permissions are `contents: read` and nothing else.
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # The action overwrites the git identity with its bot_name/bot_id
+          # (default claude[bot]). Keep the autofix bot's, so the publish
+          # job's force-push guard recognises a retry of its own branch.
+          bot_name: ${{ env.AUTOFIX_BOT_NAME }}
+          bot_id: ${{ env.AUTOFIX_BOT_ID }}
           # Never spill Claude's fix write-up to the public Actions step
           # summary (content-free-public-sink doctrine, security-model.md).
           display_report: "false"
@@ -385,43 +469,109 @@ jobs:
             --allowedTools "Edit,Write,Read,Grep,Glob,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(bundle exec rspec:*)"
         timeout-minutes: 30
 
-      # Everything below is deterministic: validate the agent's output, then
-      # publish with the App identity. Fail closed: no assessment or no
-      # commits -> no PR, surfaced on the issue.
-      - name: Validate the attempt
-        id: validate
+      # DATA only crosses to the publish job: the agent's commits as a git
+      # bundle plus its assessment. Nothing here is trusted downstream — the
+      # publish job re-validates all of it on a fresh runner. Symlinks are
+      # refused so a planted link cannot smuggle another file's content out.
+      - name: Package the attempt (git bundle + assessment)
         run: |
           set -euo pipefail
-          commits=$(git rev-list --count origin/main..HEAD)
-          if [ "$commits" -eq 0 ]; then
-            echo "result=no-commits" >> "$GITHUB_OUTPUT"
-            exit 0
+          out="$RUNNER_TEMP/autofix-attempt"
+          rm -rf "$out" && mkdir -p "$out"
+          if [ "$(git rev-list --count origin/main..HEAD)" -gt 0 ]; then
+            git bundle create "$out/fix.bundle" HEAD ^origin/main
           fi
-          if ! jq -e '.confidence' tmp/autofix/assessment.json > /dev/null 2>&1; then
-            echo "result=no-assessment" >> "$GITHUB_OUTPUT"
-            exit 0
+          assessment=tmp/autofix/assessment.json
+          if [ -f "$assessment" ] && [ ! -L "$assessment" ]; then
+            cp "$assessment" "$out/assessment.json"
           fi
-          if [ "$(jq -r '.fixable' tmp/autofix/assessment.json)" = "false" ]; then
-            echo "result=not-fixable" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          touch "$out/packaged"
+
+      - name: Hand the attempt to the publish job
+        uses: actions/upload-artifact@v7
+        with:
+          name: autofix-attempt-${{ matrix.issue.number }}
+          path: ${{ runner.temp }}/autofix-attempt
+          if-no-files-found: error
+          retention-days: 1
+
+  # Everything here is deterministic and runs on a FRESH runner that never
+  # executes the agent's output: validate the bundle against a pristine main
+  # checkout, then publish with the App identity (the App identity is what
+  # makes CI run on the PR). Fail closed: no artifact, no commits, no
+  # assessment, a deny-listed path -> no PR, surfaced on the issue.
+  publish:
+    runs-on: ubuntu-latest
+    needs: [gate, select, prepare, fix]
+    # !cancelled(): runs after a failed fix leg too (`needs.fix.result` is the
+    # matrix aggregate, so each leg detects its own failure by its missing
+    # artifact), so every attempt leaves a trace on its issue.
+    if: ${{ !cancelled() && needs.gate.outputs.proceed == 'true' && needs.select.result == 'success' && needs.select.outputs.count != '0' }}
+    permissions:
+      contents: read
+      issues: write
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        issue: ${{ fromJSON(needs.select.outputs.issues) }}
+    steps:
+      # Full history: main may have moved since the fix job checked it out,
+      # and the bundle's prerequisite is that older main commit.
+      - name: Checkout main (the judge)
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download the attempt
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: autofix-attempt-${{ matrix.issue.number }}
+          path: ${{ runner.temp }}/autofix-attempt
+
+      - name: Validate the attempt
+        id: validate
+        env:
+          DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          ATTEMPT_DIR: ${{ runner.temp }}/autofix-attempt
+        run: |
+          set -euo pipefail
+          result() { echo "result=$1" >> "$GITHUB_OUTPUT"; exit 0; }
+
+          [ "$PREPARE_RESULT" = "success" ] || result prepare-failed
+          { [ "$DOWNLOAD_OUTCOME" = "success" ] && [ -f "$ATTEMPT_DIR/packaged" ]; } \
+            || result agent-step-failed
+          [ -f "$ATTEMPT_DIR/fix.bundle" ] || result no-commits
+          git bundle verify -q "$ATTEMPT_DIR/fix.bundle" > /dev/null 2>&1 || result bundle-invalid
+          git fetch -q --no-tags "$ATTEMPT_DIR/fix.bundle" "+HEAD:refs/autofix/candidate" \
+            || result bundle-invalid
+          [ "$(git rev-list --count refs/autofix/candidate ^origin/main)" -gt 0 ] || result no-commits
+
+          assessment="$ATTEMPT_DIR/assessment.json"
+          jq -e '.confidence' "$assessment" > /dev/null 2>&1 || result no-assessment
+          [ "$(jq -r '.fixable' "$assessment")" != "false" ] || result not-fixable
 
           # PRE-PUSH blast-radius gate: a deny-listed path must never even be
           # PUSHED — a pushed workflow file executes on push with the default
           # token, so the scorer's later needs-human verdict would be too
-          # late. Judged with PRISTINE main copies of checker + config (the
-          # agent can edit the working tree, so the working-tree copies must
-          # never be the judge). Both sides of renames are included.
-          git show origin/main:script/self_healing/blast_radius.rb > "$RUNNER_TEMP/blast_radius.rb"
-          git show origin/main:.github/autofix/blast_radius.yml > "$RUNNER_TEMP/blast_radius.yml"
-          git diff --name-status origin/main..HEAD \
-            | awk '{print $2; if (NF > 2) print $3}' > "$RUNNER_TEMP/changed_paths.txt"
-          if ! ruby "$RUNNER_TEMP/blast_radius.rb" --config "$RUNNER_TEMP/blast_radius.yml" \
-               < "$RUNNER_TEMP/changed_paths.txt"; then
-            echo "result=deny-listed" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "result=ok" >> "$GITHUB_OUTPUT"
+          # late. The checker + config are this job's pristine main checkout
+          # (the agent never touched this runner). Judged over BOTH diffs:
+          # three-dot = what the PR will show; two-dot = every path whose
+          # pushed content differs from main's tip, which also catches a
+          # bundle built on an OLD main commit (stale denied files would ride
+          # along unseen by three-dot). Fails closed if main itself touched a
+          # denied path since the fix job's checkout. Both sides of renames.
+          for range in origin/main...refs/autofix/candidate origin/main..refs/autofix/candidate; do
+            git diff --name-status "$range"
+          done | awk '{print $2; if (NF > 2) print $3}' | sort -u > "$RUNNER_TEMP/changed_paths.txt"
+          ruby script/self_healing/blast_radius.rb --config .github/autofix/blast_radius.yml \
+            < "$RUNNER_TEMP/changed_paths.txt" || result deny-listed
+          result ok
 
       - name: Mint GitHub App token
         id: app-token
@@ -439,16 +589,19 @@ jobs:
           ISSUE_NUMBER: ${{ matrix.issue.number }}
           ISSUE_TITLE: ${{ matrix.issue.title }}
           SHORT_ID: ${{ matrix.issue.short_id }}
+          ASSESSMENT: ${{ runner.temp }}/autofix-attempt/assessment.json
         run: |
           set -euo pipefail
           branch="fix/sentry-$(tr '[:upper:]' '[:lower:]' <<< "$SHORT_ID")"
           # A branch normally pre-exists here only when a human removed
           # `autofix:attempted` to consciously retry — but never clobber a
           # HUMAN branch that happens to share the name: only force-push
-          # over a tip authored by the bot identity.
+          # over a tip authored by the bot identity (the one the fix job
+          # passes to claude-code-action as bot_name/bot_id).
+          bot_email="${AUTOFIX_BOT_ID}+${AUTOFIX_BOT_NAME}@users.noreply.github.com"
           if git fetch origin "refs/heads/${branch}" 2>/dev/null; then
             tip_author=$(git log -1 --format=%ae FETCH_HEAD)
-            if [ "$tip_author" != "move-autofix[bot]@users.noreply.github.com" ]; then
+            if [ "$tip_author" != "$bot_email" ]; then
               echo "::warning::Branch ${branch} exists with a non-bot tip (${tip_author}) — not overwriting."
               gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body \
                 "🤖 Fix attempt aborted: branch \`${branch}\` already exists with commits not authored by the autofix bot. Rename or delete that branch, then remove \`autofix:attempted\` to retry."
@@ -457,21 +610,24 @@ jobs:
           fi
           git push --force \
             "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-            "HEAD:refs/heads/${branch}"
+            "refs/autofix/candidate:refs/heads/${branch}"
 
           {
             echo "Closes #${ISSUE_NUMBER}"
             echo
             echo "## Automated fix attempt for ${SHORT_ID}"
             echo
-            echo "**Diagnosis (agent, self-reported):** $(jq -r '.diagnosis' tmp/autofix/assessment.json)"
+            echo "**Diagnosis (agent, self-reported):** $(jq -r '.diagnosis' "$ASSESSMENT")"
             echo
-            echo "**Agent confidence:** $(jq -r '.confidence' tmp/autofix/assessment.json)/100 · **Regression spec:** \`$(jq -r '.spec_file // "?"' tmp/autofix/assessment.json)\` (failed before fix: $(jq -r '.spec_failed_before_fix // "?"' tmp/autofix/assessment.json))"
+            echo "**Agent confidence:** $(jq -r '.confidence' "$ASSESSMENT")/100 · **Regression spec:** \`$(jq -r '.spec_file // "?"' "$ASSESSMENT")\` (failed before fix: $(jq -r '.spec_failed_before_fix // "?"' "$ASSESSMENT"))"
             echo
-            notes=$(jq -r '.notes // empty' tmp/autofix/assessment.json)
+            notes=$(jq -r '.notes // empty' "$ASSESSMENT")
             [ -n "$notes" ] && { echo "**Reviewer notes:** ${notes}"; echo; }
+            # `<`/`>` occur only inside JSON strings, so encoding them as
+            # \u003c/\u003e keeps valid JSON (the scorer's jq decodes it back)
+            # while model text can never close this comment with `-->`.
             echo "<!-- autofix:assessment"
-            jq -c . tmp/autofix/assessment.json
+            jq -c . "$ASSESSMENT" | sed 's/</\\u003c/g; s/>/\\u003e/g'
             echo "-->"
             echo
             echo "---"
@@ -487,11 +643,11 @@ jobs:
 
       # !cancelled(): an `if` without a status function gets an implicit
       # success(), which would SKIP this report exactly on the opaque
-      # failures — the agent step timing out/crashing (validate skipped,
-      # result empty) or the publication path (token mint, push, pr create)
-      # failing after a green validation. Every such outcome must leave an
-      # explanatory comment, or the issue stays autofix:attempted (excluded
-      # from future cycles) with no trace outside the Actions log.
+      # failures — validation crashing (result empty) or the publication path
+      # (token mint, push, pr create) failing after a green validation. Every
+      # such outcome must leave an explanatory comment, or the issue stays
+      # autofix:attempted (excluded from future cycles) with no trace outside
+      # the Actions log.
       - name: Report a failed attempt on the issue
         if: >-
           ${{ !cancelled() &&
@@ -500,13 +656,14 @@ jobs:
                steps.publish.outcome == 'failure') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ matrix.issue.number }}
           REASON: >-
             ${{ steps.validate.outputs.result != 'ok'
-                && (steps.validate.outputs.result || 'agent-step-failed')
+                && (steps.validate.outputs.result || 'validation-failed')
                 || 'publish-failed' }}
         run: |
           set -euo pipefail
-          gh issue comment "${{ matrix.issue.number }}" --repo "$GITHUB_REPOSITORY" --body \
+          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body \
             "🤖 Automated fix attempt did not produce a PR (\`${REASON}\`). A human should triage this one — remove the \`autofix:attempted\` label to allow a retry. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
   # Deterministic scoring of every open autofix PR, from MAIN (a PR can never
@@ -514,7 +671,7 @@ jobs:
   # breakdown comment.
   score:
     runs-on: ubuntu-latest
-    needs: [gate, fix]
+    needs: [gate, publish]
     # inputs.dry_run is empty on schedule events, so the != true guard only
     # bites on an explicit dry-run dispatch (a dry run must mutate NOTHING —
     # no labels, no comments, no merges).

@@ -48,7 +48,7 @@ flowchart TD
     SENTRY["Sentry — prod errors,<br/>PII-scrubbed at ingest<br/>(config/initializers/sentry.rb)"]
     TRIAGE["triage (cron */30)<br/>kill switch · circuit breaker ·<br/>dedupe · caps"]
     ISSUE["Public-safe GitHub issue<br/>(whitelist-reduced fields only)"]
-    FIX["fix<br/>claude-code-action: failing spec →<br/>minimal fix → assessment.json<br/>(no push credential)"]
+    FIX["prepare → fix → publish<br/>claude-code-action: failing spec →<br/>minimal fix → assessment.json<br/>(model job: read-only token only)"]
     PR["PR via App token<br/>'Closes #N' — App identity<br/>makes CI run"]
     SCORE["score (FROM MAIN)<br/>script/self_healing/score.rb<br/>hard gates + weighted score"]
     STEWARD["steward (later cycles)<br/>budget → deploy green → no failing<br/>check → Codex verdict → mergeState<br/>CLEAN → direct squash merge"]
@@ -74,8 +74,10 @@ Separation of duties: **Claude** (claude-code-action) writes the fix; **Codex**
 (`chatgpt-codex-connector[bot]`) independently reviews it; a **deterministic
 Ruby scorer** — always executed from `main`, never from the PR head — decides
 whether the change is even eligible for autonomy; the **steward** merges only
-when every gate agrees. The agent never holds push credentials; a GitHub App
-token is minted by a deterministic workflow step after the agent finishes.
+when every gate agrees. The agent never holds a write-capable credential: it
+runs in its own job with a read-only token, and a separate job on a fresh
+runner mints the GitHub App token and publishes (see
+[Credential boundary](#credential-boundary-571) below).
 
 ## Safety engine (summary)
 
@@ -160,7 +162,8 @@ deny-listed for autofix PRs: an autofix rollback is always schema-safe.
 hiccup): `unset GITHUB_TOKEN && gh workflow run Deploy --ref main`.
 
 **Retry a failed fix attempt**: remove the issue's `autofix:attempted` label —
-the next cycle picks it up again (the fix branch is force-pushed).
+the next cycle picks it up again (the fix branch is force-pushed when its tip
+is the autofix bot's).
 
 ## Label state machine
 
@@ -175,20 +178,88 @@ the next cycle picks it up again (the fix branch is force-pushed).
 ## Fix attempt lifecycle
 
 1. `select` picks up to 2 open, unattempted `autofix` issues.
-2. `fix` (per issue, matrix): labels the issue `autofix:attempted` first, checks
-   out `main` with **no persisted credentials**, boots the CI Postgres service,
-   stages whitelist-reduced context (`tmp/autofix/issue.md`, `event.json`), and
-   runs `claude-code-action` with `.github/autofix/fix-prompt.md` — strict TDD
+2. `prepare` (one job, no model code): labels every selected issue
+   `autofix:attempted` **before** any agent runs (the retry-loop guard), then
+   stages the whitelist-reduced context per issue (`issue.md`, `event.json` via
+   `sentry_fetch.rb`) and hands it over as the `autofix-context` artifact.
+3. `fix` (per issue, matrix — **the only job that runs model-generated code**):
+   checks out `main` with **no persisted credentials**, boots the CI Postgres
+   service, places the issue's context in `tmp/autofix/`, and runs
+   `claude-code-action` with `.github/autofix/fix-prompt.md` — strict TDD
    (failing regression spec first), house conventions, path/size constraints,
    an honesty-calibrated `assessment.json`, and **no push/gh/network tools**
-   (`--max-turns 40`, 30-minute timeout).
-3. Deterministic post-steps validate (commits exist, assessment well-formed,
-   `fixable: true`) and only then mint the App token, push
-   `fix/sentry-<shortid>`, and open the PR (`Closes #<issue>`, assessment
-   embedded in an HTML comment for the scorer). A failed attempt is reported on
-   the issue instead — nothing is pushed.
-4. `score` re-scores **every** open autofix PR from `main` each cycle:
+   (`--max-turns 40`, 30-minute timeout). It then packages its local commits as
+   a git bundle plus `assessment.json` into the `autofix-attempt-<issue>`
+   artifact (data only, symlinks refused, 1-day retention).
+4. `publish` (per issue, matrix, fresh runner, no model code): checks out
+   pristine `main` (full history), fetches the bundle into
+   `refs/autofix/candidate`, and validates it — artifact present, bundle
+   well-formed, commits exist, assessment well-formed, `fixable: true`, and the
+   pre-push blast-radius gate over both the three-dot diff (what the PR shows)
+   and the two-dot diff against `main`'s tip (so a bundle built on an old
+   `main` commit cannot push stale denied files). Only then does it mint
+   the App token, push `fix/sentry-<shortid>`, and open the PR (`Closes
+   #<issue>`, assessment embedded in an HTML comment for the scorer). Any
+   failure — including a crashed or timed-out `fix` leg (no artifact) — is
+   reported on the issue instead, and nothing is pushed.
+5. `score` re-scores **every** open autofix PR from `main` each cycle:
    hard gates + weighted score → labels + a transparent breakdown comment.
+
+### Credential boundary (#571)
+
+The fix agent runs the specs it writes, so the `fix` job executes **arbitrary
+model-generated code** on its runner. Whatever that code can reach is the
+model's: the job's `GITHUB_TOKEN`, every secret the job references (the runner
+receives them when the job starts), `$GITHUB_ENV`, and the `.git/hooks` /
+`.git/config` that later steps in the same job would run. A step boundary
+inside one job is therefore not a security boundary; a **job** boundary is.
+
+```mermaid
+flowchart LR
+    subgraph PREP["prepare — no model code"]
+        P1["label autofix:attempted"]
+        P2["sentry_fetch.rb → issue.md + event.json"]
+    end
+    subgraph FIX["fix — MODEL CODE"]
+        F1["claude-code-action<br/>+ bundle exec rspec"]
+        F2["git bundle + assessment.json"]
+    end
+    subgraph PUB["publish — fresh runner, no model code"]
+        U1["pristine main · validate bundle ·<br/>blast-radius gate"]
+        U2["App token → push + PR<br/>or failure comment"]
+    end
+    PREP -- "artifact: context (data)" --> FIX
+    FIX -- "artifact: attempt (data)" --> PUB
+```
+
+| Job | Permissions | Secrets referenced | Runs model code |
+|---|---|---|---|
+| `prepare` | `contents: read`, `issues: write` | `GITHUB_TOKEN`, `SENTRY_AUTOFIX_TOKEN` | no |
+| `fix` | `contents: read` | `AUTOFIX_ANTHROPIC_API_KEY`, `GITHUB_TOKEN` (read-only) | **yes** |
+| `publish` | `contents: read`, `issues: write` | `GITHUB_TOKEN`, `AUTOFIX_APP_ID`, `AUTOFIX_APP_PRIVATE_KEY` | no |
+
+`claude-code-action` needs a token in agent mode (without one it falls into
+its OIDC path, which this repo does not use), exports it to the agent, and
+embeds it in `origin`. That is why the `fix` job's only permission is
+`contents: read`. Before #571 that token carried `issues: write`, and the App
+private key was referenced by the same job.
+
+**Bot identity.** The action rewrites the git identity from its
+`bot_name`/`bot_id` inputs (default `claude[bot]`). The workflow-level env
+`AUTOFIX_BOT_NAME=move-autofix[bot]`, `AUTOFIX_BOT_ID=300478077` (the App's bot
+user id) feeds both those inputs and `publish`'s retry guard, which only
+force-pushes over an existing `fix/sentry-*` branch whose tip author is
+`300478077+move-autofix[bot]@users.noreply.github.com`.
+
+`spec/script/self_healing/workflow_spec.rb` pins all of this: the model job's
+permissions and secret set, that no write-scoped job runs the agent or app
+code, the bot identity wiring, and the `publish` validation script itself
+(run against sandbox git repos).
+
+**Residual risk (accepted).** The model job still holds the Anthropic API key
+(inherent to running the agent) and a read-only token, and model code runs
+with the runner's full local privileges. Keep that job free of any other
+secret or write scope; the spec fails if one is added.
 
 Until autonomy is enabled (`SELF_HEALING_AUTONOMY_ENABLED` after the canary
 drill), nothing merges — scored PRs wait for a human, which doubles as the
