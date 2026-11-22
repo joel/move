@@ -758,3 +758,8 @@ flowchart LR
   key to the decommissioned Vultr IP for months after the cutover (#824).
 - Secrets (Doppler `move/prd` → GitHub): `SSH_PRIVATE_KEY` (a CI key in the NUC
   `deploy` user's `authorized_keys`), `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`.
+- **Secrets are step-scoped, never job-level** (#834). The production secret set
+  lives on only the secret-check step and the `Deploy` step (one `&deploy_secrets`
+  YAML anchor), so third-party actions never inherit it. The tailnet join runs
+  first (before checkout and the SSH agent), and `tailscale/github-action` and
+  `webfactory/ssh-agent` are pinned by commit SHA.
