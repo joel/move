@@ -35,6 +35,19 @@ RSpec.describe Items::Delete do
       end
     end
 
+    it "never re-completes a reopened empty box when deleting an already-removed item (#757 Codex R5)" do
+      box = create(:box, move:, status: "unpacking") # reopened: everything already unpacked
+      item = create(:item, :manual, move:, box:, presence_state: "removed")
+
+      result = described_class.new.call(item:, actor:)
+
+      aggregate_failures do
+        expect(result).to be_success
+        expect(Item.with_discarded.find(item.id)).to be_discarded
+        expect(box.reload.status).to eq("unpacking")
+      end
+    end
+
     it "leaves the box unpacking while other in-box items remain" do
       box = create(:box, move:, status: "unpacking")
       item = create(:item, :manual, move:, box:)

@@ -7,7 +7,7 @@ module Items
   # children, so the cascade discards just the one record under its own batch.
   # Emits `item.deleted` for the activity feed. Caller owns tenant context.
   #
-  # Deleting the last in-box item of an `unpacking` box completes the box
+  # Deleting the last IN-BOX item of an `unpacking` box completes the box
   # (#757) — the same lifecycle rule as Items::Unpack, applied after the
   # discard commits as a secondary mutation (its failure never masks the
   # deletion; Success(item) either way).
@@ -16,9 +16,12 @@ module Items
 
     #: (item: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:, source: :web)
-      box, batch_id = yield with_current_box_lock(item) { |locked| locked_discard(item, locked, actor, source) }
+      box, batch_id, was_in_box = yield with_current_box_lock(item) { |locked| locked_discard(item, locked, actor, source) }
       yield emit_event(item, actor, source, batch_id)
-      Boxes::CompleteIfEmpty.completed_box(box: box, actor: actor)
+      # Only deleting an IN-BOX item can empty the box: deleting an already
+      # removed one must not close a deliberately reopened empty box
+      # ("reopen never re-completes", #757 Codex R5).
+      Boxes::CompleteIfEmpty.completed_box(box: box, actor: actor) if was_in_box
       Success(item)
     end
 
@@ -33,8 +36,9 @@ module Items
 
     #: (untyped item, untyped box, untyped actor, Symbol source) -> Dry::Monads::Result[untyped, untyped]
     def locked_discard(item, box, actor, source)
+      was_in_box = !item.removed? # presence as re-read under the lock
       batch_id = yield Discards::Cascade.new.call(record: item, actor: actor, source: source)
-      Success([box, batch_id])
+      Success([box, batch_id, was_in_box])
     end
 
     #: (untyped item, untyped actor, Symbol source, untyped batch_id) -> Dry::Monads::Success[nil]
