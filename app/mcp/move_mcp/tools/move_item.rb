@@ -26,16 +26,13 @@ module MoveMcp
         target = find_box(server_context, to_box_number)
         return error_response("No box ##{to_box_number} in this move.") if target.nil?
 
-        source = item.box
-        was_unpacking = source.unpacking?
         result = ::Items::Move.new.call(item: item, target_box: target, mover: actor(server_context))
         return failure_response(result.failure) if result.failure?
 
         audit(server_context, item_id: item.id, box_number: target.number.to_i)
-        # The source box's post-action REALITY (#756 R5 rule), not whether this
-        # call won a concurrent completion race.
-        data_response(item: item_json(item.reload),
-                      source_box_completed: was_unpacking && source.reload.unpacked?)
+        # Items::Move reports the box the item actually left and its post-action
+        # REALITY (#756 R5 rule), not a pre-call snapshot.
+        data_response(item: item_json(item.reload), source_box_completed: result.value![:source_completed])
       end
     end
   end

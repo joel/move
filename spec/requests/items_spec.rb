@@ -337,6 +337,26 @@ RSpec.describe "Items" do
       end
     end
 
+    it "links the box the action actually left, not the pre-call box (#757 Codex R2)" do
+      stale = create(:box, move:, status: "unpacking", number: "3")
+      left = create(:box, move:, status: "unpacked", number: "4") # re-boxed + completed under the lock
+      target = create(:box, move:, number: "8")
+      item = create(:item, :manual, move:, box: stale)
+      raced = instance_double(Items::Move)
+      allow(Items::Move).to receive(:new).and_return(raced)
+      allow(raced).to receive(:call) do
+        item.update!(box: target)
+        Dry::Monads::Success(item: item, source_box: left, source_completed: true)
+      end
+
+      patch move_move_item_path(move, item), params: { target_box_id: target.id }
+      follow_redirect!
+
+      expect(response.body)
+        .to include(I18n.t("items.move.moved_box_unpacked", number: "8", source: "4"))
+        .and include(move_box_path(move, left))
+    end
+
     it "keeps the plain moved toast when the source box isn't completed" do
       source = create(:box, move:, status: "unpacking", number: "3")
       target = create(:box, move:, number: "8")

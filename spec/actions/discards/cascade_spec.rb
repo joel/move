@@ -95,6 +95,20 @@ RSpec.describe "Discards cascade" do # rubocop:disable RSpec/DescribeClass
   end
 
   describe Discards::Cascade do
+    it "row-locks the root before writing any child — parent before child (#757 Codex R2)" do
+      create_list(:item, 2, move:, box:)
+      statements = []
+      callback = ->(*, payload) { statements << payload[:sql].to_s }
+
+      ActiveSupport::Notifications.subscribed(callback, "sql.active_record") do
+        described_class.new.call(record: box, actor:)
+      end
+
+      root_lock = statements.index { |sql| sql.include?('FROM "boxes"') && sql.include?("FOR UPDATE") }
+      first_child_write = statements.index { |sql| sql.start_with?('UPDATE "items"') }
+      expect(root_lock).to be < first_child_write
+    end
+
     it "rolls back a partial discard inside a caller's transaction (#757 savepoint)" do
       item = create(:item, move:, box:)
       allow(box).to receive(:discard_in_batch!).and_raise(Discard::RecordNotDiscarded.new("nope", box))

@@ -60,6 +60,29 @@ RSpec.describe Items::Move do
       end
     end
 
+    it "reports the box the item left and whether that move completed it" do
+      source = create(:box, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box: source)
+      other = create(:box, move:, status: "unpacking")
+      sibling = create(:item, :manual, move:, box: other)
+      create(:item, :manual, move:, box: other)
+
+      emptied = described_class.new.call(item:, target_box: target, mover:).value!
+      remaining = described_class.new.call(item: sibling, target_box: target, mover:).value!
+
+      aggregate_failures do
+        expect(emptied).to eq(item: item, source_box: source, source_completed: true)
+        expect(remaining).to include(source_box: other, source_completed: false)
+      end
+    end
+
+    it "never reports a completion for a source that was already unpacked" do
+      source = create(:box, move:, status: "unpacked")
+      item = create(:item, :manual, move:, box: source) # stray in_box item (#839)
+
+      expect(described_class.new.call(item:, target_box: target, mover:).value![:source_completed]).to be(false)
+    end
+
     it "emits exactly one box.status_changed, for the source box" do
       source = create(:box, move:, status: "unpacking")
       item = create(:item, :manual, move:, box: source)
@@ -161,6 +184,7 @@ RSpec.describe Items::Move do
 
         aggregate_failures do
           expect(result).to be_success
+          expect(result.value!).to include(source_box: current, source_completed: true) # #757 Codex R2
           expect(item.reload.box).to eq(target)
           expect(current.reload.status).to eq("unpacked") # the box the item actually left
           expect(stale.reload.status).to eq("unpacking")

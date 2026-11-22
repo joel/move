@@ -9,8 +9,12 @@ module Items
   # Moving the last in-box item out of an `unpacking` box completes that SOURCE
   # box (#757) — the same lifecycle rule as Items::Unpack, so an emptied box
   # never lingers in `unpacking`. The destination is never completed (it just
-  # gained an item). Callers read the source box's post-action reality to
-  # surface the completion (it's a secondary mutation: Success(item) either way).
+  # gained an item). Returns Success(item:, source_box:, source_completed:):
+  # source_box is the box the item actually left (re-locked if a concurrent
+  # move re-boxed it), and source_completed is that box's REALITY (it was
+  # unpacking and is now unpacked), not whether this call won the completion
+  # race (#756 R7). The completion is a secondary mutation, so its failure
+  # never fails the move.
   class Move < BaseAction
     include CurrentBoxLock
 
@@ -23,10 +27,11 @@ module Items
     #: (item: untyped, target_box: untyped, mover: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, target_box:, mover:)
       yield ensure_writable(item.move)
-      source = yield with_current_box_lock(item, lock: SOURCE_LOCK) { |box| locked_move(item, box, target_box) }
+      moved = with_current_box_lock(item, lock: SOURCE_LOCK) { |box| locked_move(item, box, target_box) }
+      source, was_unpacking = yield moved
       yield emit_event(item, target_box, mover)
       Boxes::CompleteIfEmpty.completed_box(box: source, actor: mover)
-      Success(item)
+      Success(item: item, source_box: source, source_completed: was_unpacking && source.reload.unpacked?)
     end
 
     private
@@ -34,15 +39,17 @@ module Items
     # Runs under the lock of the box the item is in NOW (CurrentBoxLock): that
     # serializes the move with a concurrent "mark box unpacked" (whose cascade
     # may have just removed this item), with restores, and with another move of
-    # the same item, which may have re-boxed it (#757 Codex R1). The box
-    # returned is the one the item actually left, so the completion, which runs
-    # AFTER this commits in its own box lock, checks the right box.
+    # the same item, which may have re-boxed it (#757 Codex R1). Returns the
+    # box the item actually left and whether it was `unpacking` at lock time
+    # (read fresh by the lock), so the completion, which runs AFTER this
+    # commits in its own box lock, checks the right box, and the adapters
+    # report it (#757 Codex R2).
 
     #: (untyped item, untyped box, untyped target_box) -> Dry::Monads::Result[untyped, untyped]
     def locked_move(item, box, target_box)
       yield validate(item, target_box)
       yield persist(item, target_box)
-      Success(box)
+      Success([box, box.unpacking?])
     end
 
     #: (untyped item, untyped target_box) -> Dry::Monads::Result[untyped, untyped]

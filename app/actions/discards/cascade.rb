@@ -18,6 +18,13 @@ module Discards
       # would be swallowed into a Failure while the outer commit kept the
       # partial discard.
       ActiveRecord::Base.transaction(requires_new: true) do
+        # Parent before child (#757 Codex R2): row-lock the root FIRST.
+        # discard_node writes (locks) children before the root, so without this
+        # a box delete would lock items then the box, the reverse of every
+        # box-first path (TransitionStatus's cascade, RestoreToBox,
+        # CompleteIfEmpty, Items::Move/Delete via CurrentBoxLock), and a
+        # concurrent move or unpack-all would deadlock with it.
+        record.lock!
         discard_node(record, batch_id: batch_id, parent: nil)
       end
       Success(batch_id)

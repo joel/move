@@ -136,11 +136,9 @@ class ItemsController < MoveScopedController
   #: () -> untyped
   def move
     target = @move.boxes.find_by(id: params[:target_box_id])
-    source = @item.box
-    was_unpacking = source.unpacking?
     case Items::Move.new.call(item: @item, target_box: target, mover: current_user)
-    in Dry::Monads::Success(item)
-      moved_response(item, completed_source: was_unpacking && source.reload.unpacked? ? source : nil)
+    in Dry::Monads::Success({ item:, source_box:, source_completed: })
+      moved_response(item, completed_source: source_completed ? source_box : nil)
     in Dry::Monads::Failure(reason)
       redirect_to move_item_path(@move, @item), alert: move_error(reason)
     end
@@ -290,8 +288,8 @@ class ItemsController < MoveScopedController
   # box completes that SOURCE box (#757, Items::Move); the completion happens
   # off-screen (we land on the item, now in the destination), so it surfaces
   # with a LINKING toast to the source box (UX rule 1) instead of the plain
-  # moved toast. Derived from the source's post-action reality (was unpacking,
-  # is now unpacked) — not from which request won a completion race (#756 R7).
+  # moved toast. Items::Move reports the box the item actually left and its
+  # reality (was unpacking, is now unpacked), never a pre-call snapshot.
 
   #: (untyped item, completed_source: untyped) -> untyped
   def moved_response(item, completed_source:)
