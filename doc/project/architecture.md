@@ -167,28 +167,55 @@ cascade via FK. An org the user shares with **any** other member is **refused**
 (`Failure(:owns_shared_data)`): dropping a shared tenant would destroy others'
 data, and deleting the user would strand the moves they authored there
 (`Move#created_by` is required, no FK). Multi-member deletion is deferred to the
-ownership-transfer feature (#366). Today every user owns a single org, so the
-guard never trips.
+leave / ownership-transfer feature (#366). Since member invitations (#608) the
+guard **does** trip: an invitee and the owner who invited them both share an org,
+so neither can delete their account until #366 lands.
 
-**Ordering is the whole game** — `DROP SCHEMA` is irreversible and runs on a
-neutral connection (it can't share the row-delete transaction), and the Active
+**Ordering is the whole game** — `DROP SCHEMA` is irreversible, and the Active
 Storage `attachments`/`blobs` tables are excluded into `public`, so a naive drop
-orphans them. Each solo org is therefore torn down as a **per-org atomic unit**,
-then the user is deleted last:
+orphans them. Each solo org is therefore torn down as a **per-org atomic unit**
+(one transaction per org), then the user is deleted last:
 
 ```mermaid
 sequenceDiagram
   participant A as Accounts::Delete
   participant PG as Postgres (public + tenant schema)
   participant AS as Active Storage (public blobs + storage)
-  A->>A: guard — refuse if any org has another member (:owns_shared_data)
-  loop each solo org (irreversible unit)
-    A->>AS: capture attachment ids (Media/LabelPrintRun, unscoped*)
+  A->>A: pre-check — refuse if any org has another member (:owns_shared_data)
+  loop each solo org (one transaction)
+    A->>PG: BEGIN; SELECT organizations row FOR UPDATE
+    A->>PG: recheck under the lock — another member? → ROLLBACK, :organization_became_shared
+    A->>AS: capture attachment ids (Media/LabelPrintRun/InsuranceDossierRun, unscoped*, savepoint)
     A->>PG: DROP SCHEMA <slug> CASCADE  (gated on schema_exists?)
-    A->>AS: purge captured attachments (only AFTER the drop succeeds)
-    A->>PG: destroy public Organization row (memberships cascade)
+    A->>PG: destroy public Organization row (memberships cascade); COMMIT
+    A->>AS: purge captured attachments (only AFTER the commit)
   end
   A->>PG: destroy users row (Rodauth user_*_keys cascade)
+```
+
+- **The solo check is re-run under a lock (#366).** The snapshot's membership
+  count can go stale: `MoveInvitations::Accept` adds a member to an *existing*
+  org. Teardown therefore locks the org's `public.organizations` row
+  (`SELECT … FOR UPDATE`) and rechecks "no other member" under that lock, and
+  `Accept#join_organization` takes the **same** row lock around its membership
+  insert. Either the join commits first (the recheck sees it and the deletion
+  refuses with `:organization_became_shared`), or the join waits and then finds
+  the org gone (`:gone`). On a single-server Apartment setup `Tenant.drop` runs
+  `DROP SCHEMA` on the app connection, and excluded models are schema-qualified
+  onto that same connection, so the lock, the drop and the row delete commit or
+  roll back together. `spec/actions/accounts/delete_lock_spec.rb` proves the lock
+  is held at both critical sections (a second connection probes with `NOWAIT`).
+
+```mermaid
+sequenceDiagram
+  participant D as Accounts::Delete (owner)
+  participant O as organizations row
+  participant J as MoveInvitations::Accept (invitee)
+  D->>O: FOR UPDATE (granted)
+  J->>O: FOR UPDATE (waits)
+  D->>D: recheck: no other member → DROP SCHEMA, delete row, COMMIT
+  O-->>J: lock granted, row is gone → Failure(:gone), no membership
+  Note over D,J: reverse order: J commits its membership first → D's recheck sees it → :organization_became_shared, nothing dropped
 ```
 
 - **Drop before the row delete; abort on a real drop failure.** The schema is
@@ -197,9 +224,9 @@ sequenceDiagram
   drop that genuinely fails returns `Failure(:tenant_drop_failed)` rather than
   reporting a "deleted" account in front of a live, routable schema. Drops are
   gated on `schema_exists?`, so a retry after a partial teardown is idempotent.
-- **Capture attachments *before* the drop, purge *after* it.** The tenant records
-  must still exist to identify their public attachment rows; purging before the
-  drop would strip files from a tenant that then survives a failed drop.
+- **Capture attachments *before* the drop, purge *after* the commit.** The tenant
+  records must still exist to identify their public attachment rows; purging
+  before the commit would strip files from a tenant whose drop then rolls back.
   `*unscoped` reaches soft-deleted (`Discardable`) media too.
 - **Best-effort cleanup never fails an already-irreversible step** — blob
   capture/purge swallow errors (the sanctioned `Move/BroadRescue` of AGENTS §1#4).
