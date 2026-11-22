@@ -20,6 +20,21 @@ RSpec.describe Items::Delete do
     end
   end
 
+  it "refuses an archived Move before locking anything (#757 Codex R6)" do
+    box = create(:box, move:, status: "unpacking")
+    item = create(:item, :manual, move:, box:)
+    move.update!(status: "archived")
+
+    result = nil
+    locks = box_locks_taken { result = described_class.new.call(item: item.reload, actor:) }
+
+    aggregate_failures do
+      expect(result.failure).to eq(:move_archived)
+      expect(locks).to be_empty
+      expect(Item.find(item.id)).not_to be_discarded
+    end
+  end
+
   describe "last-item auto-complete (#757)" do
     it "completes an unpacking box when its last in-box item is deleted" do
       box = create(:box, move:, status: "unpacking")

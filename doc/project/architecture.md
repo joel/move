@@ -615,6 +615,7 @@ stateDiagram-v2
   in_transit --> unpacking: open
   unpacking --> unpacked: mark box unpacked (CTA)
   unpacking --> unpacked: last item unpacked (auto, #755)
+  unpacking --> unpacked: last in-box item moved out / deleted (auto, #757)
   unpacked --> unpacking: reopen (Undo — never auto-recompletes)
 ```
 

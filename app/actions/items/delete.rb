@@ -16,6 +16,7 @@ module Items
 
     #: (item: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:, source: :web)
+      yield ensure_writable(item.move) # first step: no lock taken on a read-only Move
       box, batch_id, was_in_box = yield with_current_box_lock(item) { |locked| locked_discard(item, locked, actor, source) }
       yield emit_event(item, actor, source, batch_id)
       # Only deleting an IN-BOX item can empty the box: deleting an already
