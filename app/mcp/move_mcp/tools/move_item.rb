@@ -4,10 +4,13 @@ module MoveMcp
   module Tools
     # Moves an item to another box within the same Move, via Items::Move (which
     # rejects a cross-Move target). Both records are resolved through the token's
-    # Move, so neither can belong to another Move or Organization.
+    # Move, so neither can belong to another Move or Organization. Moving the
+    # last in-box item out of an unpacking box completes that source box (#757)
+    # — reported as source_box_completed.
     class MoveItem < Base
       tool_name "move_item"
-      description "Move an item to another box in the same move."
+      description "Move an item to another box in the same move. Moving the last item out of a box " \
+                  "being unpacked also marks that box unpacked (source_box_completed: true)."
       input_schema(
         properties: {
           item_id: { type: "string", description: "The item id (uuid)." },
@@ -23,11 +26,16 @@ module MoveMcp
         target = find_box(server_context, to_box_number)
         return error_response("No box ##{to_box_number} in this move.") if target.nil?
 
+        source = item.box
+        was_unpacking = source.unpacking?
         result = ::Items::Move.new.call(item: item, target_box: target, mover: actor(server_context))
         return failure_response(result.failure) if result.failure?
 
         audit(server_context, item_id: item.id, box_number: target.number.to_i)
-        data_response(item: item_json(item.reload))
+        # The source box's post-action REALITY (#756 R5 rule), not whether this
+        # call won a concurrent completion race.
+        data_response(item: item_json(item.reload),
+                      source_box_completed: was_unpacking && source.reload.unpacked?)
       end
     end
   end

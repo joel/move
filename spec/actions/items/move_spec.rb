@@ -41,4 +41,125 @@ RSpec.describe Items::Move do
     expect(item.reload.box).to eq(source)
     expect(item.presence_state).to eq("removed")
   end
+
+  describe "last-item auto-complete (#757)" do
+    let(:target) { create(:box, move:, status: "unpacking") }
+
+    it "completes an unpacking source box when its last in-box item moves out" do
+      source = create(:box, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box: source)
+
+      result = described_class.new.call(item:, target_box: target, mover:)
+
+      aggregate_failures do
+        expect(result).to be_success
+        expect(item.reload.box).to eq(target)
+        expect(item.presence_state).to eq("in_box")
+        expect(source.reload.status).to eq("unpacked")
+        expect(target.reload.status).to eq("unpacking") # destination untouched
+      end
+    end
+
+    it "emits exactly one box.status_changed, for the source box" do
+      source = create(:box, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box: source)
+
+      allow(Rails.event).to receive(:notify).and_call_original
+
+      described_class.new.call(item:, target_box: target, mover:)
+
+      expect(Rails.event).to have_received(:notify).with("box.status_changed", anything).once
+      expect(Rails.event).to have_received(:notify)
+        .with("box.status_changed", hash_including(box_id: source.id, to: "unpacked"))
+    end
+
+    it "leaves the source unpacking while other in-box items remain" do
+      source = create(:box, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box: source)
+      create(:item, :manual, move:, box: source)
+
+      described_class.new.call(item:, target_box: target, mover:)
+
+      expect(source.reload.status).to eq("unpacking")
+    end
+
+    it "ignores removed stragglers when deciding the source is empty" do
+      source = create(:box, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box: source)
+      create(:item, :manual, move:, box: source, presence_state: "removed")
+
+      described_class.new.call(item:, target_box: target, mover:)
+
+      expect(source.reload.status).to eq("unpacked")
+    end
+
+    it "never completes the destination, even an empty unpacking one" do
+      source = create(:box, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box: source)
+      create(:item, :manual, move:, box: source)
+      empty_target = create(:box, move:, status: "unpacking")
+
+      described_class.new.call(item:, target_box: empty_target, mover:)
+
+      expect(empty_target.reload.status).to eq("unpacking")
+    end
+
+    %w[packing sealed in_transit].each do |status|
+      it "changes no box status when the emptied source is #{status}" do
+        source = create(:box, move:, status:)
+        item = create(:item, :manual, move:, box: source)
+
+        result = described_class.new.call(item:, target_box: target, mover:)
+
+        aggregate_failures do
+          expect(result).to be_success
+          expect(source.reload.status).to eq(status)
+          expect(target.reload.status).to eq("unpacking")
+        end
+      end
+    end
+
+    it "preserves the committed move when the completion fails (#756 R4)" do
+      source = create(:box, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box: source)
+      failing = instance_double(Boxes::CompleteIfEmpty)
+      allow(Boxes::CompleteIfEmpty).to receive(:new).and_return(failing)
+      allow(failing).to receive(:call).and_return(Dry::Monads::Failure(:move_archived))
+
+      result = described_class.new.call(item:, target_box: target, mover:)
+
+      aggregate_failures do
+        expect(result).to be_success
+        expect(item.reload.box).to eq(target)
+        expect(source.reload.status).to eq("unpacking")
+      end
+    end
+
+    it "fails cleanly when the item was deleted concurrently" do
+      source = create(:box, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box: source)
+      Item.where(id: item.id).update_all(discarded_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+
+      result = described_class.new.call(item:, target_box: target, mover:)
+
+      aggregate_failures do
+        expect(result.failure).to eq(:not_found)
+        expect(source.reload.status).to eq("unpacking")
+      end
+    end
+
+    it "re-checks presence under the source box lock (a concurrent unpack-all wins)" do
+      source = create(:box, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box: source)
+      # Stale in-memory item: the box's unpacked cascade already removed it.
+      Item.where(id: item.id).update_all(presence_state: "removed") # rubocop:disable Rails/SkipsModelValidations
+
+      result = described_class.new.call(item:, target_box: target, mover:)
+
+      aggregate_failures do
+        expect(result.failure).to eq(:removed)
+        expect(item.reload.box).to eq(source)
+      end
+    end
+  end
 end
