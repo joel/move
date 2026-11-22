@@ -55,6 +55,18 @@ RSpec.describe Boxes::CompleteIfEmpty do
     expect(box.reload.status).to eq("unpacked")
   end
 
+  it "never completes a box a concurrent delete discarded (#757 Codex R4)" do
+    box = create(:box, :with_room, move:, status: "unpacking")
+    Box.where(id: box.id).update_all(discarded_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+
+    result = described_class.new.call(box:, actor:) # in-memory `box` is stale/kept
+
+    aggregate_failures do
+      expect(result.value!).to be_nil
+      expect(Box.with_discarded.find(box.id).status).to eq("unpacking")
+    end
+  end
+
   it ".completed_box folds not-applicable AND failures to nil (secondary-mutation form, #756 R4)" do
     aggregate_failures do
       packing = create(:box, :with_room, move:, status: "packing")

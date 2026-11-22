@@ -25,6 +25,9 @@ module Boxes
     #: (box: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, actor:)
       box.with_lock do
+        # The lock's re-read is unscoped: a box a concurrent Boxes::Delete
+        # discarded is no longer anyone's to complete (#757 Codex R4).
+        return Success(nil) if box.discarded?
         return Success(nil) unless box.unpacking? && box.items.in_box.none?
 
         case TransitionStatus.new.call(box: box, to: "unpacked", actor: actor)

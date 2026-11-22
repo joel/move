@@ -219,6 +219,22 @@ RSpec.describe Items::Move do
         end
       end
 
+      it "reports no completion when the source is deleted right after the move commits (#757 Codex R4)" do
+        source = create(:box, move:, status: "unpacking")
+        item = create(:item, :manual, move:, box: source)
+        allow(Boxes::CompleteIfEmpty).to receive(:completed_box).and_wrap_original do |original, **kwargs|
+          Box.where(id: source.id).update_all(discarded_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+          original.call(**kwargs)
+        end
+
+        result = described_class.new.call(item:, target_box: target, mover:)
+
+        aggregate_failures do
+          expect(result.value![:source_completed]).to be(false)
+          expect(Box.with_discarded.find(source.id).status).to eq("unpacking")
+        end
+      end
+
       it "gives up after bounded retries without writing when the item keeps moving" do
         source = create(:box, move:, status: "unpacking")
         hops = create_list(:box, 3, move:, status: "unpacking")
