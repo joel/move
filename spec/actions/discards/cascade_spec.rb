@@ -93,4 +93,20 @@ RSpec.describe "Discards cascade" do # rubocop:disable RSpec/DescribeClass
       expect(Box.with_discarded.find(box.id)).not_to be_discarded
     end
   end
+
+  describe Discards::Cascade do
+    it "rolls back a partial discard inside a caller's transaction (#757 savepoint)" do
+      item = create(:item, move:, box:)
+      allow(box).to receive(:discard_in_batch!).and_raise(Discard::RecordNotDiscarded.new("nope", box))
+
+      result = ActiveRecord::Base.transaction do
+        described_class.new.call(record: box, actor:)
+      end
+
+      aggregate_failures do
+        expect(result).to be_failure
+        expect(Item.with_discarded.find(item.id)).not_to be_discarded # child rolled back
+      end
+    end
+  end
 end

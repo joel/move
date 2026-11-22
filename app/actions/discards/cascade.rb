@@ -12,7 +12,12 @@ module Discards
     def call(record:, actor:, source: :web) # rubocop:disable Lint/UnusedMethodArgument
       yield ensure_writable(record.move)
       batch_id = SecureRandom.uuid
-      ActiveRecord::Base.transaction do
+      # requires_new: the error is rescued below (outside this block), so when a
+      # caller already holds a transaction (Items::Delete's box lock, #757) the
+      # tree must sit in its own savepoint — joined, a mid-cascade failure
+      # would be swallowed into a Failure while the outer commit kept the
+      # partial discard.
+      ActiveRecord::Base.transaction(requires_new: true) do
         discard_node(record, batch_id: batch_id, parent: nil)
       end
       Success(batch_id)
