@@ -114,4 +114,31 @@ RSpec.describe MoveInvitations::Accept do
     expect(invitation.reload).not_to be_accepted # revivable if the Move is un-archived
     expect(OrganizationMembership.exists?(organization:, user: invitee)).to be(false)
   end
+
+  # #366: Accounts::Delete locks the org row, rechecks membership, then drops the
+  # tenant. The org-join takes the SAME lock so the two can't interleave, and an
+  # org that was torn down while this request was in flight fails closed.
+  it "locks the organization row before joining it" do
+    allow(Organization).to receive(:lock).and_call_original
+    allow(OrganizationMembership).to receive(:find_or_create_by!).and_call_original
+
+    expect(accept).to be_success
+    expect(Organization).to have_received(:lock).ordered
+    expect(OrganizationMembership).to have_received(:find_or_create_by!).ordered
+  end
+
+  it "fails as :gone without joining when the org is torn down mid-accept" do
+    action = described_class.new
+    allow(action).to receive(:claim_or_resume).and_wrap_original do |original, *args|
+      claimed = original.call(*args)
+      Organization.find(organization.id).destroy! # the owner's account deletion wins the lock
+      claimed
+    end
+
+    result = action.call(raw_token: raw_token, user: invitee)
+
+    expect(result.failure).to eq(:gone)
+    expect(OrganizationMembership.where(user: invitee)).not_to exist
+    expect(move.move_memberships.where(user: invitee)).not_to exist
+  end
 end
