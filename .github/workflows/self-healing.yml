@@ -395,10 +395,29 @@ jobs:
           ref: main
           persist-credentials: false
 
+      # Restore-only gem cache: this job runs generated code, so it never
+      # saves a cache. bundler-cache is off (its post step would save) and
+      # actions/cache/restore has no post step. The prefix falls back to the
+      # newest gem cache the plain CI jobs saved on main; `bundle install`
+      # then reconciles it against Gemfile.lock (a miss just installs fresh).
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          bundler-cache: true
+          bundler-cache: false
+
+      - name: Restore gem cache (read-only)
+        uses: actions/cache/restore@v6
+        with:
+          path: vendor/bundle
+          key: restore-only-gems-${{ runner.os }}-${{ hashFiles('.ruby-version', 'Gemfile.lock') }}
+          restore-keys: |
+            setup-ruby-bundler-cache-
+
+      - name: Install gems
+        run: |
+          bundle config set --local deployment true
+          bundle config set --local path vendor/bundle
+          bundle install --jobs 4 --retry 3
 
       # Mirrors the CI test job: the agent must be able to RUN the failing
       # regression spec (TDD evidence), and image-adjacent specs need libvips.
