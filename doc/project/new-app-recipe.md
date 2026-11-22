@@ -244,6 +244,27 @@ Set `require_destination: true` in `config/deploy.yml` and keep hosts only in
   `bundle-audit --update` refreshes the advisory database (data), not the gem,
   so same-day advisories still surface. Tool upgrades arrive deliberately as
   `Gemfile.lock` bumps (Dependabot), and local `bundle exec` agrees with CI.
+- **Cache rule for workflows** (#845):
+  - **Secret-holding jobs don't restore shared caches.** A job whose env or inputs
+    carry deploy/API secrets (Deploy, Security Audit, Release Bug Scan, the
+    self-healing jobs that publish) installs its dependencies fresh: use
+    `ruby/setup-ruby` with `bundler-cache: false` plus an explicit install, and no
+    `actions/cache`:
+    ```yaml
+    - uses: ruby/setup-ruby@v1
+      with:
+        bundler-cache: false
+    - run: |
+        bundle config set --local deployment true
+        bundle install --jobs 4 --retry 3
+    ```
+    An uncached `bundle install` costs about 35s here, so there is nothing to win
+    by caching in these jobs.
+  - **Jobs that run untrusted or generated code don't save caches.** Restore-only
+    at most: `actions/cache/restore` + `bundle install`, never `bundler-cache: true`
+    or `actions/cache` (both add a post step that saves).
+  - Caches are produced only by the plain, secret-free CI jobs (`lint`,
+    `packwerk`).
 
 ---
 
