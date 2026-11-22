@@ -135,10 +135,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      # Secret-holding job: no shared Actions cache is restored here. Gems are
+      # installed fresh with the same frozen/deployment settings that
+      # `bundler-cache: true` applied (lockfile enforced, vendor/bundle path).
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          bundler-cache: true
+          bundler-cache: false
+
+      - name: Install gems
+        run: |
+          bundle config set --local deployment true
+          bundle install --jobs 4 --retry 3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4

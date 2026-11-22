@@ -94,6 +94,17 @@ RSpec.describe "/account" do
     expect(response).to redirect_to(root_url(host: apex))
   end
 
+  it "explains a delete lost to a concurrent org join with the shared-data alert (#366)" do
+    failing = instance_double(Accounts::Delete,
+                              call: Dry::Monads::Result::Failure.new(:organization_became_shared))
+    allow(Accounts::Delete).to receive(:new).and_return(failing)
+
+    delete account_url
+
+    expect(response).to redirect_to(account_path)
+    expect(flash[:alert]).to eq(I18n.t("accounts.destroy.shared_data"))
+  end
+
   it "requires authentication" do
     stub_current_user(nil)
     get account_url
