@@ -75,6 +75,30 @@ RSpec.describe Items::Delete do
       end
     end
 
+    it "fails cleanly when its box was deleted before the lookup (#757 Codex R3)" do
+      box = create(:box, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box:)
+      Boxes::Delete.new.call(box:, actor: create(:user)) # cascade discards box + item; `item` is stale
+
+      expect(described_class.new.call(item:, actor:).failure).to eq(:not_found)
+    end
+
+    it "fails cleanly when its box is deleted while waiting for the lock (#757 Codex R3)" do
+      box = create(:box, move:, status: "unpacking")
+      item = create(:item, :manual, move:, box:)
+      allow(item).to receive(:box).and_wrap_original do |original|
+        original.call.tap { |b| Box.where(id: b.id).update_all(discarded_at: Time.current) } # rubocop:disable Rails/SkipsModelValidations
+      end
+
+      result = described_class.new.call(item:, actor:)
+
+      aggregate_failures do
+        expect(result.failure).to eq(:not_found)
+        expect(Item.with_discarded.find(item.id).box_id).to eq(box.id)
+        expect(Item.with_discarded.find(item.id)).not_to be_discarded
+      end
+    end
+
     it "gives up after bounded retries without discarding when the item keeps moving" do
       box = create(:box, move:, status: "unpacking")
       hops = create_list(:box, 3, move:, status: "unpacking")

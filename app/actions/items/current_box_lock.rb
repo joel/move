@@ -14,7 +14,8 @@ module Items
   # returns Failure(:box_changed), and nothing has been written at that point.
   #
   # The block receives the locked box, which is the item's current box, and
-  # returns a Result. That Result is passed through unchanged. Box associations
+  # returns a Result. That Result is passed through unchanged. A box that is
+  # gone (discarded by a concurrent box delete) is Failure(:not_found). Box associations
   # are reloaded each attempt (Item#reload is unscoped, so a concurrently
   # discarded item still reloads; callers guard discarded? in the block).
   module CurrentBoxLock
@@ -27,8 +28,14 @@ module Items
     #: (untyped item, ?lock: untyped) { (untyped) -> untyped } -> untyped
     def with_current_box_lock(item, lock: true)
       MAX_ATTEMPTS.times do
-        box = item.reload.box
+        # A concurrent Boxes::Delete may have discarded the box (and, via its
+        # cascade, the item): Box's kept scope then hides it from the
+        # association (nil), or the lock's unscoped re-read finds it discarded
+        # after we waited. Either way nothing is written (#757 Codex R3).
+        box = item.reload.box or return Failure(:not_found)
         result = box.with_lock(lock) do
+          next Failure(:not_found) if box.discarded?
+
           item.reload.box_id == box.id ? yield(box) : STALE
         end
         return result unless result.equal?(STALE)
