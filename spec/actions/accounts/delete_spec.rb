@@ -96,6 +96,62 @@ RSpec.describe Accounts::Delete do
     end
   end
 
+  # #366: since invitations (#608) MoveInvitations::Accept can add a member to an
+  # EXISTING org, so the snapshot's "solo" verdict can be stale by the time the
+  # schema drops. Teardown locks the org row and rechecks under that lock.
+  context "when a member joins the org after the snapshot (TOCTOU, #366)" do
+    subject(:result) { action.call(user: user) }
+
+    let(:action) { described_class.new }
+    let!(:organization) { create(:organization, slug: "acme") }
+
+    before do
+      create(:organization_membership, :owner, organization: organization, user: user)
+      # An acceptance commits between the snapshot and the teardown.
+      allow(action).to receive(:ensure_only_solo_data).and_wrap_original do |original, *args|
+        create(:organization_membership, organization: organization)
+        original.call(*args)
+      end
+    end
+
+    it "refuses under the lock, leaving the account, org and schema intact" do
+      expect(result).to be_failure
+      expect(result.failure).to eq(:organization_became_shared)
+      expect(User.exists?(user.id)).to be(true)
+      expect(Organization.exists?(organization.id)).to be(true)
+      expect(OrganizationMembership.where(organization: organization).count).to eq(2)
+      expect(Apartment::Tenant).not_to have_received(:drop)
+    end
+  end
+
+  context "when tearing down a solo org" do
+    let!(:organization) { create(:organization, slug: "acme") }
+
+    before { create(:organization_membership, :owner, organization: organization, user: user) }
+
+    it "locks the org row before rechecking membership and dropping the schema" do
+      allow(Organization).to receive(:lock).and_call_original
+      allow(OrganizationMembership).to receive(:where).and_call_original
+
+      expect(result).to be_success
+      expect(Organization).to have_received(:lock).ordered
+      expect(OrganizationMembership).to have_received(:where).with(organization_id: organization.id).ordered
+      expect(Apartment::Tenant).to have_received(:drop).with("acme").ordered
+    end
+
+    it "treats an org already removed by a concurrent teardown as done" do
+      action = described_class.new
+      allow(action).to receive(:ensure_only_solo_data).and_wrap_original do |original, *args|
+        Organization.find(organization.id).destroy!
+        original.call(*args)
+      end
+
+      expect(action.call(user: user)).to be_success
+      expect(Apartment::Tenant).not_to have_received(:drop)
+      expect(User.exists?(user.id)).to be(false)
+    end
+  end
+
   # Belonging to an org the user does not solely own is deliberately unsupported
   # until ownership transfer exists: deleting them would strand the moves they
   # created in the surviving tenant (Move#created_by is required, no FK).

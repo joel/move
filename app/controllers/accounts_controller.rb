@@ -42,6 +42,10 @@ class AccountsController < ApplicationController
     in Dry::Monads::Failure(:owns_shared_data)
       # Refused before any drop, so the current subdomain is intact.
       redirect_to account_path, alert: t(".shared_data")
+    in Dry::Monads::Failure(:organization_became_shared)
+      # Someone joined an org mid-deletion (#366). Same reason as above, but an
+      # earlier org in the loop may already have dropped the current subdomain.
+      redirect_to failure_redirect_url, allow_other_host: true, alert: t(".shared_data")
     in Dry::Monads::Failure(_)
       # A partial multi-org teardown may have dropped the current subdomain;
       # fall back to the apex so the elevator doesn't 404.
