@@ -6,15 +6,32 @@ module Items
   # box during unpacking (the `presence_state` axis). An Item has no discardable
   # children, so the cascade discards just the one record under its own batch.
   # Emits `item.deleted` for the activity feed. Caller owns tenant context.
+  #
+  # Deleting the last in-box item of an `unpacking` box completes the box
+  # (#757) — the same lifecycle rule as Items::Unpack, applied after the
+  # discard commits as a secondary mutation (its failure never masks the
+  # deletion; Success(item) either way).
   class Delete < BaseAction
     #: (item: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:, source: :web)
-      batch_id = yield Discards::Cascade.new.call(record: item, actor: actor, source: source)
+      batch_id = yield discard_under_box_lock(item, actor, source)
       yield emit_event(item, actor, source, batch_id)
+      Boxes::CompleteIfEmpty.completed_box(box: item.box, actor: actor)
       Success(item)
     end
 
     private
+
+    # Box-first (#756 R2 — the order of Items::RestoreToBox and the unpacked
+    # cascade), so a delete serializes with a concurrent "mark box unpacked" and
+    # with restores; the completion re-locks the box after this commits.
+
+    #: (untyped item, untyped actor, Symbol source) -> Dry::Monads::Result[untyped, untyped]
+    def discard_under_box_lock(item, actor, source)
+      item.box.with_lock do
+        Discards::Cascade.new.call(record: item, actor: actor, source: source)
+      end
+    end
 
     #: (untyped item, untyped actor, Symbol source, untyped batch_id) -> Dry::Monads::Success[nil]
     def emit_event(item, actor, source, batch_id)

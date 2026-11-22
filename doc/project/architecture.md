@@ -587,9 +587,14 @@ per adapter, so no surface can drift:
   the same completion after its loop. `FindLists::MarkFound` sequences it after
   its auto-open (a one-item **sealed** box goes `sealed → unpacking → unpacked`
   in one "Found" tap — two honest `box.status_changed` events, one deduped
-  toast). The review walk's mis-detection removal deliberately does **not**
-  complete (packing-phase cleanup), and reopen never re-completes an emptied
-  box.
+  toast). `Items::Move` (moving the last in-box item **out**) and
+  `Items::Delete` run the same completion on the **source** box after their
+  write commits (#757) — the destination is never completed; the item-detail
+  move and the MCP `move_item` tool surface it (linking toast /
+  `source_box_completed`). Both take the box lock first around their item write,
+  like `Items::RestoreToBox`. The review walk's mis-detection removal
+  deliberately does **not** complete (packing-phase cleanup), and reopen never
+  re-completes an emptied box.
 - `Boxes::CompleteIfEmpty` re-checks `unpacking? && items.in_box.none?` under
   the **box lock** (box-first — the same order as the completion cascade and
   `Items::RestoreToBox`'s guard, so restores and completions serialize and an
