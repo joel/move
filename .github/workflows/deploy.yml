@@ -87,18 +87,13 @@ jobs:
           # per-Move BYO, so the deploy injects no shared AI key (and it is no longer
           # in Doppler). Its only consumer is the Release Bug Scan workflow, which
           # reads a distinctly named CI-only repo secret (CODEX_OPENAI_API_KEY).
-          # Tailnet + CI SSH key: checked by the guard, consumed only as inputs.
-          TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           missing=()
           for s in KAMAL_REGISTRY_PASSWORD RAILS_MASTER_KEY POSTGRES_PASSWORD \
                    NOTIF_MAIL_USERNAME NOTIF_MAIL_PASSWORD STORAGE_ACCESS_KEY_ID \
                    STORAGE_SECRET_ACCESS_KEY R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY \
                    R2_ENDPOINT MEDIA_TRANSFORM_SECRET RESTIC_REPOSITORY RESTIC_PASSWORD \
-                   AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY \
-                   TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET SSH_PRIVATE_KEY; do
+                   AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
             [ -n "${!s}" ] || missing+=("$s")
           done
           if [ ${#missing[@]} -ne 0 ]; then
@@ -106,6 +101,24 @@ jobs:
             exit 1
           fi
           echo "All required deploy secrets are present."
+
+      # Separate guard for the connectivity credentials, so they stay OUT of the
+      # &deploy_secrets anchor: Kamal and its child processes never need the raw
+      # SSH key or the tailnet OAuth secret (they use the agent and the tailnet).
+      - name: Verify tailnet and SSH credentials are present
+        env:
+          TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          missing=()
+          for s in TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET SSH_PRIVATE_KEY; do
+            [ -n "${!s}" ] || missing+=("$s")
+          done
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing or empty deploy secrets: ${missing[*]}. Check the Doppler -> GitHub Actions sync (move/prd)."
+            exit 1
+          fi
 
       # Production is the NUC home server (config/deploy.nuc.yml), reachable only
       # over the tailnet: an ephemeral node tagged `tag:ci`, which the tailnet ACL
