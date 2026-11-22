@@ -33,7 +33,9 @@ module Items
       # the source lock) is eligible: a box opened AFTER we released the lock
       # was deliberately opened empty and must stay open (#757 Codex R9).
       Boxes::CompleteIfEmpty.completed_box(box: source, actor: mover) if was_unpacking
-      Success(item: item, source_box: source, source_completed: was_unpacking && source.reload.unpacked?)
+      source.reload # unscoped: also sees a box a concurrent delete discarded (#757 Codex R11)
+      Success(item: item, source_box: source,
+              source_completed: was_unpacking && source.unpacked? && !source.discarded?)
     end
 
     private
