@@ -395,10 +395,45 @@ jobs:
           ref: main
           persist-credentials: false
 
+      # Restore-only gem cache: this job runs generated code, so it never
+      # saves a cache. bundler-cache is off (its post step would save) and
+      # actions/cache/restore has no post step. The key reproduces the one
+      # setup-ruby saves in the plain CI jobs on main, including every
+      # compatibility dimension (cache version, OS image, arch, Ruby engine
+      # and version, workdir), so a fallback only ever matches a cache built
+      # for the same ABI. If setup-ruby changes its key format this simply
+      # misses and `bundle install` installs fresh.
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          bundler-cache: true
+          bundler-cache: false
+
+      - name: Compute gem cache key
+        id: gem-cache
+        env:
+          RUNNER_ARCH_NAME: ${{ runner.arch }}
+        run: |
+          . /etc/os-release
+          arch="$(echo "$RUNNER_ARCH_NAME" | tr '[:upper:]' '[:lower:]')"
+          rb="$(ruby -e 'print "#{RUBY_ENGINE}-#{RUBY_VERSION}"')"
+          prefix="setup-ruby-bundler-cache-v6-${ID}-${VERSION_ID}-${arch}-${rb}-wd-${GITHUB_WORKSPACE}-with--without--only--"
+          lock="$(sha256sum Gemfile.lock | cut -d' ' -f1)"
+          echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
+          echo "key=${prefix}Gemfile.lock-${lock}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore gem cache (read-only)
+        uses: actions/cache/restore@v6
+        with:
+          path: vendor/bundle
+          key: ${{ steps.gem-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.gem-cache.outputs.prefix }}
+
+      - name: Install gems
+        run: |
+          bundle config set --local deployment true
+          bundle config set --local path vendor/bundle
+          bundle install --jobs 4 --retry 3
 
       # Mirrors the CI test job: the agent must be able to RUN the failing
       # regression spec (TDD evidence), and image-adjacent specs need libvips.
