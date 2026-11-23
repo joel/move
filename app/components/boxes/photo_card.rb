@@ -41,6 +41,7 @@ module Components
       # @rbs items: untyped
       # @rbs reviewable: bool
       # @rbs recoverable: bool
+      # @rbs conflict: bool
       # @rbs unpacked: bool
       # @rbs eager: bool
       # @rbs unpacking: bool
@@ -48,7 +49,7 @@ module Components
       # @rbs pinnable: bool
       # @rbs pinned_item_ids: untyped
       # @rbs return: void
-      def initialize(move:, box:, media:, items:, reviewable: false, recoverable: false,
+      def initialize(move:, box:, media:, items:, reviewable: false, recoverable: false, conflict: false,
                      unpacked: false, eager: false, unpacking: false, interactive: false,
                      pinnable: false, pinned_item_ids: Set.new)
         @move = move
@@ -57,6 +58,7 @@ module Components
         @items = items # this photo's items (in-box; removed ride along while unpacking)
         @reviewable = reviewable
         @recoverable = recoverable
+        @conflict = conflict # conflict-only photo (#891): no items, matched a confirmed one
         @unpacked = unpacked
         @eager = eager
         @unpacking = unpacking
@@ -268,7 +270,9 @@ module Components
 
       #: () -> untyped
       def photo_href
-        if @reviewable
+        # A conflict-only photo (#891) has no items to review, but its review page
+        # is where retake / rescan / delete live and where the match is explained.
+        if @reviewable || @conflict
           move_box_review_photo_path(@move, @box, media_id: @media.id)
         elsif @recoverable
           move_box_recovery_photo_path(@move, @box, media_id: @media.id)

@@ -97,6 +97,76 @@ RSpec.describe "Per-photo review" do
     end
   end
 
+  # #891 — a conflict-only photo (its latest run matched confirmed items and
+  # added none) explains the match in the empty state and links to each match.
+  describe "GET .../review/photo/:media_id — conflict-only photo (#891)" do
+    let(:lamp) { create(:item, move:, box:, name: "Lamp", review_state: "confirmed") }
+
+    def conflict_on(item, run: create(:recognition_run, :succeeded, move:, box:, media:))
+      create(:recognition_suggestion, :conflict, move:, box:, media:, recognition_run: run, item:)
+      run
+    end
+
+    def item_list
+      response.parsed_body.at_css("##{Components::Reviews::ItemList::ID}")
+    end
+
+    it "explains the match and links to every matched item" do
+      run = conflict_on(lamp)
+      rug = create(:item, move:, box:, name: "Rug", review_state: "confirmed")
+      conflict_on(rug, run:)
+
+      get move_box_review_photo_path(move, box, media)
+
+      expect(response).to have_http_status(:ok)
+      expect(item_list.text).to include(I18n.t("reviews.photo.conflict_title"))
+      expect(item_list.text).to include(I18n.t("reviews.photo.conflict_description", count: 2))
+      expect(item_list.text).not_to include(I18n.t("reviews.photo.empty_title"))
+      expect(item_list.at_css(%(a[href="#{move_item_path(move, lamp)}"]))&.text).to include("Lamp")
+      expect(item_list.at_css(%(a[href="#{move_item_path(move, rug)}"]))&.text).to include("Rug")
+    end
+
+    it "keeps retake, rescan and delete available" do
+      conflict_on(lamp)
+
+      get move_box_review_photo_path(move, box, media)
+
+      page = response.parsed_body
+      expect(page.at_css(%(form[action="#{move_box_review_retake_photo_path(move, box, media)}"]))).to be_present
+      expect(page.at_css('input[name="rerun_recognition"]')).to be_present
+      expect(page.at_css(%(form[action="#{move_box_review_photo_path(move, box, media)}"] input[name="_method"][value="delete"]))).to be_present
+    end
+
+    it "shows the plain empty state once the matched item is deleted" do
+      conflict_on(lamp)
+      lamp.discard!
+
+      get move_box_review_photo_path(move, box, media)
+
+      expect(item_list.text).to include(I18n.t("reviews.photo.empty_title"))
+      expect(item_list.text).not_to include(I18n.t("reviews.photo.conflict_title"))
+    end
+
+    it "ignores a conflict recorded only by an older run" do
+      conflict_on(lamp, run: create(:recognition_run, :succeeded, move:, box:, media:, created_at: 1.hour.ago))
+      create(:recognition_run, :succeeded, move:, box:, media:)
+
+      get move_box_review_photo_path(move, box, media)
+
+      expect(item_list.text).to include(I18n.t("reviews.photo.empty_title"))
+    end
+
+    it "lists the photo's own items instead when it has any" do
+      conflict_on(lamp)
+      detected(name: "Kettle")
+
+      get move_box_review_photo_path(move, box, media)
+
+      expect(item_list.text).to include("Kettle")
+      expect(item_list.text).not_to include(I18n.t("reviews.photo.conflict_title"))
+    end
+  end
+
   describe "nav arrows on the box walk (#699)" do
     # A walk photo older than `media` (the let is captured "now"); the box walk
     # orders oldest capture first.

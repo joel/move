@@ -278,6 +278,21 @@ class BoxesController < MoveScopedController
         .pluck(:id)
   end
 
+  # Photos whose LATEST run recorded a conflict (it matched an already-confirmed
+  # item and created none of its own, #872) and that aren't already in the review
+  # walk. recoverable_media_ids excludes them (they have suggestions), so without
+  # this set the tile is a dead end and the photo can't be retaken or deleted
+  # (#891). One SQL query; the matched item's current state doesn't matter here —
+  # the photo itself still needs managing.
+
+  #: (untyped review_media_ids) -> untyped
+  def conflict_media_ids(review_media_ids)
+    photos = @box.media.not_generated
+    photos.where.not(id: review_media_ids)
+          .where(id: RecognitionSuggestion.latest_conflicts_for(photos.select(:id)).select(:media_id))
+          .pluck(:id)
+  end
+
   # Photos in this box whose every sourced item has been unpacked (presence
   # removed) — drives the gallery "Unpacked" badge during the destination-side
   # unpacking surface. SQL aggregate (HARD RULE — no Ruby grouping): group the
@@ -380,6 +395,10 @@ class BoxesController < MoveScopedController
       # Orphaned photos worth a recovery affordance (failed / zero-detection) —
       # these link to the recovery screen instead of being dead-end thumbnails.
       recoverable_media_ids: recoverable_media_ids,
+      # Conflict-only photos (#891) — no item of their own, but the latest run
+      # matched an item already confirmed. They link to their review page so
+      # retake / rescan / delete stay reachable.
+      conflict_media_ids: conflict_media_ids(review_media_ids),
       # Photos whose every sourced item has been unpacked — the gallery badges them.
       unpacked_media_ids: unpacked_media_ids
     )

@@ -27,13 +27,14 @@ module Views
       # @rbs reviewable: untyped
       # @rbs reviewable_media_ids: untyped
       # @rbs recoverable_media_ids: untyped
+      # @rbs conflict_media_ids: untyped
       # @rbs unpacked_media_ids: untyped
       # @rbs boxes: untyped
       # @rbs pinnable: bool
       # @rbs pinned_item_ids: untyped
       # @rbs return: void
       def initialize(move:, box:, items: [], media: [], editable: false, pending_count: 0,
-                     reviewable: false, reviewable_media_ids: [], recoverable_media_ids: [],
+                     reviewable: false, reviewable_media_ids: [], recoverable_media_ids: [], conflict_media_ids: [],
                      unpacked_media_ids: [], boxes: [], pinnable: false, pinned_item_ids: Set.new)
         @move = move
         @box = box
@@ -54,6 +55,8 @@ module Views
         @reviewable_media_ids = reviewable_media_ids
         # Orphaned-but-settled photos that link to the recovery screen.
         @recoverable_media_ids = recoverable_media_ids
+        # Conflict-only photos (#891) — linked to their review page too.
+        @conflict_media_ids = conflict_media_ids
         # Find-list pin mode (#747): the box is closed (sealed/in transit), so
         # the grid's cards render the per-item pin toggle. Personal state —
         # pinned_item_ids is the CURRENT USER's pins only.
@@ -105,7 +108,8 @@ module Views
         render Components::Boxes::ContentsGrid.new(
           move: @move, box: @box, media: @media, items: @items,
           reviewable_media_ids: @reviewable_media_ids,
-          recoverable_media_ids: @recoverable_media_ids, unpacked_media_ids: @unpacked_media_ids,
+          recoverable_media_ids: @recoverable_media_ids, conflict_media_ids: @conflict_media_ids,
+          unpacked_media_ids: @unpacked_media_ids,
           editable: @editable, pinnable: @pinnable, pinned_item_ids: @pinned_item_ids
         )
       end
