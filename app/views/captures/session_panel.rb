@@ -55,15 +55,15 @@ module Views
         @media.each { |media| rows(media) }
       end
 
-      # A succeeded photo becomes one card with its recognised names as chips;
-      # otherwise a single status row (queued / recognising / failed).
+      # A succeeded photo becomes one card with its recognised names as chips (or
+      # a "no items detected" caption when it found nothing, #856); otherwise a
+      # single status row (queued / recognising / failed).
 
       #: (untyped media) -> untyped
       def rows(media)
         run = media.recognition_runs.max_by(&:created_at)
-        items = @items_by_media[media.id]
-        if succeeded?(run) && items&.any?
-          photo_card(media, items)
+        if succeeded?(run)
+          photo_card(media, @items_by_media[media.id] || [])
         else
           status_row(media, run)
         end
@@ -87,12 +87,25 @@ module Views
                  "hover:bg-surface-container-high"
         ) do
           thumb(media)
-          div(class: "flex min-w-0 flex-1 flex-wrap gap-1") do
-            items.first(CHIP_CAP).each { |item| name_chip(item.name) }
-            name_chip(I18n.t("captures.session.more", count: items.size - CHIP_CAP)) if items.size > CHIP_CAP
-          end
+          items.any? ? name_chips(items) : no_items_caption
           render Components::Icons::ChevronRight.new(css: "h-4 w-4 shrink-0 text-muted")
         end
+      end
+
+      #: (untyped items) -> untyped
+      def name_chips(items)
+        div(class: "flex min-w-0 flex-1 flex-wrap gap-1") do
+          items.first(CHIP_CAP).each { |item| name_chip(item.name) }
+          name_chip(I18n.t("captures.session.more", count: items.size - CHIP_CAP)) if items.size > CHIP_CAP
+        end
+      end
+
+      # Nothing recognised: say so instead of a bare success tick, so the user
+      # knows to open the photo and add what the model missed.
+
+      #: () -> untyped
+      def no_items_caption
+        span(class: "min-w-0 flex-1 text-body-sm text-muted") { I18n.t("captures.session.no_items") }
       end
 
       #: (untyped label) -> untyped
