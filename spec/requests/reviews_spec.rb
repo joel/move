@@ -156,14 +156,14 @@ RSpec.describe "Per-photo review" do
       expect(item_list.text).to include(I18n.t("reviews.photo.empty_title"))
     end
 
-    it "lists the photo's own items instead when it has any" do
+    it "lists the photo's own items, then the matches still to settle (#881)" do
       conflict_on(lamp)
       detected(name: "Kettle")
 
       get move_box_review_photo_path(move, box, media)
 
-      expect(item_list.text).to include("Kettle")
-      expect(item_list.text).not_to include(I18n.t("reviews.photo.conflict_title"))
+      expect(item_list.text).to include("Kettle").and include(I18n.t("reviews.photo.conflict_title"))
+      expect(item_list.text).not_to include(I18n.t("reviews.photo.conflict_description", count: 1))
     end
   end
 

@@ -48,6 +48,32 @@ module ReviewPhotoMoveResponses
   def move_photo_error: (untyped reason) -> String
 end
 
+# The per-photo review item list + its stream (ReviewsController; #881).
+module ReviewItemListing
+  def photo_items: (untyped media) -> untyped
+
+  def conflict_suggestions: () -> untyped
+
+  def queue_mode?: () -> bool
+
+  def queue_query: () -> Hash[Symbol, String]
+
+  def review_list_stream: (Array[untyped] items, ?highlight_id: untyped) -> untyped
+end
+
+# ReviewsController#dismiss_conflict / #keep_both_conflict responses (#881).
+module ReviewConflictResponses
+  def resolve_conflict: (Symbol outcome) -> Dry::Monads::Result[untyped, untyped]
+
+  def conflict_resolved_response: (String message, untyped item, ?highlight_id: untyped) -> untyped
+
+  def conflict_refused_response: (untyped reason) -> untyped
+
+  def conflict_refusal_message: (untyped reason) -> String
+
+  def conflict_photo_path: () -> String
+end
+
 # ── View concerns (app/views/layouts) ──
 module Views
   module Layouts

@@ -525,6 +525,22 @@ RSpec.describe "Boxes" do
       expect(page.at_css(%(form[action="#{move_box_review_photo_path(move, box, photo)}"] input[name="_method"][value="delete"]))).to be_present
     end
 
+    # #881 — "Same item" leaves the run's suggestion (now accepted) but no item of
+    # the photo's own; the tile must keep its way to the review page.
+    it "still links the photo to its review page after its conflict is settled as the same item" do
+      box = create(:box, move:, number: "1", status: "packing")
+      existing = create(:item, move:, box:, name: "Lamp", review_state: "confirmed")
+      photo = create(:media, move:, box:)
+      run = create(:recognition_run, :succeeded, move:, box:, media: photo)
+      create(:recognition_suggestion, move:, box:, media: photo, recognition_run: run, item: existing,
+                                      state: "accepted")
+
+      get move_box_path(move, box)
+
+      tile = response.parsed_body.at_css("##{Components::Boxes::PhotoCard.dom_id(photo)}")
+      expect(tile["href"]).to eq(move_box_review_photo_path(move, box, media_id: photo.id))
+    end
+
     it "does not link a photo whose conflict was only on an older run" do
       box = create(:box, move:, number: "1")
       photo = create(:media, move:, box:)

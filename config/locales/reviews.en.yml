@@ -58,12 +58,27 @@ en:
       conflict_description:
         one: "This photo matched an item that's already in this box, so nothing new was added."
         other: "This photo matched items that are already in this box, so nothing new was added."
+      # The same matches on a photo that also has items of its own (#881).
+      conflict_section_description:
+        one: "One detection matched an item that's already in this box. Is it the same one?"
+        other: "Some detections matched items that are already in this box. Are they the same ones?"
+      # Per-match resolve controls (#881).
+      conflict_matches: "Matches"
+      conflict_same: "Same item"
+      conflict_keep_both: "Keep both"
     flash:
       nothing: "Nothing to review in this box yet."
       photo_marked: "Photo marked as reviewed."
       mark_failed: "Could not mark this photo as reviewed. Try again."
       item_added: "Added “%{name}”."
       add_failed: "Could not add that item — give it a name and try again."
+      # Conflict resolution (#881).
+      conflict_dismissed: "Kept as the same item: “%{name}”."
+      conflict_kept_both: "Added a second “%{name}”."
+      conflict_stale: "That match was already settled or the photo was re-scanned."
+      conflict_box_unpacked: "This box is unpacked, so its items can't change."
+      conflict_failed: "Could not settle that match. Try again."
+      view_item: "View item"
       photo_moved: "Photo moved to box #%{number}."
       photo_moved_box_unpacked: "Photo moved to box #%{number} — box #%{source} unpacked"
       view_box: "View box"

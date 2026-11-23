@@ -21,22 +21,22 @@ module Components
       # @rbs box: untyped
       # @rbs media: untyped
       # @rbs items: untyped
-      # @rbs conflict_items: untyped
+      # @rbs conflicts: untyped
       # @rbs editable: untyped
       # @rbs highlight_id: untyped
       # @rbs queue: untyped
       # @rbs pinnable: bool
       # @rbs pinned_item_ids: untyped
       # @rbs return: void
-      def initialize(move:, box:, media:, items:, editable:, conflict_items: [], highlight_id: nil,
+      def initialize(move:, box:, media:, items:, editable:, conflicts: [], highlight_id: nil,
                      queue: false, pinnable: false, pinned_item_ids: Set.new)
         @move = move
         @box = box
         @media = media
         @items = items.to_a
-        # Confirmed items the photo's latest run matched instead of creating its
-        # own (#891) — a lazy relation, loaded only for the empty state.
-        @conflict_items = conflict_items
+        # Conflict suggestions the photo's latest run left to settle (#891/#881),
+        # each with its matched item preloaded.
+        @conflicts = conflicts.to_a
         @editable = editable
         @highlight_id = highlight_id
         @queue = queue
@@ -61,6 +61,7 @@ module Components
                 )
               end
             end
+            conflict_section if @conflicts.any?
           end
         end
       end
@@ -69,8 +70,7 @@ module Components
 
       #: () -> untyped
       def empty_state
-        matches = @conflict_items.to_a
-        return conflict_empty_state(matches) if matches.any?
+        return conflict_empty_state if @conflicts.any?
 
         render Components::Ui::EmptyState.new(
           icon: Components::Icons::Camera,
@@ -80,25 +80,39 @@ module Components
       end
 
       # A conflict-only photo (#891): recognition matched items already confirmed
-      # in this box, so it added none. Say so and link to each match. Kept simple
-      # on purpose — #881 adds the real resolve actions (dismiss / keep both).
+      # in this box, so it added none. Say so and list each match with its
+      # resolve controls (#881).
 
-      #: (Array[untyped] matches) -> untyped
-      def conflict_empty_state(matches)
+      #: () -> untyped
+      def conflict_empty_state
         render Components::Ui::EmptyState.new(
           icon: Components::Icons::Camera,
           title: I18n.t("reviews.photo.conflict_title"),
-          description: I18n.t("reviews.photo.conflict_description", count: matches.size)
-        ) do
-          matches.each do |item|
-            a(href: move_item_path(@move, item),
-              class: "inline-flex items-center gap-1 rounded-full bg-surface-container-high px-3 py-1.5 " \
-                     "text-label-caps uppercase text-on-surface-variant transition hover:text-accent-sage") do
-              plain item.name
-              render Components::Icons::ChevronRight.new(css: "h-3.5 w-3.5")
-            end
+          description: I18n.t("reviews.photo.conflict_description", count: @conflicts.size)
+        ) { conflict_list }
+      end
+
+      # A photo with items of its own AND matches (#881): the matches still need
+      # a call, so they follow the rows instead of hiding behind them.
+
+      #: () -> untyped
+      def conflict_section
+        section(class: "mt-6 flex flex-col gap-3", aria: { labelledby: "review-conflicts-title" }) do
+          h3(id: "review-conflicts-title", class: "text-headline-md text-text-warm") do
+            I18n.t("reviews.photo.conflict_title")
           end
+          p(class: "text-body-md text-on-surface-variant") do
+            I18n.t("reviews.photo.conflict_section_description", count: @conflicts.size)
+          end
+          conflict_list
         end
+      end
+
+      #: () -> untyped
+      def conflict_list
+        render Components::Reviews::ConflictList.new(
+          move: @move, box: @box, media: @media, conflicts: @conflicts, editable: @editable, queue: @queue
+        )
       end
     end
   end

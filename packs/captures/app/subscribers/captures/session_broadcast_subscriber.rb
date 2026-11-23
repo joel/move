@@ -13,20 +13,26 @@ module Captures
   # to the tenant-unique Box; the replace target is the panel's stable DOM id.
   class SessionBroadcastSubscriber
     RUN_EVENTS = %w[recognition_run.processing recognition_run.succeeded recognition_run.failed].freeze
+    # A person settling a conflict (#881) changes the photo's card too: the
+    # "Already in this box" caption gives way to the normal states.
+    CONFLICT_EVENTS = %w[recognition_suggestion.conflict_dismissed recognition_suggestion.conflict_kept_both].freeze
 
     def emit(event)
-      return unless RUN_EVENTS.include?(event[:name])
-
-      run_id = event[:payload]&.dig(:recognition_run_id)
-      return if run_id.blank?
-
-      run = RecognitionRun.includes(box: :move).find_by(id: run_id)
-      return if run.nil?
-
-      broadcast(run.box)
+      box = box_for(event)
+      broadcast(box) if box
     end
 
     private
+
+    def box_for(event)
+      payload = event[:payload] || {}
+      if RUN_EVENTS.include?(event[:name])
+        run_id = payload[:recognition_run_id]
+        RecognitionRun.includes(box: :move).find_by(id: run_id)&.box if run_id.present?
+      elsif CONFLICT_EVENTS.include?(event[:name]) && payload[:box_id].present?
+        Box.find_by(id: payload[:box_id])
+      end
+    end
 
     # This runs synchronously inside RecognitionRuns::Process (it emits the events),
     # so a render/broadcast failure must NEVER propagate — Process would rescue it
