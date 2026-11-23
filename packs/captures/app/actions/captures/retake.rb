@@ -12,7 +12,9 @@ module Captures
   #
   # Recognition is NOT re-run by default — the photo already has its reviewed items,
   # and a re-scan would layer new suggestions on top of them. Pass
-  # `rerun_recognition: true` to also re-scan (RecognitionRuns::Enqueue).
+  # `rerun_recognition: true` to also re-scan (RecognitionRuns::Enqueue). The run
+  # is marked `rescan` (#897), so Retry and Process judge it on the items of the
+  # new image only and the "retry from the capture screen" recovery works.
   #
   # The image SWAP is allowed in ANY box phase (only the writable-Move guard
   # applies): it fixes existing data rather than adding inventory, and the primary
@@ -34,7 +36,7 @@ module Captures
       return Failure(:rescan_wrong_phase) if rerun_recognition && !media.box.capturable?
 
       yield swap_image(media, file)
-      rescan = rerun_recognition ? RecognitionRuns::Enqueue.new.call(media: media) : Success()
+      rescan = rerun_recognition ? RecognitionRuns::Enqueue.new.call(media: media, rescan: true) : Success()
       finish(media, actor, rescan)
     end
 

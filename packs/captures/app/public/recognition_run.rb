@@ -39,6 +39,19 @@ class RecognitionRun < ApplicationRecord
     TERMINAL.include?(status)
   end
 
+  # The kept items that show this run's photo was already turned into
+  # inventory (#896), so a new run must not materialize it again: every kept
+  # item sourced from the photo. A retake re-scan (`rescan`, #897) is meant to
+  # layer suggestions over the items of an earlier image, so for it only the
+  # items created since the current image was attached count.
+
+  #: () -> untyped
+  def materialized_items
+    items = Item.kept.where(source_media_id: media_id)
+    attached_at = image_attached_at if rescan?
+    attached_at ? items.where(created_at: attached_at..) : items
+  end
+
   # Coarse classification of a failure for user-facing copy. Pure derivation from
   # the already-sanitized error_message — no business logic, no side effects.
   # Quota is checked before rate_limit because some vendors (OpenAI's
@@ -72,5 +85,15 @@ class RecognitionRun < ApplicationRecord
     return unless msg.match?(TRANSPORT_PREFIX)
 
     msg.sub(TRANSPORT_PREFIX, "").presence
+  end
+
+  private
+
+  # Read straight from the attachment row: the photo may be discarded, which
+  # Media's kept default scope would hide from the association.
+
+  #: () -> untyped
+  def image_attached_at
+    ActiveStorage::Attachment.where(record_type: "Media", record_id: media_id, name: "image").pick(:created_at)
   end
 end

@@ -425,6 +425,59 @@ RSpec.describe RecognitionRuns::Process do
     end
   end
 
+  context "when the photo was already materialized by another run (#896)" do
+    # Fake provider labels: Coffee maker / Stack of books / Desk lamp.
+    it "supersedes a late run instead of adding a second set of items" do
+      create(:item, move:, box:, source_media: media, name: "Coffee maker") # the first run's set
+
+      result = described_class.new.call(run:)
+
+      expect(result).to be_failure
+      expect(run.reload).to have_attributes(status: "failed", error_code: "superseded")
+      expect(Item.kept.where(source_media_id: media.id).count).to eq(1)
+      expect(run.recognition_suggestions).to be_empty
+    end
+
+    it "catches items committed while the provider call was in flight" do
+      fake = RecognitionProviders::Fake.new
+      provider = instance_double(RecognitionProviders::Fake)
+      allow(provider).to receive(:identify) do |**kwargs|
+        create(:item, move:, box:, source_media: media, name: "Coffee maker")
+        fake.identify(**kwargs)
+      end
+
+      expect(described_class.new.call(run:, provider:)).to be_failure
+      expect(Item.kept.where(source_media_id: media.id).count).to eq(1)
+    end
+
+    context "with a retake re-scan run (#897)" do
+      let(:run) { create(:recognition_run, move:, box:, media:, rescan: true) }
+
+      before do
+        # The earlier image's set, then the retake swaps the image.
+        create(:item, move:, box:, source_media: media, name: "Old vase", created_at: 1.hour.ago)
+        media.image.attach(io: Rails.root.join("spec/fixtures/files/sample_image.png").open,
+                           filename: "retake.png", content_type: "image/png")
+      end
+
+      it "layers the new image's items over the earlier image's" do
+        result = described_class.new.call(run:)
+
+        expect(result).to be_success
+        expect(Item.kept.where(source_media_id: media.id).count).to eq(4)
+      end
+
+      it "is superseded once the current image already has its items" do
+        create(:item, move:, box:, source_media: media, name: "Kettle")
+
+        result = described_class.new.call(run:)
+
+        expect(result).to be_failure
+        expect(Item.kept.where(source_media_id: media.id).count).to eq(2)
+      end
+    end
+  end
+
   context "when the Move was archived after capture (#118)" do
     let(:move) { create(:move, :archived) }
 

@@ -14,8 +14,9 @@ module RecognitionRuns
 
     # The run may no longer commit inventory (#871): the stale-run reaper
     # (RecognitionRuns::FailStale) failed it while the provider call was in
-    # flight, which armed Retry, or a newer run on the same photo superseded
-    # it. Raised inside the materialize transaction so nothing commits.
+    # flight, which armed Retry, a newer run on the same photo superseded it,
+    # or another run already materialized the photo (#896). Raised inside the
+    # materialize transaction so nothing commits.
     class RunSuperseded < StandardError; end
 
     SUPERSEDED_CODE = "superseded"
@@ -69,6 +70,7 @@ module RecognitionRuns
       # backfill has no later event to correct a stale pre-commit read).
       backfilled = ActiveRecord::Base.transaction do
         ensure_source_kept(run)
+        ensure_not_materialized(run)
         ensure_still_processing(run)
         payloads = materialize(run, result)
         complete(run, result)
@@ -124,6 +126,23 @@ module RecognitionRuns
       return if status == "processing" && latest_for_media?(run)
 
       raise RunSuperseded, "The run was failed or superseded while recognition was running"
+    end
+
+    # One set of items per photo (#896): two runs on the same photo (two
+    # retries racing, a duplicate job delivery) can both get past the claim,
+    # so the photo's materialized items are re-read here, after
+    # ensure_source_kept locked the photo. The photo lock serializes the
+    # materialize transactions of every run on it (FOR NO KEY UPDATE conflicts
+    # with itself), so a late run sees the items the first one committed and
+    # rolls back. A retake re-scan only counts the current image's items
+    # (RecognitionRun#materialized_items), so it can still layer suggestions
+    # over an earlier image's items, but never add a second set of its own.
+
+    #: (untyped run) -> void
+    def ensure_not_materialized(run)
+      return unless run.materialized_items.exists?
+
+      raise RunSuperseded, "The photo was already turned into items by another run"
     end
 
     # Same "latest" as Media#recognition_state / #recognition_in_flight?.
