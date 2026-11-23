@@ -473,6 +473,49 @@ RSpec.describe "Per-photo review" do
       expect(item.reload.box_id).to eq(target.id)
       expect(response).to redirect_to(move_box_path(move, target))
       expect(flash[:notice]).to eq(I18n.t("reviews.flash.photo_moved", number: target.number))
+      expect(flash[:action_href]).to be_nil
+    end
+
+    context "when the photo held the last in-box items of an unpacking box (#838)" do
+      let(:box) { create(:box, move:, number: "3", status: "unpacking") }
+
+      it "completes the source box and links to it from the toast (UX rule 1)" do
+        detected(name: "Lamp")
+        target = create(:box, move:, number: "8", status: "unpacking")
+
+        patch move_box_review_move_photo_path(move, box, media), params: { target_box_id: target.id }
+
+        aggregate_failures do
+          expect(box.reload.status).to eq("unpacked")
+          expect(target.reload.status).to eq("unpacking")
+          expect(response).to redirect_to(move_box_path(move, target))
+          expect(flash[:notice]).to eq(I18n.t("reviews.flash.photo_moved_box_unpacked", number: "8", source: "3"))
+          expect(flash[:action_href]).to eq(move_box_path(move, box))
+          expect(flash[:action_label]).to eq(I18n.t("reviews.flash.view_box"))
+        end
+      end
+
+      it "keeps the plain toast while other in-box items remain" do
+        detected(name: "Lamp")
+        create(:item, :manual, move:, box:) # another photo's / manual item stays behind
+        target = create(:box, move:, number: "8")
+
+        patch move_box_review_move_photo_path(move, box, media), params: { target_box_id: target.id }
+
+        expect(box.reload.status).to eq("unpacking")
+        expect(flash[:notice]).to eq(I18n.t("reviews.flash.photo_moved", number: "8"))
+        expect(flash[:action_href]).to be_nil
+      end
+
+      it "stays in the queue walk and still links to the completed box" do
+        detected(name: "Lamp")
+        target = create(:box, move:, number: "8")
+
+        patch move_box_review_move_photo_path(move, box, media, queue: "move"), params: { target_box_id: target.id }
+
+        expect(response).to redirect_to(move_box_review_photo_path(move, target, media, queue: "move"))
+        expect(flash[:action_href]).to eq(move_box_path(move, box))
+      end
     end
 
     it "rejects a target outside this Move (scoped to @move.boxes) without moving the photo" do

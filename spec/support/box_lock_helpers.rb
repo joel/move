@@ -19,13 +19,14 @@ module BoxLockHelpers
   # Simulates a concurrent move that commits while `item`'s box lock is being
   # waited on: the item's in-lock re-read (CurrentBoxLock's 2nd reload of each
   # attempt) first sees the row re-boxed to the next of `boxes`. With
-  # `every_attempt: true` it keeps moving on each attempt.
+  # `every_attempt: true` it keeps moving on each attempt. Works for any boxed
+  # record CurrentBoxLock guards (an Item, or a Media for Photos::Move, #838).
   def move_while_waiting(item, *boxes, every_attempt: false)
     calls = 0
     allow(item).to receive(:reload).and_wrap_original do |original|
       calls += 1
       if calls.even? && (every_attempt || calls == 2) && (to = boxes.shift)
-        Item.where(id: item.id).update_all(box_id: to.id) # rubocop:disable Rails/SkipsModelValidations
+        item.class.where(id: item.id).update_all(box_id: to.id) # rubocop:disable Rails/SkipsModelValidations
       end
       original.call
     end
