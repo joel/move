@@ -54,6 +54,15 @@ RSpec.describe RecognitionRuns::Retry do
     end.not_to change(box.recognition_runs, :count)
   end
 
+  it "retries the latest failed run although an older run is stuck in flight (#904)" do
+    create(:recognition_run, :processing, move:, box:, media:, created_at: 2.hours.ago) # a lost job
+    run = create(:recognition_run, :failed, move:, box:, media:)
+
+    expect do
+      expect(described_class.new.call(run:)).to be_success
+    end.to change(box.recognition_runs, :count).by(1)
+  end
+
   it "re-checks under the photo lock, refusing a retry whose pre-check went stale (#896)" do
     run = create(:recognition_run, :failed, move:, box:, media:)
     action = described_class.new
