@@ -31,9 +31,31 @@ module Captures
           .group_by(&:source_media_id)
     end
 
+    # Photos whose LATEST run matched an already-confirmed item (#872): media id →
+    # the matched item's id. Such a run records `conflict` suggestions and creates
+    # no item (no-overwrite, Domain §6.4), so without this the panel would say
+    # "No items detected" and nudge a duplicate add. One SQL round trip (DISTINCT
+    # ON picks the earliest conflict per photo); the join drops a matched item that
+    # was since deleted (Item's kept default scope), which falls back to the
+    # zero-detection caption. Latest-run ids come from the already-preloaded runs.
+    def conflict_item_by_media
+      latest_run_ids = media.filter_map { |m| m.recognition_runs.max_by(&:created_at)&.id }
+      return {} if latest_run_ids.empty?
+
+      RecognitionSuggestion.joins(:item)
+                           .where(state: "conflict", recognition_run_id: latest_run_ids)
+                           .select("DISTINCT ON (recognition_suggestions.media_id) " \
+                                   "recognition_suggestions.media_id, recognition_suggestions.item_id")
+                           .order("recognition_suggestions.media_id", "recognition_suggestions.created_at")
+                           .to_h { |s| [s.media_id, s.item_id] }
+    end
+
     # The configured panel for this box (used by the broadcast subscriber).
     def panel
-      Views::Captures::SessionPanel.new(box: @box, media: media, items_by_media: items_by_media)
+      Views::Captures::SessionPanel.new(
+        box: @box, media: media, items_by_media: items_by_media,
+        conflict_item_by_media: conflict_item_by_media
+      )
     end
   end
 end

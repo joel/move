@@ -15,7 +15,8 @@ class CapturesController < MoveScopedController
   def show
     content = Captures::SessionContent.new(@box)
     render Views::Captures::Show.new(
-      move: @move, box: @box, media: content.media, items_by_media: content.items_by_media
+      move: @move, box: @box, media: content.media, items_by_media: content.items_by_media,
+      conflict_item_by_media: content.conflict_item_by_media
     )
   end
 
