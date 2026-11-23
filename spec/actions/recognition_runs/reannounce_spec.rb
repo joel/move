@@ -35,4 +35,15 @@ RSpec.describe RecognitionRuns::Reannounce do
     expect { described_class.new.call(run:) }.not_to raise_error
     expect(Rails.logger).to have_received(:warn).with(/re-announce failed/)
   end
+
+  it "returns Failure without raising when the logger also raises (#652)" do
+    run = create(:recognition_run, :succeeded, move:, box:, media:, metadata: { "item_count" => 3 })
+    allow(Rails.event).to receive(:notify).and_raise(StandardError, "boom")
+    allow(Rails.logger).to receive(:warn).and_raise(IOError, "log device closed")
+
+    result = described_class.new.call(run:)
+
+    expect(result).to be_failure
+    expect(result.failure).to eq(run)
+  end
 end

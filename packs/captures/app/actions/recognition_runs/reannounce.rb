@@ -20,8 +20,20 @@ module RecognitionRuns
       )
       Success(run)
     rescue StandardError => e # rubocop:disable Move/BroadRescue -- §1#4 a re-announcement must not fail its caller over a done run
-      Rails.logger.warn("[recognition] re-announce failed for run=#{run.id}: #{e.class}: #{e.message}")
+      log_failure(run, e)
       Failure(run)
+    end
+
+    private
+
+    # A failing logger must not raise out of the rescue above (#652).
+
+    #: (untyped run, untyped error) -> nil
+    def log_failure(run, error)
+      Rails.logger.warn("[recognition] re-announce failed for run=#{run.id}: #{error.class}: #{error.message}")
+      nil
+    rescue StandardError # rubocop:disable Move/BroadRescue -- §1#4: a failing logger must not escape the rescue that called it
+      nil
     end
   end
 end

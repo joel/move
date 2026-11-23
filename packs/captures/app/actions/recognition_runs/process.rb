@@ -7,6 +7,11 @@ module RecognitionRuns
   # data or bounding boxes are stored. Provider/persistence errors end the run
   # `failed` (never stuck in processing) and return Failure — they never raise up.
   class Process < BaseAction
+    # The run's box or photo was deleted while the provider call was in flight
+    # (#854). Raised inside the materialize transaction so it rolls back and the
+    # broad rescue records a failed run with zero inventory.
+    class SourceDiscarded < StandardError; end
+
     #: (run: untyped, ?provider: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(run:, provider: nil)
       # Per-Move provider (#185): the active provider + key come from the Move, not
@@ -54,6 +59,7 @@ module RecognitionRuns
       # The backfill payloads are collected and emitted post-commit (#650 — a
       # backfill has no later event to correct a stale pre-commit read).
       backfilled = ActiveRecord::Base.transaction do
+        ensure_source_kept(run)
         payloads = materialize(run, result)
         complete(run, result)
         payloads
@@ -71,6 +77,25 @@ module RecognitionRuns
     def mark_processing(run)
       run.update!(status: "processing", started_at: Time.current)
       notify_isolated(run, "recognition_run.processing", { recognition_run_id: run.id })
+    end
+
+    # identify takes seconds, and a photo or box delete in that window must not
+    # leave live items sourced from discarded media (#854) — they would sit
+    # outside the delete's discard batch, so its Restore could not cover them.
+    # Lock box then media (parent first, the order every box-first path uses)
+    # and re-read them past the kept scope. Each delete row-locks its root
+    # before discarding (Discards::Cascade), so after these locks either the
+    # delete committed first and we see it, or it waits for this commit and
+    # cascades over the items we create. NO KEY UPDATE (PARENT_ROW_LOCK) lets
+    # our own item inserts' FK checks through.
+
+    #: (untyped run) -> void
+    def ensure_source_kept(run)
+      box = Box.with_discarded.lock(PARENT_ROW_LOCK).find(run.box_id)
+      media = Media.with_discarded.lock(PARENT_ROW_LOCK).find(run.media_id)
+      return unless box.discarded? || media.discarded?
+
+      raise SourceDiscarded, "The photo or its box was deleted while recognition was running"
     end
 
     # The room is the only vocabulary the model is given as context — it nudges the
@@ -217,14 +242,27 @@ module RecognitionRuns
     # where an escape would be catastrophic: on the success path it would flip
     # a committed run to failed and arm Retry to duplicate its items; from the
     # rescue path it would leak the raise past the class contract. Failures
-    # are Sentry-visible (error_reporter) and logged.
+    # are Sentry-visible (error_reporter) and logged — each through #swallow,
+    # so a failing logger or reporter can't escape this rescue either (#652).
 
     #: (untyped run, String name, Hash[Symbol, untyped] payload) -> untyped
     def notify_isolated(run, name, payload)
       Rails.event.notify(name, payload)
     rescue StandardError => e # rubocop:disable Move/BroadRescue -- §1#4: an event dispatch failure must not change the run's committed fate
-      Rails.logger.warn("[recognition] #{name} announcement failed for run=#{run.id}: #{e.class}: #{e.message}")
-      Rails.error.report(e, handled: true)
+      swallow { Rails.logger.warn("[recognition] #{name} announcement failed for run=#{run.id}: #{e.class}: #{e.message}") }
+      swallow { Rails.error.report(e, handled: true) }
+    end
+
+    # Runs a best-effort reporting call (log / error report) from inside a
+    # rescue. Each call is isolated on its own, so one failing sink still
+    # lets the other run and nothing re-enters #call's broad rescue (#652).
+
+    #: () { () -> untyped } -> nil
+    def swallow
+      yield
+      nil
+    rescue StandardError # rubocop:disable Move/BroadRescue -- §1#4: a failing logger/reporter must not escape the rescue that called it
+      nil
     end
 
     #: (untyped run, untyped error) -> untyped
