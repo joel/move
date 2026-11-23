@@ -592,7 +592,7 @@ RSpec.describe "Per-photo review" do
         patch move_box_review_move_photo_path(move, box, media), params: { target_box_id: target.id }
 
         expect(response).to redirect_to(move_boxes_path(move))
-        expect(flash[:alert]).to eq(I18n.t("reviews.flash.move_photo_errors.photo_deleted"))
+        expect(flash[:alert]).to eq(I18n.t("reviews.flash.move_photo_errors.box_deleted"))
         follow_redirect!
         expect(response).to have_http_status(:ok)
       end
@@ -610,14 +610,16 @@ RSpec.describe "Per-photo review" do
         expect(response).to have_http_status(:ok)
       end
 
-      it "stays in the queue walk at the photo's current box when a concurrent move wins" do
+      it "lands on the review queue when a concurrent move wins in queue mode" do
         detected(name: "Lamp")
         elsewhere = create(:box, move:, number: "9")
         race_box_changed(to: elsewhere)
 
         patch move_box_review_move_photo_path(move, box, media, queue: "move"), params: { target_box_id: target.id }
 
-        expect(response).to redirect_to(move_box_review_photo_path(move, elsewhere, media, queue: "move"))
+        # Not the photo's review URL in `elsewhere`: that would embed an unlocked
+        # read and 404 again if another move lands before the browser follows it.
+        expect(response).to redirect_to(move_review_path(move))
         expect(flash[:alert]).to eq(I18n.t("reviews.flash.move_photo_errors.moved_elsewhere", number: "9"))
         follow_redirect!
         expect(response).to have_http_status(:ok)
