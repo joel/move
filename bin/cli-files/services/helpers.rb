@@ -18,7 +18,6 @@ module AppCLI
     APP_CONTAINER_BASE = "#{APP_NAME}-app".freeze
     DB_CONTAINER_BASE = "#{APP_NAME}-db".freeze
     APP_IMAGE_BASE = "#{DOCKER_NAMESPACE}/#{APP_NAME}-app".freeze
-    WAIT_IMAGE = "workeverywhere/wait:2.12.1".freeze
     DB_IMAGES = {
       "mysql" => "mysql:latest",
       # pgvector/pgvector:pg18 = postgres:18 + the `vector` extension (D8 hybrid
@@ -113,10 +112,6 @@ module AppCLI
       def app_image
         tag = short == "dev" ? "latest" : short
         "#{APP_IMAGE_BASE}:#{tag}"
-      end
-
-      def wait_image
-        WAIT_IMAGE
       end
 
       def db_image
