@@ -467,8 +467,15 @@ RSpec.describe "Unpacking" do
     it "drops the card when the photo left the box before the action ran (Failure(:not_found))" do
       box = create(:box, :with_room, move:, status: "unpacking")
       photo = create(:media, move:, box:)
-      create(:item, move:, box:, source_media: photo, name: "Plates")
-      refuse(Items::MarkPhotoRemoved, :not_found)
+      plates = create(:item, move:, box:, source_media: photo, name: "Plates")
+      # A Photos::Move (photo + its in-box item) commits before the action runs.
+      elsewhere = create(:box, :with_room, move:, status: "unpacking")
+      refused = instance_double(Items::MarkPhotoRemoved)
+      allow(Items::MarkPhotoRemoved).to receive(:new).and_return(refused)
+      allow(refused).to receive(:call) do
+        [photo, plates].each { |record| record.update!(box: elsewhere) }
+        Dry::Monads::Failure(:not_found)
+      end
 
       patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id), as: :turbo_stream
 
@@ -506,10 +513,10 @@ RSpec.describe "Unpacking" do
       end
     end
 
-    # A real Photos::Move lands right after the bulk loop's first removal.
-    def move_photo_after_first_removal(photo, destination)
+    # A real Photos::Move lands right after action_class's first call returns.
+    def move_photo_after_first_call(action_class, photo, destination)
       moved = false
-      allow(Items::MarkRemoved).to receive(:new).and_wrap_original do |original|
+      allow(action_class).to receive(:new).and_wrap_original do |original|
         original.call.tap do |action|
           allow(action).to receive(:call).and_wrap_original do |call, **kw|
             call.call(**kw).tap do
@@ -530,15 +537,18 @@ RSpec.describe "Unpacking" do
       plates = create(:item, :confirmed, move:, box:, source_media: photo, name: "Plates")
       mugs = create(:item, :confirmed, move:, box:, source_media: photo, name: "Mugs")
       create(:item, :confirmed, move:, box:, name: "Lamp") # keeps the box open
-      move_photo_after_first_removal(photo, destination)
+      move_photo_after_first_call(Items::MarkRemoved, photo, destination)
 
       patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id), as: :turbo_stream
 
+      # Plates was unpacked before the move and stays behind: it takes the
+      # departed photo card's place as a standalone card (Codex #886).
       card = Components::Boxes::PhotoCard.dom_id(photo)
       expect(response.body)
-        .to include(%(action="remove" target="#{card}"), %(target="#{Components::Boxes::ContentsHeader::ID}"),
+        .to include(%(action="replace" target="#{card}"), Components::Boxes::ItemCard.dom_id(plates),
+                    %(target="#{Components::Boxes::ContentsHeader::ID}"),
                     ERB::Util.h(I18n.t("unpacking.flash.photo_moved")))
-      expect(response.body).not_to include(%(action="replace" target="#{card}"))
+      expect(response.body).not_to include(Components::Boxes::ItemCard.dom_id(mugs))
       expect([plates.reload.presence_state, mugs.reload.box_id]).to eq(["removed", destination.id])
     end
 
@@ -569,6 +579,23 @@ RSpec.describe "Unpacking" do
       card = Components::Boxes::PhotoCard.dom_id(photo)
       expect(response.body).to include(%(action="remove" target="#{card}"))
       expect(response.body).not_to include(%(action="replace" target="#{card}"))
+    end
+
+    it "turns a chip into a standalone card when its photo moves away after the unpack (Codex #886)" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      destination = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      plates = create(:item, :confirmed, move:, box:, source_media: photo, name: "Plates")
+      mugs = create(:item, :confirmed, move:, box:, source_media: photo, name: "Mugs")
+      create(:item, :manual, move:, box:, name: "Lamp") # keeps the box open
+      # Plates is unpacked, then a Photos::Move takes the photo and Mugs (in_box).
+      move_photo_after_first_call(Items::Unpack, photo, destination)
+
+      patch move_box_unpacking_remove_path(move, box, plates, params: { origin: "box" }), as: :turbo_stream
+
+      card = Components::Boxes::PhotoCard.dom_id(photo)
+      expect(response.body).to include(%(action="replace" target="#{card}"), Components::Boxes::ItemCard.dom_id(plates))
+      expect(response.body).not_to include(Components::Boxes::ItemCard.dom_id(mugs))
     end
 
     it "redraws a refused standalone card from the DB, not the pre-action item" do
