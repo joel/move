@@ -2,6 +2,7 @@
 
 require "fileutils"
 require_relative "../services/helpers"
+require_relative "container_flags"
 
 module AppCLI
   module Services
@@ -188,53 +189,24 @@ module AppCLI
         FileUtils.mkdir_p(File.join(AppCLI::ROOT, "db"))
       end
 
+      def container_flags
+        @container_flags ||= ContainerFlags.new(
+          env_config: env_config,
+          checkout_path: AppCLI::ROOT,
+          sources: MountSources.new(checkout_path: AppCLI::ROOT, main_path: AppCLI::ROOT)
+        )
+      end
+
       def app_env_flags
-        flags = [
-          "--env RAILS_MASTER_KEY=$(cat #{env_config.master_key_path})",
-          "--env RAILS_ENV=#{env_config.env}",
-          "--env RAILS_LOG_TO_STDOUT=true",
-          "--env RAILS_SERVE_STATIC_FILES=true",
-          "--env RAILS_ALLOW_ALL_HOSTS=true"
-        ]
-
-        # docker run --env-file fails if the file is absent (e.g. a checkout that
-        # hasn't run bin/setup), so only pass it when it exists. Use an absolute
-        # path so the check and the flag agree regardless of bin/cli's CWD.
-        env_file = File.join(AppCLI::ROOT, ".env.#{env_config.env}")
-        flags << "--env-file #{env_file}" if File.exist?(env_file)
-
-        flags << "--env BUNDLE_WITHOUT=production" if env_config.short == "dev"
-
-        if env_config.mysql? || env_config.postgresql?
-          db_port = env_config.db_port
-          flags << "--env DB_HOST=#{env_config.db_container}"
-          flags << "--env DB_PORT=#{db_port}" if db_port
-        end
-
-        if env_config.mysql?
-          flags << "--env MYSQL_USER=root"
-          flags << "--env MYSQL_PASSWORD=\"\""
-        end
-
-        flags
+        container_flags.env
       end
 
       def app_volume_flags
-        flags = []
-
-        if env_config.mysql?
-          flags << "--volume #{File.join(AppCLI::ROOT, "certs/mysql/ca.pem")}:/run/secrets/mysql-ca.pem:ro"
-        end
-
-        flags << "--volume #{AppCLI::ROOT}:/rails" if env_config.short == "dev"
-
-        flags << "--volume #{File.join(AppCLI::ROOT, "db")}:/rails/db" if env_config.sqlite3?
-
-        flags
+        container_flags.volumes
       end
 
       def network_flags
-        ["--network #{env_config.network_name}"]
+        container_flags.network
       end
 
       def copy_schema_from_container(container_name)

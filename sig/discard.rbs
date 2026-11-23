@@ -12,6 +12,10 @@ class Media
   def self.with_discarded: () -> untyped
 end
 
+class Box
+  def self.with_discarded: () -> untyped
+end
+
 # The discard scopes also surface on association proxies (rbs_rails-generated
 # classes) — declared per proxy as call sites appear.
 class Item

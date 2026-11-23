@@ -203,6 +203,19 @@ module AppCLI
         success
       end
 
+      # Runs the command and returns its exit status, shell-style: 128 + signal
+      # when it was killed, 127 when it could not start.
+      def run_status(command)
+        normalized = normalize(command)
+        say_status(:run, normalized)
+
+        Kernel.system(normalized)
+        status = Process.last_status
+        return 127 unless status
+
+        status.exitstatus || (128 + status.termsig.to_i)
+      end
+
       def capture(command, quiet: false)
         normalized = normalize(command)
         say_status(:run, normalized) unless quiet

@@ -160,6 +160,38 @@ RSpec.describe "Captures" do
       expect(response.body).not_to include('data-turbo-prefetch="false"')
     end
 
+    # #856 — a successful run that detected nothing must not dead-end on a bare
+    # "Succeeded" badge: say so, and link to the photo review to add items by hand.
+    %w[succeeded partially_succeeded].each do |status|
+      it "renders a #{status} run with zero items as a 'No items detected' row linking to the photo review" do
+        media = create(:media, move:, box:)
+        create(:recognition_run, :succeeded, move:, box:, media:, status:)
+
+        get move_box_capture_path(move, box)
+
+        panel = response.parsed_body.at_css("##{Views::Captures::SessionPanel::ID}")
+        link = panel.at_css(%(a[href="#{move_box_review_photo_path(move, box, media_id: media.id)}"]))
+        expect(link).to be_present
+        expect(link.text).to include("No items detected")
+      end
+    end
+
+    # The zero-items link is gated on success: a run still in flight keeps the
+    # non-link status row with its state badge.
+    %w[queued processing].each do |status|
+      it "keeps a #{status} run as a non-link status row" do
+        media = create(:media, move:, box:)
+        create(:recognition_run, move:, box:, media:, status:)
+
+        get move_box_capture_path(move, box)
+
+        panel = response.parsed_body.at_css("##{Views::Captures::SessionPanel::ID}")
+        expect(panel.at_css(%(a[href="#{move_box_review_photo_path(move, box, media_id: media.id)}"]))).to be_nil
+        expect(panel.text).to include(I18n.t("ui.states.#{status}"))
+        expect(panel.text).not_to include(I18n.t("captures.session.no_items"))
+      end
+    end
+
     it "surfaces a friendly reason for a known failure category (quota)" do
       media = create(:media, move:, box:)
       create(:recognition_run, :failed, move:, box:, media:,
