@@ -528,6 +528,101 @@ RSpec.describe "Per-photo review" do
       # The cross-Move box id resolves to nil under @move.boxes, so it's :box_missing.
       expect(flash[:alert]).to eq(I18n.t("reviews.flash.move_photo_errors.box_missing"))
     end
+
+    # #874: a concurrent request wins between the controller loading @media and
+    # Photos::Move taking the box lock. The photo is no longer reachable under
+    # @box, so the old "back to this photo" redirect would 404.
+    context "when a concurrent request wins the race (#874)" do
+      let(:target) { create(:box, move:, number: "7") }
+
+      # Runs `race` right before the action's pre-lock validation — after the
+      # controller loaded @media, before the box lock is taken.
+      def race_before_lock(race)
+        allow(Photos::Move).to receive(:new).and_wrap_original do |original|
+          original.call.tap do |action|
+            allow(action).to(receive(:validate).and_wrap_original do |validate, *args|
+              race.call
+              validate.call(*args)
+            end)
+          end
+        end
+      end
+
+      # A concurrent move kept relocating the photo while we waited on the lock:
+      # the action gives up with Failure(:box_changed) and writes nothing.
+      def race_box_changed(to:)
+        allow(Photos::Move).to receive(:new).and_wrap_original do |original|
+          original.call.tap do |action|
+            allow(action).to receive(:relocate) do
+              Media.find(media.id).update!(box: to)
+              Dry::Monads::Failure(:box_changed)
+            end
+          end
+        end
+      end
+
+      it "lands on the box with a deleted alert when a concurrent delete wins" do
+        detected(name: "Lamp")
+        race_before_lock(-> { Photos::Delete.new.call(media: Media.find(media.id), actor: user) })
+
+        patch move_box_review_move_photo_path(move, box, media), params: { target_box_id: target.id }
+
+        expect(response).to redirect_to(move_box_path(move, box))
+        expect(flash[:alert]).to eq(I18n.t("reviews.flash.move_photo_errors.photo_deleted"))
+        follow_redirect!
+        expect(response).to have_http_status(:ok)
+      end
+
+      it "lands on the review queue when a concurrent delete wins in queue mode" do
+        detected(name: "Lamp")
+        race_before_lock(-> { Photos::Delete.new.call(media: Media.find(media.id), actor: user) })
+
+        patch move_box_review_move_photo_path(move, box, media, queue: "move"), params: { target_box_id: target.id }
+
+        expect(response).to redirect_to(move_review_path(move))
+        expect(flash[:alert]).to eq(I18n.t("reviews.flash.move_photo_errors.photo_deleted"))
+        follow_redirect!
+        expect(response).to have_http_status(:ok)
+      end
+
+      it "lands on the box list when a concurrent box delete took the photo with it" do
+        detected(name: "Lamp")
+        race_before_lock(-> { Boxes::Delete.new.call(box: Box.find(box.id), actor: user) })
+
+        patch move_box_review_move_photo_path(move, box, media), params: { target_box_id: target.id }
+
+        expect(response).to redirect_to(move_boxes_path(move))
+        expect(flash[:alert]).to eq(I18n.t("reviews.flash.move_photo_errors.photo_deleted"))
+        follow_redirect!
+        expect(response).to have_http_status(:ok)
+      end
+
+      it "lands on the photo's current box when a concurrent move wins" do
+        detected(name: "Lamp")
+        elsewhere = create(:box, move:, number: "9")
+        race_box_changed(to: elsewhere)
+
+        patch move_box_review_move_photo_path(move, box, media), params: { target_box_id: target.id }
+
+        expect(response).to redirect_to(move_box_path(move, elsewhere))
+        expect(flash[:alert]).to eq(I18n.t("reviews.flash.move_photo_errors.moved_elsewhere", number: "9"))
+        follow_redirect!
+        expect(response).to have_http_status(:ok)
+      end
+
+      it "stays in the queue walk at the photo's current box when a concurrent move wins" do
+        detected(name: "Lamp")
+        elsewhere = create(:box, move:, number: "9")
+        race_box_changed(to: elsewhere)
+
+        patch move_box_review_move_photo_path(move, box, media, queue: "move"), params: { target_box_id: target.id }
+
+        expect(response).to redirect_to(move_box_review_photo_path(move, elsewhere, media, queue: "move"))
+        expect(flash[:alert]).to eq(I18n.t("reviews.flash.move_photo_errors.moved_elsewhere", number: "9"))
+        follow_redirect!
+        expect(response).to have_http_status(:ok)
+      end
+    end
   end
 
   describe "archived Move (read-only)" do
