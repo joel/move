@@ -70,6 +70,19 @@ RSpec.describe "Items" do
       end.to change(sealed.items, :count).by(1)
     end
 
+    it "refuses a recovery add on an unpacked (terminal) box (#855)" do
+      unpacked = create(:box, :with_room, move:, status: "unpacked")
+      media = create(:media, move:, box: unpacked)
+
+      expect do
+        post move_box_items_path(move, unpacked),
+             params: { item: { name: "Missed mug", source_media_id: media.id } }
+      end.not_to change(unpacked.items, :count)
+
+      expect(response).to redirect_to(move_box_path(move, unpacked))
+      expect(flash[:alert]).to eq(I18n.t("items.create.box_closed"))
+    end
+
     it "still gates a forged/stale source_media_id that doesn't resolve (no bypass)" do
       sealed = create(:box, move:, status: "sealed")
 
