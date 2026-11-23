@@ -103,6 +103,28 @@ RSpec.describe Media do
     end
   end
 
+  describe "#orphaned? and the latest run (#899)" do
+    let(:media) { create(:media) }
+    let!(:old_run) do
+      create(:recognition_run, :succeeded, move: media.move, box: media.box, media:, created_at: 1.hour.ago)
+    end
+
+    before do
+      create(:recognition_suggestion, :conflict, move: media.move, box: media.box, media:,
+                                                 recognition_run: old_run)
+    end
+
+    it "is false while the latest run carries the conflict" do
+      expect(media.orphaned?).to be(false)
+    end
+
+    it "is true once a newer run settles with no suggestions" do
+      create(:recognition_run, :failed, move: media.move, box: media.box, media:)
+
+      expect(media.orphaned?).to be(true)
+    end
+  end
+
   describe "#image_displayable? (#563)" do
     it "is true for a ready media with a readable master" do
       expect(create(:media)).to be_image_displayable

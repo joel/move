@@ -537,6 +537,35 @@ RSpec.describe "Boxes" do
       expect(response.body).not_to include(move_box_review_photo_path(move, box, media_id: photo.id))
     end
 
+    # #899 — a re-scan after a conflict supersedes the older run's suggestions. If
+    # it settles with nothing to act on (failed, or zero detections), the photo is
+    # orphaned again and its tile must route to recovery, not dead-end.
+    {
+      "fails" => { status: "failed" },
+      "finds no objects" => { status: "succeeded" }
+    }.each do |outcome, run_attrs|
+      it "links a conflict-only photo to recovery once its re-scan #{outcome}" do
+        box = create(:box, move:, number: "1", status: "packing")
+        existing = create(:item, move:, box:, name: "Lamp", review_state: "confirmed")
+        photo = create(:media, move:, box:)
+        old_run = create(:recognition_run, :succeeded, move:, box:, media: photo, created_at: 1.hour.ago)
+        create(:recognition_suggestion, :conflict, move:, box:, media: photo, recognition_run: old_run,
+                                                   item: existing)
+        create(:recognition_run, move:, box:, media: photo, **run_attrs)
+
+        get move_box_path(move, box)
+
+        recovery_path = move_box_recovery_photo_path(move, box, media_id: photo.id)
+        tile = response.parsed_body.at_css("##{Components::Boxes::PhotoCard.dom_id(photo)}")
+        expect(tile.name).to eq("a")
+        expect(tile["href"]).to eq(recovery_path)
+
+        # The recovery page agrees (Media#orphaned?) instead of bouncing back.
+        get recovery_path
+        expect(response).to have_http_status(:ok)
+      end
+    end
+
     it "badges a gallery photo whose every item is unpacked, but not one with an in-box item" do
       box = create(:box, move:, number: "1", status: "unpacking")
       all_unpacked = create(:media, move:, box:)
