@@ -16,29 +16,34 @@ module Items
   # The photo must belong to THIS box (#729): the controller already scopes
   # the id to box.media, but the action states the invariant itself so any
   # future caller (an MCP bulk tool) gets Failure(:not_found) for a foreign
-  # photo instead of a silent no-op. A fresh read, not media.box_id: the
-  # caller's Media may predate a concurrent Photos::Move. No box lock is held
-  # here (see below), so the check is a pre-loop read; a move committing
-  # after it re-boxes the items too, and the box-scoped item query then
-  # finds nothing to remove.
+  # photo. Without it, an item moved INTO this box that still points at a
+  # foreign photo would be unpacked.
   #
-  # No wrapping transaction: the presence write cannot fail mid-loop (always a
-  # valid enum value, no callbacks), and events must not outlive a rollback —
-  # each success is durable, per the bulk best-effort convention.
+  # Serialized with Photos::Move / Items::Move, which relocate under the
+  # source box's lock (Items::CurrentBoxLock): the ownership check + item load
+  # run under this box's lock (PARENT_ROW_LOCK), and so does EACH removal,
+  # which re-checks under the lock that the item is still in_box here before
+  # writing (Codex #876 R1). A move committing between the load and an item's
+  # turn re-boxes that item, so it is skipped — never unpacked in its new box.
+  # Box-first, like Items::RestoreToBox; we hold no other row lock while
+  # waiting, so no cycle with the movers (box → photo → items).
+  #
+  # No wrapping transaction: each item runs in its own short box-locked
+  # transaction and commits before the next, so every success is durable,
+  # per the bulk best-effort convention. MarkRemoved emits only after its
+  # write succeeds, so no event can outlive a rollback; the in-lock event's
+  # side effects are commit-safe (activity row in the same transaction,
+  # search enqueue deferred to commit #648, cluster refresh a debounced job).
   class MarkPhotoRemoved < BaseAction
     #: (box: untyped, media: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, media:, actor:)
       yield ensure_writable(box.move)
-      yield ensure_in_box(box, media)
       # Guarded here too (not only via the per-item loop) so a photo whose
       # items are all already removed still fails correctly on a wrong phase.
       yield ensure_unpacking_phase(box)
 
-      # :move/:box preloaded — the per-item MarkRemoved guards read both, and
-      # the loop must not re-load them per item (Bullet).
-      items = box.items.in_box.where(source_media_id: media.id)
-                 .includes(:move, :box).order(:created_at, :id).to_a
-      items.each { |item| yield MarkRemoved.new.call(item: item, actor: actor) }
+      candidates = yield owned_items(box, media)
+      items = candidates.filter_map { |item| yield remove_if_still_here(box, item, actor) }
       # The bulk counterpart of Items::Unpack (#755): unpacking the box's last
       # photo completes the box — owned here, not by the adapter, so the rule
       # cannot drift. Post-loop, own box lock (#739 R2); completed_box never
@@ -48,11 +53,31 @@ module Items
 
     private
 
-    #: (untyped box, untyped media) -> Dry::Monads::Result[untyped, untyped]
-    def ensure_in_box(box, media)
-      return Failure(:not_found) unless box.media.exists?(media.id)
+    # :move preloaded — the per-item MarkRemoved guard reads it, and the loop
+    # must not re-load it per item (Bullet); each item's box is pointed at the
+    # locked box in remove_if_still_here.
 
-      Success()
+    #: (untyped box, untyped media) -> Dry::Monads::Result[untyped, untyped]
+    def owned_items(box, media)
+      box.with_lock(PARENT_ROW_LOCK) do
+        next Failure(:not_found) unless box.media.exists?(media.id)
+
+        Success(box.items.in_box.where(source_media_id: media.id).includes(:move).order(:created_at, :id).to_a)
+      end
+    end
+
+    # Success(item) when removed, Success(nil) when the item left this box
+    # (or was already removed) since the load. The item points at the locked,
+    # freshly re-read box, so MarkRemoved's phase guard sees the current status.
+
+    #: (untyped box, untyped item, untyped actor) -> Dry::Monads::Result[untyped, untyped]
+    def remove_if_still_here(box, item, actor)
+      box.with_lock(PARENT_ROW_LOCK) do
+        next Success(nil) unless box.items.in_box.exists?(item.id)
+
+        item.box = box
+        MarkRemoved.new.call(item: item, actor: actor)
+      end
     end
 
     #: (untyped box) -> Dry::Monads::Result[untyped, untyped]
