@@ -27,6 +27,8 @@ en:
         other: "and %{count} items inside"
       done: "Restored."
       failed: "Couldn't restore that."
+      parent_discarded: "Restore the box first — this item's box is deleted."
+      view_box_entry: "Show the box"
     revert:
       action: "Revert"
       done: "Reverted the change."

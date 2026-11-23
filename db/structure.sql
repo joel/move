@@ -1254,7 +1254,8 @@ CREATE TABLE public.recognition_runs (
     started_at timestamp(6) without time zone,
     completed_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    rescan boolean DEFAULT false NOT NULL
 );
 
 
@@ -2714,6 +2715,7 @@ ALTER TABLE ONLY public.terms_acceptances
 SET search_path TO "public";
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261123120000'),
 ('20260726180000'),
 ('20260723163405'),
 ('20260719120000'),

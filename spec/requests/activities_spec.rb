@@ -184,6 +184,71 @@ RSpec.describe "Activities" do
         .and include(I18n.t("activities.restore.done"))
       expect(Box.exists?(box.id)).to be(true)
     end
+
+    context "when the item's box is deleted too (#894)" do
+      let(:box) { create(:box, move:, number: "7") }
+      let(:item) { create(:item, :manual, move:, box:, name: "Lamp") }
+
+      def item_activity
+        move.activities.find_by!(action: "item.deleted", subject_id: item.id)
+      end
+
+      # The feed page that starts at the box's own `box.deleted` row.
+      def entry_href
+        box_activity = move.activities.find_by!(action: "box.deleted", subject_id: box.id)
+        move_activity_path(move, before: box_activity.occurred_at.iso8601(6),
+                                 before_id: ActivitiesController::MAX_UUID)
+      end
+
+      before do
+        Items::Delete.new.call(item:, actor: user)
+        Boxes::Delete.new.call(box:, actor: user)
+      end
+
+      it "refuses with 'restore the box first' and links to the box's restore entry" do
+        post move_activity_restore_path(move, item_activity.id), as: :turbo_stream
+
+        aggregate_failures do
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.body)
+            .to include(CGI.escapeHTML(I18n.t("activities.restore.parent_discarded")))
+            .and include(%(href="#{entry_href}"))
+            .and include(I18n.t("activities.restore.view_box_entry"))
+          expect(Item.with_discarded.find(item.id)).to be_discarded
+        end
+      end
+
+      it "carries the link through the no-JS redirect" do
+        post move_activity_restore_path(move, item_activity.id)
+
+        expect(response).to redirect_to(move_activity_path(move))
+        expect(flash[:alert]).to eq(I18n.t("activities.restore.parent_discarded"))
+        expect(flash[:action_href]).to eq(entry_href)
+      end
+
+      it "opens a feed page that starts at the box's restore entry" do
+        later = create(:box, move:, number: "99")
+        travel(1.minute) { Boxes::Update.new.call(box: later, editor: user, params: { weight_kg: 3 }) }
+
+        get entry_href
+
+        expect(response.body).to include("Box 7").and include(I18n.t("activities.restore.action"))
+        expect(response.body).not_to include("Box 99") # newer than the entry: not on this page
+      end
+
+      it "refuses a photo restore the same way" do
+        media = create(:media, move:, box: create(:box, move:, number: "8"))
+        Photos::Delete.new.call(media:, actor: user)
+        Boxes::Delete.new.call(box: media.box, actor: user)
+        photo_activity = move.activities.find_by!(action: "media.discarded", subject_id: media.id)
+
+        post move_activity_restore_path(move, photo_activity.id), as: :turbo_stream
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include(I18n.t("activities.restore.view_box_entry"))
+        expect(Media.with_discarded.find(media.id)).to be_discarded
+      end
+    end
   end
 
   describe "POST /moves/:move_id/activity/:id/revert" do

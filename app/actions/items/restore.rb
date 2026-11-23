@@ -5,17 +5,48 @@ module Items
   # from Items::RestoreToBox (the unpacking `presence_state` inverse, which emits
   # `item.restored`); this emits `item.undeleted` so the feed never conflates the
   # two. The caller resolves the Item with `with_discarded`.
+  #
+  # Refused with Failure(:parent_discarded) while the item's box is discarded
+  # (#894): an item deleted on its own BEFORE its box was deleted keeps its own
+  # batch, so the box cascade never touched it — restoring it alone would make
+  # it kept inside a deleted box, which every "kept item ⇒ kept box" read
+  # (the find-list counts, the box grid) assumes cannot happen. The user
+  # restores the box first, then the item.
   class Restore < BaseAction
     #: (item: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:, source: :web)
+      yield ensure_writable(item.move) # first step: no lock taken on a read-only Move
       batch_id = item.discard_batch_id
-      yield Discards::CascadeRestore.new.call(record: item, actor: actor, source: source)
+      yield restore_in_kept_box(item, actor, source)
       yield restore_source_photo(item)
       yield emit_event(item, actor, source, batch_id)
       Success(item)
     end
 
     private
+
+    # The box check and the undiscard run under the box's row lock — the same
+    # PARENT_ROW_LOCK Boxes::Delete's cascade takes on the box first — so a
+    # concurrent box delete either commits before us (we see it discarded and
+    # refuse) or waits and then cascades over the item we just restored. A
+    # discarded item cannot be moved, so its box_id is stable: no
+    # CurrentBoxLock re-read is needed. with_lock reloads unscoped, so the
+    # check sees a box discarded while we waited.
+
+    #: (untyped item, untyped actor, Symbol source) -> Dry::Monads::Result[untyped, untyped]
+    def restore_in_kept_box(item, actor, source)
+      # Expired outranks "restore the box first": the box was deleted after
+      # this record, so its own window lapses first and restoring the box
+      # could never make this one restorable again.
+      return Failure(:retention_expired) if item.retention_expired?
+
+      box = Box.with_discarded.find_by(id: item.box_id) or return Failure(:not_found)
+      box.with_lock(PARENT_ROW_LOCK) do
+        next Failure(:parent_discarded) if box.discarded?
+
+        Discards::CascadeRestore.new.call(record: item, actor: actor, source: source)
+      end
+    end
 
     # A photo must be visible whenever a kept item references it. Items::Remove
     # discards a shared photo only once its LAST referencing item is removed —

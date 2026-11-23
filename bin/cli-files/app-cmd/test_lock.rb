@@ -6,15 +6,21 @@ require "thor"
 
 module AppCLI
   module Services
-    # Serialises `bin/cli app test` runs: every worktree shares one test database.
+    # A host-wide, non-blocking flock on a file in the main checkout's tmp/.
+    # It serialises `bin/cli app test` runs (every worktree shares one test
+    # database) and, with its own file, `app start`/`stop`/`restart` (every
+    # worktree shares the move-app-dev container names).
     #
-    # The lock is an flock on a file in the main checkout's tmp/. The holder writes
-    # its pid, checkout and branch into the file so a refused run can say who holds
-    # it. The kernel drops the flock when the holder dies, so a crash never leaves
-    # a stale lock behind.
+    # The holder writes its pid, checkout and branch into the file so a refused
+    # run can say who holds it. The kernel drops the flock when the holder dies,
+    # so a crash never leaves a stale lock behind.
     class TestLock
-      def initialize(path:)
+      DEFAULT_BUSY = "Another `bin/cli app test` is running".freeze
+
+      # @param busy [String] the start of the refusal message, before "(<holder>)"
+      def initialize(path:, busy: DEFAULT_BUSY)
         @path = path
+        @busy = busy
       end
 
       def synchronize(holder)
@@ -34,7 +40,7 @@ module AppCLI
 
       private
 
-      attr_reader :path
+      attr_reader :path, :busy
 
       def record(file, holder)
         file.truncate(0)
@@ -46,7 +52,7 @@ module AppCLI
       def busy_message(file)
         holder = file.read.to_s.strip
         holder = "unknown holder" if holder.empty?
-        "Another `bin/cli app test` is running (#{holder}). Wait for it to finish; lock: #{path}"
+        "#{busy} (#{holder}). Wait for it to finish; lock: #{path}"
       end
     end
   end

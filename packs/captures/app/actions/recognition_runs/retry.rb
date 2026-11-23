@@ -7,23 +7,48 @@
 module RecognitionRuns
   # Retry a failed run by creating a *new* RecognitionRun for the same Media and
   # re-enqueuing (Domain §4.10). The original run is left as-is for the record.
+  # The new run inherits the failed run's `rescan` flag (#897).
   class Retry < BaseAction
     # Only a failed run is retryable — guards against double-submits / replayed
     # POSTs queuing a duplicate run (and duplicate items) for the same media.
-    # A failed run whose media already yielded kept items is NOT retryable
+    # A failed run whose photo was already materialized is NOT retryable
     # either (#649): under the atomic completion model a failed run commits no
-    # inventory, so items sourced from this media mean another run already
+    # inventory, so kept items sourced from this photo mean another run already
     # materialized it (a pre-#649 legacy failed-with-inventory run, or a stale
     # tab retrying a media a later run succeeded on) — re-running would
-    # duplicate every one of them.
+    # duplicate every one of them. A retake re-scan run is judged on the items
+    # of the current image only (RecognitionRun#materialized_items), so the
+    # retake's "retry from the capture screen" recovery works.
+    #
+    # The checks run again under the photo lock that Enqueue takes for the
+    # guard (#896): two concurrent retries serialize there, and the second
+    # sees the first's queued run and is refused.
 
     #: (run: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(run:)
-      return Failure(:not_retryable) unless run&.failed?
-      return Failure(:not_retryable) if Item.kept.exists?(source_media_id: run.media_id)
+      return Failure(:not_retryable) unless retryable?(run)
 
       yield ensure_writable(run.move)
-      Enqueue.new.call(media: run.media)
+      Enqueue.new.call(media: run.media, rescan: run.rescan?, guard: ->(_media) { recheck(run) })
+    end
+
+    private
+
+    #: (untyped run) -> bool
+    def retryable?(run)
+      !run.nil? && run.failed? && !run.materialized_items.exists?
+    end
+
+    # Under the photo lock: the run is still failed, nothing has materialized
+    # the photo since the pre-check, and no newer run is already in flight.
+
+    #: (untyped run) -> Dry::Monads::Result[untyped, untyped]
+    def recheck(run)
+      run.reload
+      return Failure(:not_retryable) unless retryable?(run)
+      return Failure(:not_retryable) if RecognitionRun.exists?(media_id: run.media_id, status: RecognitionRun::IN_FLIGHT)
+
+      Success()
     end
   end
 end

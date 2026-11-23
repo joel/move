@@ -7,6 +7,8 @@
 # model → render, or call the action and redirect.
 class ActivitiesController < MoveScopedController
   PAGE = 40
+  # The largest uuid: a keyset cursor half that sorts after every real id.
+  MAX_UUID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
   before_action :require_writable_move!, only: %i[restore revert]
 
@@ -19,11 +21,19 @@ class ActivitiesController < MoveScopedController
 
   # POST /moves/:move_id/activity/:id/restore — re-streams the feed from the top
   # (the restore appends a new audit entry there, and the acted-on row's button
-  # drops) + a toast; no reload. HTML clients still redirect.
+  # drops) + a toast; no reload. HTML clients still redirect. An item whose box
+  # is still deleted is refused (#894) with "restore the box first", linking to
+  # the box's own restore entry when the feed has one.
 
   #: () -> untyped
   def restore
-    result = restore_subject(activities_scope.find(params.expect(:id)))
+    activity = activities_scope.find(params.expect(:id))
+    result = restore_subject(activity)
+    if result in Dry::Monads::Failure(:parent_discarded)
+      link_box_restore_entry(activity)
+      return stream_feed(result, t(".done"), t(".parent_discarded"))
+    end
+
     stream_feed(result, t(".done"), t(".failed"))
   end
 
@@ -78,6 +88,38 @@ class ActivitiesController < MoveScopedController
       media = @move.media.with_discarded.find_by(id: activity.subject_id)
       media && Photos::Restore.new.call(media:, actor: current_user, source:)
     end
+  end
+
+  # Points the failure toast at the deleted box's `box.deleted` row. The feed
+  # is keyset-paginated, so the link opens the page that STARTS at that row:
+  # the cursor is strictly-older-than (occurred_at, id), and the max uuid as
+  # the id half keeps every row at that instant — the entry itself included.
+  # The link rides flash.now for the stream render, the persistent flash for
+  # the no-JS redirect (the respond_with_box_toast pattern).
+
+  #: (untyped activity) -> untyped
+  def link_box_restore_entry(activity)
+    entry = box_restore_entry(activity) or return
+    link_flash = request.format.turbo_stream? ? flash.now : flash
+    link_flash[:action_href] = move_activity_path(
+      @move, before: entry.occurred_at.iso8601(6), before_id: MAX_UUID
+    )
+    link_flash[:action_label] = t("activities.restore.view_box_entry")
+  end
+
+  #: (untyped activity) -> untyped
+  def box_restore_entry(activity)
+    box_id = parent_box_id(activity)
+    return if box_id.nil?
+
+    activities_scope.high_signal.where(subject_type: "Box", subject_id: box_id, action: "box.deleted")
+                    .recent.first
+  end
+
+  #: (untyped activity) -> untyped
+  def parent_box_id(activity)
+    parents = activity.subject_type == "Media" ? @move.media : @move.items
+    parents.with_discarded.where(id: activity.subject_id).pick(:box_id)
   end
 
   #: (untyped activity) -> untyped

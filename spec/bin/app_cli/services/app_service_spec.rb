@@ -17,7 +17,7 @@ class FakeAppRunner
   }.freeze
 
   attr_reader :commands, :containers
-  attr_accessor :image_present, :bundle_satisfied, :boots, :auto_remove, :removal_lag
+  attr_accessor :image_present, :bundle_satisfied, :boots, :auto_remove, :removal_lag, :up_status
 
   def initialize
     @commands = []
@@ -28,15 +28,17 @@ class FakeAppRunner
     @boots = ->(_name) { true }
     @auto_remove = false
     @removal_lag = 0
+    @up_status = nil # HTTP status of /up for a container that boots; nil means "200"
   end
 
-  # Kernel.system-style: false only for a failing `bundle check` or /up probe.
+  # Kernel.system-style: false only for a failing `bundle check`.
   def run(command, **)
     line = Array(command).join(" ")
     @commands << line
     return bundle_satisfied if line.end_with?("bundle check")
 
     simulate(line)
+    true
   end
 
   def capture(command, **)
@@ -44,6 +46,7 @@ class FakeAppRunner
     return AppCLI::Services::EnvConfig.new("development").ruby_version if command.include?("RUBY_VERSION")
     return auto_remove.to_s if command.include?("AutoRemove")
     return "/checkouts/old" if command.include?("Mounts")
+    return probe(Regexp.last_match(1)) if command =~ /\Adocker exec (\S+) curl/
 
     "boot log line\n#{"\tfrom /rails/bin/rails:4:in '<main>'\n" * 50}" if command.start_with?("docker logs")
   end
@@ -65,9 +68,10 @@ class FakeAppRunner
 
   private
 
-  def simulate(line)
-    return @ready.fetch(Regexp.last_match(1), false) if line =~ /\Adocker exec (\S+) curl/
+  # curl --write-out '%{http_code}' prints 000 when nothing answers.
+  def probe(name) = @ready.fetch(name, false) ? up_status || "200" : "000"
 
+  def simulate(line)
     TRANSITIONS.each do |pattern, effect|
       match = pattern.match(line)
       next unless match
@@ -75,7 +79,6 @@ class FakeAppRunner
       instance_exec(match, &effect)
       break
     end
-    true
   end
 
   def started(name)
@@ -388,7 +391,62 @@ RSpec.describe AppCLI::Services::AppService do
     end
   end
 
+  describe "the host-wide restart lock" do
+    let(:lock_path) { File.join(main, "tmp/app-restart.lock") }
+    let(:holder) { AppCLI::Services::TestLock.new(path: lock_path, busy: "x") }
+
+    before { File.write(File.join(main, "config/master.key"), "k") }
+
+    %i[replace start stop].each do |command|
+      it "refuses a second caller of ##{command} while another holds the lock, before any docker call" do
+        holder.synchronize("/checkouts/other (branch b)") do
+          expect { service.public_send(command) }.to raise_error(
+            Thor::Error, %r{another restart is in progress \(pid \d+, /checkouts/other \(branch b\), started }
+          )
+        end
+        expect(runner.commands).to be_empty
+      end
+    end
+
+    it "names its own holder (pid, checkout, branch, start time) while it runs" do
+      seen = nil
+      allow(runner).to receive(:run).and_wrap_original do |original, command, **opts|
+        seen ||= File.read(lock_path) if Array(command).join(" ").start_with?("docker create")
+        original.call(command, **opts)
+      end
+      service.replace
+
+      expect(seen).to match(/\Apid #{Process.pid}, #{Regexp.escape(worktree)} \(branch \S+\), started \d{4}-/)
+      expect(File.read(lock_path)).to be_empty
+    end
+
+    it "lets a restart that stops a --rm container (a nested #stop) through its own lock" do
+      runner.auto_remove = true
+      expect { service.replace }.not_to raise_error
+      expect(runner.containers).to eq("move-app-dev" => "running")
+    end
+  end
+
   describe AppCLI::Services::ReadinessCheck do
+    let(:check) do
+      described_class.new(runner: runner, shell: instance_double(Thor::Shell::Basic, say: nil), timeout: 0)
+    end
+
+    it "is ready on a 2xx from /up" do
+      runner.containers["move-app-next"] = "running"
+      runner.send(:started, "move-app-next")
+      runner.up_status = "204"
+      expect(check.ready?("move-app-next")).to be(true)
+    end
+
+    it "is not ready on a 302 from /up (curl --fail passes any 3xx)" do
+      runner.containers["move-app-next"] = "running"
+      runner.send(:started, "move-app-next")
+      runner.up_status = "302"
+      expect(check.ready?("move-app-next")).to be(false)
+      expect(runner.commands.last).to include("--write-out '%{http_code}'") # rubocop:disable Style/FormatStringToken -- curl syntax
+    end
+
     it "defaults to 60 seconds and reads MOVE_APP_READY_TIMEOUT" do
       expect(described_class.timeout({})).to eq(60)
       expect(described_class.timeout("MOVE_APP_READY_TIMEOUT" => "120")).to eq(120)

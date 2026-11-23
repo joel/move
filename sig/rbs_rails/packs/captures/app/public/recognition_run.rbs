@@ -563,6 +563,46 @@ class ::RecognitionRun < ::ApplicationRecord
     def updated_at_before_type_cast: () -> ::Time
 
     def updated_at_for_database: () -> ::Time
+
+    def rescan: () -> bool
+
+    def rescan=: (bool) -> bool
+
+    def rescan?: () -> bool
+
+    def rescan_changed?: (?from: bool?, ?to: bool?) -> bool
+
+    def rescan_change: () -> [ bool?, bool? ]
+
+    def rescan_will_change!: () -> void
+
+    def rescan_was: () -> bool?
+
+    def rescan_previously_changed?: (?from: bool?, ?to: bool?) -> bool
+
+    def rescan_previous_change: () -> ::Array[bool?]?
+
+    def rescan_previously_was: () -> bool?
+
+    def rescan_before_last_save: () -> bool?
+
+    def rescan_change_to_be_saved: () -> ::Array[bool?]?
+
+    def rescan_in_database: () -> bool?
+
+    def saved_change_to_rescan: () -> ::Array[bool?]?
+
+    def saved_change_to_rescan?: (?from: bool?, ?to: bool?) -> bool
+
+    def will_save_change_to_rescan?: (?from: bool?, ?to: bool?) -> bool
+
+    def restore_rescan!: () -> void
+
+    def clear_rescan_change: () -> void
+
+    def rescan_before_type_cast: () -> bool
+
+    def rescan_for_database: () -> bool
   end
   include ::RecognitionRun::GeneratedAttributeMethods
   module ::RecognitionRun::GeneratedAliasAttributeMethods

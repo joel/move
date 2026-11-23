@@ -54,7 +54,7 @@ RSpec.describe Captures::Retake do
 
     retake(rerun_recognition: true)
 
-    expect(enqueue).to have_received(:call).with(media:)
+    expect(enqueue).to have_received(:call).with(media:, rescan: true) # a re-scan run (#897)
   end
 
   it "keeps the swap and still emits media.retaken when the re-scan job can't be queued (#871)" do
@@ -64,6 +64,18 @@ RSpec.describe Captures::Retake do
 
     expect(retake(rerun_recognition: true).failure).to eq(:enqueue_failed)
     expect(Rails.event).to have_received(:notify).with("media.retaken", hash_including(media_id: media.id))
+  end
+
+  it "leaves a re-scan the capture screen's Retry accepts when its job can't be queued (#897)" do
+    create(:item, move:, box:, source_media: media, name: "Coffee maker") # reviewed items from the old image
+    allow(RecognitionRuns::ProcessJob).to receive(:perform_later).and_return(false)
+
+    expect(retake(rerun_recognition: true).failure).to eq(:enqueue_failed)
+    run = media.recognition_runs.order(:created_at).last
+    expect(run).to have_attributes(status: "failed", rescan: true)
+
+    allow(RecognitionRuns::ProcessJob).to receive(:perform_later).and_return(true)
+    expect(RecognitionRuns::Retry.new.call(run:)).to be_success
   end
 
   it "is allowed in any phase (recovery of existing data)" do

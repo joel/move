@@ -45,6 +45,64 @@ RSpec.describe RecognitionRuns::Retry do
     end.to change(box.recognition_runs, :count).by(1)
   end
 
+  it "refuses while a newer run on the photo is already in flight (#896)" do
+    run = create(:recognition_run, :failed, move:, box:, media:)
+    create(:recognition_run, move:, box:, media:, status: "queued")
+
+    expect do
+      expect(described_class.new.call(run:).failure).to eq(:not_retryable)
+    end.not_to change(box.recognition_runs, :count)
+  end
+
+  it "re-checks under the photo lock, refusing a retry whose pre-check went stale (#896)" do
+    run = create(:recognition_run, :failed, move:, box:, media:)
+    action = described_class.new
+    raced = false
+    # A concurrent retry's run commits between this retry's pre-check and its
+    # photo lock: the under-lock re-check must see it.
+    allow(action).to receive(:retryable?).and_wrap_original do |original, *args|
+      original.call(*args).tap do
+        create(:recognition_run, move:, box:, media:, status: "queued") unless raced
+        raced = true
+      end
+    end
+
+    expect do
+      expect(action.call(run:).failure).to eq(:not_retryable)
+    end.to change(box.recognition_runs, :count).by(1) # only the racing run
+  end
+
+  describe "a retake re-scan run (#897)" do
+    before do
+      # Items from the earlier image, then the retake swaps the image.
+      create(:item, move:, box:, source_media: media, name: "Coffee maker", created_at: 1.hour.ago)
+      media.image.attach(io: Rails.root.join("spec/fixtures/files/sample_image.png").open,
+                         filename: "retake.png", content_type: "image/png")
+    end
+
+    it "is retryable although the photo holds items from an earlier image, and the new run is a re-scan" do
+      run = create(:recognition_run, :failed, move:, box:, media:, rescan: true)
+
+      result = described_class.new.call(run:)
+
+      expect(result).to be_success
+      expect(result.value!.rescan).to be(true)
+    end
+
+    it "is refused once the current image has its own items" do
+      run = create(:recognition_run, :failed, move:, box:, media:, rescan: true)
+      create(:item, move:, box:, source_media: media, name: "Kettle")
+
+      expect(described_class.new.call(run:).failure).to eq(:not_retryable)
+    end
+
+    it "still refuses a plain (non-re-scan) run on the same photo" do
+      run = create(:recognition_run, :failed, move:, box:, media:)
+
+      expect(described_class.new.call(run:).failure).to eq(:not_retryable)
+    end
+  end
+
   it "refuses to retry on an archived Move, queuing no new run (#118)" do
     archived = create(:move, :archived)
     abox = create(:box, move: archived)

@@ -335,6 +335,19 @@ RSpec.describe "Captures" do
       expect do
         post move_box_capture_retry_path(move, box, media_id: media.id)
       end.to change(box.recognition_runs, :count).by(1)
+      expect(flash[:notice]).to eq(I18n.t("captures.retry_recognition.retried"))
+    end
+
+    it "explains a refused retry with an alert (#897)" do
+      media = create(:media, move:, box:)
+      create(:recognition_run, :failed, move:, box:, media:)
+      create(:item, move:, box:, source_media: media, name: "Coffee maker")
+
+      expect do
+        post move_box_capture_retry_path(move, box, media_id: media.id)
+      end.not_to change(box.recognition_runs, :count)
+      expect(response).to redirect_to(move_box_capture_path(move, box))
+      expect(flash[:alert]).to eq(I18n.t("captures.retry_recognition.not_retryable"))
     end
   end
 
