@@ -50,6 +50,15 @@ RSpec.describe AppCLI::Services::WorktreeRun do
 
   after { FileUtils.remove_entry(tmp) }
 
+  it "refuses the production environment before any docker call" do
+    checkout = AppCLI::Services::Checkout.new(path: worktree, branch: "fix/x", main: false)
+    expect do
+      described_class.new(shell: shell, env: "production", checkout: checkout, main_path: main,
+                          runner: runner, db: db, tty: tty)
+    end.to raise_error(Thor::Error, /only supports the dev environment/)
+    expect(runner.commands).to be_empty
+  end
+
   describe "#run" do
     it "announces the checkout first, brings up db and mounts the worktree" do
       expect(worktree_run.run(["bin/rails", "runner", "puts 1"])).to eq(0)

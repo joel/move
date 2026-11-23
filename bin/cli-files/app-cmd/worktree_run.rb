@@ -24,6 +24,7 @@ module AppCLI
       def initialize(shell:, env:, checkout:, main_path:, runner: nil, db: nil, tty: nil)
         @shell = shell
         @env_config = EnvConfig.new(env)
+        refuse_non_dev_env!
         @checkout = checkout
         @main_path = main_path
         @runner = runner || CommandRunner.new(shell: shell)
@@ -68,6 +69,19 @@ module AppCLI
       private
 
       attr_reader :shell, :env_config, :checkout, :main_path, :runner, :db, :tty
+
+      # Only the dev image runs mounted code. The prod image runs its baked-in
+      # build (precompiled assets, production-only bundle), so a mounted
+      # checkout would not match it. Refuse instead of silently running the
+      # image's revision.
+      def refuse_non_dev_env!
+        return if env_config.short == "dev"
+
+        raise Thor::Error,
+              "bin/cli app run/test only supports the dev environment: it mounts a checkout, " \
+              "and the #{env_config.env} image runs its built-in code. " \
+              "Use `bin/cli app exec #{env_config.short} ...` for the production image."
+      end
 
       def announce
         shell.say("Running in #{checkout.describe}")

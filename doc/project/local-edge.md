@@ -95,7 +95,9 @@ flowchart LR
 first, brings up the database, and exits with the command's status. stdin is
 attached only when it is a TTY (`--tty` only when stdout is one too), so it
 works in pipes and agent shells. `app console` / `app connect` still target the
-long-lived container.
+long-lived container. Both commands are **dev-only**: `app run prod …` is
+refused, because the prod image runs its baked-in build rather than a mounted
+checkout (use `bin/cli app exec prod …` for that image).
 
 **`app test [--repo T] [-- RSPEC_ARGS...]`** runs
 `bin/rails db:test:prepare && bundle exec rspec …` under `RAILS_ENV=test` in a
