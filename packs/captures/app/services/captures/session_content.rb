@@ -42,7 +42,7 @@ module Captures
     def conflict_item_by_media
       RecognitionSuggestion.joins(:item)
                            .merge(Item.in_box.where(box_id: @box.id))
-                           .where(state: "conflict", recognition_run_id: latest_run_ids)
+                           .latest_conflicts_for(media.map(&:id))
                            .select("DISTINCT ON (recognition_suggestions.media_id) " \
                                    "recognition_suggestions.media_id, recognition_suggestions.item_id")
                            .order("recognition_suggestions.media_id", "recognition_suggestions.created_at")
@@ -55,15 +55,6 @@ module Captures
         box: @box, media: media, items_by_media: items_by_media,
         conflict_item_by_media: conflict_item_by_media
       )
-    end
-
-    private
-
-    # The panel's photos' latest run ids, as a subquery (never loaded into Ruby).
-    def latest_run_ids
-      RecognitionRun.where(media_id: media.map(&:id))
-                    .select("DISTINCT ON (recognition_runs.media_id) recognition_runs.id")
-                    .order("recognition_runs.media_id", "recognition_runs.created_at DESC")
     end
   end
 end

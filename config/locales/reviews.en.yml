@@ -52,6 +52,12 @@ en:
       ignore: "Ignore"
       empty_title: "Nothing detected here"
       empty_description: "No items remain to review in this photo."
+      # A conflict-only photo (#891): every detection matched an item already
+      # confirmed in this box, so none was added. Links to the match(es) follow.
+      conflict_title: "Already in this box"
+      conflict_description:
+        one: "This photo matched an item that's already in this box, so nothing new was added."
+        other: "This photo matched items that are already in this box, so nothing new was added."
     flash:
       nothing: "Nothing to review in this box yet."
       photo_marked: "Photo marked as reviewed."

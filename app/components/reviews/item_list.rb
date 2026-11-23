@@ -21,18 +21,22 @@ module Components
       # @rbs box: untyped
       # @rbs media: untyped
       # @rbs items: untyped
+      # @rbs conflict_items: untyped
       # @rbs editable: untyped
       # @rbs highlight_id: untyped
       # @rbs queue: untyped
       # @rbs pinnable: bool
       # @rbs pinned_item_ids: untyped
       # @rbs return: void
-      def initialize(move:, box:, media:, items:, editable:, highlight_id: nil, queue: false,
-                     pinnable: false, pinned_item_ids: Set.new)
+      def initialize(move:, box:, media:, items:, editable:, conflict_items: [], highlight_id: nil,
+                     queue: false, pinnable: false, pinned_item_ids: Set.new)
         @move = move
         @box = box
         @media = media
         @items = items.to_a
+        # Confirmed items the photo's latest run matched instead of creating its
+        # own (#891) — a lazy relation, loaded only for the empty state.
+        @conflict_items = conflict_items
         @editable = editable
         @highlight_id = highlight_id
         @queue = queue
@@ -65,11 +69,36 @@ module Components
 
       #: () -> untyped
       def empty_state
+        matches = @conflict_items.to_a
+        return conflict_empty_state(matches) if matches.any?
+
         render Components::Ui::EmptyState.new(
           icon: Components::Icons::Camera,
           title: I18n.t("reviews.photo.empty_title"),
           description: I18n.t("reviews.photo.empty_description")
         )
+      end
+
+      # A conflict-only photo (#891): recognition matched items already confirmed
+      # in this box, so it added none. Say so and link to each match. Kept simple
+      # on purpose — #881 adds the real resolve actions (dismiss / keep both).
+
+      #: (Array[untyped] matches) -> untyped
+      def conflict_empty_state(matches)
+        render Components::Ui::EmptyState.new(
+          icon: Components::Icons::Camera,
+          title: I18n.t("reviews.photo.conflict_title"),
+          description: I18n.t("reviews.photo.conflict_description", count: matches.size)
+        ) do
+          matches.each do |item|
+            a(href: move_item_path(@move, item),
+              class: "inline-flex items-center gap-1 rounded-full bg-surface-container-high px-3 py-1.5 " \
+                     "text-label-caps uppercase text-on-surface-variant transition hover:text-accent-sage") do
+              plain item.name
+              render Components::Icons::ChevronRight.new(css: "h-3.5 w-3.5")
+            end
+          end
+        end
       end
     end
   end

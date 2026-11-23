@@ -50,6 +50,12 @@ module AppCLI
         to_checkout(entry)
       end
 
+      # The checkout at `path` as it stands, without resolving it against the
+      # worktree list (for naming a lock holder).
+      def checkout_at(path)
+        Checkout.new(path: path, branch: branch_at(path), main: false)
+      end
+
       def worktrees
         @worktrees ||= begin
           output, ok = git.call("-C", root, "worktree", "list", "--porcelain")

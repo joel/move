@@ -7,6 +7,7 @@ require_relative "checkout_resolver"
 require_relative "container_swap"
 require_relative "container_flags"
 require_relative "mount_sources"
+require_relative "test_lock"
 
 module AppCLI
   module Services
@@ -14,6 +15,11 @@ module AppCLI
       # How long #stop waits for Docker to remove the --rm container.
       REMOVAL_POLLS = 20
       REMOVAL_POLL_INTERVAL = 0.5
+      # Held around #start, #stop and #replace, which reuse fixed container
+      # names (move-app-dev, -next, -prev): two at once would remove or
+      # promote each other's containers.
+      RESTART_LOCK_FILE = "tmp/app-restart.lock".freeze
+      RESTART_BUSY = "Refused: another restart is in progress".freeze
 
       # @param checkout_path [String] the checkout mounted at /rails (the one bin/cli lives in)
       # @param main_path [String, nil] fallback for gitignored files; default: the main checkout
@@ -53,15 +59,17 @@ module AppCLI
       end
 
       def start
-        preflight
-        swap.refuse_stale_previous!
+        with_restart_lock do
+          preflight
+          swap.refuse_stale_previous!
 
-        return shell.say("Application already running.") if runner.container_running?(app)
+          next shell.say("Application already running.") if runner.container_running?(app)
 
-        swap.discard_leftover(app)
-        FileUtils.rm_f(File.join(checkout_path, ContainerSwap::PID_FILE))
-        runner.run(["docker run --detach", *server_args(app)])
-        swap.await_started
+          swap.discard_leftover(app)
+          FileUtils.rm_f(File.join(checkout_path, ContainerSwap::PID_FILE))
+          runner.run(["docker run --detach", *server_args(app)])
+          swap.await_started
+        end
       end
 
       # Replaces the running app container, or starts one. The caller runs
@@ -73,26 +81,33 @@ module AppCLI
       # until the replacement answers /up. If it doesn't, the replacement is
       # removed, -prev is renamed back and started, and this raises with the
       # replacement's last log lines.
+      #
+      # A second caller (another worktree's restart, start or stop) is refused
+      # while this runs; see RESTART_LOCK_FILE.
       def replace
-        swap.refuse_stale_previous!
-        candidate = "#{app}-next"
-        swap.discard_leftover(candidate)
-        runner.run(["docker create", *server_args(candidate)])
+        with_restart_lock do
+          swap.refuse_stale_previous!
+          candidate = "#{app}-next"
+          swap.discard_leftover(candidate)
+          runner.run(["docker create", *server_args(candidate)])
 
-        swap.replace_with(candidate)
+          swap.replace_with(candidate)
+        end
       end
 
       def stop
-        status = runner.container_status(app)
-        return shell.say("Application not running, skipping stop.") if status == "missing"
+        with_restart_lock do
+          status = runner.container_status(app)
+          next shell.say("Application not running, skipping stop.") if status == "missing"
 
-        if status == "running"
-          shell.say("Stopping application container")
-          runner.run("docker stop #{app}")
+          if status == "running"
+            shell.say("Stopping application container")
+            runner.run("docker stop #{app}")
+          end
+          # Containers started before #879 run with --rm and go on their own.
+          runner.run("docker rm #{app}", allow_failure: true, quiet: true) unless container_removed?
+          wait_until_removed
         end
-        # Containers started before #879 run with --rm and go on their own.
-        runner.run("docker rm #{app}", allow_failure: true, quiet: true) unless container_removed?
-        wait_until_removed
       end
 
       def teardown
@@ -161,6 +176,27 @@ module AppCLI
       attr_reader :runner, :shell, :env_config, :checkout_path
 
       def app = env_config.app_container
+
+      # Re-entrant within this instance: #replace stops a --rm container
+      # through #stop while it holds the lock.
+      def with_restart_lock(&)
+        return yield if @restart_lock_held
+
+        restart_lock.synchronize(restart_lock_holder) do
+          @restart_lock_held = true
+          yield
+        ensure
+          @restart_lock_held = false
+        end
+      end
+
+      def restart_lock
+        TestLock.new(path: File.join(main_path, RESTART_LOCK_FILE), busy: RESTART_BUSY)
+      end
+
+      def restart_lock_holder
+        CheckoutResolver.new(root: checkout_path).checkout_at(checkout_path).describe
+      end
 
       # Built (and MOVE_APP_READY_TIMEOUT read) before anything is stopped, so
       # a bad timeout fails early.

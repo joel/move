@@ -204,7 +204,24 @@ RSpec.describe "Captures" do
         expect(link).to be_present
         expect(link.text).to include(I18n.t("captures.session.conflict_only"))
         expect(panel.text).not_to include(I18n.t("captures.session.no_items"))
-        expect(panel.at_css(%(a[href="#{move_box_review_photo_path(move, box, media_id: media.id)}"]))).to be_nil
+      end
+
+      # #891 — the matched-item link must not strand the photo: a secondary link
+      # opens its review page, where an editor retakes, re-scans or deletes it.
+      it "links 'Manage photo' to the photo's review page, which carries retake and delete" do
+        conflict_run
+
+        get move_box_capture_path(move, box)
+
+        review_path = move_box_review_photo_path(move, box, media_id: media.id)
+        manage = panel.at_css(%(a[href="#{review_path}"]))
+        expect(manage&.text).to eq(I18n.t("captures.session.manage_photo"))
+
+        get review_path
+
+        page = response.parsed_body
+        expect(page.at_css(%(form[action="#{move_box_review_retake_photo_path(move, box, media)}"]))).to be_present
+        expect(page.at_css(%(form[action="#{move_box_review_photo_path(move, box, media)}"] input[name="_method"][value="delete"]))).to be_present
       end
 
       it "keeps 'No items detected' when only an older run recorded the conflict" do
