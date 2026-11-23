@@ -72,10 +72,38 @@ RSpec.describe "/account" do
     end.to change(User, :count).by(-1)
        .and change(Organization, :count).by(-1)
 
-    # Redirects to the canonical apex root, never the just-dropped subdomain.
+    # Redirects to the canonical apex root, never the just-dropped subdomain. The
+    # success notice rides along as an allow-listed key: the flash itself would be
+    # saved in the subdomain's host-only session, which the apex never sees (#844).
     apex = Rails.application.config.action_mailer.default_url_options.fetch(:host)
-    expect(response).to redirect_to(root_url(host: apex))
+    expect(response).to redirect_to("#{root_url(host: apex)}?notice=account_deleted")
     expect(Apartment::Tenant).to have_received(:drop).with("acme")
+  end
+
+  it "shows the deleted-account toast on the apex after the cross-host redirect (#844)" do
+    create(:organization_membership, :owner, organization: create(:organization, slug: "acme"),
+                                             user: user)
+    allow(Apartment::Tenant).to receive(:drop)
+    allow(Apartment::Tenant).to receive(:switch).and_yield
+    apex = Rails.application.config.action_mailer.default_url_options.fetch(:host)
+
+    stub_current_tenant("acme")
+    host! "acme.#{apex}"
+    delete account_url
+    expect(URI(location = response.location).host).to eq(apex)
+
+    # The apex is a different host with its own (empty) session: nothing carried
+    # over but the URL. It maps the key to the flash and strips it from the URL.
+    stub_current_user(nil)
+    stub_current_tenant(nil)
+    host! apex
+    get location
+    expect(response).to redirect_to(root_path)
+    expect(flash[:notice]).to eq(I18n.t("accounts.destroy.notice"))
+
+    follow_redirect!
+    expect(response).to be_successful
+    expect(response.body).to include(I18n.t("accounts.destroy.notice"))
   end
 
   it "redirects a failed delete to the apex when the current subdomain was dropped" do
