@@ -123,6 +123,15 @@ RSpec.describe Media do
 
       expect(media.orphaned?).to be(true)
     end
+
+    # #904 — the per-record form agrees with the gallery's bulk query: an even
+    # older run stuck in flight (a lost job) is superseded by the latest one.
+    it "is recoverable despite an older run stuck in flight" do
+      create(:recognition_run, :processing, move: media.move, box: media.box, media:, created_at: 2.hours.ago)
+      create(:recognition_run, :failed, move: media.move, box: media.box, media:)
+
+      expect([media.orphaned?, media.recognition_in_flight?]).to eq([true, false])
+    end
   end
 
   describe "#image_displayable? (#563)" do

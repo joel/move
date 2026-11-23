@@ -564,6 +564,41 @@ RSpec.describe "Boxes" do
         get recovery_path
         expect(response).to have_http_status(:ok)
       end
+
+      # #904 — only the photo's LATEST run decides whether it is settled (same rule
+      # as Media#recognition_in_flight?, #871): an older run stuck in flight (a lost
+      # job) is superseded and must not keep a recoverable photo's tile a dead end.
+      it "links to recovery when an older run is stuck in flight and the latest re-scan #{outcome}" do
+        box = create(:box, move:, number: "1", status: "packing")
+        existing = create(:item, move:, box:, name: "Lamp", review_state: "confirmed")
+        photo = create(:media, move:, box:)
+        create(:recognition_run, :processing, move:, box:, media: photo, created_at: 2.hours.ago)
+        conflict_run = create(:recognition_run, :succeeded, move:, box:, media: photo, created_at: 1.hour.ago)
+        create(:recognition_suggestion, :conflict, move:, box:, media: photo, recognition_run: conflict_run,
+                                                   item: existing)
+        create(:recognition_run, move:, box:, media: photo, **run_attrs)
+
+        get move_box_path(move, box)
+
+        recovery_path = move_box_recovery_photo_path(move, box, media_id: photo.id)
+        tile = response.parsed_body.at_css("##{Components::Boxes::PhotoCard.dom_id(photo)}")
+        expect(tile.name).to eq("a")
+        expect(tile["href"]).to eq(recovery_path)
+
+        get recovery_path
+        expect(response).to have_http_status(:ok)
+      end
+    end
+
+    it "does not link to recovery while the photo's latest run is in flight, even after a failed one" do
+      box = create(:box, move:, number: "1")
+      photo = create(:media, move:, box:)
+      create(:recognition_run, :failed, move:, box:, media: photo, created_at: 1.hour.ago)
+      create(:recognition_run, move:, box:, media: photo) # queued
+
+      get move_box_path(move, box)
+
+      expect(response.body).not_to include(move_box_recovery_photo_path(move, box, media_id: photo.id))
     end
 
     it "badges a gallery photo whose every item is unpacked, but not one with an in-box item" do

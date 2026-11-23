@@ -44,16 +44,16 @@ module RecognitionRuns
     end
 
     # Under the photo lock: the run is still failed and still the photo's
-    # latest, nothing has materialized the photo since the pre-check, and no
-    # newer run is already in flight.
+    # latest, and nothing has materialized the photo since the pre-check. "Still
+    # the latest" is what refuses a concurrent retry: its queued run is newer.
+    # An OLDER run left in flight (a lost job) doesn't block the retry (#904,
+    # same rule as Media#recognition_in_flight?, #871): it is superseded, and
+    # Process fails it should it ever wake up.
 
     #: (untyped run) -> Dry::Monads::Result[untyped, untyped]
     def recheck(run)
       run.reload
-      return Failure(:not_retryable) unless retryable?(run)
-      return Failure(:not_retryable) if RecognitionRun.exists?(media_id: run.media_id, status: RecognitionRun::IN_FLIGHT)
-
-      Success()
+      retryable?(run) ? Success() : Failure(:not_retryable)
     end
   end
 end
