@@ -42,6 +42,10 @@ module AppCLI
         (?:\[.*\])?\z
       /x
       TASK_RUNNERS = %w[rails rake].freeze
+      # Rails commands whose arguments are free-form (code, generator names,
+      # options), so a task-shaped word after them is not a task.
+      FREE_FORM_COMMAND = /\A(?:runner|r|console|c|generate|g|destroy|d|server|s|dbconsole|db|
+                             (?:credentials|encrypted):\w+)\z/x
       # Shell operators that end one command and start the next.
       COMMAND_SEPARATOR = /\A(?:&&|\|\||;|\||&)\z/
 
@@ -150,19 +154,26 @@ module AppCLI
 
       # The first gated task given to `rails`/`rake` (bin/, bundle exec and
       # `bash -c "…"` included). A task name that is only an argument of some
-      # other command (`echo db:migrate`, `rg db:migrate doc`) does not count.
+      # other command (`echo db:migrate`, `rg db:migrate doc`), or of a
+      # free-form Rails command (`rails runner 'puts "db:migrate"'`), does not
+      # count. Several tasks in one call (`rake db:seed db:migrate`) are all seen.
       def schema_task(command_parts)
-        runner_seen = false
+        scanning = false
         shell_tokens(command_parts).each do |token|
-          if token.match?(COMMAND_SEPARATOR)
-            runner_seen = false
+          if ends_scan?(token, scanning)
+            scanning = false # until the next rails/rake
           elsif TASK_RUNNERS.include?(File.basename(token))
-            runner_seen = true
-          elsif runner_seen && token.match?(SCHEMA_TASK)
+            scanning = true
+          elsif scanning && token.match?(SCHEMA_TASK)
             return token
           end
         end
         nil
+      end
+
+      # A new command starts, or `rails`/`rake` got a free-form command.
+      def ends_scan?(token, scanning)
+        token.match?(COMMAND_SEPARATOR) || (scanning && token.match?(FREE_FORM_COMMAND))
       end
 
       # Each argument is split shell-style too, so `bash -c "bin/rails db:migrate && …"`

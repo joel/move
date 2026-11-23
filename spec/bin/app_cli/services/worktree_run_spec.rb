@@ -140,7 +140,13 @@ RSpec.describe AppCLI::Services::WorktreeRun do
       ["sh", "-c", "cd /rails; bin/rails db:rollback"],
       %w[bundle exec rake db:rollback STEP=2],
       %w[env RAILS_ENV=development bin/rails db:drop],
-      ["bash", "-c", "echo hi&&rails db:purge;"]
+      ["bash", "-c", "echo hi&&rails db:purge;"],
+      # several tasks in one call
+      %w[bundle exec rake db:seed db:migrate],
+      %w[bin/rails db:version db:reset],
+      # a free-form command earlier in the line does not hide a later one
+      ["bash", "-c", "bin/rails runner 'puts 1' && bin/rails db:migrate"],
+      ["bash", "-c", "bin/rails generate model Box; rake db:rollback"]
     ].each do |command|
       it "gates the task given to rails/rake in #{command.inspect}" do
         expect { worktree_run.run(command) }.to raise_error(Thor::Error, /without --yes/)
@@ -151,7 +157,24 @@ RSpec.describe AppCLI::Services::WorktreeRun do
       %w[echo db:migrate],
       %w[rg db:migrate doc],
       ["bash", "-c", "bin/rails runner 'puts 1' && echo db:migrate"],
-      ["bash", "-c", "grep -r 'db:reset' lib"]
+      ["bash", "-c", "grep -r 'db:reset' lib"],
+      # free-form Rails commands: what follows is code, names or options
+      ["bin/rails", "runner", 'puts "db:migrate"'],
+      ["bin/rails", "r", "Rake::Task['db:drop'].invoke"],
+      %w[bin/rails generate migration db:reset],
+      %w[bin/rails g migration db:reset],
+      %w[bin/rails destroy migration db:reset],
+      %w[bin/rails d migration db:reset],
+      %w[bin/rails console db:drop],
+      %w[bin/rails c db:drop],
+      %w[bin/rails server db:migrate],
+      %w[bin/rails s db:migrate],
+      %w[bin/rails dbconsole db:purge],
+      %w[bin/rails db db:purge],
+      %w[bin/rails credentials:edit db:migrate],
+      %w[bin/rails credentials:show db:migrate],
+      %w[bin/rails encrypted:edit db:migrate],
+      ["bash", "-c", "bundle exec rails runner 'puts \"db:migrate\"'"]
     ].each do |command|
       it "lets #{command.inspect} through: no rails/rake runs the task" do
         expect(worktree_run.run(command)).to eq(0)
