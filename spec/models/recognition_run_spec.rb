@@ -7,6 +7,40 @@ RSpec.describe RecognitionRun do
     build(:recognition_run, :failed, error_message: message)
   end
 
+  describe ".latest_for? (#902)" do
+    let(:media) { create(:media) }
+
+    def run_at(time)
+      create(:recognition_run, :failed, move: media.move, box: media.box, media:, created_at: time)
+    end
+
+    it "is true only for the photo's newest run" do
+      older = run_at(1.hour.ago)
+      newer = run_at(1.minute.ago)
+
+      expect([described_class.latest_for?(older), described_class.latest_for?(newer)]).to eq([false, true])
+      expect(described_class.latest_for(media.id)).to contain_exactly(newer)
+    end
+
+    it "breaks a created_at tie on id, like Media#recognition_state" do
+      time = 1.minute.ago
+      runs = [run_at(time), run_at(time)]
+      latest = runs.max_by(&:id)
+
+      expect(runs.map { |run| described_class.latest_for?(run) }).to eq(runs.map { |run| run == latest })
+      latest.update!(status: "succeeded")
+      expect(media.recognition_state).to eq("succeeded")
+    end
+
+    it "judges each photo on its own runs" do
+      other = create(:recognition_run, :failed, move: media.move, box: media.box,
+                                                media: create(:media, move: media.move, box: media.box))
+      mine = run_at(1.hour.ago)
+
+      expect([described_class.latest_for?(mine), described_class.latest_for?(other)]).to eq([true, true])
+    end
+  end
+
   describe "#error_category" do
     it "classifies an exhausted quota / billing message as :quota" do
       expect(run_with("(429): You exceeded your current quota, please check your plan and billing details.")

@@ -18,11 +18,23 @@ class RecognitionRun < ApplicationRecord
 
   # Each photo's LATEST run id, as a subquery (never loaded into Ruby — AGENTS.md
   # rule 5). `media` is anything `where(media_id:)` accepts: ids or a relation.
+  # THE definition of "latest" (#902): newest created_at, id breaking a tie.
+  # Process, Retry and Media#recognition_state all read it through
+  # .latest_for / .latest_for? so they can't drift apart.
   scope :latest_ids_for, lambda { |media|
     where(media_id: media)
       .select("DISTINCT ON (recognition_runs.media_id) recognition_runs.id")
-      .order("recognition_runs.media_id", "recognition_runs.created_at DESC")
+      .order("recognition_runs.media_id", "recognition_runs.created_at DESC", "recognition_runs.id DESC")
   }
+  # The latest run of each photo, as rows (filter outside the DISTINCT ON).
+  scope :latest_for, ->(media) { where(id: latest_ids_for(media)) }
+
+  # Is `run` still its photo's latest run?
+
+  #: (untyped run) -> bool
+  def self.latest_for?(run)
+    latest_for(run.media_id).exists?(id: run.id)
+  end
 
   #: () -> bool
   def processing?

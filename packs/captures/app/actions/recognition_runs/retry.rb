@@ -19,6 +19,10 @@ module RecognitionRuns
     # duplicate every one of them. A retake re-scan run is judged on the items
     # of the current image only (RecognitionRun#materialized_items), so the
     # retake's "retry from the capture screen" recovery works.
+    # Only the photo's latest run is retryable (#902): once a newer run exists
+    # (say a retry that succeeded with nothing detected), the old failure is
+    # history, and re-running it would re-scan a photo that already has a
+    # result — and a failure there would replace that good result.
     #
     # The checks run again under the photo lock that Enqueue takes for the
     # guard (#896): two concurrent retries serialize there, and the second
@@ -36,11 +40,12 @@ module RecognitionRuns
 
     #: (untyped run) -> bool
     def retryable?(run)
-      !run.nil? && run.failed? && !run.materialized_items.exists?
+      !run.nil? && run.failed? && RecognitionRun.latest_for?(run) && !run.materialized_items.exists?
     end
 
-    # Under the photo lock: the run is still failed, nothing has materialized
-    # the photo since the pre-check, and no newer run is already in flight.
+    # Under the photo lock: the run is still failed and still the photo's
+    # latest, nothing has materialized the photo since the pre-check, and no
+    # newer run is already in flight.
 
     #: (untyped run) -> Dry::Monads::Result[untyped, untyped]
     def recheck(run)
