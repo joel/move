@@ -19,6 +19,8 @@ module AppCLI
       LOCK_FILE = "tmp/bin-cli-app-test.lock".freeze
       DEFAULT_TEST_ARGS = ["spec", "--exclude-pattern", "spec/system/**/*_spec.rb"].freeze
       SYSTEM_SPEC_DIR = "spec/system".freeze
+      # spec/system itself, a file or dir under it, or a file:line, with an optional leading ./
+      SYSTEM_SPEC_PATH = %r{\A(?:\./)?spec/system(?:[/:]|\z)}
       # CI runs the system suite the same way (.github/workflows/ci.yml).
       SYSTEM_ENV = { "TEST_BROWSER" => "rack_test" }.freeze
       INTERACTIVE_COMMANDS = { console: %w[bin/rails console], connect: %w[bash] }.freeze
@@ -124,7 +126,7 @@ module AppCLI
       # spec/system unless the caller already named system spec paths. :js
       # specs switch to headless Chrome, which needs chromedriver in the image.
       def system_args(rspec_args)
-        args = rspec_args.any? { |arg| arg.start_with?(SYSTEM_SPEC_DIR) } ? rspec_args : [SYSTEM_SPEC_DIR, *rspec_args]
+        args = rspec_args.any?(SYSTEM_SPEC_PATH) ? rspec_args : [SYSTEM_SPEC_DIR, *rspec_args]
         return args if chromedriver?
 
         shell.say("chromedriver is not in #{env_config.app_image}: skipping :js system specs (--tag ~js); " \

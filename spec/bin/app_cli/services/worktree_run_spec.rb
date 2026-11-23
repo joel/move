@@ -188,6 +188,18 @@ RSpec.describe AppCLI::Services::WorktreeRun do
       expect(runner.commands.last).to end_with("rspec\\ spec/system/boxes_spec.rb:12")
     end
 
+    it "keeps a dot-relative system spec path" do
+      runner.chromedriver = "/usr/bin/chromedriver\n"
+      worktree_run.test(["./spec/system/boxes_spec.rb"], system: true)
+      expect(runner.commands.last).to end_with("rspec\\ ./spec/system/boxes_spec.rb")
+    end
+
+    it "does not mistake a lookalike directory for spec/system" do
+      runner.chromedriver = "/usr/bin/chromedriver\n"
+      worktree_run.test(["spec/systematic_spec.rb"], system: true)
+      expect(runner.commands.last).to end_with("rspec\\ spec/system\\ spec/systematic_spec.rb")
+    end
+
     it "prefixes spec/system when only options are given" do
       runner.chromedriver = "/usr/bin/chromedriver\n"
       worktree_run.test(["--format", "doc"], system: true)
