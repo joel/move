@@ -38,13 +38,16 @@ class UnpackingController < MoveScopedController
   def remove
     # Items::Unpack owns the pair: MarkRemoved + the last-item auto-complete
     # (#755/#756 — the lifecycle rule lives in the action, not per adapter).
-    case Items::Unpack.new.call(item: @item, actor: current_user)
+    result = Items::Unpack.new.call(item: @item, actor: current_user)
+    return redirect_to_current_phase unless box_still_unpacking?
+
+    case result
     in Dry::Monads::Success(_)
       respond_to_removed
     in Dry::Monads::Failure(_)
-      # Nothing was removed (e.g. the box left `unpacking` between
-      # require_active_checklist and the action's own phase guard, #729):
-      # re-render the real state with an alert instead of success streams.
+      # Nothing was removed (e.g. a concurrent change the action's own guard
+      # caught, #729): re-render the real state with an alert instead of
+      # success streams.
       respond_to_toggle_failure(t("unpacking.flash.remove_failed", name: @item.name)) do
         box_origin? ? box_streams : checklist_streams
       end
@@ -55,17 +58,15 @@ class UnpackingController < MoveScopedController
 
   #: () -> untyped
   def restore
-    case Items::RestoreToBox.new.call(item: @item, actor: current_user)
+    result = Items::RestoreToBox.new.call(item: @item, actor: current_user)
+    return redirect_to_current_phase unless box_still_unpacking?
+
+    case result
     in Dry::Monads::Success(_)
       return respond_from_box if box_origin?
 
       respond_with_streams(move_item_streams(from: :unpacked, to: :remaining),
                            redirect: move_box_unpacking_path(@move, @box))
-    in Dry::Monads::Failure(:box_unpacked)
-      # The box completed between require_active_checklist and the box-locked
-      # guard (#756 R3): nothing mutated — success streams would strip a row
-      # the DB still holds. Land on the surface that shows the terminal state.
-      redirect_to box_origin? ? move_box_path(@move, @box) : move_box_unpacking_path(@move, @box)
     in Dry::Monads::Failure(_)
       redirect_to move_box_unpacking_path(@move, @box), alert: t("unpacking.not_available")
     end
@@ -80,9 +81,12 @@ class UnpackingController < MoveScopedController
   def remove_photo
     # MarkPhotoRemoved owns its completion (the bulk counterpart of
     # Items::Unpack); unpacking the last photo redirects like the last chip.
-    case Items::MarkPhotoRemoved.new.call(box: @box, media: @media, actor: current_user)
-    in Dry::Monads::Success(_)
-      return redirect_to(move_box_path(@move, @box), notice: t("unpacking.flash.completed")) if box_completed?
+    result = Items::MarkPhotoRemoved.new.call(box: @box, media: @media, actor: current_user)
+    return redirect_to_current_phase unless box_still_unpacking?
+
+    case result
+    in Dry::Monads::Success(removal)
+      return respond_to_photo_moved if removal[:photo_moved]
 
       respond_with_streams([contents_header_stream, review_badge_stream, photo_card_stream(@media)],
                            redirect: move_box_path(@move, @box))
@@ -90,8 +94,7 @@ class UnpackingController < MoveScopedController
       # The photo left this box (a concurrent Photos::Move) after set_media:
       # drop its card and refresh the counts it no longer contributes to.
       respond_to_toggle_failure(t("unpacking.flash.photo_gone")) do
-        [contents_header_stream, review_badge_stream,
-         turbo_stream.remove(Components::Boxes::PhotoCard.dom_id(@media))]
+        [contents_header_stream, review_badge_stream, photo_card_stream(@media)]
       end
     in Dry::Monads::Failure(_)
       # The bulk loop is best-effort (the action documents why): a failure
@@ -132,14 +135,6 @@ class UnpackingController < MoveScopedController
 
   #: () -> untyped
   def respond_to_removed
-    # The response is a full navigation when the box completed — the
-    # celebration (checklist) or the unpacked box summary (grid origin) are
-    # page-level changes no region stream expresses.
-    if box_completed?
-      return redirect_to(move_box_path(@move, @box), notice: t("unpacking.flash.completed")) if box_origin?
-
-      return redirect_to(move_box_unpacking_path(@move, @box))
-    end
     return respond_from_box if box_origin?
 
     respond_with_streams(move_item_streams(from: :remaining, to: :unpacked),
@@ -178,16 +173,46 @@ class UnpackingController < MoveScopedController
     ]
   end
 
-  # The response follows the box's REALITY after the unpack ran, not whether
-  # THIS request won the completion race (#756 P2): the loser of two
-  # concurrent last-item removals gets completed_box nil — the post-lock
-  # re-read saw `unpacked` — but its checklist/grid streams would render an
-  # active surface for a terminal box, so it must redirect just the same.
-  # Reload: the action completed via @item.box, a different AR object.
+  # Every toggle response, success or failure, first follows the box's
+  # REALITY after the action ran (#877, Codex #886 R2). A box that left
+  # `unpacking` (in practice: completed by this request, a concurrent one,
+  # or a photo move that emptied it) gets a full navigation: the celebration
+  # or the unpacked box summary are page-level changes no region stream
+  # expresses. The reality, not whether THIS request won the completion race
+  # (#756 P2): the loser of two concurrent last-item removals gets
+  # completed_box nil, yet its streams would render an active surface for a
+  # terminal box. Reload: the action ran on its own box object and a
+  # concurrent writer may have committed since set_box, so every stream
+  # renders from this post-action read, never the pre-action @box.
 
   #: () -> bool
-  def box_completed?
-    @box.reload.unpacked?
+  def box_still_unpacking? = @box.reload.unpacking?
+
+  # The box left the checklist phase (in practice: it was marked unpacked,
+  # by this request or a concurrent one). The grid lands on the box summary
+  # with a toast; the checklist on the unpacking page, which renders the
+  # celebration (or bounces an earlier phase to the box itself).
+
+  #: () -> untyped
+  def redirect_to_current_phase
+    return redirect_to(move_box_unpacking_path(@move, @box)) unless box_origin? || action_name == "remove_photo"
+
+    notice = @box.unpacked? ? t("unpacking.flash.completed") : t("unpacking.not_available")
+    redirect_to move_box_path(@move, @box), notice: notice
+  end
+
+  # The photo left this box mid-loop (a concurrent Photos::Move, #877): the
+  # items unpacked before it moved stay here, unpacked; the rest went with it.
+  # Its card gives way to those left-behind items, and a notice says where the
+  # rest went, rather than redraw a photo this box no longer holds. A partial
+  # success, so 200.
+
+  #: () -> untyped
+  def respond_to_photo_moved
+    respond_with_streams([contents_header_stream, review_badge_stream, photo_card_stream(@media)],
+                         redirect: move_box_path(@move, @box), toast: true) do
+      [:notice, t("unpacking.flash.photo_moved")]
+    end
   end
 
   # The surgical Turbo Stream array for moving an item between the two checklist
@@ -259,9 +284,7 @@ class UnpackingController < MoveScopedController
   # checklist sections, and the HTML fallback returns to the box detail.
 
   #: () -> bool
-  def box_origin?
-    params[:origin] == "box"
-  end
+  def box_origin? = params[:origin] == "box"
 
   #: () -> untyped
   def respond_from_box
@@ -270,9 +293,31 @@ class UnpackingController < MoveScopedController
 
   #: () -> Array[untyped]
   def box_streams
-    media = @box.media.ready.not_generated.find_by(id: @item.source_media_id)
-    [contents_header_stream, review_badge_stream, media ? photo_card_stream(media) : item_card_stream]
+    [contents_header_stream, review_badge_stream, *grid_card_streams]
   end
+
+  # The toggled item's grid card, from a post-action read (#877): the item
+  # may have been unpacked, restored or moved out by a concurrent writer since
+  # set_item, so @item's in-memory state is never rendered. A photo still in
+  # this box redraws its photo card. Otherwise the server can't tell which
+  # card the page holds, so both are addressed (Turbo ignores a missing
+  # target): the departed photo's card, then the item's own card — redrawn
+  # if the item is still here, dropped if it left the box.
+
+  #: () -> Array[untyped]
+  def grid_card_streams
+    item = authorized_scope(@box.items).find_by(id: @item.id)
+    media = fresh_media((item || @item).source_media_id)
+    return [photo_card_stream(media)] if media
+
+    own = item ? item_card_stream(item) : turbo_stream.remove(Components::Boxes::ItemCard.dom_id(@item))
+    @item.source_media_id ? [departed_photo_stream(@item.source_media_id), own] : [own]
+  end
+
+  # The grid's photo-card membership (ready, not generated, kept), read now.
+
+  #: (untyped id) -> untyped
+  def fresh_media(id) = id && @box.media.ready.not_generated.find_by(id: id)
 
   # Item.unreviewed counts in-box items only, so toggling an unreviewed item's
   # presence changes the badge (Codex #728). Turbo ignores the replace when the
@@ -304,8 +349,14 @@ class UnpackingController < MoveScopedController
   # user's focus stays on the toggled chip — the node is attribute-updated in
   # place, not torn out (UX rule 5; Codex #728).
 
-  #: (untyped media) -> untyped
-  def photo_card_stream(media)
+  # Re-reads the photo first: one that left this box (or was discarded)
+  # since it was loaded is dropped from the grid, never redrawn (#877).
+
+  #: (untyped loaded) -> untyped
+  def photo_card_stream(loaded)
+    media = fresh_media(loaded.id)
+    return departed_photo_stream(loaded.id) if media.nil?
+
     items = authorized_scope(@box.items).where(source_media_id: media.id).order(:created_at, :id).to_a
     turbo_stream.replace(
       Components::Boxes::PhotoCard.dom_id(media),
@@ -323,16 +374,33 @@ class UnpackingController < MoveScopedController
     )
   end
 
-  #: () -> untyped
-  def item_card_stream
-    turbo_stream.replace(
-      Components::Boxes::ItemCard.dom_id(@item),
-      view_context.render(Components::Boxes::ItemCard.new(
-                            item: @item, move: @move, image_ready: @move.image_generation_ready?,
-                            unpacking: @box.unpacking? && editable_move?
-                          )),
-      method: :morph
-    )
+  # A photo that left this box (Codex #886): Photos::Move takes only its
+  # in-box items, so the ones already unpacked stay here — and with their
+  # photo gone, a full grid render shows them as standalone cards. They take
+  # the photo card's place (a reload re-sorts them after the photos); with
+  # none left behind the card is simply removed.
+
+  #: (untyped media_id) -> untyped
+  def departed_photo_stream(media_id)
+    target = Components::Boxes::PhotoCard.dom_id_for(media_id)
+    # The cards read their (shared) source photo + blob for the tile (#416).
+    left = authorized_scope(@box.items).where(source_media_id: media_id).order(created_at: :desc, id: :desc)
+                                       .includes(source_media: { image_attachment: :blob }).to_a
+    return turbo_stream.remove(target) if left.empty?
+
+    turbo_stream.replace(target, view_context.safe_join(left.map { |item| view_context.render(item_card(item)) }))
+  end
+
+  #: (untyped item) -> untyped
+  def item_card_stream(item)
+    turbo_stream.replace(Components::Boxes::ItemCard.dom_id(item), view_context.render(item_card(item)),
+                         method: :morph)
+  end
+
+  #: (untyped item) -> untyped
+  def item_card(item)
+    Components::Boxes::ItemCard.new(item: item, move: @move, image_ready: @move.image_generation_ready?,
+                                    unpacking: @box.unpacking? && editable_move?)
   end
 
   #: () -> untyped
