@@ -15,9 +15,16 @@ module Components
 
       # @rbs skip
       def self.dom_id(media)
-        # Custom prefix — the gallery's tiles already use Rails' dom_id(media)
-        # for Turbo append de-dupe; this card must never collide with those.
-        "box_photo_#{media.id}_card"
+        dom_id_for(media.id)
+      end
+
+      # By id alone, for a caller that no longer holds the photo (it left the
+      # box, #877). Custom prefix — the gallery's tiles already use Rails'
+      # dom_id(media) for Turbo append de-dupe; this card must never collide.
+
+      # @rbs skip
+      def self.dom_id_for(media_id)
+        "box_photo_#{media_id}_card"
       end
 
       # `unpacking:` switches the card to the in-place checklist rendering

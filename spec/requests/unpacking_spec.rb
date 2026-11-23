@@ -490,6 +490,148 @@ RSpec.describe "Unpacking" do
     end
   end
 
+  describe "renders from post-action state after a concurrent change (#877)" do
+    # A concurrent writer commits after the controller loaded @box/@item/@media
+    # and before (or during) the action: the response must describe the DB,
+    # never the request's pre-action objects.
+
+    # The action refuses after `concurrently` committed (the stubbed refusal
+    # stands in for the guard that tripped on the concurrent change).
+    def refuse_after(action_class, reason = :wrong_phase)
+      refused = instance_double(action_class)
+      allow(action_class).to receive(:new).and_return(refused)
+      allow(refused).to receive(:call) do
+        yield
+        Dry::Monads::Failure(reason)
+      end
+    end
+
+    # A real Photos::Move lands right after the bulk loop's first removal.
+    def move_photo_after_first_removal(photo, destination)
+      moved = false
+      allow(Items::MarkRemoved).to receive(:new).and_wrap_original do |original|
+        original.call.tap do |action|
+          allow(action).to receive(:call).and_wrap_original do |call, **kw|
+            call.call(**kw).tap do
+              next if moved
+
+              moved = true
+              Photos::Move.new.call(media: Media.find(photo.id), target_box: Box.find(destination.id), mover: user)
+            end
+          end
+        end
+      end
+    end
+
+    it "drops the photo card with a toast when the photo moves away mid-loop" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      destination = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      plates = create(:item, :confirmed, move:, box:, source_media: photo, name: "Plates")
+      mugs = create(:item, :confirmed, move:, box:, source_media: photo, name: "Mugs")
+      create(:item, :confirmed, move:, box:, name: "Lamp") # keeps the box open
+      move_photo_after_first_removal(photo, destination)
+
+      patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id), as: :turbo_stream
+
+      card = Components::Boxes::PhotoCard.dom_id(photo)
+      expect(response.body)
+        .to include(%(action="remove" target="#{card}"), %(target="#{Components::Boxes::ContentsHeader::ID}"),
+                    ERB::Util.h(I18n.t("unpacking.flash.photo_moved")))
+      expect(response.body).not_to include(%(action="replace" target="#{card}"))
+      expect([plates.reload.presence_state, mugs.reload.box_id]).to eq(["removed", destination.id])
+    end
+
+    it "redirects a moved-away HTML photo unpack to the box detail with the notice" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      create(:item, :confirmed, move:, box:, name: "Lamp")
+      moved = instance_double(Items::MarkPhotoRemoved)
+      allow(Items::MarkPhotoRemoved).to receive(:new).and_return(moved)
+      allow(moved).to receive(:call)
+        .and_return(Dry::Monads::Success(items: [], completed_box: nil, photo_moved: true))
+
+      patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id)
+
+      expect(response).to redirect_to(move_box_path(move, box))
+      expect(flash[:notice]).to eq(I18n.t("unpacking.flash.photo_moved"))
+    end
+
+    it "drops the photo card when a refused photo unpack follows a concurrent move" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      destination = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      create(:item, :confirmed, move:, box:, name: "Lamp")
+      refuse_after(Items::MarkPhotoRemoved) { photo.update!(box: destination) }
+
+      patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id), as: :turbo_stream
+
+      card = Components::Boxes::PhotoCard.dom_id(photo)
+      expect(response.body).to include(%(action="remove" target="#{card}"))
+      expect(response.body).not_to include(%(action="replace" target="#{card}"))
+    end
+
+    it "redraws a refused standalone card from the DB, not the pre-action item" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      lamp = create(:item, :manual, move:, box:, name: "Lamp")
+      create(:item, :manual, move:, box:, name: "Fan") # keeps the box open
+      # Another tab unpacked the lamp after set_item loaded it in_box.
+      refuse_after(Items::Unpack) { lamp.update!(presence_state: "removed") }
+
+      patch move_box_unpacking_remove_path(move, box, lamp, params: { origin: "box" }), as: :turbo_stream
+
+      expect(response).to have_http_status(:unprocessable_content)
+      body = response.body
+      aggregate_failures do
+        expect(body).to include(%(target="#{Components::Boxes::ItemCard.dom_id(lamp)}"))
+        # The card's control matches the DB (Restore), not the stale Unpack.
+        expect(body).to include(move_box_unpacking_restore_path(move, box, lamp))
+        expect(body).not_to include(move_box_unpacking_remove_path(move, box, lamp))
+      end
+    end
+
+    it "drops a refused standalone card when the item left the box concurrently" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      lamp = create(:item, :manual, move:, box:, name: "Lamp")
+      create(:item, :manual, move:, box:, name: "Fan")
+      elsewhere = create(:box, :with_room, move:, status: "unpacking")
+      refuse_after(Items::Unpack) { lamp.update!(box: elsewhere) }
+
+      patch move_box_unpacking_remove_path(move, box, lamp, params: { origin: "box" }), as: :turbo_stream
+
+      card = Components::Boxes::ItemCard.dom_id(lamp)
+      expect(response.body).to include(%(action="remove" target="#{card}"))
+      expect(response.body).not_to include(%(action="replace" target="#{card}"))
+    end
+
+    it "redirects a refused grid remove to the box's current phase when the box completed concurrently" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      lamp = create(:item, :manual, move:, box:, name: "Lamp")
+      refuse_after(Items::Unpack) do
+        lamp.update!(presence_state: "removed")
+        box.update!(status: "unpacked")
+      end
+
+      patch move_box_unpacking_remove_path(move, box, lamp, params: { origin: "box" }), as: :turbo_stream
+
+      expect(response).to redirect_to(move_box_path(move, box))
+      expect(flash[:notice]).to eq(I18n.t("unpacking.flash.completed"))
+    end
+
+    it "redirects a refused checklist remove to the celebration when the box completed concurrently" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      lamp = create(:item, move:, box:, name: "Lamp")
+      refuse_after(Items::Unpack) do
+        lamp.update!(presence_state: "removed")
+        box.update!(status: "unpacked")
+      end
+
+      patch move_box_unpacking_remove_path(move, box, lamp), as: :turbo_stream
+
+      expect(response).to redirect_to(move_box_unpacking_path(move, box))
+    end
+  end
+
   describe "origin=box toggles (#727 — B1 grid)" do
     it "streams the photo card + header for a photo item's remove, not the checklist" do
       box = create(:box, :with_room, move:, status: "unpacking")
