@@ -116,6 +116,74 @@ RSpec.describe AppCLI::Services::WorktreeRun do
       worktree_run.run(["true"])
       expect(shell).not_to have_received(:say).with(/differs/)
     end
+
+    it "says the dev database is shared with move-app-dev" do
+      worktree_run.run(["true"])
+      expect(shell).to have_received(:say).with("Database: move_development (shared with move-app-dev)")
+    end
+
+    %w[db:migrate db:migrate:redo db:rollback db:forward db:schema:load db:structure:load db:reset db:prepare
+       db:setup db:drop db:drop:_unsafe db:purge db:truncate_all db:seed:replant db:fixtures:load
+       db:purge:all db:reset:all db:migrate:primary db:rollback:primary db:schema:load:primary
+       db:truncate_all:primary db:migrate:up:primary].each do |task|
+      it "refuses #{task} from a worktree without --yes, before any docker call" do
+        expect { worktree_run.run(["bin/rails", task]) }
+          .to raise_error(Thor::Error, /Refusing to run #{task} .* without --yes/)
+        expect(shell).to have_received(:say).with(/Warning: #{task} changes the schema or data of move_development/)
+        expect(runner.commands).to be_empty
+        expect(db).not_to have_received(:start)
+      end
+    end
+
+    [
+      ["bash", "-c", "bin/rails db:migrate && echo ok"],
+      ["sh", "-c", "cd /rails; bin/rails db:rollback"],
+      %w[bundle exec rake db:rollback STEP=2],
+      %w[env RAILS_ENV=development bin/rails db:drop],
+      ["bash", "-c", "echo hi&&rails db:purge;"]
+    ].each do |command|
+      it "gates the task given to rails/rake in #{command.inspect}" do
+        expect { worktree_run.run(command) }.to raise_error(Thor::Error, /without --yes/)
+      end
+    end
+
+    [
+      %w[echo db:migrate],
+      %w[rg db:migrate doc],
+      ["bash", "-c", "bin/rails runner 'puts 1' && echo db:migrate"],
+      ["bash", "-c", "grep -r 'db:reset' lib"]
+    ].each do |command|
+      it "lets #{command.inspect} through: no rails/rake runs the task" do
+        expect(worktree_run.run(command)).to eq(0)
+        expect(shell).not_to have_received(:say).with(/Warning/)
+      end
+    end
+
+    it "copes with unbalanced quotes" do
+      expect { worktree_run.run(["bash", "-c", "bin/rails db:migrate 'oops"]) }
+        .to raise_error(Thor::Error, /without --yes/)
+    end
+
+    it "runs a schema task with --yes, after the warning" do
+      expect(worktree_run.run(%w[bin/rails db:migrate], confirmed: true)).to eq(0)
+      expect(shell).to have_received(:say).with(/Warning: db:migrate changes/).ordered
+      expect(runner.commands.last).to end_with("bin/rails db:migrate")
+    end
+
+    it "lets read-only db tasks through without --yes" do
+      read_only = %w[db:migrate:status db:migrate:status:primary db:version db:test:prepare db:seed
+                     db:schema:dump db:prepared db:schema:cache:dump]
+      read_only.each { |task| worktree_run.run(["bin/rails", task]) }
+      expect(runner.commands.size).to eq(read_only.size)
+      expect(shell).not_to have_received(:say).with(/Warning/)
+    end
+
+    it "does not ask for --yes on the main checkout" do
+      main_checkout = AppCLI::Services::Checkout.new(path: worktree, branch: "main", main: true)
+      run = described_class.new(shell: shell, env: "development", checkout: main_checkout, main_path: main,
+                                runner: runner, db: db, tty: tty)
+      expect(run.run(%w[bin/rails db:migrate])).to eq(0)
+    end
   end
 
   describe "#interactive" do
@@ -130,9 +198,10 @@ RSpec.describe AppCLI::Services::WorktreeRun do
       expect(command).not_to include("--name", "docker exec")
     end
 
-    it "prints the checkout banner first" do
+    it "prints the checkout banner and the shared database first" do
       worktree_run.interactive(:console)
-      expect(shell).to have_received(:say).with("Running in #{worktree} (branch fix/x)")
+      expect(shell).to have_received(:say).with("Running in #{worktree} (branch fix/x)").ordered
+      expect(shell).to have_received(:say).with("Database: move_development (shared with move-app-dev)").ordered
     end
 
     it "opens a shell for :connect and returns its exit status" do
@@ -180,6 +249,27 @@ RSpec.describe AppCLI::Services::WorktreeRun do
       expect(shell).to have_received(:say)
         .with("chromedriver is not in workeverywhere/move-app:latest: skipping :js system specs " \
               "(--tag ~js); they run in CI only.").once
+    end
+
+    it "fails an all-filtered run of named specs when the image has no chromedriver" do
+      worktree_run.test(["spec/system/gallery_lightbox_js_spec.rb"], system: true)
+
+      file = described_class::FAIL_IF_NO_EXAMPLES_FILE
+      expected = ["spec/system/gallery_lightbox_js_spec.rb", "--tag", "~js", "--require", file]
+      script = Shellwords.shellsplit(runner.commands.last).last
+      expect(script).to start_with("echo #{Shellwords.escape(described_class::FAIL_IF_NO_EXAMPLES_CODE)} > #{file} && ")
+      expect(script).to end_with("rspec #{Shellwords.join(expected)}")
+      expect(shell).to have_received(:say).with(/If every named spec is :js, the run fails with no examples/)
+    end
+
+    it "does not require fail_if_no_examples for the whole-suite run" do
+      worktree_run.test([], system: true)
+      expect(runner.commands.last).not_to include("fail-if-no-examples")
+    end
+
+    it "does not print the database banner for the test database" do
+      worktree_run.test([], system: true)
+      expect(shell).not_to have_received(:say).with(/Database:/)
     end
 
     it "keeps the caller's system spec paths" do

@@ -40,6 +40,27 @@ RSpec.describe AppCLI::Services::MountSources do
     expect { sources.master_key_path }.to raise_error(Thor::Error, %r{Missing config/master.key in #{worktree} and #{main}})
   end
 
+  it "refuses a blank master.key" do
+    File.write(File.join(main, "config/master.key"), " \n")
+    expect { sources.master_key_path }.to raise_error(Thor::Error, %r{main/config/master.key is empty})
+  end
+
+  it "refuses a master.key it can't read" do
+    key = File.join(main, "config/master.key")
+    File.write(key, "k")
+    allow(File).to receive(:readable?).and_call_original
+    allow(File).to receive(:readable?).with(key).and_return(false)
+    expect { sources.master_key_path }.to raise_error(Thor::Error, /master.key is not readable/)
+  end
+
+  it "refuses an env file it can't read" do
+    env_file = File.join(main, ".env.development")
+    File.write(env_file, "A=1")
+    allow(File).to receive(:readable?).and_call_original
+    allow(File).to receive(:readable?).with(env_file).and_return(false)
+    expect { sources.env_file_path("development") }.to raise_error(Thor::Error, /.env.development is not readable/)
+  end
+
   it "refuses a directory where the master.key file belongs, with a fix hint" do
     File.write(File.join(main, "config/master.key"), "k")
     FileUtils.mkdir_p(File.join(worktree, "config/master.key"))

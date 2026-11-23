@@ -2,20 +2,31 @@
 
 require "fileutils"
 require_relative "../services/helpers"
+require_relative "app_preflight"
+require_relative "checkout_resolver"
 require_relative "container_flags"
+require_relative "mount_sources"
 
 module AppCLI
   module Services
     class AppService
-      def initialize(shell:, env:)
-        @runner = CommandRunner.new(shell: shell)
+      # How long #stop waits for Docker to remove the --rm container.
+      REMOVAL_POLLS = 20
+      REMOVAL_POLL_INTERVAL = 0.5
+
+      # @param checkout_path [String] the checkout mounted at /rails (the one bin/cli lives in)
+      # @param main_path [String, nil] fallback for gitignored files; default: the main checkout
+      def initialize(shell:, env:, runner: nil, checkout_path: AppCLI::ROOT, main_path: nil)
+        @runner = runner || CommandRunner.new(shell: shell)
         @shell = shell
         @env_config = EnvConfig.new(env)
+        @checkout_path = checkout_path
+        @main_path = main_path
       end
 
       def setup
         runner.ensure_network(env_config.network_name)
-        ensure_master_key!
+        checks.mount_sources!
         runner.ensure_mysql_certs if env_config.mysql?
         ensure_sqlite_db_dir
       end
@@ -42,44 +53,49 @@ module AppCLI
         )
       end
 
-      def prepare
+      # Resolves and validates every input of the app container (network +
+      # AppPreflight). It raises before anything is stopped or removed.
+      def preflight
         setup
-        if runner.image_exists?(env_config.app_image)
-          ensure_ruby_version!
-        else
-          shell.say("App image #{env_config.app_image} missing, building it first")
-          build
-        end
+        checks.image_and_volumes!
       end
 
       def start
-        prepare
+        preflight
 
         return shell.say("Application already running.") if runner.container_running?(env_config.app_container)
 
-        FileUtils.rm_f(File.join(AppCLI::ROOT, "tmp/pids/server.pid"))
+        FileUtils.rm_f(File.join(checkout_path, "tmp/pids/server.pid"))
+        runner.run(["docker run --rm --detach", *server_args(env_config.app_container)])
+        await_app
+      end
 
-        runner.run(
-          [
-            "docker run --rm --detach",
-            "--name #{env_config.app_container}",
-            # Direct fallback; the browser path is https://move.move-easy.docker via move-router.
-            "--publish 8080:9292",
-            *network_flags,
-            *app_env_flags,
-            *app_volume_flags,
-            "#{env_config.app_image} bin/rails s -p 9292 -b 0.0.0.0"
-          ]
-        )
+      # Replaces the running app container, or starts one. The caller runs
+      # #preflight first. The replacement is created (not started) under a
+      # temporary name while the old one still serves, so Docker has accepted
+      # its flags, env file, image and network before anything is stopped.
+      #
+      # After the stop, nothing reads an input any more: the removal wait
+      # (bounded, see #wait_until_removed), the rename, the pid-file cleanup
+      # (rm_f ignores errors), `docker start` of the created container and the
+      # readiness wait.
+      def replace
+        candidate = "#{env_config.app_container}-next"
+        discard_leftover(candidate)
+        runner.run(["docker create --rm", *server_args(candidate)])
 
-        wait_for_app
-        runner.run("docker logs #{env_config.app_container}", allow_failure: true, quiet: true)
+        stop
+        runner.run("docker rename #{candidate} #{env_config.app_container}")
+        FileUtils.rm_f(File.join(checkout_path, "tmp/pids/server.pid"))
+        runner.run("docker start #{env_config.app_container}")
+        await_app
       end
 
       def stop
         if runner.container_running?(env_config.app_container)
           shell.say("Stopping application container")
           runner.run("docker stop #{env_config.app_container}")
+          wait_until_removed
         else
           shell.say("Application not running, skipping stop.")
         end
@@ -134,7 +150,7 @@ module AppCLI
           return
         end
 
-        prepare
+        preflight
 
         runner.run(
           [
@@ -149,7 +165,24 @@ module AppCLI
 
       private
 
-      attr_reader :runner, :shell, :env_config
+      attr_reader :runner, :shell, :env_config, :checkout_path
+
+      def server_args(name)
+        [
+          "--name #{name}",
+          # Direct fallback; the browser path is https://move.move-easy.docker via move-router.
+          "--publish 8080:9292",
+          *network_flags,
+          *app_env_flags,
+          *app_volume_flags,
+          "#{env_config.app_image} bin/rails s -p 9292 -b 0.0.0.0"
+        ]
+      end
+
+      def await_app
+        wait_for_app
+        runner.run("docker logs #{env_config.app_container}", allow_failure: true, quiet: true)
+      end
 
       def ensure_running!
         return if runner.container_running?(env_config.app_container)
@@ -157,30 +190,30 @@ module AppCLI
         raise Thor::Error, "App container is not running. Start it with `bin/cli app start`."
       end
 
-      def ensure_master_key!
-        key_path = env_config.master_key_path
-        return if File.exist?(key_path)
+      # A -next container left by an interrupted restart would block the create.
+      def discard_leftover(candidate)
+        return if runner.container_status(candidate) == "missing"
 
-        raise Thor::Error, "Missing config/master.key. Please add it before starting the app."
+        runner.run("docker rm --force #{candidate}", allow_failure: true, quiet: true)
       end
 
-      def ensure_ruby_version!
-        desired_version = env_config.ruby_version
-        return if desired_version.nil?
+      # The container runs with --rm, and Docker removes it only after
+      # `docker stop` returns; a `docker run --name` before then would conflict.
+      def wait_until_removed
+        REMOVAL_POLLS.times do
+          return if container_removed?
 
-        current_version = runner.capture(%(docker run --rm #{env_config.app_image} ruby -e "print RUBY_VERSION"),
-                                         quiet: true)
-        current_version = current_version.to_s.strip
+          sleep(REMOVAL_POLL_INTERVAL)
+        end
+        runner.run("docker rm --force #{env_config.app_container}", allow_failure: true)
+        return if container_removed?
 
-        return if current_version == desired_version
+        raise Thor::Error, "#{env_config.app_container} is still there after `docker stop`. " \
+                           "Remove it with `docker rm -f #{env_config.app_container}`, then run `bin/cli app start`."
+      end
 
-        message = if current_version.empty?
-                    "Unable to detect Ruby version in #{env_config.app_image}; rebuilding image."
-                  else
-                    "Ruby version mismatch (#{current_version} != #{desired_version}); rebuilding image."
-                  end
-        shell.say(message)
-        build
+      def container_removed?
+        runner.container_status(env_config.app_container) == "missing"
       end
 
       def ensure_sqlite_db_dir
@@ -189,12 +222,23 @@ module AppCLI
         FileUtils.mkdir_p(File.join(AppCLI::ROOT, "db"))
       end
 
+      # config/master.key and .env.<env> are gitignored, so a worktree reads
+      # them from the main checkout when it has none (never copied).
+      def checks
+        @checks ||= AppPreflight.new(env_config: env_config, runner: runner, shell: shell, sources: sources,
+                                     checkout_path: checkout_path, build: method(:build))
+      end
+
+      def sources
+        @sources ||= MountSources.new(checkout_path: checkout_path, main_path: main_path)
+      end
+
+      def main_path
+        @main_path ||= CheckoutResolver.new(root: checkout_path).main_checkout.path
+      end
+
       def container_flags
-        @container_flags ||= ContainerFlags.new(
-          env_config: env_config,
-          checkout_path: AppCLI::ROOT,
-          sources: MountSources.new(checkout_path: AppCLI::ROOT, main_path: AppCLI::ROOT)
-        )
+        @container_flags ||= ContainerFlags.new(env_config: env_config, checkout_path: checkout_path, sources: sources)
       end
 
       def app_env_flags

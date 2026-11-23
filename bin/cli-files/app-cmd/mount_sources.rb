@@ -23,11 +23,12 @@ module AppCLI
 
       def master_key_path
         path = locate("config/master.key")
-        return path if path
+        raise Thor::Error, missing_key_message unless path
 
-        raise Thor::Error,
-              "Missing config/master.key in #{checkout_path}" \
-              "#{" and #{main_path}" unless same_checkout?}. Please add it before starting the app."
+        # `$(cat …)` of a blank key starts the app without one.
+        raise Thor::Error, "#{path} is empty. Please add the key before starting the app." if File.read(path).strip.empty?
+
+        path
       end
 
       # @return [String, nil] nil when no checkout has the file (it is optional)
@@ -48,10 +49,21 @@ module AppCLI
 
       attr_reader :checkout_path, :main_path
 
+      # Every file found is read on the host when the container starts
+      # (`$(cat …)`, `--env-file`), so an unreadable one is refused here, before
+      # anything is stopped or started.
       def locate(relative)
         candidates = [checkout_path, main_path].uniq.map { |root| File.join(root, relative) }
         candidates.each { |path| refuse_directory!(path) }
-        candidates.find { |path| File.file?(path) }
+        path = candidates.find { |candidate| File.file?(candidate) }
+        refuse_unreadable!(path) if path
+        path
+      end
+
+      def refuse_unreadable!(path)
+        return if File.readable?(path)
+
+        raise Thor::Error, "#{path} is not readable by #{ENV.fetch("USER", "this user")}. Fix its permissions and retry."
       end
 
       # Docker creates a missing bind-mount source as an empty directory, so a
@@ -62,6 +74,11 @@ module AppCLI
         raise Thor::Error,
               "#{path} is a directory, but it must be a file (Docker probably created it). " \
               "Remove it with `rmdir #{path}` and retry."
+      end
+
+      def missing_key_message
+        "Missing config/master.key in #{checkout_path}" \
+          "#{" and #{main_path}" unless same_checkout?}. Please add it before starting the app."
       end
 
       def same_checkout?

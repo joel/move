@@ -23,7 +23,27 @@ module AppCLI
       SYSTEM_SPEC_PATH = %r{\A(?:\./)?spec/system(?:[/:]|\z)}
       # CI runs the system suite the same way (.github/workflows/ci.yml).
       SYSTEM_ENV = { "TEST_BROWSER" => "rack_test" }.freeze
+      # fail_if_no_examples is a config setting, not an rspec flag. The file is
+      # written inside the throwaway container, so the checkout needs no copy.
+      FAIL_IF_NO_EXAMPLES_FILE = "/tmp/bin-cli-fail-if-no-examples.rb".freeze
+      FAIL_IF_NO_EXAMPLES_CODE = "RSpec.configure { |config| config.fail_if_no_examples = true }".freeze
       INTERACTIVE_COMMANDS = { console: %w[bin/rails console], connect: %w[bash] }.freeze
+      # Rails db tasks (activerecord/lib/active_record/railties/databases.rake)
+      # that change the schema of the shared dev database or wipe its data,
+      # with any namespaced variant: `:all`, a database name (`:primary`),
+      # `db:migrate:redo`, `db:drop:_unsafe`. db:migrate:status (in any
+      # variant) only reads it.
+      SCHEMA_TASK = /
+        \Adb:
+        (?!migrate:status)
+        (?:migrate|rollback|forward|schema:load|structure:load|reset|prepare|setup|drop|purge|
+           truncate_all|seed:replant|fixtures:load)
+        (?::\w+)*
+        (?:\[.*\])?\z
+      /x
+      TASK_RUNNERS = %w[rails rake].freeze
+      # Shell operators that end one command and start the next.
+      COMMAND_SEPARATOR = /\A(?:&&|\|\||;|\||&)\z/
 
       # @param checkout [Checkout] the checkout to mount
       # @param main_path [String] the main checkout (fallback for gitignored files, lock home)
@@ -40,11 +60,13 @@ module AppCLI
       end
 
       # @param keep_stdin [Boolean] attach stdin even when it is not a TTY
+      # @param confirmed [Boolean] --yes: run a schema-changing task from a worktree anyway
       # @return [Integer] the command's exit status
-      def run(command_parts, keep_stdin: false)
+      def run(command_parts, keep_stdin: false, confirmed: false)
         raise Thor::Error, "No command given. Usage: bin/cli app run [--repo T] -- CMD..." if command_parts.empty?
 
-        announce
+        announce(shared_db: true)
+        confirm_schema_change!(command_parts, confirmed)
         prepare
         runner.run_status(docker_run(command_parts, rails_env: env_config.env, keep_stdin: keep_stdin))
       end
@@ -66,6 +88,7 @@ module AppCLI
           prepare
           args = system ? system_args(rspec_args) : unit_args(rspec_args)
           script = "bin/rails db:test:prepare && bundle exec rspec #{Shellwords.join(args)}"
+          script = "#{fail_if_no_examples_prelude} && #{script}" if args.include?(FAIL_IF_NO_EXAMPLES_FILE)
           extra_env = system ? SYSTEM_ENV : {}
           runner.run_status(docker_run(["bash", "-c", script], rails_env: "test", name: TEST_CONTAINER,
                                                                extra_env: extra_env))
@@ -103,8 +126,57 @@ module AppCLI
               "Use `bin/cli app exec #{env_config.short} ...` for the production image."
       end
 
-      def announce
+      # run/console/connect use the dev database of move-app-dev; test uses move_test.
+      def announce(shared_db: false)
         shell.say("Running in #{checkout.describe}")
+        shell.say("Database: #{env_config.db_names.first} (shared with #{env_config.app_container})") if shared_db
+      end
+
+      # A worktree's migrations would change the schema main's dev app runs on
+      # (and its db/structure.sql dump), so ask for --yes first.
+      def confirm_schema_change!(command_parts, confirmed)
+        return if checkout.main?
+
+        task = schema_task(command_parts)
+        return unless task
+
+        shell.say("Warning: #{task} changes the schema or data of #{env_config.db_names.first}, " \
+                  "which #{env_config.app_container} uses too.")
+        return if confirmed
+
+        raise Thor::Error, "Refusing to run #{task} from #{checkout.describe} without --yes. " \
+                           "Re-run as `bin/cli app run --repo #{checkout.path} --yes -- #{Shellwords.join(command_parts)}`."
+      end
+
+      # The first gated task given to `rails`/`rake` (bin/, bundle exec and
+      # `bash -c "…"` included). A task name that is only an argument of some
+      # other command (`echo db:migrate`, `rg db:migrate doc`) does not count.
+      def schema_task(command_parts)
+        runner_seen = false
+        shell_tokens(command_parts).each do |token|
+          if token.match?(COMMAND_SEPARATOR)
+            runner_seen = false
+          elsif TASK_RUNNERS.include?(File.basename(token))
+            runner_seen = true
+          elsif runner_seen && token.match?(SCHEMA_TASK)
+            return token
+          end
+        end
+        nil
+      end
+
+      # Each argument is split shell-style too, so `bash -c "bin/rails db:migrate && …"`
+      # is seen as its own commands; operators glued to a word (`db:migrate;`) are split off.
+      def shell_tokens(command_parts)
+        command_parts.flat_map { |part| split_words(part) }
+                     .flat_map { |word| word.split(/(&&|\|\||;|\||&)/) }
+                     .reject(&:empty?)
+      end
+
+      def split_words(part)
+        Shellwords.split(part)
+      rescue ArgumentError # unbalanced quotes: fall back to whitespace
+        part.split
       end
 
       def prepare
@@ -125,13 +197,23 @@ module AppCLI
 
       # spec/system unless the caller already named system spec paths. :js
       # specs switch to headless Chrome, which needs chromedriver in the image.
+      # When the caller named the specs, a run that filters all of them out
+      # must fail rather than pass with 0 examples.
       def system_args(rspec_args)
-        args = rspec_args.any?(SYSTEM_SPEC_PATH) ? rspec_args : [SYSTEM_SPEC_DIR, *rspec_args]
+        explicit = rspec_args.any?(SYSTEM_SPEC_PATH)
+        args = explicit ? rspec_args : [SYSTEM_SPEC_DIR, *rspec_args]
         return args if chromedriver?
 
         shell.say("chromedriver is not in #{env_config.app_image}: skipping :js system specs (--tag ~js); " \
                   "they run in CI only.")
-        [*args, "--tag", "~js"]
+        return [*args, "--tag", "~js"] unless explicit
+
+        shell.say("If every named spec is :js, the run fails with no examples (fail_if_no_examples).")
+        [*args, "--tag", "~js", "--require", FAIL_IF_NO_EXAMPLES_FILE]
+      end
+
+      def fail_if_no_examples_prelude
+        "echo #{Shellwords.escape(FAIL_IF_NO_EXAMPLES_CODE)} > #{FAIL_IF_NO_EXAMPLES_FILE}"
       end
 
       def chromedriver?

@@ -41,11 +41,26 @@ module AppCLI
       # The edge (dns + router) first: it only proxies, so it can come up before
       # its upstreams exist.
       def start_all
+        start_dependencies
+        app.start
+      end
+
+      # Everything app.start needs, without touching the app container.
+      def start_dependencies
         dns.start
         router.start
         db.start
         storage.start
-        app.start
+      end
+
+      # Replaces the running app container. Every check that can fail (the
+      # app preflight, the dependencies, and Docker accepting the replacement)
+      # runs while the old container still serves, so a failed restart leaves
+      # it up.
+      def restart_app
+        app.preflight
+        start_dependencies
+        app.replace
       end
 
       def stop_all

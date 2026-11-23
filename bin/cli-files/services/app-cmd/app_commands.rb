@@ -40,9 +40,9 @@ module AppCLI
         app_service(env).build
       end
 
-      desc "prepare [ENV]", "Prepare the application image and prerequisites"
+      desc "prepare [ENV]", "Check every input of the app container (key, .env, volumes, image, gems, network)"
       def prepare(env = nil)
-        app_service(env).prepare
+        app_service(env).preflight
       end
 
       desc "setup [ENV]", "Setup the application prerequisites"
@@ -88,12 +88,15 @@ module AppCLI
       end
 
       map "run" => :run_command
-      desc "run [ENV] [--repo T] -- CMD...", "Run a command in a throwaway app container for a checkout"
+      desc "run [ENV] [--repo T] [--yes] -- CMD...", "Run a command in a throwaway app container for a checkout"
       method_option :repo, type: :string, desc: REPO_OPTION_DESC
+      method_option :yes, type: :boolean, default: false,
+                          desc: "Run a schema-changing db task (db:migrate, db:rollback, ...) from a worktree " \
+                                "against the shared dev database"
       def run_command(*args)
         env, command_parts = parse_env_and_command(args)
         checkout = CheckoutResolver.new.resolve(options[:repo])
-        exit(worktree_run(env, checkout).run(command_parts))
+        exit(worktree_run(env, checkout).run(command_parts, confirmed: options[:yes]))
       end
 
       map "test" => :test_command
@@ -109,17 +112,15 @@ module AppCLI
 
       desc "rebuild [ENV]", "Rebuild and restart the application"
       def rebuild(env = nil)
-        service = app_service(env)
-        service.stop
-        service.build
-        ServicesManager.new(shell: self, env: env).start_all
+        manager = ServicesManager.new(shell: self, env: env)
+        manager.app.setup # key and .env before spending a build
+        manager.app.build
+        manager.restart_app
       end
 
       desc "restart [ENV]", "Restart the application"
       def restart(env = nil)
-        service = app_service(env)
-        service.stop
-        ServicesManager.new(shell: self, env: env).start_all
+        ServicesManager.new(shell: self, env: env).restart_app
       end
 
       private
