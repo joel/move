@@ -5,11 +5,14 @@
 # items/photos simplification epic. The registry shape is kept (rather than
 # inlining rooms everywhere) so VocabulariesController and Views::Vocabularies::Index
 # still dispatch through one object; adding a future kind stays a one-line change.
+#
+# This is the pack's public data contract, so it carries no presentation: the
+# icon and chip tint per kind live in Components::Vocabularies::Presentation (#472).
 class Vocabulary
   KINDS = %w[rooms].freeze
 
   CONFIG = {
-    "rooms" => { model: Room, chip_kind: :room, icon: Components::Icons::Boxes }
+    "rooms" => { model: Room }
   }.freeze
 
   attr_reader :kind
@@ -30,16 +33,6 @@ class Vocabulary
   #: () -> untyped
   def model
     CONFIG.fetch(kind)[:model]
-  end
-
-  #: () -> Symbol
-  def chip_kind
-    CONFIG.fetch(kind)[:chip_kind]
-  end
-
-  #: () -> untyped
-  def icon
-    CONFIG.fetch(kind)[:icon]
   end
 
   # The plural association on Move (move.rooms).
