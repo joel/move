@@ -15,6 +15,14 @@ class RecognitionRun < ApplicationRecord
   validates :provider, presence: true
   validates :status, inclusion: { in: STATUSES }
 
+  # Each photo's LATEST run id, as a subquery (never loaded into Ruby — AGENTS.md
+  # rule 5). `media` is anything `where(media_id:)` accepts: ids or a relation.
+  scope :latest_ids_for, lambda { |media|
+    where(media_id: media)
+      .select("DISTINCT ON (recognition_runs.media_id) recognition_runs.id")
+      .order("recognition_runs.media_id", "recognition_runs.created_at DESC")
+  }
+
   #: () -> bool
   def processing?
     status == "processing"

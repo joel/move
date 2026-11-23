@@ -13,6 +13,8 @@ module Views
 
       ID = "capture-session-panel"
       CHIP_CAP = 4 # name chips shown per photo card before collapsing to "+N more"
+      CARD_CLASSES = "flex items-center gap-3 rounded-xl border border-card-border bg-surface-container p-3"
+      CARD_HOVER = "transition hover:border-accent-sage hover:bg-surface-container-high"
 
       RUN_TO_STATE = {
         "queued" => :queued, "processing" => :processing,
@@ -79,28 +81,47 @@ module Views
       # Photo-first card: the photo + its recognised names as chips, tapping into
       # the per-photo detail (C2) where a wrong name can be fixed — no separate
       # per-item rows. A conflict-only photo (no items of its own, its latest run
-      # matched a confirmed item) taps into that matched item instead: the photo's
-      # own review would be empty and invite a duplicate add.
+      # matched a confirmed item) taps into that matched item instead (#872), with
+      # a secondary "Manage photo" link to its review page so retake / rescan /
+      # delete stay reachable (#891).
 
       #: (untyped media, untyped items) -> untyped
       def photo_card(media, items)
         conflict_item_id = (@conflict_item_by_media[media.id] if items.empty?)
-        a(
-          href: card_href(media, conflict_item_id),
-          class: "flex items-center gap-3 rounded-xl border border-card-border " \
-                 "bg-surface-container p-3 transition hover:border-accent-sage " \
-                 "hover:bg-surface-container-high"
-        ) do
-          thumb(media)
-          card_body(items, conflict_item_id)
-          render Components::Icons::ChevronRight.new(css: "h-4 w-4 shrink-0 text-muted")
+        return conflict_card(media, conflict_item_id) if conflict_item_id
+
+        a(href: review_href(media), class: "#{CARD_CLASSES} #{CARD_HOVER}") do
+          card_inner(media) { card_body(items, nil) }
         end
       end
 
-      #: (untyped media, untyped conflict_item_id) -> String
-      def card_href(media, conflict_item_id)
-        return view_context.move_item_path(@box.move_id, conflict_item_id) if conflict_item_id
+      # Two sibling links (an anchor can't nest another): the card body opens the
+      # matched item, the trailing link opens this photo's own review page.
 
+      #: (untyped media, untyped conflict_item_id) -> untyped
+      def conflict_card(media, conflict_item_id)
+        div(class: CARD_CLASSES) do
+          a(href: view_context.move_item_path(@box.move_id, conflict_item_id),
+            class: "flex min-w-0 flex-1 items-center gap-3 transition hover:text-accent-sage") do
+            card_inner(media) { card_body([], conflict_item_id) }
+          end
+          a(href: review_href(media),
+            class: "shrink-0 rounded-full border border-card-border px-3 py-1 text-label-caps uppercase " \
+                   "text-muted transition hover:border-accent-sage hover:text-accent-sage") do
+            I18n.t("captures.session.manage_photo")
+          end
+        end
+      end
+
+      #: (untyped media) { () -> untyped } -> untyped
+      def card_inner(media, &)
+        thumb(media)
+        yield
+        render Components::Icons::ChevronRight.new(css: "h-4 w-4 shrink-0 text-muted")
+      end
+
+      #: (untyped media) -> String
+      def review_href(media)
         view_context.move_box_review_photo_path(@box.move, @box, media_id: media.id)
       end
 

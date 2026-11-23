@@ -34,6 +34,9 @@ en:
       # A run whose every detection matched an already-confirmed item (#872): it
       # records conflict suggestions but no new item; the card links to the match.
       conflict_only: "Already in this box — review the match"
+      # Secondary link on that card (#891): the photo's own review page, where
+      # it can be retaken, re-scanned or deleted.
+      manage_photo: "Manage photo"
       ingest_failed: "This photo couldn't be processed. Try capturing it again."
       items_found:
         zero: "No items found"
