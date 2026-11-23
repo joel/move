@@ -18,6 +18,7 @@ module Views
       # @rbs box: untyped
       # @rbs media: untyped
       # @rbs items: untyped
+      # @rbs conflict_items: untyped
       # @rbs position: untyped
       # @rbs total: untyped
       # @rbs next_media: untyped
@@ -33,13 +34,15 @@ module Views
       # @rbs pinnable: bool
       # @rbs pinned_item_ids: untyped
       # @rbs return: void
-      def initialize(move:, box:, media:, items:, position:, total:, next_media:, editable: false, move_boxes: [],
-                     queue: false, queue_remaining: nil, pending_review: false, advance_href: nil, mark_href: nil,
+      def initialize(move:, box:, media:, items:, position:, total:, next_media:, conflict_items: [],
+                     editable: false, move_boxes: [], queue: false, queue_remaining: nil, pending_review: false, advance_href: nil, mark_href: nil,
                      prev_href: nil, next_href: nil, pinnable: false, pinned_item_ids: Set.new)
         @move = move
         @box = box
         @media = media
         @items = items
+        # Items the photo's latest run matched instead of creating its own (#891).
+        @conflict_items = conflict_items
         @position = position
         @total = total
         @next_media = next_media
@@ -214,7 +217,8 @@ module Views
       #: () -> untyped
       def list
         render Components::Reviews::ItemList.new(
-          move: @move, box: @box, media: @media, items: @items, editable: @editable, queue: @queue,
+          move: @move, box: @box, media: @media, items: @items, conflict_items: @conflict_items,
+          editable: @editable, queue: @queue,
           pinnable: @pinnable, pinned_item_ids: @pinned_item_ids
         )
       end

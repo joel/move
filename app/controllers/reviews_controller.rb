@@ -50,7 +50,7 @@ class ReviewsController < MoveScopedController
     walk = review_media
     next_media = next_after(@media, walk)
     render Views::Reviews::Photo.new(
-      move: @move, box: @box, media: @media, items: photo_items(@media),
+      move: @move, box: @box, media: @media, items: photo_items(@media), conflict_items: conflict_items,
       position: position_of(@media, walk), total: walk.size,
       next_media: next_media, editable: editable_move?,
       move_boxes: other_boxes, pending_review: pending_review?, pinnable: pinnable?,
@@ -201,9 +201,8 @@ class ReviewsController < MoveScopedController
   def render_queue_photo
     next_media = queue_next_media
     render Views::Reviews::Photo.new(
-      move: @move, box: @box, media: @media, items: photo_items(@media),
-      position: nil, total: nil,
-      next_media: next_media,
+      move: @move, box: @box, media: @media, items: photo_items(@media), conflict_items: conflict_items,
+      position: nil, total: nil, next_media: next_media,
       editable: editable_move?, move_boxes: other_boxes,
       queue: true, queue_remaining: forward_scope(pending_remaining).count,
       pending_review: pending_review?, pinnable: pinnable?, pinned_item_ids: pinned_item_ids,
@@ -347,7 +346,7 @@ class ReviewsController < MoveScopedController
     turbo_stream.replace(
       Components::Reviews::ItemList::ID,
       view_context.render(Components::Reviews::ItemList.new(
-                            move: @move, box: @box, media: @media, items: items, editable: editable_move?,
+                            move: @move, box: @box, media: @media, items: items, editable: editable_move?, conflict_items:,
                             highlight_id: highlight_id, queue: queue_mode?,
                             pinnable: pinnable?, pinned_item_ids: pinned_item_ids
                           ))
@@ -393,6 +392,14 @@ class ReviewsController < MoveScopedController
 
     review_media.find { |m| ids.include?(m.id) }
   end
+
+  # The confirmed items this photo's LATEST run matched instead of creating its
+  # own (#891, the capture panel's #872 rule): the empty state explains the
+  # match and links to them. The match must still be in this box (kept, in_box).
+  # A lazy relation — ItemList loads it only when the photo has no items.
+
+  #: () -> untyped
+  def conflict_items = @box.items.in_box.where(id: RecognitionSuggestion.latest_conflicts_for(@media.id).select(:item_id)).order(:name)
 
   # Every in-box item detected in (or hand-added to) this photo, in detection
   # order. Manual review-time additions carry source_media so they join the list.
