@@ -412,6 +412,31 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
     end
   end
 
+  # #872 — a conflict-only photo: its run matched an item already confirmed in a
+  # packing box, so it recorded a `conflict` suggestion and created no item (the
+  # no-overwrite rule). The box's capture panel shows "Already in this box —
+  # review the match" linking to that item. Idempotent: skipped once the Move has
+  # any conflict suggestion. Runs after the activity showcase, which seals box 2,
+  # so it picks a box that stays packing (capture is blocked on a sealed box).
+  unless RecognitionSuggestion.exists?(move: move, state: "conflict")
+    existing = move.items.in_box.joins(:box).where(boxes: { status: "packing" }, review_state: "confirmed")
+                   .order(:created_at).first
+    if existing
+      dup_photo = existing.box.media.new(move: move, media_type: "image", captured_via: "web",
+                                         captured_at: Time.current)
+      dup_photo.image.attach(SeedData.image_attachable(SeedData::PHOTOS.first[:slug]))
+      dup_photo.save!
+      run = dup_photo.recognition_runs.create!(
+        move: move, box: existing.box, provider: "fake", provider_model: "fake-1",
+        status: "succeeded", started_at: 1.minute.ago, completed_at: Time.current
+      )
+      run.recognition_suggestions.create!(
+        move: move, box: existing.box, media: dup_photo, item: existing,
+        proposed_name: existing.name, confidence_score: 0.97, state: "conflict"
+      )
+    end
+  end
+
   Rails.logger.info(
     "[seeds] #{organization.slug}: #{move.boxes.count} boxes, #{move.rooms.count} rooms, " \
     "#{move.items.count} items, #{move.media.count} media, " \
