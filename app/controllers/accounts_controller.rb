@@ -37,8 +37,10 @@ class AccountsController < ApplicationController
       reset_session
       # Deletion may have dropped the tenant schema for the org subdomain we are
       # on, so a relative redirect would 404 in the elevator — always land the
-      # signed-out user on the canonical apex root.
-      redirect_to post_deletion_url, allow_other_host: true, notice: t(".notice")
+      # signed-out user on the canonical apex root. A flash would be saved in this
+      # host's session, which the apex never sees (#844), so the success notice
+      # travels as an allow-listed key that WelcomeController turns into a toast.
+      redirect_to deleted_notice_url, allow_other_host: true
     in Dry::Monads::Failure(:owns_shared_data)
       # Refused before any drop, so the current subdomain is intact.
       redirect_to account_path, alert: t(".shared_data")
@@ -63,6 +65,12 @@ class AccountsController < ApplicationController
   #: () -> String
   def post_deletion_url
     apex_host ? root_url(host: apex_host) : root_path
+  end
+
+  #: () -> String
+  def deleted_notice_url
+    host = apex_host
+    host ? root_url(host:, notice: "account_deleted") : root_path(notice: "account_deleted")
   end
 
   #: () -> String

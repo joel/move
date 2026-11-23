@@ -66,14 +66,17 @@ network with the chosen checkout mounted at `/rails`, and leaves `move-app-dev`
 alone.
 
 ```bash
-bin/cli app run  --repo fix/862-cli -- bin/rails runner 'puts Item.count'
-bin/cli app test --repo fix/862-cli -- spec/actions/items
-bin/cli app test --repo ../move-wt-foo        # whole unit suite (no system specs)
+bin/cli app run     --repo fix/862-cli -- bin/rails runner 'puts Item.count'
+bin/cli app console --repo fix/862-cli        # Rails console in a throwaway container
+bin/cli app connect --repo fix/862-cli        # bash in a throwaway container
+bin/cli app test    --repo fix/862-cli -- spec/actions/items
+bin/cli app test    --repo ../move-wt-foo     # whole unit suite (no system specs)
+bin/cli app test    --repo ../move-wt-foo --system   # spec/system under rack_test
 ```
 
 ```mermaid
 flowchart LR
-  CLI["bin/cli app run|test --repo T"] --> RES["CheckoutResolver<br/>git worktree list of the main checkout"]
+  CLI["bin/cli app run|test|console|connect --repo T"] --> RES["CheckoutResolver<br/>git worktree list of the main checkout"]
   RES -->|"path"| RUN["docker run --rm<br/>worktree → /rails"]
   MAIN["main checkout<br/>config/master.key, .env.&lt;env&gt;"] -.->|"read when the worktree lacks them"| RUN
   RUN --> DB["move-db-dev"]
@@ -94,10 +97,19 @@ flowchart LR
 **`app run [ENV] [--repo T] -- CMD...`** prints `Running in <path> (branch <b>)`
 first, brings up the database, and exits with the command's status. stdin is
 attached only when it is a TTY (`--tty` only when stdout is one too), so it
-works in pipes and agent shells. `app console` / `app connect` still target the
-long-lived container. Both commands are **dev-only**: `app run prod …` is
+works in pipes and agent shells. It is **dev-only**: `app run prod …` is
 refused, because the prod image runs its baked-in build rather than a mounted
 checkout (use `bin/cli app exec prod …` for that image).
+
+**`app console [ENV] [--repo T]` / `app connect [ENV] [--repo T]`.** Without
+`--repo` they attach to the long-lived container as before
+(`docker exec -it move-app-dev bin/rails console` / `bash`, prod included).
+With `--repo` they open `bin/rails console` / `bash` in a throwaway container
+for that checkout, the same way `app run` does: banner first, database up,
+exit with the session's status, dev only (same refusal message). stdin is
+always attached, so a script can be piped in
+(`echo 'puts User.count' | bin/cli app console --repo T`); `--tty` is added
+only when stdin and stdout are both terminals.
 
 **`app test [--repo T] [-- RSPEC_ARGS...]`** runs
 `bin/rails db:test:prepare && bundle exec rspec …` under `RAILS_ENV=test` in a
@@ -112,6 +124,14 @@ All worktrees share the one `move_test` database, so runs are serialised:
   `docker rm -f move-app-test`.
 - a plain `bundle exec rspec` inside `move-app-dev` does **not** take the lock.
 
+**`app test --system`** runs `spec/system` with `TEST_BROWSER=rack_test`, as
+CI does, under the same lock and container. Arguments after `--` are passed
+through; `spec/system` is prepended unless one of them already names a
+`spec/system…` path. `:js` specs switch to headless Chrome, which needs
+chromedriver. The dev image has none, so when `command -v chromedriver` fails
+in the image they are excluded (`--tag ~js`) with a one-line note that they
+run in CI only.
+
 **Gitignored files.** A fresh worktree has no `config/master.key` or
 `.env.<env>`. They are read from the worktree when present, otherwise from the
 main checkout, and are never copied into the worktree (`git status` stays
@@ -121,13 +141,130 @@ source as an empty directory) is refused with an `rmdir` hint. `tmp/` and
 
 **Gemfile.lock drift.** The container runs the gems baked into
 `workeverywhere/move-app:latest`. When the worktree's `Gemfile.lock` differs
-from the image's, a warning is printed; if gems changed, `bin/cli app build`
-(which also changes the image the main checkout uses).
+from the image's, a warning is printed. If gems changed, build a private image
+from the worktree (`DOCKER_NAMESPACE=wt<n> bin/cli app build`) and run with the
+same `DOCKER_NAMESPACE`, so the shared `workeverywhere/move-app:latest`, which
+must keep matching main, is left alone.
 
-**Not covered:** serving a worktree **in the browser** next to main. That needs a
-second routed app container, and host-only sessions (#280), the Apartment
-subdomain elevator and the ActionCable `allowed_request_origins` all depend on
-the hostname, so it needs its own design note.
+**Not covered yet:** serving a worktree **in the browser** next to main. See
+the proposal below (#869 part 3).
+
+### Proposed: serving a worktree in the browser
+
+> **Status: proposal, pending user sign-off. Nothing here is implemented.**
+> Each question lists the recommended option first. Implementation (#869
+> step B) touches auth and tenancy, so it needs a `/security-review` and the
+> full live auth journey (AGENTS.md rule 3).
+
+Today a browser live check means `bin/cli app restart` from the worktree,
+which replaces `move-app-dev` (one agent at a time), then restoring main. The
+goal is a second, routed app per worktree that runs next to main.
+
+```mermaid
+flowchart LR
+  B["Browser"] -->|"*.move-easy.docker → 127.0.0.2<br/>(move-dns, unchanged)"| T["move-router<br/>Traefik file provider"]
+  T -->|"move.move-easy.docker<br/>&lt;slug&gt;.move-easy.docker"| A["move-app-dev<br/>main checkout"]
+  T -->|"move.869.wt.move-easy.docker<br/>&lt;slug&gt;.869.wt.move-easy.docker<br/>(dynamic/wt-869.yml)"| W["move-app-wt-869<br/>worktree at /rails"]
+  A --> DBM[("move_development")]
+  W --> DBW[("move_development_wt_869")]
+  A & W --> M["mail (shared mailcatcher)"]
+```
+
+**1. Hostname scheme.** The elevator (`MoveTenantElevator`) takes the single
+label left of `config.x.tenant_zone`; a host with more labels stays on the
+public schema. Every tenant and apex URL derives from `tenant_zone` and the
+mailer `default_url_options[:host]` (handoff, `RodauthMailer`, invitations,
+CSP).
+
+- **Recommended:** a per-worktree zone `<wt>.wt.move-easy.docker`. The apex is
+  `move.<wt>.wt.move-easy.docker` and orgs are `<slug>.<wt>.wt.move-easy.docker`.
+  `<wt>` is a sanitised `[a-z0-9-]{1,20}` label from the worktree directory
+  name, or `--name`. The worktree container sets the zone and apex through two
+  new env overrides in `development.rb` (`MOVE_TENANT_ZONE`,
+  `MOVE_APEX_HOST`), with today's values as defaults. Add `wt` to
+  `EXCLUDED_SUBDOMAINS` so `wt.move-easy.docker` can never resolve as an org,
+  and no org slug can collide with a worktree (the worktree label sits one
+  level deeper). Main's elevator and its tenant `HostRegexp` both match one
+  label only, so main never serves a worktree host.
+- Rejected: a distinct parent domain per worktree (`move-wt-869.docker`). It
+  needs a new root-only DNS delegate and a new CA, re-trusted, per worktree.
+- Rejected: a reserved label prefix (`wt-869-<slug>.move-easy.docker`). It
+  needs elevator parsing changes, and an org slug starting with `wt-` would
+  collide.
+
+**2. Router, DNS, CA.**
+
+- **DNS:** no change. dnsmasq's `address=/move-easy.docker/127.0.0.2` answers
+  every depth.
+- **Router (recommended):** `app serve` writes one file per worktree,
+  `~/.local/state/move/router/dynamic/wt-<wt>.yml`, with a `Host(move.<wt>…)`
+  router and a `HostRegexp(^[a-z0-9-]+\.<wt>\.wt\.move-easy\.docker$)` router
+  to `http://move-app-wt-<wt>:9292`. `watch: true` applies it live and `stop`
+  deletes it. `RouterConfig` keeps owning main's file.
+- **Certificates:** the root CA is name-constrained to `move-easy.docker`
+  *and* `.move-easy.docker`, so it may sign deeper names and needs no
+  re-trust. The current leaf only covers `*.move-easy.docker` (one label), so
+  it does **not** cover `<slug>.<wt>.wt…`. **Recommended:** a per-worktree leaf
+  for `*.<wt>.wt.move-easy.docker`, signed by the same CA and listed in that
+  worktree's router file under `tls.certificates`. Traefik picks it by SNI.
+
+**3. Auth.**
+
+- **Cookies:** host-only (#280), so every worktree host holds its own
+  `_move_session_v2`, and a main session never reaches a worktree host. No
+  change.
+- **Handoff token:** `SessionHandoffToken` is a public-schema row, redeemed on
+  the org host it was minted for. With a per-worktree database (point 5) a
+  main token can't be redeemed by a worktree app, and the reverse holds too.
+  On a shared database it could be, if the user moved a URL across hosts. That
+  is one more reason to recommend separate databases.
+- **`WEBAUTHN_RP_ID`:** **Recommended:** leave it unset for worktree apps. It
+  then derives from the request host, so passkeys are per worktree host. A
+  passkey enrolled on main does not work there; email-link login does. Setting
+  it to main's apex would be refused by browsers, because the RP ID must be a
+  suffix of the page's host.
+- **Email-link host:** Rodauth and `RodauthMailer` links follow `MOVE_APEX_HOST`
+  and `MOVE_TENANT_ZONE`, so mail sent by a worktree app links back to that
+  worktree. The mailcatcher is shared (one inbox): the link host tells you
+  which app sent it.
+- **Google sign-in:** OAuth callbacks are registered for main's hosts only, so
+  it stays unavailable on worktree hosts. Accepted, not planned.
+
+**4. ActionCable.** `allowed_request_origins` already accepts
+`([a-z0-9-]+\.)*move-easy\.docker`, which covers the nested hosts. No change.
+Dev uses the `async` adapter, which is per process, so each app only
+broadcasts to its own clients.
+
+**5. Data.**
+
+- **Recommended:** a per-worktree database, `move_development_wt_<wt>`, chosen
+  through a new `MOVE_DEV_DATABASE` override in `config/database.yml`.
+  `app serve` runs `bin/rails db:prepare` (load the worktree's
+  `structure.sql`, migrate, seed). The worktree's unapplied migrations then
+  only ever touch its own database, so the main database and main's
+  `structure.sql` can't drift. That was the cross-branch contamination
+  failure; see the `structure-sql-cross-branch-contamination` memory. Apartment
+  tenants are schemas inside that database, so they are isolated too.
+- Rejected: the shared `move_development`. A worktree with a new migration
+  either fails every page (`migration_error = :page_load`), or migrates main's
+  database ahead of main's code and contaminates main's next schema dump.
+- Rejected: a schema prefix. Apartment already uses schemas for tenants, and
+  the public-schema auth tables would still be shared.
+
+**6. Lifecycle.**
+
+- `bin/cli app serve [--repo T] [--name W]` starts a detached
+  `move-app-wt-<wt>` (same image and mount flags as `app run`, no published
+  port), writes the router file and the leaf, prepares the database, waits
+  for `/up` and prints the apex URL.
+- `bin/cli app stop --repo T [--drop-db]` removes the container and the
+  router file, and drops the database only when asked.
+- A cap of **3** concurrent worktree apps (counted by container name), with
+  the running ones listed on refusal.
+- `bin/cli app serve --prune` stops apps whose worktree is no longer in
+  `git worktree list`.
+- The same Gemfile.lock drift rule as `app run` applies: the worktree runs the
+  image's gems.
 
 ## Gotchas
 
@@ -137,6 +274,6 @@ the hostname, so it needs its own design note.
 | move-dns and isms-dns get mixed up | a `resolved.conf.d` drop-in was used: drop-ins merge into **one global** server list | use a DNS **delegate**, which is scoped to its zone |
 | `docker stop move-dns` hangs | dnsmasq started with `--no-daemon` serves TCP in the main process; resolved's kept-open TCP fallback stalls SIGTERM | the image uses `--keep-in-foreground` |
 | `https://mail.move-easy.docker` returns 502 just after `mail start` | mailcatcher not listening yet | retry after a second |
-| `bin/cli app run --repo …` fails with `Could not find <gem>-x.y.z in locally installed gems` | the worktree's `Gemfile.lock` is ahead of the image's bundle (the drift warning says so) | `bin/cli app build`, or run against a checkout whose lock matches the image |
+| `bin/cli app run --repo …` fails with `Could not find <gem>-x.y.z in locally installed gems` | the worktree's `Gemfile.lock` is ahead of the image's bundle (the drift warning says so) | a private image for that shell, `DOCKER_NAMESPACE=wt<n> bin/cli app build`, then the same `DOCKER_NAMESPACE` on `app run`/`test`/`console`/`connect` (leaves the shared image, and so main, alone); or `bin/cli app build` once main has the same lock |
 | `dig` works but the browser doesn't | `dig`/`nslookup` bypass NSS | check with `getent ahostsv4 <name>` (what `dns check` uses) |
 | `systemctl` warns that the unit "changed on disk" during bootstrap | resolved's unit config changed | `sudo systemctl daemon-reload` before the restart |
