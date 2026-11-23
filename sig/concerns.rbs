@@ -37,6 +37,13 @@ module FindListPinnable
   def pinned_item_ids: () -> untyped
 end
 
+# The contents grid's standalone cards (#889).
+module BoxGridItems
+  def standalone_grid_items: () -> Array[untyped]
+
+  def preload_item_tiles: (Array[untyped] items) -> void
+end
+
 # ReviewsController#move_photo responses (#874).
 module ReviewPhotoMoveResponses
   def photo_moved_response: (untyped target, completed_source: untyped) -> untyped

@@ -514,6 +514,15 @@ RSpec.describe "Unpacking" do
     end
 
     # A real Photos::Move lands right after action_class's first call returns.
+    def standalone_update
+      %(action="update" target="#{Components::Boxes::ContentsGrid::STANDALONE_ID}")
+    end
+
+    # The ItemCard root ids in document order.
+    def item_card_ids(html)
+      Nokogiri::HTML(html).css("[id]").pluck("id").grep(/\Abox_item_.+_card\z/)
+    end
+
     def move_photo_after_first_call(action_class, photo, destination)
       moved = false
       allow(action_class).to receive(:new).and_wrap_original do |original|
@@ -541,11 +550,11 @@ RSpec.describe "Unpacking" do
 
       patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id), as: :turbo_stream
 
-      # Plates was unpacked before the move and stays behind: it takes the
-      # departed photo card's place as a standalone card (Codex #886).
+      # Plates was unpacked before the move and stays behind: the photo card
+      # goes and the standalone region is redrawn with it (Codex #886, #889).
       card = Components::Boxes::PhotoCard.dom_id(photo)
       expect(response.body)
-        .to include(%(action="replace" target="#{card}"), Components::Boxes::ItemCard.dom_id(plates),
+        .to include(%(action="remove" target="#{card}"), standalone_update, Components::Boxes::ItemCard.dom_id(plates),
                     %(target="#{Components::Boxes::ContentsHeader::ID}"),
                     ERB::Util.h(I18n.t("unpacking.flash.photo_moved")))
       expect(response.body).not_to include(Components::Boxes::ItemCard.dom_id(mugs))
@@ -578,7 +587,8 @@ RSpec.describe "Unpacking" do
 
       card = Components::Boxes::PhotoCard.dom_id(photo)
       expect(response.body).to include(%(action="remove" target="#{card}"))
-      expect(response.body).not_to include(%(action="replace" target="#{card}"))
+      # Nothing was left behind, so the standalone region is untouched (#889).
+      expect(response.body).not_to include(%(action="replace" target="#{card}"), standalone_update)
     end
 
     it "turns a chip into a standalone card when its photo moves away after the unpack (Codex #886)" do
@@ -594,8 +604,34 @@ RSpec.describe "Unpacking" do
       patch move_box_unpacking_remove_path(move, box, plates, params: { origin: "box" }), as: :turbo_stream
 
       card = Components::Boxes::PhotoCard.dom_id(photo)
-      expect(response.body).to include(%(action="replace" target="#{card}"), Components::Boxes::ItemCard.dom_id(plates))
-      expect(response.body).not_to include(Components::Boxes::ItemCard.dom_id(mugs))
+      expect(response.body)
+        .to include(%(action="remove" target="#{card}"), standalone_update, Components::Boxes::ItemCard.dom_id(plates))
+      expect(response.body).not_to include(Components::Boxes::ItemCard.dom_id(mugs), %(action="replace" target="#{card}"))
+    end
+
+    it "places the left-behind cards where a full grid render would (#889)" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      destination = create(:box, :with_room, move:, status: "unpacking")
+      older_photo = create(:media, move:, box:, created_at: 2.days.ago)
+      create(:item, :confirmed, move:, box:, source_media: older_photo, name: "Books")
+      # The newer photo leads the grid, so its card is not the last photo card.
+      photo = create(:media, move:, box:, created_at: 1.day.ago)
+      plates = create(:item, :confirmed, move:, box:, source_media: photo, name: "Plates", created_at: 2.hours.ago)
+      lamp = create(:item, :manual, move:, box:, name: "Lamp", created_at: 3.hours.ago)
+      vase = create(:item, :manual, move:, box:, name: "Vase", created_at: 1.hour.ago)
+      move_photo_after_first_call(Items::Unpack, photo, destination)
+
+      patch move_box_unpacking_remove_path(move, box, plates, params: { origin: "box" }), as: :turbo_stream
+
+      streamed = item_card_ids(Nokogiri::HTML5.fragment(response.body)
+        .at_css(%(turbo-stream[action="update"][target="#{Components::Boxes::ContentsGrid::STANDALONE_ID}"]))
+        .at_css("template").inner_html)
+      get move_box_path(move, box)
+      rendered = item_card_ids(response.parsed_body
+        .at_css("##{Components::Boxes::ContentsGrid::STANDALONE_ID}").to_html)
+
+      expect(streamed).to eq([vase, plates, lamp].map { |item| Components::Boxes::ItemCard.dom_id(item) })
+      expect(streamed).to eq(rendered)
     end
 
     it "redirects a refused photo unpack whose concurrent move completed the box (Codex #886 R2)" do
