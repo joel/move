@@ -587,9 +587,26 @@ per adapter, so no surface can drift:
   the same completion after its loop. `FindLists::MarkFound` sequences it after
   its auto-open (a one-item **sealed** box goes `sealed → unpacking → unpacked`
   in one "Found" tap — two honest `box.status_changed` events, one deduped
-  toast). The review walk's mis-detection removal deliberately does **not**
-  complete (packing-phase cleanup), and reopen never re-completes an emptied
-  box.
+  toast). `Items::Move` (moving the last in-box item **out**) and
+  `Items::Delete` run the same completion on the **source** box after their
+  write commits (#757) — the destination is never completed; the item-detail
+  move and the MCP `move_item` tool surface it (linking toast /
+  `source_box_completed`). Both take the box lock first around their item write,
+  like `Items::RestoreToBox`, via `Items::CurrentBoxLock`: lock the box the
+  item is in **now**, re-read the item under the lock, and retry against its
+  new box (bounded; `Failure(:box_changed)`) if a concurrent move re-boxed it
+  while we waited, so the write, event and completion all follow the box the
+  item actually left. Every parent-first lock (box locks, the discard
+  cascade's root) is `FOR NO KEY UPDATE` (`BaseAction::PARENT_ROW_LOCK`): it
+  still serializes all box-first paths, but never blocks the `FOR KEY SHARE`
+  a concurrent child write's FK check takes on the box (re-boxing an item,
+  `GenerateImage` attaching media), which with `FOR UPDATE` deadlocks. The
+  one exception is `Boxes::CompleteIfEmpty`, which keeps `FOR UPDATE` so no
+  item can be moved or created **into** the box between its emptiness check
+  and the unpacked cascade. That can't deadlock: it only proceeds when the
+  box has no `in_box` rows to wait on. The review walk's mis-detection removal
+  deliberately does **not** complete (packing-phase cleanup), and reopen never
+  re-completes an emptied box.
 - `Boxes::CompleteIfEmpty` re-checks `unpacking? && items.in_box.none?` under
   the **box lock** (box-first — the same order as the completion cascade and
   `Items::RestoreToBox`'s guard, so restores and completions serialize and an
@@ -606,6 +623,7 @@ stateDiagram-v2
   in_transit --> unpacking: open
   unpacking --> unpacked: mark box unpacked (CTA)
   unpacking --> unpacked: last item unpacked (auto, #755)
+  unpacking --> unpacked: last in-box item moved out / deleted (auto, #757)
   unpacked --> unpacking: reopen (Undo — never auto-recompletes)
 ```
 

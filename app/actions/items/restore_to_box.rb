@@ -21,7 +21,7 @@ module Items
     #: (item: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:)
       yield ensure_writable(item.move)
-      item.box.with_lock do
+      item.box.with_lock(PARENT_ROW_LOCK) do
         yield ensure_box_active(item.box)
         return Success(item) unless item.reload.removed?
 

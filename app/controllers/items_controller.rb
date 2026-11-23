@@ -136,12 +136,9 @@ class ItemsController < MoveScopedController
   #: () -> untyped
   def move
     target = @move.boxes.find_by(id: params[:target_box_id])
-    result = Items::Move.new.call(item: @item, target_box: target, mover: current_user)
-
-    case result
-    in Dry::Monads::Success(item)
-      redirect_to move_item_path(@move, item),
-                  notice: t(".moved", number: item.box.number)
+    case Items::Move.new.call(item: @item, target_box: target, mover: current_user)
+    in Dry::Monads::Success({ item:, source_box:, source_completed: })
+      moved_response(item, completed_source: source_completed ? source_box : nil)
     in Dry::Monads::Failure(reason)
       redirect_to move_item_path(@move, @item), alert: move_error(reason)
     end
@@ -252,9 +249,7 @@ class ItemsController < MoveScopedController
   end
 
   #: () -> String
-  def item_path
-    move_item_path(@move, @item)
-  end
+  def item_path = move_item_path(@move, @item)
 
   # The presence-flip alert (non-2xx toast; streams only when the DOM should
   # re-render reality — e.g. the stale-restore refusal swaps in the reopen link).
@@ -287,6 +282,23 @@ class ItemsController < MoveScopedController
     else
       respond_with_streams(presence_streams, redirect: item_path, toast: true) { [:notice, t(".removed")] }
     end
+  end
+
+  # The move success response. Moving the last in-box item out of an unpacking
+  # box completes that SOURCE box (#757, Items::Move); the completion happens
+  # off-screen (we land on the item, now in the destination), so it surfaces
+  # with a LINKING toast to the source box (UX rule 1) instead of the plain
+  # moved toast. Items::Move reports the box the item actually left and its
+  # reality (was unpacking, is now unpacked), never a pre-call snapshot.
+
+  #: (untyped item, completed_source: untyped) -> untyped
+  def moved_response(item, completed_source:)
+    number = item.box.number
+    return redirect_to(item_path, notice: t(".moved", number: number)) unless completed_source
+
+    flash[:action_href] = move_box_path(@move, completed_source)
+    flash[:action_label] = t(".view_box")
+    redirect_to item_path, notice: t(".moved_box_unpacked", number: number, source: completed_source.number)
   end
 
   # Streams for a presence flip (mark_removed / restore): the overlay badges (the
@@ -405,9 +417,7 @@ class ItemsController < MoveScopedController
   end
 
   #: () -> Hash[Symbol, untyped]
-  def item_params
-    item_attributes.to_h.symbolize_keys
-  end
+  def item_params = item_attributes.to_h.symbolize_keys
 
   #: () -> untyped
   def item_attributes

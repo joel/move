@@ -93,4 +93,36 @@ RSpec.describe "Discards cascade" do # rubocop:disable RSpec/DescribeClass
       expect(Box.with_discarded.find(box.id)).not_to be_discarded
     end
   end
+
+  describe Discards::Cascade do
+    it "row-locks the root before writing any child — parent before child (#757 Codex R2)" do
+      create_list(:item, 2, move:, box:)
+      statements = []
+      callback = ->(*, payload) { statements << payload[:sql].to_s }
+
+      ActiveSupport::Notifications.subscribed(callback, "sql.active_record") do
+        described_class.new.call(record: box, actor:)
+      end
+
+      # NO KEY UPDATE (BaseAction::PARENT_ROW_LOCK, Codex R8): a child holder's
+      # FK insert against the box (FOR KEY SHARE) must not deadlock with it.
+      root_lock = statements.index { |sql| sql.include?('FROM "boxes"') && sql.include?("FOR NO KEY UPDATE") }
+      first_child_write = statements.index { |sql| sql.start_with?('UPDATE "items"') }
+      expect(root_lock).to be < first_child_write
+    end
+
+    it "rolls back a partial discard inside a caller's transaction (#757 savepoint)" do
+      item = create(:item, move:, box:)
+      allow(box).to receive(:discard_in_batch!).and_raise(Discard::RecordNotDiscarded.new("nope", box))
+
+      result = ActiveRecord::Base.transaction do
+        described_class.new.call(record: box, actor:)
+      end
+
+      aggregate_failures do
+        expect(result).to be_failure
+        expect(Item.with_discarded.find(item.id)).not_to be_discarded # child rolled back
+      end
+    end
+  end
 end

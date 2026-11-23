@@ -71,4 +71,8 @@ module Items
   module ConfirmedEdit
     include Dry::Monads::_ResultConstructors
   end
+
+  module CurrentBoxLock
+    include Dry::Monads::_ResultConstructors
+  end
 end

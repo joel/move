@@ -6,15 +6,44 @@ module Items
   # box during unpacking (the `presence_state` axis). An Item has no discardable
   # children, so the cascade discards just the one record under its own batch.
   # Emits `item.deleted` for the activity feed. Caller owns tenant context.
+  #
+  # Deleting the last IN-BOX item of an `unpacking` box completes the box
+  # (#757) — the same lifecycle rule as Items::Unpack, applied after the
+  # discard commits as a secondary mutation (its failure never masks the
+  # deletion; Success(item) either way).
   class Delete < BaseAction
+    include CurrentBoxLock
+
     #: (item: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:, source: :web)
-      batch_id = yield Discards::Cascade.new.call(record: item, actor: actor, source: source)
+      yield ensure_writable(item.move) # first step: no lock taken on a read-only Move
+      box, batch_id, emptied = yield with_current_box_lock(item) { |locked| locked_discard(item, locked, actor, source) }
       yield emit_event(item, actor, source, batch_id)
+      Boxes::CompleteIfEmpty.completed_box(box: box, actor: actor) if emptied
       Success(item)
     end
 
     private
+
+    # Runs under the lock of the box the item is in NOW (CurrentBoxLock), not
+    # the cached item.box: a concurrent move may have re-boxed the item while we
+    # waited (#757 Codex R1). The event's box_id and the completion then follow
+    # the box the item was actually deleted from. Box-first (#756 R2), so a
+    # delete serializes with "mark box unpacked" and with restores; the
+    # completion re-locks the box after this commits.
+    #
+    # `emptied` gates the completion on state read UNDER the lock: only
+    # deleting an IN-BOX item of a box being UNPACKED can complete it. Deleting
+    # an already removed item must not close a deliberately reopened empty box
+    # ("reopen never re-completes", #757 Codex R5), and a box opened after we
+    # release the lock was opened empty on purpose (#757 Codex R9).
+
+    #: (untyped item, untyped box, untyped actor, Symbol source) -> Dry::Monads::Result[untyped, untyped]
+    def locked_discard(item, box, actor, source)
+      emptied = !item.removed? && box.unpacking?
+      batch_id = yield Discards::Cascade.new.call(record: item, actor: actor, source: source)
+      Success([box, batch_id, emptied])
+    end
 
     #: (untyped item, untyped actor, Symbol source, untyped batch_id) -> Dry::Monads::Success[nil]
     def emit_event(item, actor, source, batch_id)

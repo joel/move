@@ -24,7 +24,18 @@ module Boxes
 
     #: (box: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, actor:)
-      box.with_lock do
+      # FOR UPDATE on purpose: the ONE parent lock that must also exclude FK
+      # writers (#757 Codex R10). The emptiness check must still hold when
+      # TransitionStatus's cascade runs; under NO KEY UPDATE, a move or create
+      # INTO the box (FOR KEY SHARE) could commit in between, and the cascade
+      # would sweep the newcomer to `removed`. It cannot form the R8 deadlock:
+      # it proceeds only when the box has no in_box rows, and FOR UPDATE
+      # stops new ones arriving, so it never waits on a child row while
+      # holding the box.
+      box.with_lock("FOR UPDATE") do
+        # The lock's re-read is unscoped: a box a concurrent Boxes::Delete
+        # discarded is no longer anyone's to complete (#757 Codex R4).
+        return Success(nil) if box.discarded?
         return Success(nil) unless box.unpacking? && box.items.in_box.none?
 
         case TransitionStatus.new.call(box: box, to: "unpacked", actor: actor)

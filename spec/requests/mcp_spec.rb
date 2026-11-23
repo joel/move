@@ -183,9 +183,22 @@ RSpec.describe "MCP endpoint" do
       to = create(:box, move:, number: 5)
       item = create(:item, move:, box: from, name: "Mug")
 
-      tool_call("move_item", { item_id: item.id, to_box_number: 5 })
+      body = tool_call("move_item", { item_id: item.id, to_box_number: 5 })
 
       expect(item.reload.box_id).to eq(to.id)
+      expect(body.dig("result", "structuredContent", "source_box_completed")).to be(false)
+    end
+
+    it "completes an emptied unpacking source box and reports it (#757)" do
+      from = create(:box, move:, number: 4, status: "unpacking")
+      to = create(:box, move:, number: 5, status: "unpacking")
+      item = create(:item, move:, box: from, name: "Mug")
+
+      body = tool_call("move_item", { item_id: item.id, to_box_number: 5 })
+
+      expect(body.dig("result", "structuredContent", "source_box_completed")).to be(true)
+      expect(from.reload.status).to eq("unpacked")
+      expect(to.reload.status).to eq("unpacking")
     end
   end
 

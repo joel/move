@@ -17,6 +17,18 @@ class BaseAction
   # @rbs skip
   include Dry::Monads[:result, :do]
 
+  # The row-lock mode for a PARENT row (a Box, a cascade root) taken before
+  # writing its children (#757 Codex R1-R8). FOR NO KEY UPDATE still excludes
+  # every other parent-first locker (it conflicts with itself and FOR UPDATE),
+  # but, unlike FOR UPDATE, it does not block the FOR KEY SHARE a concurrent
+  # child write's FK check takes on the parent (re-boxing an item, attaching
+  # a generated image's media). With FOR UPDATE, a job holding a child row
+  # while inserting an FK to the parent deadlocks against us. None of these
+  # lockers changes the parent's key, so NO KEY UPDATE is sufficient.
+  # Exception: Boxes::CompleteIfEmpty keeps FOR UPDATE, because its emptiness
+  # check must exclude children ARRIVING (see there).
+  PARENT_ROW_LOCK = "FOR NO KEY UPDATE"
+
   private
 
   # The archived-Move invariant lives here, in one place, instead of being

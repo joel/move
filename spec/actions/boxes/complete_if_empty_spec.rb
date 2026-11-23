@@ -55,6 +55,27 @@ RSpec.describe Boxes::CompleteIfEmpty do
     expect(box.reload.status).to eq("unpacked")
   end
 
+  it "never completes a box a concurrent delete discarded (#757 Codex R4)" do
+    box = create(:box, :with_room, move:, status: "unpacking")
+    Box.where(id: box.id).update_all(discarded_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+
+    result = described_class.new.call(box:, actor:) # in-memory `box` is stale/kept
+
+    aggregate_failures do
+      expect(result.value!).to be_nil
+      expect(Box.with_discarded.find(box.id).status).to eq("unpacking")
+    end
+  end
+
+  it "locks FOR UPDATE so no item can be moved/created INTO the box mid-check (#757 Codex R10)" do
+    box = create(:box, :with_room, move:, status: "unpacking")
+
+    locks = box_locks_taken(mode: /FOR UPDATE\b/) { described_class.new.call(box:, actor:) }
+
+    # FOR UPDATE (not NO KEY UPDATE) conflicts with the FK KEY SHARE an incoming item write takes.
+    expect(locks).to include(box.id)
+  end
+
   it ".completed_box folds not-applicable AND failures to nil (secondary-mutation form, #756 R4)" do
     aggregate_failures do
       packing = create(:box, :with_room, move:, status: "packing")

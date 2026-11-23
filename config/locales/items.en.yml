@@ -56,6 +56,8 @@ en:
       updated: "%{name} was updated."
     move:
       moved: "Item moved to box %{number}."
+      moved_box_unpacked: "Item moved to box %{number} — box %{source} unpacked"
+      view_box: "View box"
       same_box: "The item is already in that box."
       invalid: "That box isn't part of this move."
       removed_item: "Restore this item before moving it to another box."
