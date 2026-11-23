@@ -95,18 +95,20 @@ module Views
         end
       end
 
-      # Two sibling links (an anchor can't nest another): the card body opens the
-      # matched item, the trailing link opens this photo's own review page.
+      # Two sibling links (an anchor can't nest another): the top row opens the
+      # matched item, the link under it opens this photo's own review page.
 
       #: (untyped media, untyped conflict_item_id) -> untyped
       def conflict_card(media, conflict_item_id)
-        div(class: CARD_CLASSES) do
+        # Stacked: the panel column is narrow, so a side-by-side pill would
+        # squeeze the caption to one word per line.
+        div(class: "flex flex-col gap-2 rounded-xl border border-card-border bg-surface-container p-3") do
           a(href: view_context.move_item_path(@box.move_id, conflict_item_id),
-            class: "flex min-w-0 flex-1 items-center gap-3 transition hover:text-accent-sage") do
+            class: "flex min-w-0 items-center gap-3 transition hover:text-accent-sage") do
             card_inner(media) { card_body([], conflict_item_id) }
           end
           a(href: review_href(media),
-            class: "shrink-0 rounded-full border border-card-border px-3 py-1 text-label-caps uppercase " \
+            class: "self-end rounded-full border border-card-border px-3 py-1 text-label-caps uppercase " \
                    "text-muted transition hover:border-accent-sage hover:text-accent-sage") do
             I18n.t("captures.session.manage_photo")
           end
