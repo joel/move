@@ -239,6 +239,29 @@ sequenceDiagram
   mean a needless apex bounce lands the user unauthenticated. The danger-zone
   delete submits with `data-turbo="false"` + a `confirm` Stimulus controller so
   the browser follows the cross-host redirect (Turbo won't follow it via fetch).
+- **The success toast crosses hosts as a fixed key, not a flash (#844).** A
+  successful delete always lands on the apex root, but a flash set on the org
+  subdomain lives in that host's session, which the apex never sees. The redirect
+  therefore carries `?notice=account_deleted`; `WelcomeController` maps it through
+  an allow-list (`CROSS_HOST_NOTICES`, key → i18n key, never free text) to a flash
+  and immediately redirects to the clean `/`, so a reload or shared URL doesn't
+  replay it. Only a signed-out visitor gets the toast. Accepted limitation: anyone
+  can craft the link, but all it can show is that one fixed sentence.
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant S as acme.move-easy.org
+  participant A as move-easy.org (apex)
+  B->>S: DELETE /account
+  S->>S: Accounts::Delete, reset_session
+  S-->>B: 302 https://move-easy.org/?notice=account_deleted
+  B->>A: GET /?notice=account_deleted
+  A->>A: allow-listed key → flash[:notice]
+  A-->>B: 302 /
+  B->>A: GET /
+  A-->>B: 200 welcome page + success toast
+```
 
 ### Terms-agreement gate: every account accepts before any app surface (#369)
 
