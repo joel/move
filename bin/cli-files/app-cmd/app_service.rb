@@ -25,7 +25,7 @@ module AppCLI
 
       def setup
         runner.ensure_network(env_config.network_name)
-        ensure_master_key!
+        ensure_mount_sources!
         runner.ensure_mysql_certs if env_config.mysql?
         ensure_sqlite_db_dir
       end
@@ -171,9 +171,12 @@ module AppCLI
         raise Thor::Error, "App container is not running. Start it with `bin/cli app start`."
       end
 
-      # Raises when neither this checkout nor the main one has config/master.key.
-      def ensure_master_key!
+      # Raises when neither this checkout nor the main one has config/master.key,
+      # or when either file is a directory (a leftover Docker bind source). Runs
+      # in setup, so restart checks it before stopping the old container.
+      def ensure_mount_sources!
         sources.master_key_path
+        sources.env_file_path(env_config.env)
       end
 
       def ensure_ruby_version!

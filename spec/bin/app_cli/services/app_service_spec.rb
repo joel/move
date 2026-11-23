@@ -55,6 +55,14 @@ RSpec.describe AppCLI::Services::AppService do
       expect(runner.commands).to be_empty
     end
 
+    it "refuses a .env file that is a directory before any docker call" do
+      File.write(File.join(main, "config/master.key"), "k")
+      FileUtils.mkdir_p(File.join(worktree, ".env.development"))
+
+      expect { service.prepare }.to raise_error(Thor::Error, %r{#{worktree}/.env.development is a directory})
+      expect(runner.commands).to be_empty
+    end
+
     it "accepts the main checkout's key when the worktree has none" do
       File.write(File.join(main, "config/master.key"), "k")
       expect { service.prepare }.not_to raise_error
@@ -155,6 +163,14 @@ RSpec.describe AppCLI::Services::AppService do
       expect { manager.restart_app }.to raise_error(Thor::Error, /move-app-dev is still there after `docker stop`/)
       expect(runner.commands).to include("docker rm --force move-app-dev")
       expect(runner.commands).not_to include(a_string_matching(/docker run --rm --detach/))
+    end
+
+    it "refuses a .env directory before stopping the running container" do
+      File.write(File.join(main, "config/master.key"), "k")
+      FileUtils.mkdir_p(File.join(main, ".env.development"))
+
+      expect { manager.restart_app }.to raise_error(Thor::Error, /is a directory/)
+      expect(stops).to be_empty
     end
 
     it "builds a missing image before stopping the running container" do
