@@ -16,6 +16,10 @@ module Components
       # photos render before standalone items, so indexing the media loop is
       # sufficient (#673).
       EAGER_TILES = 4
+      # The standalone cards' region (#889): a `display: contents` wrapper, so
+      # its cards stay direct grid items. Always rendered inside the grid, so a
+      # stream can redraw the standalone cards in this order.
+      STANDALONE_ID = "box-standalone-cards"
 
       # @rbs move: untyped
       # @rbs box: untyped
@@ -100,12 +104,14 @@ module Components
           # The eager index CONTINUES across them: when the box has fewer than
           # EAGER_TILES photos, image-backed item cards fill the first visible
           # row and must not lazy-load the likely LCP (#673 Codex).
-          @standalone_items.reverse_each.with_index(@media.size) do |item, index|
-            render Components::Boxes::ItemCard.new(
-              item: item, move: @move, image_ready: @move.image_generation_ready?,
-              eager: index < EAGER_TILES, unpacking: @interactive,
-              pinnable: @pinnable, pinned: @pinned_item_ids.include?(item.id)
-            )
+          div(id: STANDALONE_ID, class: "contents") do
+            @standalone_items.reverse_each.with_index(@media.size) do |item, index|
+              render Components::Boxes::ItemCard.new(
+                item: item, move: @move, image_ready: @move.image_generation_ready?,
+                eager: index < EAGER_TILES, unpacking: @interactive,
+                pinnable: @pinnable, pinned: @pinned_item_ids.include?(item.id)
+              )
+            end
           end
         end
       end
