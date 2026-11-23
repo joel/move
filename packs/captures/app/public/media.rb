@@ -151,7 +151,7 @@ class Media < ApplicationRecord
 
   #: () -> String?
   def recognition_state
-    recognition_runs.order(created_at: :desc).first&.status
+    recognition_runs.order(created_at: :desc, id: :desc).pick(:status)
   end
 
   # Has this photo produced an item? MOVE-wide, not box-scoped: Items::Move keeps
@@ -177,11 +177,17 @@ class Media < ApplicationRecord
     !sourced_item? && !recognition_suggestions.exists?
   end
 
-  # A run is queued or processing — recognition may still materialize items, so
-  # recovery mutations (re-run, manual-add binding) must wait until it settles.
+  # The photo's LATEST run is queued or processing — recognition may still
+  # materialize items, so recovery mutations (re-run, manual-add binding) and
+  # deletion must wait until it settles. Only the latest run counts (#871): an
+  # older run left non-terminal (a lost job) is superseded by any newer run and
+  # must not block the photo for ever. Should such a run ever wake up,
+  # RecognitionRuns::Process re-checks the photo under a row lock before
+  # materializing. Same "latest" as #recognition_state, so the badge and the
+  # guard can't disagree.
 
   #: () -> bool
   def recognition_in_flight?
-    recognition_runs.exists?(status: %w[queued processing])
+    RecognitionRun::IN_FLIGHT.include?(recognition_state)
   end
 end

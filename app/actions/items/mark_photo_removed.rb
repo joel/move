@@ -28,6 +28,9 @@ module Items
   # Box-first, like Items::RestoreToBox; we hold no other row lock while
   # waiting, so no cycle with the movers (box → photo → items).
   #
+  # Returns Success(items:, completed_box:, photo_moved:) — photo_moved is
+  # true when the photo left this box mid-loop (see moved_away?).
+  #
   # No wrapping transaction: each item runs in its own short box-locked
   # transaction and commits before the next, so every success is durable,
   # per the bulk best-effort convention. MarkRemoved emits only after its
@@ -48,7 +51,8 @@ module Items
       # photo completes the box — owned here, not by the adapter, so the rule
       # cannot drift. Post-loop, own box lock (#739 R2); completed_box never
       # fails the already-committed removals (#756 R4).
-      Success(items: items, completed_box: Boxes::CompleteIfEmpty.completed_box(box: box, actor: actor))
+      Success(items: items, completed_box: Boxes::CompleteIfEmpty.completed_box(box: box, actor: actor),
+              photo_moved: moved_away?(box, media))
     end
 
     private
@@ -77,6 +81,17 @@ module Items
       media.reload.box_id == box.id && !media.discarded?
     rescue ActiveRecord::RecordNotFound
       false
+    end
+
+    # A Photos::Move can commit between two per-item transactions and take the
+    # photo (with its remaining items) to another box (#877): the loop then
+    # skips them, so success alone can't tell "unpacked" from "moved away".
+    # Re-read under the box lock, like the opening check; the caller drops the
+    # photo's card from this box instead of redrawing a photo it no longer holds.
+
+    #: (untyped box, untyped media) -> bool
+    def moved_away?(box, media)
+      box.with_lock(PARENT_ROW_LOCK) { !owned?(box, media) }
     end
 
     # Success(item) when removed, Success(nil) when the item left this box

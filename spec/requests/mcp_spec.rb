@@ -365,6 +365,18 @@ RSpec.describe "MCP endpoint" do
         expect(media.image.content_type).to eq("image/jpeg")
       end
 
+      it "reports the saved photo with failed recognition when the job can't be queued (#871)" do
+        signed = upload(png_bytes)
+        allow(RecognitionRuns::ProcessJob).to receive(:perform_later).and_raise(SolidQueue::Job::EnqueueError)
+
+        body = tool_call("add_media_to_box", { box_number: 9, signed_id: signed })
+
+        media = box.media.sole
+        expect(body.dig("result", "isError")).not_to be(true)
+        expect(structured(body)).to include("media_id" => media.id, "recognition" => "failed")
+        expect(media.recognition_runs.sole.status).to eq("failed")
+      end
+
       it "transcodes a non-native uploaded blob (TIFF) to JPEG on attach" do
         tiff = Rails.root.join("spec/fixtures/files/sample.tiff").binread
         signed = upload(tiff, filename: "a.tiff")

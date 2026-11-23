@@ -6,6 +6,7 @@
 class RecognitionRun < ApplicationRecord
   STATUSES = %w[queued processing succeeded partially_succeeded failed].freeze
   TERMINAL = %w[succeeded partially_succeeded failed].freeze
+  IN_FLIGHT = %w[queued processing].freeze
 
   belongs_to :move
   belongs_to :box

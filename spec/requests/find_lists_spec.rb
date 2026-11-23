@@ -261,6 +261,53 @@ RSpec.describe "FindLists" do
       end
     end
 
+    # #873: the response must come from ONE read. The other device's opposite
+    # toggle lands right AFTER the response's snapshot read — every surface
+    # (control, toast, badge, list) must still agree with that one snapshot,
+    # never mix it with a later read.
+    context "when a concurrent toggle lands after the response's read (#873)" do
+      let(:item) { create(:item, move:, box: create(:box, move:), name: "Kettle") }
+      let(:entries) { FindListEntry.where(move:, user_id: user.id, item:) }
+      let(:list_body) { response.body[%r{<turbo-stream action="replace" target="find-list">.*?</turbo-stream>}m].to_s }
+
+      def race_after_snapshot(race)
+        allow(FindListEntry).to receive(:snapshot_for).and_wrap_original do |original, *args|
+          original.call(*args).tap { race.call }
+        end
+      end
+
+      it "renders pinned everywhere, with the toast, when another tab unpins after the read" do
+        race_after_snapshot(-> { entries.delete_all })
+
+        post move_find_list_pin_path(move, item_id: item.id), as: :turbo_stream
+
+        aggregate_failures do
+          expect(entries).to be_empty # the race really landed
+          expect(FindListEntry).to have_received(:snapshot_for).once
+          expect_toggles(item, pinned: true)
+          expect(response.body).to include(I18n.t("find_lists.flash.pinned", name: "Kettle"))
+          expect(response.body).to include(I18n.t("find_lists.search_link", count: 1))
+          expect(list_body).to include("Kettle")
+        end
+      end
+
+      it "renders unpinned everywhere when another tab re-pins after the read" do
+        create(:find_list_entry, move:, user:, item:)
+        race_after_snapshot(-> { create(:find_list_entry, move:, user:, item:) })
+
+        delete move_find_list_unpin_path(move, item_id: item.id), as: :turbo_stream
+
+        aggregate_failures do
+          expect(entries).to exist # the race really landed
+          expect(FindListEntry).to have_received(:snapshot_for).once
+          expect_toggles(item, pinned: false)
+          expect(response.body).not_to include(I18n.t("find_lists.search_link", count: 1))
+          expect(list_body).not_to include("Kettle")
+          expect(list_body).to include(I18n.t("find_lists.show.empty.title"))
+        end
+      end
+    end
+
     context "when the action fails (#732)" do
       let(:item) { create(:item, move:, box: create(:box, move:), name: "Kettle") }
 
