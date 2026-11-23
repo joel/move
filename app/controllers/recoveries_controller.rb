@@ -71,7 +71,7 @@ class RecoveriesController < MoveScopedController
 
   #: () -> untyped
   def latest_run
-    @latest_run ||= @media.recognition_runs.order(created_at: :desc).first
+    @latest_run ||= RecognitionRun.latest_for(@media.id).first
   end
 
   #: () -> untyped

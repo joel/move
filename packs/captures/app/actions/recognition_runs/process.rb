@@ -145,11 +145,12 @@ module RecognitionRuns
       raise RunSuperseded, "The photo was already turned into items by another run"
     end
 
-    # Same "latest" as Media#recognition_state / #recognition_in_flight?.
+    # Same "latest" as Media#recognition_state / #recognition_in_flight? and
+    # Retry (RecognitionRun.latest_for?, #902).
 
     #: (untyped run) -> bool
     def latest_for_media?(run)
-      RecognitionRun.where(media_id: run.media_id).order(created_at: :desc, id: :desc).pick(:id) == run.id
+      RecognitionRun.latest_for?(run)
     end
 
     # Fails a superseded run that is still in flight (guarded, so a run the
