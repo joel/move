@@ -45,4 +45,3 @@ en:
       failed: "That capture could not be saved. Check your connection and try again."
       unsupported_image: "That file isn't a supported image. Use a photo (JPEG, PNG, WEBP, HEIC, or TIFF)."
       image_too_large: "That image is too large (max %{max}). Try a smaller photo."
-      enqueue_failed: "The photo was saved, but recognition couldn't start. Use Retry on the photo to try again."

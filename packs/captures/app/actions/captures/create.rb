@@ -43,13 +43,14 @@ module Captures
 
       media = yield persist(box, file, signed_id, captured_via)
       enqueued = RecognitionRuns::Enqueue.new.call(media: media)
+      # A recognition job that could not be queued (#871) leaves the photo
+      # saved and its run failed + retryable, so the capture still succeeds:
+      # the caller reads media.recognition_state rather than getting an error
+      # for a photo that exists (an MCP agent would re-upload a duplicate).
       return enqueued if enqueued.failure? && enqueued.failure != :enqueue_failed
 
-      # The photo is saved even when its recognition job could not be queued
-      # (#871: the run is failed and retryable), so the capture is still
-      # announced before the caller hears about the recognition failure.
       yield emit_event(media, captured_by)
-      enqueued.failure? ? enqueued : Success(media)
+      Success(media)
     end
 
     private

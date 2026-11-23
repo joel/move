@@ -21,13 +21,13 @@ RSpec.describe Captures::Create do
     expect(box.items.count).to eq(3)
   end
 
-  it "keeps the photo and still emits media.captured when recognition can't be queued (#871)" do
+  it "succeeds with the saved photo and emits media.captured when recognition can't be queued (#871)" do
     allow(RecognitionRuns::ProcessJob).to receive(:perform_later).and_raise(SolidQueue::Job::EnqueueError)
     allow(Rails.event).to receive(:notify).and_call_original
 
     result = described_class.new.call(box:, file: upload, captured_by: user)
 
-    expect(result.failure).to eq(:enqueue_failed)
+    expect(result.value!).to eq(box.media.sole)
     media = box.media.sole
     expect(media.recognition_runs.sole.status).to eq("failed")
     expect(Rails.event).to have_received(:notify).with("media.captured", hash_including(media_id: media.id))
