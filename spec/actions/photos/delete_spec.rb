@@ -74,6 +74,17 @@ RSpec.describe Photos::Delete do
     end
   end
 
+  it "deletes a photo whose stranded queued run was superseded by a settled run (#871)" do
+    # The issue's repro: a run left queued with no job (a pre-fix lost enqueue),
+    # then a newer run on the same photo succeeds.
+    stranded = travel_to(1.hour.ago) { create(:recognition_run, move:, box:, media:, status: "queued") }
+    create(:recognition_run, :succeeded, move:, box:, media:)
+
+    expect(call).to be_success
+    expect(stranded.reload.status).to eq("queued")
+    expect(Media.kept.exists?(media.id)).to be(false)
+  end
+
   it "deletes once the photo's recognition run has settled (#854)" do
     create(:recognition_run, move:, box:, media:, status: "failed")
 
