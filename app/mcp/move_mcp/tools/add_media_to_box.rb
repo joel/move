@@ -30,7 +30,10 @@ module MoveMcp
 
         media = result.value!
         audit(server_context, box_number: box.number.to_i, media_id: media.id)
-        data_response(media_id: media.id, box_number: box.number.to_i, recognition: "queued")
+        # "failed" when the recognition job could not be queued (#871): the
+        # photo is saved and the run can be retried from the capture screen.
+        recognition = media.recognition_state == "failed" ? "failed" : "queued"
+        data_response(media_id: media.id, box_number: box.number.to_i, recognition: recognition)
       end
     end
   end

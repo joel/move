@@ -61,6 +61,32 @@ RSpec.describe Media do
     end
   end
 
+  describe "#recognition_in_flight? (#871)" do
+    let(:media) { create(:media) }
+
+    def run(status, at: Time.current)
+      travel_to(at) { create(:recognition_run, media:, move: media.move, box: media.box, status:) }
+    end
+
+    it "is false with no runs" do
+      expect(media.recognition_in_flight?).to be(false)
+    end
+
+    %w[queued processing].each do |status|
+      it "is true when the latest run is #{status}" do
+        run("failed", at: 1.hour.ago)
+        run(status)
+        expect(media.recognition_in_flight?).to be(true)
+      end
+    end
+
+    it "ignores an older run stranded in queued once a newer run settled" do
+      run("queued", at: 1.hour.ago)
+      run("succeeded")
+      expect(media.recognition_in_flight?).to be(false)
+    end
+  end
+
   describe "#sourced_item? / #orphaned?" do
     # #198 — a soft-deleted item still sources its photo, so discarding it must not
     # re-flag the photo as orphaned (which would offer recovery and let it
