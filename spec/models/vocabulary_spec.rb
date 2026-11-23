@@ -18,10 +18,9 @@ RSpec.describe Vocabulary do
   end
 
   describe "kind dispatch" do
-    it "maps rooms to the Room model and chip tint" do
+    it "maps rooms to the Room model" do
       vocabulary = described_class.find("rooms")
       expect(vocabulary.model).to eq(Room)
-      expect(vocabulary.chip_kind).to eq(:room)
       expect(vocabulary.permitted_params).to eq(%i[name])
     end
   end

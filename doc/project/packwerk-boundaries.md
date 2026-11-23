@@ -92,7 +92,14 @@ A pack exposes the **minimum** surface. Two complementary mechanisms:
    contracts** (`ApplicationRecord` subclasses + pure-data structs) — never an action:
    it must not use `Dry::Monads` or emit events. The architecture fitness tests scan
    `app/public/` as part of the model layer, so a misplaced action there fails them
-   (move it to `app/actions/` + the sigil, per (2)).
+   (move it to `app/actions/` + the sigil, per (2)). A public contract also carries
+   **no presentation**: it must not reference `Components::`/`Views::` constants
+   (icons, chip tints, labels-as-markup). Put that mapping beside the components
+   that render it. Example: `Vocabulary` exposes only data (`kind`, `model`,
+   `records`, `usage_counts`, `permitted_params`); the per-kind icon and chip tint
+   live in `Components::Vocabularies::Presentation` (#472). Otherwise the pack
+   would need an upward reference into the application layer, which becomes an
+   architecture violation once the root is assigned `layer: application`.
 2. **Public actions → stay in `app/actions/` + `# pack_public: true`.** The
    entry-point *action* a controller calls is the domain's public API too, but it
    must stay in the action layer so the architecture fitness tests keep governing it
