@@ -9,7 +9,12 @@ module AppCLI
       TIMEOUT_ENV = "MOVE_APP_READY_TIMEOUT".freeze
       DEFAULT_TIMEOUT = 60
       POLL_INTERVAL = 2
-      PROBE = "curl --fail --silent --output /dev/null --max-time 5 http://localhost:9292/up".freeze
+      # Prints the status code (000 when nothing answers). Not `--fail`: that
+      # only fails on >= 400, so a 3xx redirect would count as ready.
+      # rubocop:disable-next Style/FormatStringToken -- curl's --write-out syntax, not a Ruby format string
+      PROBE = "curl --silent --output /dev/null --max-time 5 --write-out '%{http_code}' " \
+              "http://localhost:9292/up".freeze
+      READY_STATUS = /\A2\d\d\z/
 
       # The timeout in seconds, from MOVE_APP_READY_TIMEOUT (default 60).
       # Raises on a value that is not a positive integer.
@@ -34,7 +39,7 @@ module AppCLI
         deadline = now + timeout
         loop do
           return false unless runner.container_running?(container)
-          return true if runner.run("docker exec #{container} #{PROBE}", allow_failure: true, quiet: true)
+          return true if answers_2xx?(container)
           return false if now >= deadline
 
           sleep(POLL_INTERVAL)
@@ -46,6 +51,10 @@ module AppCLI
       attr_reader :runner, :shell, :timeout
 
       def now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+      def answers_2xx?(container)
+        runner.capture("docker exec #{container} #{PROBE}", quiet: true).to_s.strip.match?(READY_STATUS)
+      end
     end
   end
 end

@@ -195,9 +195,10 @@ flags, `--env-file`, image and network before anything stops.
 The swap is a **rollback, not blue/green**: a candidate booted next to the
 live app would migrate the shared `move_development` under it. The old
 container is renamed `move-app-dev-prev` and stopped (not removed); the new
-one is renamed to `move-app-dev`, started, and must answer `GET /up` (a
-`curl` run with `docker exec` inside it) within `MOVE_APP_READY_TIMEOUT`
-seconds (default 60; the wait ends early when the container exits).
+one is renamed to `move-app-dev`, started, and must answer `GET /up` with a
+**2xx** (a `curl --write-out '%{http_code}'` run with `docker exec` inside
+it; a 3xx redirect is not ready) within `MOVE_APP_READY_TIMEOUT` seconds
+(default 60; the wait ends early when the container exits).
 
 - **Ready:** `move-app-dev-prev` is removed.
 - **Not ready** (a wrong master key, an exception while Rails boots, a slow
@@ -209,6 +210,14 @@ seconds (default 60; the wait ends early when the container exits).
   and `restart` stop before touching anything, with the fix for the state it
   finds: `docker rm --force move-app-dev-prev` when `move-app-dev` runs, or
   the `docker rename … && docker start …` that brings it back when it does not.
+- **One at a time, host-wide.** `start`, `stop` and the swap of `restart` /
+  `rebuild` hold an `flock` on `<main>/tmp/app-restart.lock` (separate from
+  the `app test` lock), because they reuse the fixed `move-app-dev`,
+  `-next` and `-prev` names. The holder writes its pid, checkout, branch and
+  start time there; a second caller from any checkout is refused before any
+  docker call with `Refused: another restart is in progress (<holder>)`. The
+  kernel drops the lock when the holder dies. The preflight and
+  router/db/storage start of a restart run before the lock is taken.
 
 `app start` uses the same readiness check: when the new container does not
 answer, it is removed and the command exits non-zero with its logs. App
@@ -226,14 +235,15 @@ sequenceDiagram
   participant CLI as bin/cli app restart
   participant Old as move-app-dev (old)
   participant New as move-app-dev-next
-  CLI->>CLI: preflight, router/db/storage, refuse a stale -prev
+  CLI->>CLI: preflight, router/db/storage
+  CLI->>CLI: flock tmp/app-restart.lock (refused if held), refuse a stale -prev
   CLI->>New: docker create (old still serves)
   CLI->>Old: rename to move-app-dev-prev, docker stop
   CLI->>New: rename to move-app-dev, docker start
   CLI->>New: docker exec curl /up until MOVE_APP_READY_TIMEOUT
-  alt answers /up
+  alt answers /up with a 2xx
     CLI->>Old: docker rm move-app-dev-prev
-  else exits or times out
+  else exits, times out, or only 3xx/4xx/5xx
     CLI->>New: docker logs --tail 40, docker rm --force
     CLI->>Old: rename back to move-app-dev, docker start, check /up
     CLI-->>CLI: exit non-zero with the logs

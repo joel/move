@@ -27,6 +27,14 @@ RSpec.describe AppCLI::Services::TestLock do
     end
   end
 
+  it "words the refusal with the busy text it was given" do
+    lock.synchronize("/wt-a (branch a)") do
+      other = described_class.new(path: path, busy: "Refused: another restart is in progress")
+      expect { other.synchronize("/wt-b (branch b)") { :never } }
+        .to raise_error(Thor::Error, %r{\ARefused: another restart is in progress \(pid \d+, /wt-a \(branch a\)})
+    end
+  end
+
   it "is refused by another process holding it" do
     lock # build the path before forking: the child must lock the same file
     reader, writer = IO.pipe
