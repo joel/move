@@ -25,8 +25,8 @@ module AppCLI
         path = locate("config/master.key")
         raise Thor::Error, missing_key_message unless path
 
-        # `$(cat …)` of an empty key starts the app without one.
-        raise Thor::Error, "#{path} is empty. Please add the key before starting the app." if File.empty?(path)
+        # `$(cat …)` of a blank key starts the app without one.
+        raise Thor::Error, "#{path} is empty. Please add the key before starting the app." if File.read(path).strip.empty?
 
         path
       end

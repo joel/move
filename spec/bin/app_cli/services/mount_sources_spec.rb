@@ -40,8 +40,8 @@ RSpec.describe AppCLI::Services::MountSources do
     expect { sources.master_key_path }.to raise_error(Thor::Error, %r{Missing config/master.key in #{worktree} and #{main}})
   end
 
-  it "refuses an empty master.key" do
-    File.write(File.join(main, "config/master.key"), "")
+  it "refuses a blank master.key" do
+    File.write(File.join(main, "config/master.key"), " \n")
     expect { sources.master_key_path }.to raise_error(Thor::Error, %r{main/config/master.key is empty})
   end
 
