@@ -284,6 +284,42 @@ RSpec.describe "Per-photo review" do
       expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
     end
 
+    it "refuses to add an item to an unpacked (terminal) box (#855)" do
+      unpacked = create(:box, :with_room, move:, status: "unpacked")
+      photo = create(:media, move:, box: unpacked)
+
+      expect do
+        post move_box_review_add_item_path(move, unpacked, photo), params: { item: { name: "Kettle" } }
+      end.not_to change(Item, :count)
+
+      expect(flash[:alert]).to eq(I18n.t("reviews.flash.add_failed"))
+    end
+
+    it "answers 422 with an alert toast as a Turbo Stream for an unpacked box (#855)" do
+      unpacked = create(:box, :with_room, move:, status: "unpacked")
+      photo = create(:media, move:, box: unpacked)
+
+      post move_box_review_add_item_path(move, unpacked, photo), params: { item: { name: "Kettle" } },
+                                                                 as: :turbo_stream
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include(I18n.t("reviews.flash.add_failed"))
+      expect(unpacked.items.reload).to be_empty
+    end
+
+    it "hides the add-item form on an unpacked box's photo, keeps it on a sealed one (#855)" do
+      unpacked = create(:box, :with_room, move:, status: "unpacked")
+      sealed = create(:box, :sealed, move:)
+      unpacked_photo = create(:media, move:, box: unpacked)
+      sealed_photo = create(:media, move:, box: sealed)
+
+      get move_box_review_photo_path(move, unpacked, unpacked_photo)
+      expect(response.body).not_to include(move_box_review_add_item_path(move, unpacked, unpacked_photo))
+
+      get move_box_review_photo_path(move, sealed, sealed_photo)
+      expect(response.body).to include(move_box_review_add_item_path(move, sealed, sealed_photo))
+    end
+
     it "re-shows the photo with an alert when the name is blank" do
       post move_box_review_add_item_path(move, box, media), params: { item: { name: "" } }
 
@@ -437,6 +473,49 @@ RSpec.describe "Per-photo review" do
       expect(item.reload.box_id).to eq(target.id)
       expect(response).to redirect_to(move_box_path(move, target))
       expect(flash[:notice]).to eq(I18n.t("reviews.flash.photo_moved", number: target.number))
+      expect(flash[:action_href]).to be_nil
+    end
+
+    context "when the photo held the last in-box items of an unpacking box (#838)" do
+      let(:box) { create(:box, move:, number: "3", status: "unpacking") }
+
+      it "completes the source box and links to it from the toast (UX rule 1)" do
+        detected(name: "Lamp")
+        target = create(:box, move:, number: "8", status: "unpacking")
+
+        patch move_box_review_move_photo_path(move, box, media), params: { target_box_id: target.id }
+
+        aggregate_failures do
+          expect(box.reload.status).to eq("unpacked")
+          expect(target.reload.status).to eq("unpacking")
+          expect(response).to redirect_to(move_box_path(move, target))
+          expect(flash[:notice]).to eq(I18n.t("reviews.flash.photo_moved_box_unpacked", number: "8", source: "3"))
+          expect(flash[:action_href]).to eq(move_box_path(move, box))
+          expect(flash[:action_label]).to eq(I18n.t("reviews.flash.view_box"))
+        end
+      end
+
+      it "keeps the plain toast while other in-box items remain" do
+        detected(name: "Lamp")
+        create(:item, :manual, move:, box:) # another photo's / manual item stays behind
+        target = create(:box, move:, number: "8")
+
+        patch move_box_review_move_photo_path(move, box, media), params: { target_box_id: target.id }
+
+        expect(box.reload.status).to eq("unpacking")
+        expect(flash[:notice]).to eq(I18n.t("reviews.flash.photo_moved", number: "8"))
+        expect(flash[:action_href]).to be_nil
+      end
+
+      it "stays in the queue walk and still links to the completed box" do
+        detected(name: "Lamp")
+        target = create(:box, move:, number: "8")
+
+        patch move_box_review_move_photo_path(move, box, media, queue: "move"), params: { target_box_id: target.id }
+
+        expect(response).to redirect_to(move_box_review_photo_path(move, target, media, queue: "move"))
+        expect(flash[:action_href]).to eq(move_box_path(move, box))
+      end
     end
 
     it "rejects a target outside this Move (scoped to @move.boxes) without moving the photo" do
@@ -506,6 +585,16 @@ RSpec.describe "Per-photo review" do
       expect(response).to redirect_to(move_box_review_photo_path(move, sealed, photo))
       expect(flash[:alert]).to eq(I18n.t("reviews.flash.photo_delete_wrong_phase"))
       expect(Media.kept.exists?(photo.id)).to be(true)
+    end
+
+    it "refuses while the photo's recognition is still running and keeps the photo (#854)" do
+      create(:recognition_run, :processing, move:, box:, media:)
+
+      delete move_box_review_photo_path(move, box, media)
+
+      expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
+      expect(flash[:alert]).to eq(I18n.t("reviews.flash.photo_delete_recognition_in_flight"))
+      expect(Media.kept.exists?(media.id)).to be(true)
     end
   end
 

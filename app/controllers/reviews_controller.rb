@@ -138,16 +138,8 @@ class ReviewsController < MoveScopedController
     target = @move.boxes.find_by(id: params[:target_box_id])
 
     case Photos::Move.new.call(media: @media, target_box: target, mover: current_user)
-    in Dry::Monads::Success(_media)
-      # In queue mode stay in the walk: the photo now lives in the target box, so
-      # continue on its review URL there (re-opening is idempotent) instead of
-      # ejecting the reviewer to the target box page mid-queue.
-      if queue_mode?
-        redirect_to move_box_review_photo_path(@move, target, @media, queue: QUEUE_PARAM),
-                    notice: t("reviews.flash.photo_moved", number: target.number)
-      else
-        redirect_to move_box_path(@move, target), notice: t("reviews.flash.photo_moved", number: target.number)
-      end
+    in Dry::Monads::Success({ source_box:, source_completed: })
+      photo_moved_response(target, completed_source: source_completed ? source_box : nil)
     in Dry::Monads::Failure(reason)
       redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query), alert: move_photo_error(reason)
     end
@@ -164,9 +156,9 @@ class ReviewsController < MoveScopedController
       # The page's subject is gone; in queue mode the queue page is "back".
       redirect_to (queue_mode? ? move_review_path(@move) : move_box_path(@move, @box)),
                   notice: t("reviews.flash.photo_deleted")
-    in Dry::Monads::Failure(:wrong_phase)
+    in Dry::Monads::Failure(:wrong_phase | :recognition_in_flight => reason)
       redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query),
-                  alert: t("reviews.flash.photo_delete_wrong_phase")
+                  alert: t("reviews.flash.photo_delete_#{reason}")
     in Dry::Monads::Failure(_)
       redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query),
                   alert: t("reviews.flash.photo_delete_failed")
@@ -357,6 +349,24 @@ class ReviewsController < MoveScopedController
                             pinnable: pinnable?, pinned_item_ids: pinned_item_ids
                           ))
     )
+  end
+
+  # The photo-move success response. In queue mode stay in the walk: the photo
+  # now lives in the target box, so continue on its review URL there (re-opening
+  # is idempotent) instead of ejecting the reviewer to the target box page
+  # mid-queue. Moving the photo whose items were the last in-box items of an
+  # unpacking box completes that SOURCE box (#838, Photos::Move); that happens
+  # off-screen, so it surfaces with a LINKING toast to the source box (UX rule 1)
+  # instead of the plain moved toast — built from the box's reality, as
+  # ItemsController#moved_response does.
+
+  #: (untyped target, completed_source: untyped) -> untyped
+  def photo_moved_response(target, completed_source:)
+    path = queue_mode? ? move_box_review_photo_path(@move, target, @media, queue: QUEUE_PARAM) : move_box_path(@move, target)
+    return redirect_to(path, notice: t("reviews.flash.photo_moved", number: target.number)) unless completed_source
+
+    redirect_to path, notice: t("reviews.flash.photo_moved_box_unpacked", number: target.number, source: completed_source.number),
+                      flash: { action_href: move_box_path(@move, completed_source), action_label: t("reviews.flash.view_box") }
   end
 
   #: (untyped reason) -> String

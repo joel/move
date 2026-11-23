@@ -59,8 +59,11 @@ en:
       item_added: "Added “%{name}”."
       add_failed: "Could not add that item — give it a name and try again."
       photo_moved: "Photo moved to box #%{number}."
+      photo_moved_box_unpacked: "Photo moved to box #%{number} — box #%{source} unpacked"
+      view_box: "View box"
       photo_deleted: "Photo deleted. Restore it from the activity feed if needed."
       photo_delete_wrong_phase: "Photos can only be deleted while the box is packing — unseal it first."
+      photo_delete_recognition_in_flight: "This photo is still being scanned. Delete it once the scan finishes."
       photo_delete_failed: "Could not delete the photo. Try again."
       photo_retaken: "Photo replaced."
       retake_errors:
