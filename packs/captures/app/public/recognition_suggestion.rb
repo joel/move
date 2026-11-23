@@ -21,12 +21,16 @@ class RecognitionSuggestion < ApplicationRecord
   UNRESOLVED = %w[pending conflict].freeze
 
   scope :unresolved, -> { where(state: UNRESOLVED) }
+  # Suggestions recorded by each photo's LATEST run. A re-scan supersedes older
+  # runs, so their suggestions no longer describe the photo (#891/#899). One SQL
+  # subquery; `media` is anything `where(media_id:)` accepts.
+  scope :from_latest_runs_of, lambda { |media|
+    where(recognition_run_id: RecognitionRun.latest_ids_for(media))
+  }
   # Conflicts recorded by each photo's LATEST run (#872/#891): the run matched an
   # already-confirmed item and created none of its own (no-overwrite, §6.4). An
   # older run's conflict is superseded by a re-scan, so it doesn't count.
-  scope :latest_conflicts_for, lambda { |media|
-    where(state: "conflict", recognition_run_id: RecognitionRun.latest_ids_for(media))
-  }
+  scope :latest_conflicts_for, ->(media) { from_latest_runs_of(media).where(state: "conflict") }
   # Review item-by-item walks lowest-confidence first; NULLs (no score) last.
   scope :by_confidence, -> { order(Arel.sql("confidence_score ASC NULLS LAST")) }
 

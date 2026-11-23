@@ -526,11 +526,14 @@ class ::RecognitionSuggestion < ::ApplicationRecord
   include ::RecognitionSuggestion::GeneratedAssociationMethods
 
   def self.unresolved: () -> ::RecognitionSuggestion::ActiveRecord_Relation
+  def self.from_latest_runs_of: (untyped media) -> ::RecognitionSuggestion::ActiveRecord_Relation
   def self.latest_conflicts_for: (untyped media) -> ::RecognitionSuggestion::ActiveRecord_Relation
   def self.by_confidence: () -> ::RecognitionSuggestion::ActiveRecord_Relation
 
   module ::RecognitionSuggestion::GeneratedRelationMethods
     def unresolved: () -> ::RecognitionSuggestion::ActiveRecord_Relation
+
+    def from_latest_runs_of: (untyped media) -> ::RecognitionSuggestion::ActiveRecord_Relation
 
     def latest_conflicts_for: (untyped media) -> ::RecognitionSuggestion::ActiveRecord_Relation
 
