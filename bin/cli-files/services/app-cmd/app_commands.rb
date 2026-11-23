@@ -40,9 +40,9 @@ module AppCLI
         app_service(env).build
       end
 
-      desc "prepare [ENV]", "Prepare the application image and prerequisites"
+      desc "prepare [ENV]", "Check every input of the app container (key, .env, volumes, image, gems, network)"
       def prepare(env = nil)
-        app_service(env).prepare
+        app_service(env).preflight
       end
 
       desc "setup [ENV]", "Setup the application prerequisites"
@@ -113,7 +113,7 @@ module AppCLI
       desc "rebuild [ENV]", "Rebuild and restart the application"
       def rebuild(env = nil)
         manager = ServicesManager.new(shell: self, env: env)
-        manager.app.setup
+        manager.app.setup # key and .env before spending a build
         manager.app.build
         manager.restart_app
       end

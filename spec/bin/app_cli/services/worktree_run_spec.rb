@@ -133,8 +133,32 @@ RSpec.describe AppCLI::Services::WorktreeRun do
       end
     end
 
-    it "spots a schema task inside a shell string" do
-      expect { worktree_run.run(["bash", "-c", "bin/rails db:migrate && echo ok"]) }
+    [
+      ["bash", "-c", "bin/rails db:migrate && echo ok"],
+      ["sh", "-c", "cd /rails; bin/rails db:rollback"],
+      %w[bundle exec rake db:rollback STEP=2],
+      %w[env RAILS_ENV=development bin/rails db:drop],
+      ["bash", "-c", "echo hi&&rails db:purge;"]
+    ].each do |command|
+      it "gates the task given to rails/rake in #{command.inspect}" do
+        expect { worktree_run.run(command) }.to raise_error(Thor::Error, /without --yes/)
+      end
+    end
+
+    [
+      %w[echo db:migrate],
+      %w[rg db:migrate doc],
+      ["bash", "-c", "bin/rails runner 'puts 1' && echo db:migrate"],
+      ["bash", "-c", "grep -r 'db:reset' lib"]
+    ].each do |command|
+      it "lets #{command.inspect} through: no rails/rake runs the task" do
+        expect(worktree_run.run(command)).to eq(0)
+        expect(shell).not_to have_received(:say).with(/Warning/)
+      end
+    end
+
+    it "copes with unbalanced quotes" do
+      expect { worktree_run.run(["bash", "-c", "bin/rails db:migrate 'oops"]) }
         .to raise_error(Thor::Error, /without --yes/)
     end
 

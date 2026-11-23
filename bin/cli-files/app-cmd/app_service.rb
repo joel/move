@@ -2,6 +2,7 @@
 
 require "fileutils"
 require_relative "../services/helpers"
+require_relative "app_preflight"
 require_relative "checkout_resolver"
 require_relative "container_flags"
 require_relative "mount_sources"
@@ -25,7 +26,7 @@ module AppCLI
 
       def setup
         runner.ensure_network(env_config.network_name)
-        ensure_mount_sources!
+        checks.mount_sources!
         runner.ensure_mysql_certs if env_config.mysql?
         ensure_sqlite_db_dir
       end
@@ -52,19 +53,15 @@ module AppCLI
         )
       end
 
-      def prepare
+      # Resolves and validates every input of the app container (network +
+      # AppPreflight). It raises before anything is stopped or removed.
+      def preflight
         setup
-        if runner.image_exists?(env_config.app_image)
-          ensure_ruby_version!
-        else
-          shell.say("App image #{env_config.app_image} missing, building it first")
-          build
-        end
-        ensure_bundle_satisfied!
+        checks.image_and_volumes!
       end
 
       def start
-        prepare
+        preflight
 
         return shell.say("Application already running.") if runner.container_running?(env_config.app_container)
 
@@ -74,13 +71,17 @@ module AppCLI
       end
 
       # Replaces the running app container, or starts one. The caller runs
-      # #prepare first. The replacement is created (not started) under a
-      # temporary name while the old one still serves, so Docker has already
-      # accepted its flags, env file, image and network before anything is
-      # stopped. Only the rename and start run after the stop.
+      # #preflight first. The replacement is created (not started) under a
+      # temporary name while the old one still serves, so Docker has accepted
+      # its flags, env file, image and network before anything is stopped.
+      #
+      # After the stop, nothing reads an input any more: the removal wait
+      # (bounded, see #wait_until_removed), the rename, the pid-file cleanup
+      # (rm_f ignores errors), `docker start` of the created container and the
+      # readiness wait.
       def replace
         candidate = "#{env_config.app_container}-next"
-        runner.run("docker rm --force #{candidate}", allow_failure: true, quiet: true)
+        discard_leftover(candidate)
         runner.run(["docker create --rm", *server_args(candidate)])
 
         stop
@@ -149,7 +150,7 @@ module AppCLI
           return
         end
 
-        prepare
+        preflight
 
         runner.run(
           [
@@ -189,47 +190,11 @@ module AppCLI
         raise Thor::Error, "App container is not running. Start it with `bin/cli app start`."
       end
 
-      # Raises when neither this checkout nor the main one has config/master.key,
-      # or when either file is a directory (a leftover Docker bind source). Runs
-      # in setup, so restart checks it before stopping the old container.
-      def ensure_mount_sources!
-        sources.master_key_path
-        sources.env_file_path(env_config.env)
-      end
+      # A -next container left by an interrupted restart would block the create.
+      def discard_leftover(candidate)
+        return if runner.container_status(candidate) == "missing"
 
-      def ensure_ruby_version!
-        desired_version = env_config.ruby_version
-        return if desired_version.nil?
-
-        current_version = runner.capture(%(docker run --rm #{env_config.app_image} ruby -e "print RUBY_VERSION"),
-                                         quiet: true)
-        current_version = current_version.to_s.strip
-
-        return if current_version == desired_version
-
-        message = if current_version.empty?
-                    "Unable to detect Ruby version in #{env_config.app_image}; rebuilding image."
-                  else
-                    "Ruby version mismatch (#{current_version} != #{desired_version}); rebuilding image."
-                  end
-        shell.say(message)
-        build
-      end
-
-      # The dev container runs the mounted checkout on the image's gems. A
-      # checkout whose Gemfile.lock is ahead of the image (a worktree, or main
-      # after a pull) would crash on boot, so check before anything is stopped.
-      def ensure_bundle_satisfied!
-        return unless env_config.short == "dev"
-
-        command = "docker run --rm --volume #{Shellwords.escape(checkout_path)}:/rails " \
-                  "#{env_config.app_image} bundle check"
-        return if runner.run(command, allow_failure: true)
-
-        raise Thor::Error,
-              "The gems in #{env_config.app_image} don't match #{checkout_path}/Gemfile.lock. " \
-              "Run `bin/cli app build` (or `DOCKER_NAMESPACE=wt<n> bin/cli app build` for a private image), " \
-              "then retry."
+        runner.run("docker rm --force #{candidate}", allow_failure: true, quiet: true)
       end
 
       # The container runs with --rm, and Docker removes it only after
@@ -259,6 +224,11 @@ module AppCLI
 
       # config/master.key and .env.<env> are gitignored, so a worktree reads
       # them from the main checkout when it has none (never copied).
+      def checks
+        @checks ||= AppPreflight.new(env_config: env_config, runner: runner, shell: shell, sources: sources,
+                                     checkout_path: checkout_path, build: method(:build))
+      end
+
       def sources
         @sources ||= MountSources.new(checkout_path: checkout_path, main_path: main_path)
       end

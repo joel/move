@@ -32,11 +32,14 @@ module AppCLI
       # that change the schema of the shared dev database or wipe its data.
       # db:migrate:status only reads it.
       SCHEMA_TASK = /
-        (?<![\w:])db:
+        \Adb:
         (?:migrate(?!:status)(?::\w+)?|rollback|forward|schema:load|structure:load|reset|prepare|setup|
            drop(?::\w+)?|purge|truncate_all|seed:replant|fixtures:load)
-        (?![\w:])
+        (?:\[.*\])?\z
       /x
+      TASK_RUNNERS = %w[rails rake].freeze
+      # Shell operators that end one command and start the next.
+      COMMAND_SEPARATOR = /\A(?:&&|\|\||;|\||&)\z/
 
       # @param checkout [Checkout] the checkout to mount
       # @param main_path [String] the main checkout (fallback for gitignored files, lock home)
@@ -130,7 +133,7 @@ module AppCLI
       def confirm_schema_change!(command_parts, confirmed)
         return if checkout.main?
 
-        task = command_parts.join(" ")[SCHEMA_TASK]
+        task = schema_task(command_parts)
         return unless task
 
         shell.say("Warning: #{task} changes the schema or data of #{env_config.db_names.first}, " \
@@ -139,6 +142,37 @@ module AppCLI
 
         raise Thor::Error, "Refusing to run #{task} from #{checkout.describe} without --yes. " \
                            "Re-run as `bin/cli app run --repo #{checkout.path} --yes -- #{Shellwords.join(command_parts)}`."
+      end
+
+      # The first gated task given to `rails`/`rake` (bin/, bundle exec and
+      # `bash -c "…"` included). A task name that is only an argument of some
+      # other command (`echo db:migrate`, `rg db:migrate doc`) does not count.
+      def schema_task(command_parts)
+        runner_seen = false
+        shell_tokens(command_parts).each do |token|
+          if token.match?(COMMAND_SEPARATOR)
+            runner_seen = false
+          elsif TASK_RUNNERS.include?(File.basename(token))
+            runner_seen = true
+          elsif runner_seen && token.match?(SCHEMA_TASK)
+            return token
+          end
+        end
+        nil
+      end
+
+      # Each argument is split shell-style too, so `bash -c "bin/rails db:migrate && …"`
+      # is seen as its own commands; operators glued to a word (`db:migrate;`) are split off.
+      def shell_tokens(command_parts)
+        command_parts.flat_map { |part| split_words(part) }
+                     .flat_map { |word| word.split(/(&&|\|\||;|\||&)/) }
+                     .reject(&:empty?)
+      end
+
+      def split_words(part)
+        Shellwords.split(part)
+      rescue ArgumentError # unbalanced quotes: fall back to whitespace
+        part.split
       end
 
       def prepare

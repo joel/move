@@ -110,9 +110,11 @@ warning and is refused unless `--yes` is given, before any container starts.
 The gated tasks are `db:migrate` and its subtasks except `db:migrate:status`,
 plus `db:rollback`, `db:forward`, `db:schema:load`, `db:structure:load`,
 `db:reset`, `db:prepare`, `db:setup`, `db:drop`, `db:purge`,
-`db:truncate_all`, `db:seed:replant` and `db:fixtures:load`. The check matches
-the task name anywhere in the command (so `bash -c "bin/rails db:migrate"` is
-caught); a mere mention such as `echo db:migrate` asks for `--yes` too. stdin is
+`db:truncate_all`, `db:seed:replant` and `db:fixtures:load`. Only a task given
+to `rails`/`rake` counts, including `bin/rails`, `bundle exec rake` and inside
+`bash -c "…"` (each argument is shell-split, and `&&`/`;`/`|` start a new
+command); a mere mention such as `echo db:migrate` or `rg db:migrate doc` runs
+without `--yes`. stdin is
 attached only when it is a TTY (`--tty` only when stdout is one too), so it
 works in pipes and agent shells. It is **dev-only**: `app run prod …` is
 refused, because the prod image runs its baked-in build rather than a mounted
@@ -169,9 +171,12 @@ must keep matching main, is left alone.
 **`app start` / `restart` / `rebuild` from a worktree** serve that worktree in
 `move-app-dev` (the one dev container, so one checkout at a time). They read
 `config/master.key` and `.env.<env>` with the same fallback (worktree first,
-then the main checkout, never copied). `restart` and `rebuild` run every check
-that can fail (master key, image present or built, Ruby version, `bundle check`
-of the checkout's `Gemfile.lock` against the image's gems, router, db, storage)
+then the main checkout, never copied). Every input of the app container is
+checked in one preflight (`AppService#preflight` → `AppPreflight`): the
+network, `config/master.key` and `.env.<env>` (present, a file, readable, key
+not blank), the host side of every volume, the image (built if missing) and
+its Ruby, and a `bundle check` of the checkout's `Gemfile.lock` against the
+image's gems. `restart` and `rebuild` run it, then start router/db/storage,
 **before** stopping the running container, so a failed restart leaves the
 current app up. A lock the image doesn't satisfy is refused with a
 `bin/cli app build` hint. The replacement is then `docker create`d as

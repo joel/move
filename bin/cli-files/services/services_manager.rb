@@ -53,12 +53,12 @@ module AppCLI
         storage.start
       end
 
-      # Replaces the running app container. Every check that can fail (master
-      # key, image, gems, dependencies, and Docker accepting the replacement)
+      # Replaces the running app container. Every check that can fail (the
+      # app preflight, the dependencies, and Docker accepting the replacement)
       # runs while the old container still serves, so a failed restart leaves
       # it up.
       def restart_app
-        app.prepare
+        app.preflight
         start_dependencies
         app.replace
       end

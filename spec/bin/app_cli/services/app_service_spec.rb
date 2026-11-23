@@ -28,8 +28,9 @@ class FakeAppRunner
 
   def image_exists?(image) = image_present || image.include?("wait")
   def container_running?(_name) = true
-  # Scripted `docker inspect` answers after a stop; "missing" once they run out.
-  def container_status(_name) = statuses.shift || "missing"
+  # Scripted `docker inspect` answers for the app container after a stop;
+  # "missing" once they run out. No leftover -next candidate exists.
+  def container_status(name) = name.end_with?("-next") ? "missing" : statuses.shift || "missing"
   def ensure_network(_name) = nil
 end
 
@@ -50,9 +51,9 @@ RSpec.describe AppCLI::Services::AppService do
   before { FileUtils.mkdir_p([File.join(main, "config"), File.join(worktree, "config")]) }
   after { FileUtils.remove_entry(tmp) }
 
-  describe "#prepare" do
+  describe "#preflight" do
     it "fails before any docker call when neither checkout has config/master.key" do
-      expect { service.prepare }.to raise_error(Thor::Error, %r{Missing config/master.key in #{worktree} and #{main}})
+      expect { service.preflight }.to raise_error(Thor::Error, %r{Missing config/master.key in #{worktree} and #{main}})
       expect(runner.commands).to be_empty
     end
 
@@ -60,13 +61,13 @@ RSpec.describe AppCLI::Services::AppService do
       File.write(File.join(main, "config/master.key"), "k")
       FileUtils.mkdir_p(File.join(worktree, ".env.development"))
 
-      expect { service.prepare }.to raise_error(Thor::Error, %r{#{worktree}/.env.development is a directory})
+      expect { service.preflight }.to raise_error(Thor::Error, %r{#{worktree}/.env.development is a directory})
       expect(runner.commands).to be_empty
     end
 
     it "accepts the main checkout's key when the worktree has none" do
       File.write(File.join(main, "config/master.key"), "k")
-      expect { service.prepare }.not_to raise_error
+      expect { service.preflight }.not_to raise_error
     end
   end
 
@@ -109,6 +110,62 @@ RSpec.describe AppCLI::Services::AppService do
     before do
       manager.instance_variable_set(:@app, service)
       allow(manager).to receive(:start_dependencies)
+    end
+
+    # Every input the restart depends on, broken one at a time.
+    def fail_on(prefix, message)
+      allow(runner).to receive(:run).and_wrap_original do |original, command, **opts|
+        raise Thor::Error, message if Array(command).join(" ").start_with?(prefix)
+
+        original.call(command, **opts)
+      end
+    end
+
+    def unreadable(path)
+      allow(File).to receive(:readable?).and_call_original
+      allow(File).to receive(:readable?).with(path).and_return(false)
+    end
+
+    def key(root) = File.join(root, "config/master.key")
+    def env(root) = File.join(root, ".env.development")
+
+    broken_inputs = {
+      "no master.key anywhere" => -> { FileUtils.rm_f(key(main)) },
+      "a blank master.key" => -> { File.write(key(main), "\n") },
+      "an unreadable master.key" => -> { unreadable(key(main)) },
+      "a directory where the worktree's master.key belongs" => -> { FileUtils.mkdir_p(key(worktree)) },
+      "a directory where .env.development belongs" => -> { FileUtils.mkdir_p(env(main)) },
+      "an unreadable .env.development" => lambda {
+        File.write(env(main), "A=1")
+        unreadable(env(main))
+      },
+      "a missing checkout (the /rails volume source)" => -> { FileUtils.rm_rf(worktree) },
+      "the Docker network can't be created" => lambda {
+        allow(runner).to receive(:ensure_network).and_raise(Thor::Error, "network")
+      },
+      "a missing image whose build fails" => lambda {
+        runner.image_present = false
+        fail_on("docker build", "build")
+      },
+      "an image with the wrong Ruby whose rebuild fails" => lambda {
+        allow(runner).to receive(:capture).and_return("0.0.1")
+        fail_on("docker build", "build")
+      },
+      "image gems that don't satisfy the Gemfile.lock" => -> { runner.bundle_satisfied = false },
+      "a dependency (router/db/storage) that fails to start" => lambda {
+        allow(manager).to receive(:start_dependencies).and_raise(Thor::Error, "db")
+      },
+      "Docker rejecting the replacement (e.g. invalid --env-file)" => -> { fail_on("docker create", "invalid env") }
+    }
+
+    broken_inputs.each do |input, break_it|
+      it "issues no docker stop or rm, and leaves move-app-dev serving, on #{input}" do
+        File.write(key(main), "k")
+        instance_exec(&break_it)
+
+        expect { manager.restart_app }.to raise_error(Thor::Error)
+        expect(runner.commands.grep(/\Adocker (stop|rm|rename|start)\b/)).to be_empty
+      end
     end
 
     it "fails before stopping the running app container when no master key is found" do
