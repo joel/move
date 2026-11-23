@@ -28,6 +28,9 @@ en:
         other: "%{count} captures"
       empty: "Captured images for this box will appear here."
       more: "+%{count} more"
+      # A run that succeeded but detected nothing (#856): the card still links
+      # to the photo review so missed items can be added by hand.
+      no_items: "No items detected — tap to add them"
       ingest_failed: "This photo couldn't be processed. Try capturing it again."
       items_found:
         zero: "No items found"
