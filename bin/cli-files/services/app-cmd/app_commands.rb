@@ -109,17 +109,15 @@ module AppCLI
 
       desc "rebuild [ENV]", "Rebuild and restart the application"
       def rebuild(env = nil)
-        service = app_service(env)
-        service.stop
-        service.build
-        ServicesManager.new(shell: self, env: env).start_all
+        manager = ServicesManager.new(shell: self, env: env)
+        manager.app.setup
+        manager.app.build
+        manager.restart_app
       end
 
       desc "restart [ENV]", "Restart the application"
       def restart(env = nil)
-        service = app_service(env)
-        service.stop
-        ServicesManager.new(shell: self, env: env).start_all
+        ServicesManager.new(shell: self, env: env).restart_app
       end
 
       private

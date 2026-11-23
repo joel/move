@@ -147,10 +147,6 @@ module AppCLI
         version.empty? ? nil : version
       end
 
-      def master_key_path
-        File.join(AppCLI::ROOT, "config/master.key")
-      end
-
       def db_names
         base = env == "production" ? "#{APP_NAME}_production" : "#{APP_NAME}_development"
         [

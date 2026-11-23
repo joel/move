@@ -2,15 +2,21 @@
 
 require "fileutils"
 require_relative "../services/helpers"
+require_relative "checkout_resolver"
 require_relative "container_flags"
+require_relative "mount_sources"
 
 module AppCLI
   module Services
     class AppService
-      def initialize(shell:, env:)
-        @runner = CommandRunner.new(shell: shell)
+      # @param checkout_path [String] the checkout mounted at /rails (the one bin/cli lives in)
+      # @param main_path [String, nil] fallback for gitignored files; default: the main checkout
+      def initialize(shell:, env:, runner: nil, checkout_path: AppCLI::ROOT, main_path: nil)
+        @runner = runner || CommandRunner.new(shell: shell)
         @shell = shell
         @env_config = EnvConfig.new(env)
+        @checkout_path = checkout_path
+        @main_path = main_path
       end
 
       def setup
@@ -50,6 +56,7 @@ module AppCLI
           shell.say("App image #{env_config.app_image} missing, building it first")
           build
         end
+        ensure_bundle_satisfied!
       end
 
       def start
@@ -57,7 +64,7 @@ module AppCLI
 
         return shell.say("Application already running.") if runner.container_running?(env_config.app_container)
 
-        FileUtils.rm_f(File.join(AppCLI::ROOT, "tmp/pids/server.pid"))
+        FileUtils.rm_f(File.join(checkout_path, "tmp/pids/server.pid"))
 
         runner.run(
           [
@@ -80,6 +87,7 @@ module AppCLI
         if runner.container_running?(env_config.app_container)
           shell.say("Stopping application container")
           runner.run("docker stop #{env_config.app_container}")
+          wait_until_removed
         else
           shell.say("Application not running, skipping stop.")
         end
@@ -149,7 +157,7 @@ module AppCLI
 
       private
 
-      attr_reader :runner, :shell, :env_config
+      attr_reader :runner, :shell, :env_config, :checkout_path
 
       def ensure_running!
         return if runner.container_running?(env_config.app_container)
@@ -157,11 +165,9 @@ module AppCLI
         raise Thor::Error, "App container is not running. Start it with `bin/cli app start`."
       end
 
+      # Raises when neither this checkout nor the main one has config/master.key.
       def ensure_master_key!
-        key_path = env_config.master_key_path
-        return if File.exist?(key_path)
-
-        raise Thor::Error, "Missing config/master.key. Please add it before starting the app."
+        sources.master_key_path
       end
 
       def ensure_ruby_version!
@@ -183,18 +189,50 @@ module AppCLI
         build
       end
 
+      # The dev container runs the mounted checkout on the image's gems. A
+      # checkout whose Gemfile.lock is ahead of the image (a worktree, or main
+      # after a pull) would crash on boot, so check before anything is stopped.
+      def ensure_bundle_satisfied!
+        return unless env_config.short == "dev"
+
+        command = "docker run --rm --volume #{Shellwords.escape(checkout_path)}:/rails " \
+                  "#{env_config.app_image} bundle check"
+        return if runner.run(command, allow_failure: true)
+
+        raise Thor::Error,
+              "The gems in #{env_config.app_image} don't match #{checkout_path}/Gemfile.lock. " \
+              "Run `bin/cli app build` (or `DOCKER_NAMESPACE=wt<n> bin/cli app build` for a private image), " \
+              "then retry."
+      end
+
+      # The container runs with --rm, and Docker removes it only after
+      # `docker stop` returns; a `docker run --name` before then would conflict.
+      def wait_until_removed(attempts: 20, interval: 0.5)
+        attempts.times do
+          return if runner.container_status(env_config.app_container) == "missing"
+
+          sleep(interval)
+        end
+      end
+
       def ensure_sqlite_db_dir
         return unless env_config.sqlite3?
 
         FileUtils.mkdir_p(File.join(AppCLI::ROOT, "db"))
       end
 
+      # config/master.key and .env.<env> are gitignored, so a worktree reads
+      # them from the main checkout when it has none (never copied).
+      def sources
+        @sources ||= MountSources.new(checkout_path: checkout_path, main_path: main_path)
+      end
+
+      def main_path
+        @main_path ||= CheckoutResolver.new(root: checkout_path).main_checkout.path
+      end
+
       def container_flags
-        @container_flags ||= ContainerFlags.new(
-          env_config: env_config,
-          checkout_path: AppCLI::ROOT,
-          sources: MountSources.new(checkout_path: AppCLI::ROOT, main_path: AppCLI::ROOT)
-        )
+        @container_flags ||= ContainerFlags.new(env_config: env_config, checkout_path: checkout_path, sources: sources)
       end
 
       def app_env_flags
