@@ -37,6 +37,24 @@ RSpec.describe Items::MarkPhotoRemoved do
     expect(moved.reload.presence_state).to eq("in_box")
   end
 
+  it "refuses a photo that belongs to another box, touching nothing (#729)" do
+    foreign = create(:media, move:, box: create(:box, move:, status: "unpacking"))
+    # An item moved into THIS box keeps its source_media_id — without the
+    # ownership guard the box-scoped query would still unpack it.
+    stray = create(:item, :confirmed, move:, box:, source_media: foreign, name: "Kettle")
+    sibling = create(:item, :confirmed, move:, box: foreign.box, source_media: foreign, name: "Toaster")
+
+    result = described_class.new.call(box:, media: foreign, actor:)
+
+    expect(result).to be_failure
+    expect(result.failure).to eq(:not_found)
+    aggregate_failures do
+      expect(stray.reload.presence_state).to eq("in_box")
+      expect(sibling.reload.presence_state).to eq("in_box")
+      expect(box.reload.status).to eq("unpacking")
+    end
+  end
+
   it "refuses while the box is not unpacking" do
     packing_box = create(:box, move:, status: "packing")
     photo = create(:media, move:, box: packing_box)

@@ -13,6 +13,15 @@ module Items
   # box must not reach into that other box (mirrors the unpacked-badge
   # semantics in BoxesController#unpacked_media_ids).
   #
+  # The photo must belong to THIS box (#729): the controller already scopes
+  # the id to box.media, but the action states the invariant itself so any
+  # future caller (an MCP bulk tool) gets Failure(:not_found) for a foreign
+  # photo instead of a silent no-op. A fresh read, not media.box_id: the
+  # caller's Media may predate a concurrent Photos::Move. No box lock is held
+  # here (see below), so the check is a pre-loop read; a move committing
+  # after it re-boxes the items too, and the box-scoped item query then
+  # finds nothing to remove.
+  #
   # No wrapping transaction: the presence write cannot fail mid-loop (always a
   # valid enum value, no callbacks), and events must not outlive a rollback —
   # each success is durable, per the bulk best-effort convention.
@@ -20,6 +29,7 @@ module Items
     #: (box: untyped, media: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, media:, actor:)
       yield ensure_writable(box.move)
+      yield ensure_in_box(box, media)
       # Guarded here too (not only via the per-item loop) so a photo whose
       # items are all already removed still fails correctly on a wrong phase.
       yield ensure_unpacking_phase(box)
@@ -37,6 +47,13 @@ module Items
     end
 
     private
+
+    #: (untyped box, untyped media) -> Dry::Monads::Result[untyped, untyped]
+    def ensure_in_box(box, media)
+      return Failure(:not_found) unless box.media.exists?(media.id)
+
+      Success()
+    end
 
     #: (untyped box) -> Dry::Monads::Result[untyped, untyped]
     def ensure_unpacking_phase(box)
