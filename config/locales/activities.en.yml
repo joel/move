@@ -28,6 +28,8 @@ en:
       done: "Restored."
       failed: "Couldn't restore that."
       parent_discarded: "Restore the box first — this item's box is deleted."
+      stale: "Someone restored and deleted this again meanwhile — use the newer entry."
+      not_found: "Already restored — someone got there first."
       view_box_entry: "Show the box"
     revert:
       action: "Revert"

@@ -9,6 +9,12 @@ class ActivitiesController < MoveScopedController
   PAGE = 40
   # The largest uuid: a keyset cursor half that sorts after every real id.
   MAX_UUID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+  # Restore refusals a user can act on get their own toast (#894, #901);
+  # anything else is the generic "couldn't restore".
+  RESTORE_FAILURES = %i[parent_discarded stale not_found].freeze
+  # Refusals because the feed the user clicked is out of date: re-stream it so
+  # the outdated Restore button drops and the newer entries show.
+  OUTDATED_FEED_FAILURES = %i[stale not_found].freeze
 
   before_action :require_writable_move!, only: %i[restore revert]
 
@@ -23,18 +29,17 @@ class ActivitiesController < MoveScopedController
   # (the restore appends a new audit entry there, and the acted-on row's button
   # drops) + a toast; no reload. HTML clients still redirect. An item whose box
   # is still deleted is refused (#894) with "restore the box first", linking to
-  # the box's own restore entry when the feed has one.
+  # the box's own restore entry when the feed has one. A record restored (and
+  # maybe deleted again) by someone else meanwhile is refused (#901) with a
+  # toast saying so, and the feed is re-streamed to show its current entries.
 
   #: () -> untyped
   def restore
     activity = activities_scope.find(params.expect(:id))
     result = restore_subject(activity)
-    if result in Dry::Monads::Failure(:parent_discarded)
-      link_box_restore_entry(activity)
-      return stream_feed(result, t(".done"), t(".parent_discarded"))
-    end
-
-    stream_feed(result, t(".done"), t(".failed"))
+    link_box_restore_entry(activity) if result in Dry::Monads::Failure(:parent_discarded)
+    stream_feed(result, t(".done"), restore_failure_message(result),
+                refresh: OUTDATED_FEED_FAILURES.include?(failure_reason(result)))
   end
 
   # POST /moves/:move_id/activity/:id/revert
@@ -88,6 +93,17 @@ class ActivitiesController < MoveScopedController
       media = @move.media.with_discarded.find_by(id: activity.subject_id)
       media && Photos::Restore.new.call(media:, actor: current_user, source:)
     end
+  end
+
+  #: (untyped result) -> String
+  def restore_failure_message(result)
+    reason = failure_reason(result)
+    RESTORE_FAILURES.include?(reason) ? t(".#{reason}") : t(".failed")
+  end
+
+  #: (untyped result) -> untyped
+  def failure_reason(result)
+    result.failure if result.respond_to?(:failure?) && result.failure?
   end
 
   # Points the failure toast at the deleted box's `box.deleted` row. The feed
@@ -169,12 +185,13 @@ class ActivitiesController < MoveScopedController
   end
 
   # On success re-stream the feed (from the top) + a toast; on failure a toast
-  # only. HTML clients still redirect (the fallback).
+  # only, unless `refresh:` asks for the feed too. HTML clients still redirect
+  # (the fallback).
 
-  #: (untyped result, untyped ok_message, untyped fail_message) -> untyped
-  def stream_feed(result, ok_message, fail_message)
+  #: (untyped result, untyped ok_message, untyped fail_message, ?refresh: bool) -> untyped
+  def stream_feed(result, ok_message, fail_message, refresh: false)
     success = result.respond_to?(:success?) && result.success?
-    streams = success ? -> { [feed_stream] } : []
+    streams = success || refresh ? -> { [feed_stream] } : []
     respond_with_streams(streams, redirect: move_activity_path(@move),
                                   toast: true, status: success ? :ok : :unprocessable_content) do
       success ? [:notice, ok_message] : [:alert, fail_message]

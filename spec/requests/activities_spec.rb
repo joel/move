@@ -171,6 +171,35 @@ RSpec.describe "Activities" do
       expect(Box.with_discarded.exists?(box.id)).to be(false)
     end
 
+    # #901 — the record was restored (and maybe deleted again) by someone else
+    # between the feed render and this click.
+    it "says so when the item was already restored meanwhile" do
+      item = create(:item, :manual, move:, box: create(:box, move:), name: "Lamp")
+      Items::Remove.new.call(item:, actor: user)
+      activity = move.activities.find_by!(action: "item.deleted", subject_id: item.id)
+      Items::Restore.new.call(item: Item.with_discarded.find(item.id), actor: user)
+
+      post move_activity_restore_path(move, activity.id), as: :turbo_stream
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include(CGI.escapeHTML(I18n.t("activities.restore.not_found")))
+        .and include(%(action="replace" target="#{Views::Activities::Index::ID}"))
+    end
+
+    it "says so when the photo was restored and deleted again meanwhile" do
+      media = create(:media, move:, box: create(:box, move:))
+      Photos::Delete.new.call(media:, actor: user)
+      activity = move.activities.find_by!(action: "media.discarded", subject_id: media.id)
+      allow(Photos::Restore).to receive(:new)
+        .and_return(instance_double(Photos::Restore, call: Dry::Monads::Failure(:stale)))
+
+      post move_activity_restore_path(move, activity.id), as: :turbo_stream
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include(CGI.escapeHTML(I18n.t("activities.restore.stale")))
+        .and include(%(action="replace" target="#{Views::Activities::Index::ID}"))
+    end
+
     it "streams the re-rendered feed + a toast (no reload)" do
       box = create(:box, move:, number: "7")
       Boxes::Delete.new.call(box:, actor: user)
