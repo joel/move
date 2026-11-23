@@ -85,6 +85,17 @@ RSpec.describe Photos::Delete do
     expect(Media.kept.exists?(media.id)).to be(false)
   end
 
+  it "deletes a photo whose only run stranded once the reaper failed it (#871)" do
+    travel_to((RecognitionRuns::FailStale::STALE_AFTER + 1.minute).ago) do
+      create(:recognition_run, move:, box:, media:, status: "queued")
+    end
+    expect(call.failure).to eq(:recognition_in_flight)
+
+    RecognitionRuns::FailStale.new.call
+
+    expect(call).to be_success
+  end
+
   it "deletes once the photo's recognition run has settled (#854)" do
     create(:recognition_run, move:, box:, media:, status: "failed")
 
