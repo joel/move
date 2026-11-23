@@ -328,6 +328,60 @@ RSpec.describe RecognitionRuns::Process do
     expect(run.recognition_suggestions.count).to eq(0)
   end
 
+  # #854: the photo (or its box) is deleted while the provider call is in
+  # flight. The run must not materialize live items from a discarded source.
+  context "when the source is deleted while identify runs (#854)" do
+    # Wraps the Fake provider so the deletion lands between identify starting
+    # and the materialize transaction — exactly the in-flight window.
+    def provider_deleting
+      fake = RecognitionProviders::Fake.new
+      provider = instance_double(RecognitionProviders::Fake)
+      allow(provider).to receive(:identify) do |**kwargs|
+        yield
+        fake.identify(**kwargs)
+      end
+      provider
+    end
+
+    def expect_failed_run_with_no_inventory(result)
+      expect(result).to be_failure
+      run.reload
+      expect(run.status).to eq("failed")
+      expect(run.error_code).to eq("RecognitionRuns::Process::SourceDiscarded")
+      expect(run.completed_at).to be_present
+      expect(run.recognition_suggestions.count).to eq(0)
+    end
+
+    it "fails the run with zero items when the photo is deleted" do
+      # Discards::Cascade is the discard Photos::Delete runs; called directly it
+      # stands for a delete that passed Photos::Delete's in-flight check just
+      # before the run was marked processing.
+      provider = provider_deleting { Discards::Cascade.new.call(record: Media.find(media.id), actor: nil) }
+
+      result = described_class.new.call(run:, provider:)
+
+      expect_failed_run_with_no_inventory(result)
+      expect(Item.with_discarded.where(source_media_id: media.id).count).to eq(0)
+    end
+
+    it "fails the run with zero items when the box is deleted" do
+      provider = provider_deleting { Boxes::Delete.new.call(box: Box.find(box.id), actor: nil) }
+
+      result = described_class.new.call(run:, provider:)
+
+      expect_failed_run_with_no_inventory(result)
+      expect(Item.with_discarded.where(box_id: box.id).count).to eq(0)
+    end
+
+    it "still succeeds when the source is kept" do
+      result = described_class.new.call(run:, provider: provider_deleting { nil })
+
+      expect(result).to be_success
+      expect(run.reload.status).to eq("succeeded")
+      expect(box.items.count).to eq(3)
+    end
+  end
+
   context "when the Move was archived after capture (#118)" do
     let(:move) { create(:move, :archived) }
 

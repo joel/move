@@ -51,7 +51,7 @@ class ItemsController < MoveScopedController
     case result
     in Dry::Monads::Success(item)
       redirect_to move_box_path(@move, @box), notice: t(".created", name: item.name)
-    in Dry::Monads::Failure(:not_capturable)
+    in Dry::Monads::Failure(:not_capturable | :box_unpacked)
       redirect_to move_box_path(@move, @box), alert: t(".box_closed")
     in Dry::Monads::Failure(errors)
       item = @box.items.new(item_attributes.merge(move: @move))
