@@ -165,6 +165,17 @@ RSpec.describe AppCLI::Services::AppService do
       expect(runner.commands).not_to include(a_string_matching(/docker run --rm --detach/))
     end
 
+    it "refuses an unreadable .env file before stopping the running container" do
+      File.write(File.join(main, "config/master.key"), "k")
+      env_file = File.join(main, ".env.development")
+      File.write(env_file, "A=1")
+      allow(File).to receive(:readable?).and_call_original
+      allow(File).to receive(:readable?).with(env_file).and_return(false)
+
+      expect { manager.restart_app }.to raise_error(Thor::Error, /not readable/)
+      expect(stops).to be_empty
+    end
+
     it "refuses a .env directory before stopping the running container" do
       File.write(File.join(main, "config/master.key"), "k")
       FileUtils.mkdir_p(File.join(main, ".env.development"))
