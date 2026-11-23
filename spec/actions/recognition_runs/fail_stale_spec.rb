@@ -40,6 +40,18 @@ RSpec.describe RecognitionRuns::FailStale do
     expect(processing.reload.status).to eq("processing")
   end
 
+  it "leaves runs on an archived Move alone (read-only, #120)" do
+    archived = create(:move, :archived)
+    archived_box = create(:box, move: archived)
+    run = travel_to(stale_at) do
+      create(:recognition_run, move: archived, box: archived_box,
+                               media: create(:media, move: archived, box: archived_box), status: "queued")
+    end
+
+    expect(described_class.new.call.value!).to be_empty
+    expect(run.reload.status).to eq("queued")
+  end
+
   it "never touches terminal runs" do
     succeeded = run_at(stale_at, status: "succeeded")
     failed = run_at(stale_at, status: "failed", error_code: "provider_error")

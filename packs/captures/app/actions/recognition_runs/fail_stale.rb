@@ -39,9 +39,13 @@ module RecognitionRuns
       stale(cutoff).pluck(:id)
     end
 
+    # Runs on an archived Move are left alone: an archived Move is read-only
+    # and Process deliberately leaves its queued runs untouched (#120).
+
     #: (untyped cutoff) -> untyped
     def stale(cutoff)
       RecognitionRun.where(status: RecognitionRun::IN_FLIGHT, updated_at: ...cutoff)
+                    .where.not(move_id: Move.where(status: "archived").select(:id))
     end
 
     #: (untyped id, untyped cutoff, untyped now) -> bool
