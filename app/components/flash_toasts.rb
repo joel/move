@@ -22,18 +22,31 @@ module Components
     def view_template
       div(id: ID, class: "pointer-events-none fixed right-6 top-20 md:top-6 z-50 " \
                          "flex w-[calc(100vw-3rem)] max-w-sm flex-col gap-3") do
+        linked = link_variant
         flash.each do |type, message|
           variant = TOAST_VARIANTS[type.to_s]
           next unless variant
 
+          link = variant == linked
+          linked = nil if link # ONE toast carries it, even with alert + error both set
           render Components::Ui::Toast.new(
             variant: variant, message: message,
-            # The "View" link rides along only with a success toast (the create flow).
-            action_href: (flash[:action_href] if variant == :success),
-            action_label: (flash[:action_label] if variant == :success)
+            action_href: (flash[:action_href] if link),
+            action_label: (flash[:action_label] if link)
           )
         end
       end
+    end
+
+    private
+
+    # The action link rides along with ONE toast: the success toast when there
+    # is one (the create flow's "View"), otherwise the error toast (a refusal
+    # pointing at the fix — "Restore the box first", #894).
+
+    #: () -> Symbol?
+    def link_variant
+      flash[:notice].present? ? :success : :error
     end
   end
 end

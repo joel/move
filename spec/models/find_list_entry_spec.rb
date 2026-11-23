@@ -60,4 +60,34 @@ RSpec.describe FindListEntry do
       expect(described_class.snapshot_for(move, user)).to eq([])
     end
   end
+
+  describe "one live-pin definition (#894)" do
+    # An item kept inside a discarded box. Items::Restore now refuses to create
+    # this, so it is built directly: the counts must agree regardless.
+    def kept_item_in_discarded_box
+      box = create(:box, move:)
+      item = create(:item, move:, box:, name: "Orphan")
+      box.discard_in_batch!(batch_id: SecureRandom.uuid, parent: nil)
+      item
+    end
+
+    it "counts the same pins in pinned_item_ids_for and snapshot_for" do
+      live_box = create(:box, move:)
+      live = create(:item, move:, box: live_box, name: "Mug")
+      create(:find_list_entry, move:, user:, item: live)
+      create(:find_list_entry, move:, user:, item: kept_item_in_discarded_box)
+      gone = create(:item, move:, box: live_box, name: "Gone")
+      create(:find_list_entry, move:, user:, item: gone)
+      gone.discard!
+
+      ids = described_class.pinned_item_ids_for(move:, user:)
+      snapshot = described_class.snapshot_for(move, user)
+
+      aggregate_failures do
+        expect(ids).to eq(Set[live.id])
+        expect(snapshot.map(&:item_id)).to eq([live.id])
+        expect(snapshot.first.pinned_total).to eq(ids.size)
+      end
+    end
+  end
 end
