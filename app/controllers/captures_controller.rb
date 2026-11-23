@@ -87,15 +87,21 @@ class CapturesController < MoveScopedController
   def retry_recognition
     media = @box.media.find(params.expect(:media_id))
     result = RecognitionRuns::Retry.new.call(run: media.recognition_runs.order(created_at: :desc).first)
-    # Only the latest *failed* run is retryable; a no-op (e.g. replayed POST)
-    # redirects quietly without queuing a duplicate run.
-    notice = (t(".retried") if result.success?)
-    redirect_to move_box_capture_path(@move, @box), notice: notice
+    # Only the latest *failed* run is retryable; a refused retry (a replayed
+    # POST, a photo that already has its items) queues nothing and says why.
+    redirect_to move_box_capture_path(@move, @box), **retry_flash(result)
   rescue ActiveRecord::RecordNotFound
     head :not_found
   end
 
   private
+
+  #: (untyped result) -> Hash[Symbol, untyped]
+  def retry_flash(result)
+    return { notice: t(".retried") } if result.success?
+
+    result.failure == :not_retryable ? { alert: t(".not_retryable") } : {}
+  end
 
   #: () -> untyped
   def set_box
