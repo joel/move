@@ -16,6 +16,12 @@ module Views
       # write — the acted-on row's button also drops — with no reload.
       ID = "activity-feed"
 
+      # Stable id of an entry's Restore form, so a refused restore (#901) can
+      # remove just that button in place.
+
+      #: (untyped activity_id) -> String
+      def self.restore_id(activity_id) = "activity-restore-#{activity_id}"
+
       #: (move: untyped, groups: untyped, restorable: untyped, revertable: untyped, ?next_before: untyped, ?next_before_id: untyped) -> void
       def initialize(move:, groups:, restorable:, revertable:, next_before: nil, next_before_id: nil)
         @move = move
@@ -136,7 +142,7 @@ module Views
       def restore_button(id)
         button_to(
           I18n.t("activities.restore.action"), move_activity_restore_path(@move, id),
-          method: :post,
+          method: :post, form: { id: self.class.restore_id(id) },
           class: "shrink-0 rounded-full bg-primary px-4 py-2 text-xs font-bold " \
                  "text-on-primary transition hover:bg-primary/90 active:scale-95"
         )

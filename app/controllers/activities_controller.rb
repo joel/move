@@ -12,9 +12,9 @@ class ActivitiesController < MoveScopedController
   # Restore refusals a user can act on get their own toast (#894, #901);
   # anything else is the generic "couldn't restore".
   RESTORE_FAILURES = %i[parent_discarded stale not_found].freeze
-  # Refusals because the feed the user clicked is out of date: re-stream it so
-  # the outdated Restore button drops and the newer entries show.
-  OUTDATED_FEED_FAILURES = %i[stale not_found].freeze
+  # Refusals because the entry the user clicked is out of date: its Restore
+  # button is removed in place (the page, scroll and focus stay put).
+  OUTDATED_ENTRY_FAILURES = %i[stale not_found].freeze
 
   before_action :require_writable_move!, only: %i[restore revert]
 
@@ -31,15 +31,17 @@ class ActivitiesController < MoveScopedController
   # is still deleted is refused (#894) with "restore the box first", linking to
   # the box's own restore entry when the feed has one. A record restored (and
   # maybe deleted again) by someone else meanwhile is refused (#901) with a
-  # toast saying so, and the feed is re-streamed to show its current entries.
+  # toast saying so, and that entry's Restore button is removed. An entry whose
+  # deletion was superseded (restored and deleted again) is refused the same way.
 
   #: () -> untyped
   def restore
     activity = activities_scope.find(params.expect(:id))
     result = restore_subject(activity)
     link_box_restore_entry(activity) if result in Dry::Monads::Failure(:parent_discarded)
+    outdated = OUTDATED_ENTRY_FAILURES.include?(failure_reason(result))
     stream_feed(result, t(".done"), restore_failure_message(result),
-                refresh: OUTDATED_FEED_FAILURES.include?(failure_reason(result)))
+                failure_streams: outdated ? [turbo_stream.remove(Views::Activities::Index.restore_id(activity.id))] : [])
   end
 
   # POST /moves/:move_id/activity/:id/revert
@@ -85,14 +87,27 @@ class ActivitiesController < MoveScopedController
     case activity.subject_type
     when "Box"
       box = @move.boxes.with_discarded.find_by(id: activity.subject_id)
-      box && Boxes::Restore.new.call(box:, actor: current_user, source:)
+      box && current_entry(activity, box) { Boxes::Restore.new.call(box:, actor: current_user, source:) }
     when "Item"
       item = @move.items.with_discarded.find_by(id: activity.subject_id)
-      item && Items::Restore.new.call(item:, actor: current_user, source:)
+      item && current_entry(activity, item) { Items::Restore.new.call(item:, actor: current_user, source:) }
     when "Media"
       media = @move.media.with_discarded.find_by(id: activity.subject_id)
-      media && Photos::Restore.new.call(media:, actor: current_user, source:)
+      media && current_entry(activity, media) { Photos::Restore.new.call(media:, actor: current_user, source:) }
     end
+  end
+
+  # An entry undoes the deletion it records — its batch (ActivityFeed hides the
+  # button on a superseded one). A record restored and deleted again since
+  # carries a newer batch: refuse rather than undo that newer deletion from the
+  # old entry (#901). The restore then re-checks the batch under its row lock.
+
+  #: (untyped activity, untyped record) { () -> untyped } -> untyped
+  def current_entry(activity, record)
+    batch_id = activity.metadata["discard_batch_id"]
+    return Dry::Monads::Result::Failure.new(:stale) if batch_id && record.discarded? && record.discard_batch_id != batch_id
+
+    yield
   end
 
   #: (untyped result) -> String
@@ -185,13 +200,12 @@ class ActivitiesController < MoveScopedController
   end
 
   # On success re-stream the feed (from the top) + a toast; on failure a toast
-  # only, unless `refresh:` asks for the feed too. HTML clients still redirect
-  # (the fallback).
+  # plus any `failure_streams`. HTML clients still redirect (the fallback).
 
-  #: (untyped result, untyped ok_message, untyped fail_message, ?refresh: bool) -> untyped
-  def stream_feed(result, ok_message, fail_message, refresh: false)
+  #: (untyped result, untyped ok_message, untyped fail_message, ?failure_streams: Array[untyped]) -> untyped
+  def stream_feed(result, ok_message, fail_message, failure_streams: [])
     success = result.respond_to?(:success?) && result.success?
-    streams = success || refresh ? -> { [feed_stream] } : []
+    streams = success ? -> { [feed_stream] } : failure_streams
     respond_with_streams(streams, redirect: move_activity_path(@move),
                                   toast: true, status: success ? :ok : :unprocessable_content) do
       success ? [:notice, ok_message] : [:alert, fail_message]

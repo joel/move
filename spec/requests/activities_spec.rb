@@ -183,7 +183,8 @@ RSpec.describe "Activities" do
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.body).to include(CGI.escapeHTML(I18n.t("activities.restore.not_found")))
-        .and include(%(action="replace" target="#{Views::Activities::Index::ID}"))
+        .and include(%(action="remove" target="#{Views::Activities::Index.restore_id(activity.id)}"))
+      expect(response.body).not_to include(%(target="#{Views::Activities::Index::ID}"))
     end
 
     it "says so when the photo was restored and deleted again meanwhile" do
@@ -197,7 +198,30 @@ RSpec.describe "Activities" do
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.body).to include(CGI.escapeHTML(I18n.t("activities.restore.stale")))
-        .and include(%(action="replace" target="#{Views::Activities::Index::ID}"))
+        .and include(%(action="remove" target="#{Views::Activities::Index.restore_id(activity.id)}"))
+      expect(response.body).not_to include(%(target="#{Views::Activities::Index::ID}"))
+    end
+
+    # #901 — the old entry describes a deletion that was undone; the photo is
+    # deleted again under a newer batch, which only the newer entry may undo.
+    it "refuses a superseded delete entry and keeps the newer deletion" do
+      media = create(:media, move:, box: create(:box, move:))
+      Photos::Delete.new.call(media:, actor: user)
+      old_entry = move.activities.find_by!(action: "media.discarded", subject_id: media.id)
+      Photos::Restore.new.call(media: Media.with_discarded.find(media.id), actor: user)
+      Photos::Delete.new.call(media: Media.find(media.id), actor: user)
+
+      newer_entry = move.activities.where(action: "media.discarded", subject_id: media.id)
+                        .where.not(id: old_entry.id).sole
+      get move_activity_path(move)
+      expect(response.body).not_to include(Views::Activities::Index.restore_id(old_entry.id))
+      expect(response.body).to include(Views::Activities::Index.restore_id(newer_entry.id))
+
+      post move_activity_restore_path(move, old_entry.id), as: :turbo_stream
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include(CGI.escapeHTML(I18n.t("activities.restore.stale")))
+      expect(Media.with_discarded.find(media.id)).to be_discarded
     end
 
     it "streams the re-rendered feed + a toast (no reload)" do

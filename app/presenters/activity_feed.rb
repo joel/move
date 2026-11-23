@@ -104,7 +104,17 @@ class ActivityFeed
     # Still discarded AND inside the retention window — past it the record is no
     # longer restorable (Discards::CascadeRestore refuses, and the nightly sweep
     # may already be dismantling the batch), so don't offer the button.
-    !!subject&.try(:discarded?) && subject.discarded_at > Discardable::RETENTION.ago
+    !!subject&.try(:discarded?) && subject.discarded_at > Discardable::RETENTION.ago &&
+      current_deletion?(activity, subject)
+  end
+
+  # An entry undoes ONE deletion — its batch. Once the subject was restored and
+  # deleted again, the newer entry owns the Restore (#901); the old one would
+  # undo a deletion it doesn't describe. Rows recorded before the payload
+  # carried the batch have none and keep the plain discarded check.
+  def current_deletion?(activity, subject)
+    batch_id = activity.metadata["discard_batch_id"]
+    batch_id.nil? || batch_id == subject.discard_batch_id
   end
 
   def latest_updates
