@@ -167,15 +167,18 @@ class Media < ApplicationRecord
   end
 
   # Single source of truth for "this photo needs recovery": recognition produced
-  # nothing to act on — no item references it AND it has no suggestions (a
-  # conflict-only run records suggestions but no item, by the no-overwrite rule, so
-  # offering a manual add would recreate that avoided duplicate). Used by the
+  # nothing to act on — no item references it AND its LATEST run has no
+  # suggestions (a conflict-only run records suggestions but no item, by the
+  # no-overwrite rule, so offering a manual add would recreate that avoided
+  # duplicate). Only the latest run counts (#899): a re-scan that failed or found
+  # nothing supersedes an older run's conflict, so the photo is orphaned again
+  # (same "latest" as BoxesController#conflict_media_ids). Used by the
   # recovery surface (RecoveriesController, ItemsController#create) and mirrored by
   # the bulk BoxesController#recoverable_media_ids query.
 
   #: () -> bool
   def orphaned?
-    !sourced_item? && !recognition_suggestions.exists?
+    !sourced_item? && !RecognitionSuggestion.from_latest_runs_of(id).exists?
   end
 
   # The photo's LATEST run is queued or processing — recognition may still
