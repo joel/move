@@ -110,7 +110,9 @@ warning and is refused unless `--yes` is given, before any container starts.
 The gated tasks are `db:migrate` and its subtasks except `db:migrate:status`,
 plus `db:rollback`, `db:forward`, `db:schema:load`, `db:structure:load`,
 `db:reset`, `db:prepare`, `db:setup`, `db:drop`, `db:purge`,
-`db:truncate_all`, `db:seed:replant` and `db:fixtures:load`. Only a task given
+`db:truncate_all`, `db:seed:replant` and `db:fixtures:load`, each with any
+namespaced variant (`db:reset:all`, `db:purge:all`, `db:migrate:primary`, …;
+`db:migrate:status` in any form stays ungated). Only a task given
 to `rails`/`rake` counts, including `bin/rails`, `bundle exec rake` and inside
 `bash -c "…"` (each argument is shell-split, and `&&`/`;`/`|` start a new
 command); a mere mention such as `echo db:migrate` or `rg db:migrate doc` runs

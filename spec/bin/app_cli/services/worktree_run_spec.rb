@@ -123,7 +123,9 @@ RSpec.describe AppCLI::Services::WorktreeRun do
     end
 
     %w[db:migrate db:migrate:redo db:rollback db:forward db:schema:load db:structure:load db:reset db:prepare
-       db:setup db:drop db:drop:_unsafe db:purge db:truncate_all db:seed:replant db:fixtures:load].each do |task|
+       db:setup db:drop db:drop:_unsafe db:purge db:truncate_all db:seed:replant db:fixtures:load
+       db:purge:all db:reset:all db:migrate:primary db:rollback:primary db:schema:load:primary
+       db:truncate_all:primary db:migrate:up:primary].each do |task|
       it "refuses #{task} from a worktree without --yes, before any docker call" do
         expect { worktree_run.run(["bin/rails", task]) }
           .to raise_error(Thor::Error, /Refusing to run #{task} .* without --yes/)
@@ -169,7 +171,8 @@ RSpec.describe AppCLI::Services::WorktreeRun do
     end
 
     it "lets read-only db tasks through without --yes" do
-      read_only = %w[db:migrate:status db:version db:test:prepare db:seed db:schema:dump db:prepared]
+      read_only = %w[db:migrate:status db:migrate:status:primary db:version db:test:prepare db:seed
+                     db:schema:dump db:prepared db:schema:cache:dump]
       read_only.each { |task| worktree_run.run(["bin/rails", task]) }
       expect(runner.commands.size).to eq(read_only.size)
       expect(shell).not_to have_received(:say).with(/Warning/)

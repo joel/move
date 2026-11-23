@@ -29,12 +29,16 @@ module AppCLI
       FAIL_IF_NO_EXAMPLES_CODE = "RSpec.configure { |config| config.fail_if_no_examples = true }".freeze
       INTERACTIVE_COMMANDS = { console: %w[bin/rails console], connect: %w[bash] }.freeze
       # Rails db tasks (activerecord/lib/active_record/railties/databases.rake)
-      # that change the schema of the shared dev database or wipe its data.
-      # db:migrate:status only reads it.
+      # that change the schema of the shared dev database or wipe its data,
+      # with any namespaced variant: `:all`, a database name (`:primary`),
+      # `db:migrate:redo`, `db:drop:_unsafe`. db:migrate:status (in any
+      # variant) only reads it.
       SCHEMA_TASK = /
         \Adb:
-        (?:migrate(?!:status)(?::\w+)?|rollback|forward|schema:load|structure:load|reset|prepare|setup|
-           drop(?::\w+)?|purge|truncate_all|seed:replant|fixtures:load)
+        (?!migrate:status)
+        (?:migrate|rollback|forward|schema:load|structure:load|reset|prepare|setup|drop|purge|
+           truncate_all|seed:replant|fixtures:load)
+        (?::\w+)*
         (?:\[.*\])?\z
       /x
       TASK_RUNNERS = %w[rails rake].freeze
