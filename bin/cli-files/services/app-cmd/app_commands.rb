@@ -88,12 +88,15 @@ module AppCLI
       end
 
       map "run" => :run_command
-      desc "run [ENV] [--repo T] -- CMD...", "Run a command in a throwaway app container for a checkout"
+      desc "run [ENV] [--repo T] [--yes] -- CMD...", "Run a command in a throwaway app container for a checkout"
       method_option :repo, type: :string, desc: REPO_OPTION_DESC
+      method_option :yes, type: :boolean, default: false,
+                          desc: "Run a schema-changing db task (db:migrate, db:rollback, ...) from a worktree " \
+                                "against the shared dev database"
       def run_command(*args)
         env, command_parts = parse_env_and_command(args)
         checkout = CheckoutResolver.new.resolve(options[:repo])
-        exit(worktree_run(env, checkout).run(command_parts))
+        exit(worktree_run(env, checkout).run(command_parts, confirmed: options[:yes]))
       end
 
       map "test" => :test_command

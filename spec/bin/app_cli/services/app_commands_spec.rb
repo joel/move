@@ -58,6 +58,20 @@ RSpec.describe AppCLI::Services::AppCommands do
     end
   end
 
+  describe "#run_command" do
+    before { allow(worktree_run).to receive(:run).and_return(0) }
+
+    it "passes --yes through as confirmation" do
+      exit_status { commands("repo" => "fix/x", "yes" => true).run_command("bin/rails", "db:migrate") }
+      expect(worktree_run).to have_received(:run).with(%w[bin/rails db:migrate], confirmed: true)
+    end
+
+    it "is unconfirmed by default" do
+      exit_status { commands("repo" => "fix/x", "yes" => false).run_command("true") }
+      expect(worktree_run).to have_received(:run).with(["true"], confirmed: false)
+    end
+  end
+
   describe "#test_command" do
     it "runs the unit suite by default" do
       expect(exit_status { commands("system" => false).test_command }).to eq(0)

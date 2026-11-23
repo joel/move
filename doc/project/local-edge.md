@@ -79,8 +79,8 @@ flowchart LR
   CLI["bin/cli app run|test|console|connect --repo T"] --> RES["CheckoutResolver<br/>git worktree list of the main checkout"]
   RES -->|"path"| RUN["docker run --rm<br/>worktree → /rails"]
   MAIN["main checkout<br/>config/master.key, .env.&lt;env&gt;"] -.->|"read when the worktree lacks them"| RUN
-  RUN --> DB["move-db-dev"]
-  DEV["move-app-dev<br/>(main checkout, untouched)"] --> DB
+  RUN -->|"run / console / connect:<br/>move_development (shared)<br/>test: move_test"| DB["move-db-dev"]
+  DEV["move-app-dev<br/>(main checkout, untouched)"] -->|"move_development"| DB
 ```
 
 **`--repo <target>`** (default: the main checkout, i.e. the first
@@ -94,8 +94,21 @@ flowchart LR
   an ambiguous one names the matching paths; a registered but missing
   worktree suggests `git worktree prune`.
 
-**`app run [ENV] [--repo T] -- CMD...`** prints `Running in <path> (branch <b>)`
-first, brings up the database, and exits with the command's status. stdin is
+**Shared dev database.** `app run`, `app console` and `app connect` use the
+same `move_development` database as `move-app-dev`, so console writes and
+migrations from a worktree change the data **and schema** main's dev app runs
+on (and what its `db/structure.sql` dump contains). Their banner says so:
+`Database: move_development (shared with move-app-dev)`. `app test` uses
+`move_test` instead (see below). A per-worktree database is the open design
+question in the proposal below (#869 part 3).
+
+**`app run [ENV] [--repo T] [--yes] -- CMD...`** prints `Running in <path> (branch <b>)`
+and the database line first, brings up the database, and exits with the
+command's status. From a worktree (any checkout but the main one), a command
+that runs a schema-changing task (`db:migrate` and its subtasks except
+`db:migrate:status`, `db:rollback`, `db:schema:load`, `db:reset`,
+`db:prepare`, `db:setup`, `db:drop`) prints a warning and is refused unless
+`--yes` is given, before any container starts. stdin is
 attached only when it is a TTY (`--tty` only when stdout is one too), so it
 works in pipes and agent shells. It is **dev-only**: `app run prod …` is
 refused, because the prod image runs its baked-in build rather than a mounted
@@ -130,7 +143,10 @@ through; `spec/system` is prepended unless one of them already names a
 `spec/system…` path. `:js` specs switch to headless Chrome, which needs
 chromedriver. The dev image has none, so when `command -v chromedriver` fails
 in the image they are excluded (`--tag ~js`) with a one-line note that they
-run in CI only.
+run in CI only. When you name `spec/system…` paths yourself, the run also sets
+RSpec's `fail_if_no_examples` (there is no CLI flag for it, so a one-line file
+written to the container's `/tmp` is passed with `--require`). Naming only
+`:js` specs then fails (exit 1) instead of passing with `0 examples`.
 
 **Gitignored files.** A fresh worktree has no `config/master.key` or
 `.env.<env>`. They are read from the worktree when present, otherwise from the
@@ -145,6 +161,17 @@ from the image's, a warning is printed. If gems changed, build a private image
 from the worktree (`DOCKER_NAMESPACE=wt<n> bin/cli app build`) and run with the
 same `DOCKER_NAMESPACE`, so the shared `workeverywhere/move-app:latest`, which
 must keep matching main, is left alone.
+
+**`app start` / `restart` / `rebuild` from a worktree** serve that worktree in
+`move-app-dev` (the one dev container, so one checkout at a time). They read
+`config/master.key` and `.env.<env>` with the same fallback (worktree first,
+then the main checkout, never copied). `restart` and `rebuild` run every check
+that can fail (master key, image present or built, Ruby version, `bundle check`
+of the checkout's `Gemfile.lock` against the image's gems, router, db, storage)
+**before** stopping the running container, so a failed restart leaves the
+current app up. A lock the image doesn't satisfy is refused with a
+`bin/cli app build` hint. Put main back with `bin/cli app restart` from the main
+checkout.
 
 **Not covered yet:** serving a worktree **in the browser** next to main. See
 the proposal below (#869 part 3).
@@ -275,5 +302,7 @@ broadcasts to its own clients.
 | `docker stop move-dns` hangs | dnsmasq started with `--no-daemon` serves TCP in the main process; resolved's kept-open TCP fallback stalls SIGTERM | the image uses `--keep-in-foreground` |
 | `https://mail.move-easy.docker` returns 502 just after `mail start` | mailcatcher not listening yet | retry after a second |
 | `bin/cli app run --repo …` fails with `Could not find <gem>-x.y.z in locally installed gems` | the worktree's `Gemfile.lock` is ahead of the image's bundle (the drift warning says so) | a private image for that shell, `DOCKER_NAMESPACE=wt<n> bin/cli app build`, then the same `DOCKER_NAMESPACE` on `app run`/`test`/`console`/`connect` (leaves the shared image, and so main, alone); or `bin/cli app build` once main has the same lock |
+| `bin/cli app run --repo … -- bin/rails db:migrate` is refused with `without --yes` | the worktree shares `move_development` with `move-app-dev`, so its migrations would change main's schema | run it on purpose with `--yes` (and roll back before you leave), or test migrations with `bin/cli app test --repo …`, which uses `move_test` |
+| `bin/cli app test --system -- spec/system/x_js_spec.rb` exits 1 with `0 examples` | the dev image has no chromedriver, so `:js` specs are filtered out (`--tag ~js`), and named specs run with RSpec's `fail_if_no_examples` | `:js` specs run in CI only; rely on the CI `test` job, or live-check the surface in a browser |
 | `dig` works but the browser doesn't | `dig`/`nslookup` bypass NSS | check with `getent ahostsv4 <name>` (what `dns check` uses) |
 | `systemctl` warns that the unit "changed on disk" during bootstrap | resolved's unit config changed | `sudo systemctl daemon-reload` before the restart |

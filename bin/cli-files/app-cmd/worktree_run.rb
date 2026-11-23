@@ -23,7 +23,14 @@ module AppCLI
       SYSTEM_SPEC_PATH = %r{\A(?:\./)?spec/system(?:[/:]|\z)}
       # CI runs the system suite the same way (.github/workflows/ci.yml).
       SYSTEM_ENV = { "TEST_BROWSER" => "rack_test" }.freeze
+      # fail_if_no_examples is a config setting, not an rspec flag. The file is
+      # written inside the throwaway container, so the checkout needs no copy.
+      FAIL_IF_NO_EXAMPLES_FILE = "/tmp/bin-cli-fail-if-no-examples.rb".freeze
+      FAIL_IF_NO_EXAMPLES_CODE = "RSpec.configure { |config| config.fail_if_no_examples = true }".freeze
       INTERACTIVE_COMMANDS = { console: %w[bin/rails console], connect: %w[bash] }.freeze
+      # Rails tasks that change the schema of (or drop) the shared dev database.
+      # db:migrate:status only reads it.
+      SCHEMA_TASK = /(?<![\w:])db:(?:migrate(?!:status)(?::\w+)?|rollback|schema:load|reset|prepare|setup|drop)(?!\w)/
 
       # @param checkout [Checkout] the checkout to mount
       # @param main_path [String] the main checkout (fallback for gitignored files, lock home)
@@ -40,11 +47,13 @@ module AppCLI
       end
 
       # @param keep_stdin [Boolean] attach stdin even when it is not a TTY
+      # @param confirmed [Boolean] --yes: run a schema-changing task from a worktree anyway
       # @return [Integer] the command's exit status
-      def run(command_parts, keep_stdin: false)
+      def run(command_parts, keep_stdin: false, confirmed: false)
         raise Thor::Error, "No command given. Usage: bin/cli app run [--repo T] -- CMD..." if command_parts.empty?
 
-        announce
+        announce(shared_db: true)
+        confirm_schema_change!(command_parts, confirmed)
         prepare
         runner.run_status(docker_run(command_parts, rails_env: env_config.env, keep_stdin: keep_stdin))
       end
@@ -66,6 +75,7 @@ module AppCLI
           prepare
           args = system ? system_args(rspec_args) : unit_args(rspec_args)
           script = "bin/rails db:test:prepare && bundle exec rspec #{Shellwords.join(args)}"
+          script = "#{fail_if_no_examples_prelude} && #{script}" if args.include?(FAIL_IF_NO_EXAMPLES_FILE)
           extra_env = system ? SYSTEM_ENV : {}
           runner.run_status(docker_run(["bash", "-c", script], rails_env: "test", name: TEST_CONTAINER,
                                                                extra_env: extra_env))
@@ -103,8 +113,26 @@ module AppCLI
               "Use `bin/cli app exec #{env_config.short} ...` for the production image."
       end
 
-      def announce
+      # run/console/connect use the dev database of move-app-dev; test uses move_test.
+      def announce(shared_db: false)
         shell.say("Running in #{checkout.describe}")
+        shell.say("Database: #{env_config.db_names.first} (shared with #{env_config.app_container})") if shared_db
+      end
+
+      # A worktree's migrations would change the schema main's dev app runs on
+      # (and its db/structure.sql dump), so ask for --yes first.
+      def confirm_schema_change!(command_parts, confirmed)
+        return if checkout.main?
+
+        task = command_parts.join(" ")[SCHEMA_TASK]
+        return unless task
+
+        shell.say("Warning: #{task} changes #{env_config.db_names.first}, which #{env_config.app_container} " \
+                  "uses too.")
+        return if confirmed
+
+        raise Thor::Error, "Refusing to run #{task} from #{checkout.describe} without --yes. " \
+                           "Re-run as `bin/cli app run --repo #{checkout.path} --yes -- #{Shellwords.join(command_parts)}`."
       end
 
       def prepare
@@ -125,13 +153,23 @@ module AppCLI
 
       # spec/system unless the caller already named system spec paths. :js
       # specs switch to headless Chrome, which needs chromedriver in the image.
+      # When the caller named the specs, a run that filters all of them out
+      # must fail rather than pass with 0 examples.
       def system_args(rspec_args)
-        args = rspec_args.any?(SYSTEM_SPEC_PATH) ? rspec_args : [SYSTEM_SPEC_DIR, *rspec_args]
+        explicit = rspec_args.any?(SYSTEM_SPEC_PATH)
+        args = explicit ? rspec_args : [SYSTEM_SPEC_DIR, *rspec_args]
         return args if chromedriver?
 
         shell.say("chromedriver is not in #{env_config.app_image}: skipping :js system specs (--tag ~js); " \
                   "they run in CI only.")
-        [*args, "--tag", "~js"]
+        return [*args, "--tag", "~js"] unless explicit
+
+        shell.say("If every named spec is :js, the run fails with no examples (fail_if_no_examples).")
+        [*args, "--tag", "~js", "--require", FAIL_IF_NO_EXAMPLES_FILE]
+      end
+
+      def fail_if_no_examples_prelude
+        "echo #{Shellwords.escape(FAIL_IF_NO_EXAMPLES_CODE)} > #{FAIL_IF_NO_EXAMPLES_FILE}"
       end
 
       def chromedriver?
