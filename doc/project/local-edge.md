@@ -105,10 +105,14 @@ question in the proposal below (#869 part 3).
 **`app run [ENV] [--repo T] [--yes] -- CMD...`** prints `Running in <path> (branch <b>)`
 and the database line first, brings up the database, and exits with the
 command's status. From a worktree (any checkout but the main one), a command
-that runs a schema-changing task (`db:migrate` and its subtasks except
-`db:migrate:status`, `db:rollback`, `db:schema:load`, `db:reset`,
-`db:prepare`, `db:setup`, `db:drop`) prints a warning and is refused unless
-`--yes` is given, before any container starts. stdin is
+that runs a Rails db task that changes the schema or wipes data prints a
+warning and is refused unless `--yes` is given, before any container starts.
+The gated tasks are `db:migrate` and its subtasks except `db:migrate:status`,
+plus `db:rollback`, `db:forward`, `db:schema:load`, `db:structure:load`,
+`db:reset`, `db:prepare`, `db:setup`, `db:drop`, `db:purge`,
+`db:truncate_all`, `db:seed:replant` and `db:fixtures:load`. The check matches
+the task name anywhere in the command (so `bash -c "bin/rails db:migrate"` is
+caught); a mere mention such as `echo db:migrate` asks for `--yes` too. stdin is
 attached only when it is a TTY (`--tty` only when stdout is one too), so it
 works in pipes and agent shells. It is **dev-only**: `app run prod …` is
 refused, because the prod image runs its baked-in build rather than a mounted

@@ -28,9 +28,15 @@ module AppCLI
       FAIL_IF_NO_EXAMPLES_FILE = "/tmp/bin-cli-fail-if-no-examples.rb".freeze
       FAIL_IF_NO_EXAMPLES_CODE = "RSpec.configure { |config| config.fail_if_no_examples = true }".freeze
       INTERACTIVE_COMMANDS = { console: %w[bin/rails console], connect: %w[bash] }.freeze
-      # Rails tasks that change the schema of (or drop) the shared dev database.
+      # Rails db tasks (activerecord/lib/active_record/railties/databases.rake)
+      # that change the schema of the shared dev database or wipe its data.
       # db:migrate:status only reads it.
-      SCHEMA_TASK = /(?<![\w:])db:(?:migrate(?!:status)(?::\w+)?|rollback|schema:load|reset|prepare|setup|drop)(?!\w)/
+      SCHEMA_TASK = /
+        (?<![\w:])db:
+        (?:migrate(?!:status)(?::\w+)?|rollback|forward|schema:load|structure:load|reset|prepare|setup|
+           drop(?::\w+)?|purge|truncate_all|seed:replant|fixtures:load)
+        (?![\w:])
+      /x
 
       # @param checkout [Checkout] the checkout to mount
       # @param main_path [String] the main checkout (fallback for gitignored files, lock home)
@@ -127,8 +133,8 @@ module AppCLI
         task = command_parts.join(" ")[SCHEMA_TASK]
         return unless task
 
-        shell.say("Warning: #{task} changes #{env_config.db_names.first}, which #{env_config.app_container} " \
-                  "uses too.")
+        shell.say("Warning: #{task} changes the schema or data of #{env_config.db_names.first}, " \
+                  "which #{env_config.app_container} uses too.")
         return if confirmed
 
         raise Thor::Error, "Refusing to run #{task} from #{checkout.describe} without --yes. " \
