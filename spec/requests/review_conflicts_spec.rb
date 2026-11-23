@@ -131,6 +131,53 @@ RSpec.describe "Review conflict resolution" do
     end
   end
 
+  # #909 — a Photos::Move or Photos::Delete lands after the controller loaded
+  # the photo and before the action takes the box lock.
+  describe "a photo moved or deleted meanwhile" do
+    def race_resolution(&)
+      allow(RecognitionSuggestions::ResolveConflict).to receive(:new).and_wrap_original do |original|
+        original.call.tap do |action|
+          allow(action).to receive(:ensure_writable).and_wrap_original do |check, *args|
+            yield
+            check.call(*args)
+          end
+        end
+      end
+    end
+
+    def move_photo_to(target) = Photos::Move.new.call(media: Media.find(media.id), target_box: target, mover: user)
+
+    it "redirects to the photo's new box with an alert and creates nothing" do
+      other = create(:box, move:)
+      race_resolution { move_photo_to(other) }
+
+      expect { post keep_both_path, as: :turbo_stream }.not_to change(Item, :count)
+      expect(response).to redirect_to(move_box_path(move, other))
+      expect(flash[:alert]).to eq(I18n.t("reviews.flash.conflict_photo_moved", number: other.number))
+      expect(suggestion.reload.state).to eq("conflict")
+    end
+
+    it "redirects to the review queue in queue mode" do
+      other = create(:box, move:)
+      race_resolution { move_photo_to(other) }
+
+      post move_box_review_dismiss_conflict_path(move, box, media, suggestion, queue: "move")
+
+      expect(response).to redirect_to(move_review_path(move))
+    end
+
+    it "redirects to the box with an alert when the photo was deleted" do
+      suggestion.recognition_run.update!(status: "succeeded") # a queued run blocks the delete (#854)
+      race_resolution { expect(Photos::Delete.new.call(media: Media.find(media.id), actor: user)).to be_success }
+
+      post dismiss_path
+
+      expect(response).to redirect_to(move_box_path(move, box))
+      expect(flash[:alert]).to eq(I18n.t("reviews.flash.conflict_photo_deleted"))
+      expect(suggestion.reload.state).to eq("conflict")
+    end
+  end
+
   describe "guards" do
     it "refuses a viewer" do
       viewer = create(:user)

@@ -24,8 +24,9 @@ module RecognitionSuggestions
   #  - :superseded — a newer run re-scanned the photo, so this conflict no
   #    longer describes it (#899, the latest-run rule);
   #  - :box_unpacked — the box is terminal (#855), nothing may change in it;
-  #  - :stale — the photo or the matched item left the box or was deleted,
-  #    or the matched item was marked removed while unpacking (#909). Photos::Move leaves recognition rows on their historical box and
+  #  - :photo_gone — the photo left the box or was deleted (#909);
+  #  - :stale — the matched item left the box or was deleted, or was marked
+  #    removed while unpacking (#909). Photos::Move leaves recognition rows on their historical box and
   #    Photos::Delete snapshots the photo's items, so both are locked and
   #    re-read here: box, suggestion, photo, then item — the order Photos::Move
   #    and Discards::Cascade take them in. A move or delete that lands first is
@@ -63,14 +64,15 @@ module RecognitionSuggestions
     end
 
     # Locks and re-reads (unscoped, so a discard shows) the photo, then the
-    # matched item. The item must also still be present: Items::MarkRemoved
+    # matched item. A gone photo gets its own reason: its review URL no longer
+    # resolves, so the caller must send the reviewer elsewhere. The item must also still be present: Items::MarkRemoved
     # keeps it in the box, undiscarded, but no longer physically there.
     # Success value: the locked photo.
 
     #: (untyped suggestion) -> Dry::Monads::Result[untyped, untyped]
     def ensure_current(suggestion)
       media = Media.with_discarded.lock(PARENT_ROW_LOCK).find_by(id: suggestion.media_id)
-      return Failure(:stale) unless in_box?(media, suggestion)
+      return Failure(:photo_gone) unless in_box?(media, suggestion)
 
       item = Item.with_discarded.lock(PARENT_ROW_LOCK).find_by(id: suggestion.item_id)
       return Failure(:stale) unless in_box?(item, suggestion) && !item.removed?

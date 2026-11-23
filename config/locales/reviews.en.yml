@@ -75,7 +75,9 @@ en:
       # Conflict resolution (#881).
       conflict_dismissed: "Kept as the same item: “%{name}”."
       conflict_kept_both: "Added a second “%{name}”."
-      conflict_stale: "That match was already settled or the photo was re-scanned."
+      conflict_stale: "That match was already settled, the photo was re-scanned, or the matched item changed."
+      conflict_photo_moved: "This photo was moved to box #%{number} before the match could be settled."
+      conflict_photo_deleted: "This photo or its box was deleted before the match could be settled."
       conflict_box_unpacked: "This box is unpacked, so its items can't change."
       conflict_failed: "Could not settle that match. Try again."
       view_item: "View item"

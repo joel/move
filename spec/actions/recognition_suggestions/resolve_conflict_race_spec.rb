@@ -80,18 +80,18 @@ RSpec.describe RecognitionSuggestions::ResolveConflict do # vs Photos::Move + Ph
   def delete_photo(media) = Photos::Delete.new.call(media: Media.find(media.id), actor:)
 
   shared_examples "a stale resolution" do |outcome|
-    it "refuses as :stale when the photo moved to another box meanwhile" do
+    it "refuses as :photo_gone when the photo moved to another box meanwhile" do
       result = resolve_after(outcome) { expect(move_photo(photo)).to be_success }
 
-      expect(result.failure).to eq(:stale)
+      expect(result.failure).to eq(:photo_gone)
       expect(Item.where(source_media_id: photo.id)).to be_empty
       expect(suggestion.reload).to have_attributes(state: "conflict", item_id: lamp.id)
     end
 
-    it "refuses as :stale when the photo was deleted meanwhile" do
+    it "refuses as :photo_gone when the photo was deleted meanwhile" do
       result = resolve_after(outcome) { expect(delete_photo(photo)).to be_success }
 
-      expect(result.failure).to eq(:stale)
+      expect(result.failure).to eq(:photo_gone)
       expect(Item.with_discarded.where(source_media_id: photo.id)).to be_empty
       expect(suggestion.reload.state).to eq("conflict")
     end
