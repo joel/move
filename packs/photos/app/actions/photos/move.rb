@@ -20,21 +20,52 @@ module Photos
   # rather than the stale source box (Codex #318). `item.moved` reuses the existing
   # Search::IndexSubscriber + activity feed; only `box_id` changes, so presence
   # stays `in_box`.
+  #
+  # Moving the photo whose items are the last in-box items of an `unpacking` box
+  # completes that SOURCE box (#838) — the same lifecycle rule as Items::Move
+  # (#757, architecture.md §4c). The destination is never completed. Returns
+  # Success(media:, source_box:, source_completed:): source_box is the box the
+  # photo actually left (nil on the idempotent no-op), and source_completed is
+  # that box's REALITY (it was unpacking and is now unpacked), not whether this
+  # call won the completion race (#756 R7). The completion is a secondary
+  # mutation, so its failure never fails the move.
   class Move < BaseAction
+    include Items::CurrentBoxLock
+
     #: (media: untyped, target_box: untyped, mover: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, target_box:, mover:)
       yield ensure_writable(media.move)
       yield validate(media, target_box)
-      moved_item_ids = yield relocate(media, target_box)
+      relocated = yield relocate(media, target_box)
       # :noop = a concurrent move already placed the photo in target while we waited
       # on the lock. The end state the caller wanted holds, so it's an idempotent
-      # success (the controller redirects to the target box) — but emit nothing, as
-      # this request moved nothing (no duplicate activity rows / reindex).
-      emit_moves(media, moved_item_ids, target_box, mover) unless moved_item_ids == :noop
-      Success(media)
+      # success (the controller redirects to the target box) — but emit nothing and
+      # complete nothing, as this request moved nothing (no duplicate activity rows
+      # / reindex).
+      return Success(media: media, source_box: nil, source_completed: false) if relocated == :noop
+
+      source, moved_item_ids, eligible = relocated
+      emit_moves(media, moved_item_ids, target_box, mover)
+      Success(media: media, source_box: source, source_completed: source_completed?(source, eligible, mover))
     end
 
     private
+
+    # Only a box the photo's items left while it was being unpacked (read under
+    # the source lock) is eligible: a box opened AFTER we released the lock was
+    # deliberately opened empty and must stay open (#757 Codex R9). Runs after
+    # the move commits, in CompleteIfEmpty's own box lock (#756 R2 ordering).
+    # Returns the source box's reality, re-read unscoped so a box a concurrent
+    # delete discarded doesn't report as completed (#757 Codex R11).
+
+    #: (untyped source, bool eligible, untyped mover) -> bool
+    def source_completed?(source, eligible, mover)
+      return false unless eligible
+
+      Boxes::CompleteIfEmpty.completed_box(box: source, actor: mover)
+      source.reload
+      source.unpacked? && !source.discarded?
+    end
 
     #: (untyped media, untyped target_box) -> Dry::Monads::Result[untyped, untyped]
     def validate(media, target_box)
@@ -45,53 +76,65 @@ module Photos
       Success()
     end
 
-    # Relocate the photo and its co-located items in one locked transaction; returns
-    # the moved item ids. Emits NO events in here on purpose: an `item.moved` inside
-    # this transaction enqueues the search reindex job, which lives in a *separate*
-    # queue DB and so isn't covered by this app-DB transaction — it could run before
-    # the move commits and index the items under the stale source box (Codex #318).
-    # The caller emits the events after commit instead. The box update is done
-    # directly (not via Items::Move) because that action's guards — in_box, not
-    # same/cross box — are already satisfied by `co_located_items` + `validate`; only
-    # `box_id` changes, so presence stays `in_box`.
+    # Relocate the photo and its co-located items in one transaction, under the
+    # lock of the box the photo is in NOW (Items::CurrentBoxLock, #838): box-first,
+    # like Items::Move, so it serializes with a concurrent "mark box unpacked"
+    # cascade, an Items::Move out of the same box, and another move of the same
+    # photo (whose commit re-boxes it — the lock helper then re-locks the photo's
+    # new box). FOR NO KEY UPDATE (the helper's default): the box_id writes' FK
+    # check takes FOR KEY SHARE on the TARGET box, so two crossing moves can't
+    # deadlock. Emits NO events in here on purpose: an `item.moved` inside this
+    # transaction enqueues the search reindex job, which lives in a *separate*
+    # queue DB and so isn't covered by this app-DB transaction — it could run
+    # before the move commits and index the items under the stale source box
+    # (Codex #318). The caller emits the events after commit instead. The box
+    # update is done directly (not via Items::Move) because that action's guards —
+    # in_box, not same/cross box — are already satisfied by `co_located_items` +
+    # `validate`; only `box_id` changes, so presence stays `in_box`.
 
     #: (untyped media, untyped target_box) -> Dry::Monads::Result[untyped, untyped]
     def relocate(media, target_box)
-      result = nil #: untyped
-      ActiveRecord::Base.transaction do
-        # FOR UPDATE: serialize concurrent moves of the same photo. Read the source
-        # box only AFTER the lock so the second mover sees the first's committed box
-        # and can't strand the photo apart from its items.
-        media.lock!
-        # Re-check after the lock: a concurrent move of the same photo to the SAME
-        # target may have committed while we waited, so the pre-lock `validate`
-        # same_box check is stale. Return an idempotent no-op (NOT Failure(:same_box),
-        # which would make the controller redirect to the old box's review URL and
-        # 404 — the photo already lives in target now) (Codex #318).
-        result = if media.box_id == target_box.id
-                   Success(:noop)
-                 else
-                   move_rows(media, target_box)
-                 end
-      end
-      result
+      with_current_box_lock(media) { |box| locked_relocate(media, box, target_box) }
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
     end
 
-    # Inside the photo lock: relocate the co-located items then the photo, returning
-    # Success(moved_item_ids). FOR UPDATE on the items too — a concurrent individual
+    # Under the source box lock. Re-check after the lock: a concurrent move of the
+    # same photo to the SAME target may have committed while we waited, so the
+    # pre-lock `validate` same_box check is stale. Return an idempotent no-op (NOT
+    # Failure(:same_box), which would make the controller redirect to the old
+    # box's review URL and 404 — the photo already lives in target now) (Codex
+    # #318). The photo row is locked too (box, then photo, then items — nothing
+    # locks them the other way round): Photos::Delete locks the photo but not its
+    # box, so the discarded check must follow that lock, or a delete committing
+    # while we wait on the items would let us move a discarded photo. Returns
+    # [source box, moved item ids, completion-eligible]: eligible only when items
+    # actually left an `unpacking` box — a photo with no co-located items empties
+    # nothing, and an empty box someone opened or reopened must stay open.
+
+    #: (untyped media, untyped box, untyped target_box) -> Dry::Monads::Result[untyped, untyped]
+    def locked_relocate(media, box, target_box)
+      media.lock!(PARENT_ROW_LOCK) # reloads (unscoped): sees a concurrent discard
+      return Failure(:not_found) if media.discarded?
+      return Success(:noop) if box.id == target_box.id
+
+      moved_ids = move_rows(media, target_box)
+      Success([box, moved_ids, moved_ids.any? && box.unpacking?])
+    end
+
+    # Inside the source box lock: relocate the co-located items then the photo,
+    # returning the moved item ids. FOR UPDATE on the items — a concurrent individual
     # Items::Move on one of them would otherwise be clobbered (we'd overwrite its new
     # box). Locking + the `box_id = source_box_id` predicate means an item moved out
     # before our SELECT is simply not matched (its deliberate move is kept), and one
     # racing us blocks until we commit (Codex #318).
 
-    #: (untyped media, untyped target_box) -> Dry::Monads::Success[untyped]
+    #: (untyped media, untyped target_box) -> Array[untyped]
     def move_rows(media, target_box)
       items = co_located_items(media, media.box_id).lock.to_a
       items.each { |item| item.update!(box: target_box) }
       media.update!(box: target_box)
-      Success(items.map(&:id))
+      items.map(&:id)
     end
 
     # Items detected in this photo that are still in its box and present — the
