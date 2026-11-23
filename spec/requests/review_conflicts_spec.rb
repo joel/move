@@ -120,6 +120,15 @@ RSpec.describe "Review conflict resolution" do
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.body).to include(I18n.t("reviews.flash.conflict_stale"))
     end
+
+    it "is a no-op with the stale notice when the matched item was deleted meanwhile (#909)" do
+      Items::Remove.new.call(item: lamp, actor: user)
+
+      expect { post keep_both_path, as: :turbo_stream }.not_to change(Item, :count)
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include(I18n.t("reviews.flash.conflict_stale"))
+      expect(suggestion.reload.state).to eq("conflict")
+    end
   end
 
   describe "guards" do

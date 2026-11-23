@@ -23,7 +23,14 @@ module RecognitionSuggestions
   #  - :not_conflict — already settled (by this person or another);
   #  - :superseded — a newer run re-scanned the photo, so this conflict no
   #    longer describes it (#899, the latest-run rule);
-  #  - :box_unpacked — the box is terminal (#855), nothing may change in it.
+  #  - :box_unpacked — the box is terminal (#855), nothing may change in it;
+  #  - :stale — the photo or the matched item left the box or was deleted
+  #    (#909). Photos::Move leaves recognition rows on their historical box and
+  #    Photos::Delete snapshots the photo's items, so both are locked and
+  #    re-read here: box, suggestion, photo, then item — the order Photos::Move
+  #    and Discards::Cascade take them in. A move or delete that lands first is
+  #    seen; one that lands after waits for the commit (and a delete then
+  #    discards the kept item with the photo).
   # Events are emitted after the commit.
   class ResolveConflict < BaseAction
     OUTCOMES = %i[same second].freeze
@@ -37,7 +44,8 @@ module RecognitionSuggestions
       item = suggestion.box.with_lock(PARENT_ROW_LOCK) do
         suggestion.lock!
         yield ensure_resolvable(suggestion)
-        yield with_responsible(actor) { outcome == :same ? accept_match(suggestion) : keep_both(suggestion) }
+        media = yield ensure_current(suggestion)
+        yield with_responsible(actor) { outcome == :same ? accept_match(suggestion) : keep_both(suggestion, media) }
       end
       emit(suggestion, actor, outcome, matched_item_id, item)
       Success(item)
@@ -54,16 +62,35 @@ module RecognitionSuggestions
       Success()
     end
 
+    # Locks and re-reads (unscoped, so a discard shows) the photo, then the
+    # matched item. Success value: the locked photo.
+
+    #: (untyped suggestion) -> Dry::Monads::Result[untyped, untyped]
+    def ensure_current(suggestion)
+      media = Media.with_discarded.lock(PARENT_ROW_LOCK).find_by(id: suggestion.media_id)
+      return Failure(:stale) unless in_box?(media, suggestion)
+
+      item = Item.with_discarded.lock(PARENT_ROW_LOCK).find_by(id: suggestion.item_id)
+      return Failure(:stale) unless in_box?(item, suggestion)
+
+      Success(media)
+    end
+
+    #: (untyped record, untyped suggestion) -> bool
+    def in_box?(record, suggestion)
+      !record.nil? && !record.discarded? && record.box_id == suggestion.box_id
+    end
+
     #: (untyped suggestion) -> Dry::Monads::Result[untyped, untyped]
     def accept_match(suggestion)
       suggestion.update!(state: "accepted")
       Success(suggestion.item)
     end
 
-    #: (untyped suggestion) -> Dry::Monads::Result[untyped, untyped]
-    def keep_both(suggestion)
+    #: (untyped suggestion, untyped media) -> Dry::Monads::Result[untyped, untyped]
+    def keep_both(suggestion, media)
       item = suggestion.box.items.create!(
-        move: suggestion.move, source_media: suggestion.media,
+        move: suggestion.move, source_media: media,
         source_recognition_suggestion_id: suggestion.id,
         name: suggestion.proposed_name, confidence_score: suggestion.confidence_score,
         created_via: "recognition", review_state: "confirmed", presence_state: "in_box"

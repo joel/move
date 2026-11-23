@@ -40,7 +40,7 @@ module ReviewConflictResponses
 
   def conflict_refusal_message(reason)
     case reason
-    when :not_conflict, :superseded then t("reviews.flash.conflict_stale")
+    when :not_conflict, :superseded, :stale then t("reviews.flash.conflict_stale")
     when :box_unpacked then t("reviews.flash.conflict_box_unpacked")
     when :move_archived then t("moves.archived_alert")
     else t("reviews.flash.conflict_failed")
