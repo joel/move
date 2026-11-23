@@ -12,7 +12,11 @@ module Discards
       yield ensure_writable(record.move)
       yield ensure_restorable(record)
       batch_id = record.discard_batch_id
-      ActiveRecord::Base.transaction do
+      # requires_new: the error is rescued below, so when a caller already holds
+      # a transaction (Items::Restore's box lock, #894) the restore sits in its
+      # own savepoint — joined, a mid-tree failure would be swallowed into a
+      # Failure while the outer commit kept the partial restore (cf. Cascade).
+      ActiveRecord::Base.transaction(requires_new: true) do
         record.undiscard_in_batch!
         restore_children(record, batch_id) if batch_id
       end
@@ -31,8 +35,7 @@ module Discards
 
     #: (untyped record) -> (Dry::Monads::Failure[Symbol] | Dry::Monads::Success[nil])
     def ensure_restorable(record)
-      return Failure(:retention_expired) if record.discarded? &&
-                                            record.discarded_at <= Discardable::RETENTION.ago
+      return Failure(:retention_expired) if record.retention_expired?
 
       Success()
     end

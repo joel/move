@@ -54,6 +54,12 @@ module Discardable
     discard!
   end
 
+  # Past the retention window a discarded record is no longer restorable, even
+  # before the nightly purge reaches it (Discards::CascadeRestore, #583).
+  def retention_expired?
+    discarded? && discarded_at <= RETENTION.ago
+  end
+
   # Restores self and clears the cascade trace.
   def undiscard_in_batch!
     undiscard!
