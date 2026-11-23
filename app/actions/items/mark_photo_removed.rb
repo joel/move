@@ -60,10 +60,23 @@ module Items
     #: (untyped box, untyped media) -> Dry::Monads::Result[untyped, untyped]
     def owned_items(box, media)
       box.with_lock(PARENT_ROW_LOCK) do
-        next Failure(:not_found) unless box.media.exists?(media.id)
+        next Failure(:not_found) unless owned?(box, media)
 
         Success(box.items.in_box.where(source_media_id: media.id).includes(:move).order(:created_at, :id).to_a)
       end
+    end
+
+    # The CurrentBoxLock re-read (#840/#864): the caller's Media may predate a
+    # concurrent Photos::Move, so it is re-read UNDER the box lock — any move
+    # off this box has committed by now (it holds this lock while it writes)
+    # or will wait behind us. Media#reload is unscoped, so a photo discarded
+    # meanwhile still reloads; a hard-deleted one raises.
+
+    #: (untyped box, untyped media) -> bool
+    def owned?(box, media)
+      media.reload.box_id == box.id && !media.discarded?
+    rescue ActiveRecord::RecordNotFound
+      false
     end
 
     # Success(item) when removed, Success(nil) when the item left this box
