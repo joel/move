@@ -174,7 +174,8 @@ class Media < ApplicationRecord
   # nothing supersedes an older run's conflict, so the photo is orphaned again
   # (same "latest" as BoxesController#conflict_media_ids). Used by the
   # recovery surface (RecoveriesController, ItemsController#create) and mirrored by
-  # the bulk BoxesController#recoverable_media_ids query.
+  # the bulk BoxesController#recoverable_media_ids query, which adds "settled" as
+  # `!recognition_in_flight?` does here: the LATEST run is terminal (#904).
 
   #: () -> bool
   def orphaned?

@@ -264,20 +264,23 @@ class BoxesController < MoveScopedController
   #    path avoids. Only the latest run counts (#899): a re-scan that failed or
   #    found nothing supersedes an older conflict, and conflict_media_ids (same
   #    "latest") no longer links the photo, so recovery must.
-  #  - still queued/processing → transient, stays a plain thumbnail (#162).
-  # The per-record equivalent is Media#orphaned? (used by the recovery flow); this
-  # is the set-based form for the gallery, with the in-flight/terminal filter added.
+  #  - its LATEST run is still queued/processing → transient, stays a plain
+  #    thumbnail (#162). Only the latest run counts (#904), the same rule as
+  #    Media#recognition_in_flight? (#871): an older run left in flight (a lost
+  #    job) is superseded by any newer run and must not dead-end the tile.
+  # The per-record equivalent is Media#orphaned? && !Media#recognition_in_flight?
+  # (the recovery flow); this is the set-based form for the gallery.
 
   #: () -> untyped
   def recoverable_media_ids
     item_media = @move.items.with_discarded.where.not(source_media_id: nil).select(:source_media_id)
     suggestion_media = RecognitionSuggestion.from_latest_runs_of(@box.media.select(:id)).select(:media_id)
-    runs = RecognitionRun.where(box: @box)
+    settled_media = RecognitionRun.latest_for(@box.media.select(:id))
+                                  .where(status: RecognitionRun::TERMINAL).select(:media_id)
     @box.media
         .where.not(id: item_media)
         .where.not(id: suggestion_media)
-        .where(id: runs.where(status: RecognitionRun::TERMINAL).select(:media_id))
-        .where.not(id: runs.where(status: %w[queued processing]).select(:media_id))
+        .where(id: settled_media)
         .pluck(:id)
   end
 
