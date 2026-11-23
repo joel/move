@@ -12,6 +12,12 @@ module RecognitionRuns
     # broad rescue records a failed run with zero inventory.
     class SourceDiscarded < StandardError; end
 
+    # The run left `processing` while the provider call was in flight — the
+    # stale-run reaper (RecognitionRuns::FailStale, #871) failed it, which
+    # armed Retry. Raised inside the materialize transaction so nothing
+    # commits; the run keeps the terminal state the reaper gave it.
+    class RunSuperseded < StandardError; end
+
     #: (run: untyped, ?provider: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(run:, provider: nil)
       # Per-Move provider (#185): the active provider + key come from the Move, not
@@ -37,7 +43,8 @@ module RecognitionRuns
       guard = ensure_writable(run.move)
       return guard if guard.failure?
 
-      mark_processing(run)
+      return Failure(run) unless claimed?(run)
+
       result = provider.identify(image: run.media.image, context: context(run))
       # Materialize AND complete atomically (#649): one commit covers the
       # items, suggestions, family backfills and the run's terminal
@@ -60,12 +67,15 @@ module RecognitionRuns
       # backfill has no later event to correct a stale pre-commit read).
       backfilled = ActiveRecord::Base.transaction do
         ensure_source_kept(run)
+        ensure_still_processing(run)
         payloads = materialize(run, result)
         complete(run, result)
         payloads
       end
       announce(run, result, backfilled)
       Success(run)
+    rescue RunSuperseded
+      Failure(run)
     rescue StandardError => e # rubocop:disable Move/BroadRescue -- any failure marks the run failed (Failure)
       fail_run(run, e)
       Failure(run)
@@ -73,10 +83,35 @@ module RecognitionRuns
 
     private
 
-    #: (untyped run) -> untyped
-    def mark_processing(run)
-      run.update!(status: "processing", started_at: Time.current)
+    # Moves the run to `processing` only while it is still in flight: a run
+    # the reaper already failed (#871) is left alone and nothing runs. A
+    # `processing` run is re-claimed so an execution re-released after a
+    # worker crash can finish it.
+
+    #: (untyped run) -> bool
+    def claimed?(run)
+      now = Time.current
+      claimed = RecognitionRun.where(id: run.id, status: RecognitionRun::IN_FLIGHT)
+                              .update_all(status: "processing", started_at: now, updated_at: now) # rubocop:disable Rails/SkipsModelValidations
+      return false if claimed.zero?
+
+      run.reload
       notify_isolated(run, "recognition_run.processing", { recognition_run_id: run.id })
+      true
+    end
+
+    # Guarded terminal transition (#871): lock the run row and confirm it is
+    # still `processing` before anything commits. The reaper's guarded UPDATE
+    # takes the same row lock, so either it failed the run first and this
+    # rolls back (no inventory behind a Retry-able failed run), or this
+    # commits `succeeded` first and the reaper's re-checked WHERE no longer
+    # matches.
+
+    #: (untyped run) -> void
+    def ensure_still_processing(run)
+      return if RecognitionRun.lock.where(id: run.id).pick(:status) == "processing"
+
+      raise RunSuperseded, "The run was failed while recognition was running"
     end
 
     # identify takes seconds, and a photo or box delete in that window must not

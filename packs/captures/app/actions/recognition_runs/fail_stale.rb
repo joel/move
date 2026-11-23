@@ -16,7 +16,9 @@ module RecognitionRuns
   # live run — including one that sat behind a queue backlog. Each run is
   # failed with a guarded UPDATE that re-checks the status and the cutoff at
   # write time, so a run that Process picked up after the candidate read is
-  # left alone.
+  # left alone. Should a live run ever be reaped anyway, Process re-checks the
+  # run under a row lock before committing and rolls back, so a reaped run
+  # never gains inventory behind its Retry.
   class FailStale < BaseAction
     STALE_AFTER = 30.minutes
     ERROR_CODE = "stale"

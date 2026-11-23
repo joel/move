@@ -382,6 +382,38 @@ RSpec.describe RecognitionRuns::Process do
     end
   end
 
+  context "when the stale-run reaper fails the run (#871)" do
+    let(:stale_reap) do
+      lambda do
+        RecognitionRun.where(id: run.id).update_all( # rubocop:disable Rails/SkipsModelValidations
+          status: "failed", error_code: RecognitionRuns::FailStale::ERROR_CODE, completed_at: Time.current
+        )
+      end
+    end
+
+    it "commits no inventory and keeps the reaper's failure when it lands during identify" do
+      fake = RecognitionProviders::Fake.new
+      provider = instance_double(RecognitionProviders::Fake)
+      allow(provider).to receive(:identify) { |**kwargs| stale_reap.call.then { fake.identify(**kwargs) } }
+
+      result = described_class.new.call(run:, provider:)
+
+      expect(result).to be_failure
+      expect(run.reload).to have_attributes(status: "failed", error_code: "stale")
+      expect(Item.with_discarded.where(source_media_id: media.id)).to be_empty
+      expect(run.recognition_suggestions).to be_empty
+    end
+
+    it "never calls the provider for a run the reaper already failed" do
+      stale_reap.call
+      provider = instance_double(RecognitionProviders::Fake, identify: nil)
+
+      expect(described_class.new.call(run:, provider:)).to be_failure
+      expect(provider).not_to have_received(:identify)
+      expect(run.reload).to have_attributes(status: "failed", error_code: "stale")
+    end
+  end
+
   context "when the Move was archived after capture (#118)" do
     let(:move) { create(:move, :archived) }
 
