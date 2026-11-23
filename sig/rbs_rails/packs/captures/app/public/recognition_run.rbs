@@ -678,9 +678,12 @@ class ::RecognitionRun < ::ApplicationRecord
   include ::RecognitionRun::GeneratedAssociationMethods
 
   def self.latest_ids_for: (untyped media) -> ::RecognitionRun::ActiveRecord_Relation
+  def self.latest_for: (untyped media) -> ::RecognitionRun::ActiveRecord_Relation
 
   module ::RecognitionRun::GeneratedRelationMethods
     def latest_ids_for: (untyped media) -> ::RecognitionRun::ActiveRecord_Relation
+
+    def latest_for: (untyped media) -> ::RecognitionRun::ActiveRecord_Relation
   end
 
   class ::RecognitionRun::ActiveRecord_Relation < ::ActiveRecord::Relation

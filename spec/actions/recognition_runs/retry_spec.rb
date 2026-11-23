@@ -72,6 +72,47 @@ RSpec.describe RecognitionRuns::Retry do
     end.to change(box.recognition_runs, :count).by(1) # only the racing run
   end
 
+  it "refuses a failed run that is no longer the photo's latest (#902)" do
+    run = create(:recognition_run, :failed, move:, box:, media:, created_at: 1.hour.ago)
+    create(:recognition_run, :succeeded, move:, box:, media:) # nothing detected: no items
+
+    expect do
+      expect(described_class.new.call(run:).failure).to eq(:not_retryable)
+    end.not_to change(box.recognition_runs, :count)
+  end
+
+  # A provider whose scan succeeds with nothing on the photo.
+  def detecting_nothing
+    instance_double(RecognitionProviders::Fake).tap do |provider|
+      allow(provider).to receive(:identify)
+        .and_return(RecognitionProviders::Result.new(provider: "fake", provider_model: "x", objects: []))
+    end
+  end
+
+  it "refuses a stale retry once the first retry's run succeeded with nothing detected (#902)" do
+    run = create(:recognition_run, :failed, move:, box:, media:, created_at: 1.hour.ago)
+    allow(RecognitionRuns::ProcessJob).to receive(:perform_later).and_return(instance_double(RecognitionRuns::ProcessJob))
+    stale = described_class.new
+    raced = false
+    # Retry A runs, and its run is processed to an empty success, between
+    # retry B's pre-check and B's photo lock.
+    allow(stale).to receive(:retryable?).and_wrap_original do |original, *args|
+      original.call(*args).tap do
+        next if raced
+
+        raced = true
+        first = described_class.new.call(run: RecognitionRun.find(run.id)).value!
+        expect(RecognitionRuns::Process.new.call(run: first, provider: detecting_nothing)).to be_success
+        expect(first.reload.status).to eq("succeeded")
+      end
+    end
+
+    expect do
+      expect(stale.call(run:).failure).to eq(:not_retryable)
+    end.to change(box.recognition_runs, :count).by(1) # only retry A's run
+    expect(RecognitionRuns::ProcessJob).to have_received(:perform_later).once
+  end
+
   describe "a retake re-scan run (#897)" do
     before do
       # Items from the earlier image, then the retake swaps the image.

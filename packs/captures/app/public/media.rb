@@ -147,11 +147,12 @@ class Media < ApplicationRecord
   # "all reviewed" badge.
   scope :not_generated, -> { where.not(captured_via: "generated") }
 
-  # The latest run's status drives the per-image recognition badge.
+  # The latest run's status drives the per-image recognition badge. "Latest"
+  # is RecognitionRun.latest_for, shared with Process and Retry (#902).
 
   #: () -> String?
   def recognition_state
-    recognition_runs.order(created_at: :desc, id: :desc).pick(:status)
+    RecognitionRun.latest_for(id).pick(:status)
   end
 
   # Has this photo produced an item? MOVE-wide, not box-scoped: Items::Move keeps
