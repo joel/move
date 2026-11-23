@@ -217,14 +217,27 @@ module RecognitionRuns
     # where an escape would be catastrophic: on the success path it would flip
     # a committed run to failed and arm Retry to duplicate its items; from the
     # rescue path it would leak the raise past the class contract. Failures
-    # are Sentry-visible (error_reporter) and logged.
+    # are Sentry-visible (error_reporter) and logged — each through #swallow,
+    # so a failing logger or reporter can't escape this rescue either (#652).
 
     #: (untyped run, String name, Hash[Symbol, untyped] payload) -> untyped
     def notify_isolated(run, name, payload)
       Rails.event.notify(name, payload)
     rescue StandardError => e # rubocop:disable Move/BroadRescue -- §1#4: an event dispatch failure must not change the run's committed fate
-      Rails.logger.warn("[recognition] #{name} announcement failed for run=#{run.id}: #{e.class}: #{e.message}")
-      Rails.error.report(e, handled: true)
+      swallow { Rails.logger.warn("[recognition] #{name} announcement failed for run=#{run.id}: #{e.class}: #{e.message}") }
+      swallow { Rails.error.report(e, handled: true) }
+    end
+
+    # Runs a best-effort reporting call (log / error report) from inside a
+    # rescue. Each call is isolated on its own, so one failing sink still
+    # lets the other run and nothing re-enters #call's broad rescue (#652).
+
+    #: () { () -> untyped } -> nil
+    def swallow
+      yield
+      nil
+    rescue StandardError # rubocop:disable Move/BroadRescue -- §1#4: a failing logger/reporter must not escape the rescue that called it
+      nil
     end
 
     #: (untyped run, untyped error) -> untyped

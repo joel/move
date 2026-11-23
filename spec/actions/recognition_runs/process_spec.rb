@@ -208,6 +208,37 @@ RSpec.describe RecognitionRuns::Process do
       expect(Rails.logger).to have_received(:warn).with(/item.family_backfilled announcement failed/)
     end
 
+    it "keeps a committed run succeeded when the error reporter itself raises (#652)" do
+      allow(Rails.event).to receive(:notify).and_call_original
+      allow(Rails.event).to receive(:notify)
+        .with("recognition_run.succeeded", anything).and_raise(StandardError, "cable down")
+      allow(Rails.error).to receive(:report).and_raise(StandardError, "reporter down")
+      allow(Rails.logger).to receive(:warn)
+
+      result = described_class.new.call(run:)
+
+      expect(result).to be_success
+      expect(run.reload.status).to eq("succeeded")
+      expect(box.items.count).to eq(3)
+      expect(Rails.error).to have_received(:report)
+      expect(Rails.logger).to have_received(:warn).with(/recognition_run.succeeded announcement failed/)
+    end
+
+    it "still reports the dispatch failure when the logger raises (#652)" do
+      allow(Rails.event).to receive(:notify).and_call_original
+      allow(Rails.event).to receive(:notify)
+        .with("recognition_run.succeeded", anything).and_raise(StandardError, "cable down")
+      allow(Rails.logger).to receive(:warn).and_call_original
+      allow(Rails.logger).to receive(:warn).with(/announcement failed/).and_raise(IOError, "log device closed")
+      allow(Rails.error).to receive(:report)
+
+      result = described_class.new.call(run:)
+
+      expect(result).to be_success
+      expect(run.reload.status).to eq("succeeded")
+      expect(Rails.error).to have_received(:report).with(an_instance_of(StandardError), handled: true)
+    end
+
     it "re-processing the same media after a failed run creates no duplicates" do
       objects = [
         RecognitionProviders::DetectedObject.new(label: "Lamp", confidence: 0.97, family: "lighting"),
