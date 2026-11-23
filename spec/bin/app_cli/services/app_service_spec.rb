@@ -45,7 +45,7 @@ class FakeAppRunner
     return auto_remove.to_s if command.include?("AutoRemove")
     return "/checkouts/old" if command.include?("Mounts")
 
-    "boot log line\n" if command.start_with?("docker logs")
+    "boot log line\n#{"\tfrom /rails/bin/rails:4:in '<main>'\n" * 50}" if command.start_with?("docker logs")
   end
 
   def image_exists?(_image) = image_present
@@ -323,6 +323,10 @@ RSpec.describe AppCLI::Services::AppService do
 
         expect { manager.restart_app }.to raise_error(Thor::Error)
         expect(FileUtils).to have_received(:rm_f).with("/checkouts/old/tmp/pids/server.pid")
+      end
+
+      it "keeps the exception message when the backtrace is longer than the tail" do
+        expect { manager.restart_app }.to raise_error(Thor::Error) { |e| expect(e.message).not_to include("from /rails") }
       end
 
       it "says so when the old container doesn't come back either" do

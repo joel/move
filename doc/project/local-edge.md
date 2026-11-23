@@ -214,7 +214,10 @@ answer, it is removed and the command exits non-zero with its logs. App
 containers no longer run with `--rm` (the logs of a failed boot would vanish
 with it), so `app stop` removes the container after stopping it. A container
 started with `--rm` by an older `bin/cli` can't be kept, so its first restart
-has no rollback. Put main back with `bin/cli app restart` from the main
+has no rollback. The reverse also holds: an older `bin/cli` (a main checkout not yet
+pulled past #879) only `docker stop`s before its `docker run --name`, so it
+can't replace a container started by this one. Run `docker rm move-app-dev`
+after that stop, or pull main first. Put main back with `bin/cli app restart` from the main
 checkout.
 
 ```mermaid

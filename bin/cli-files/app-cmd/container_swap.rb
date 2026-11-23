@@ -12,6 +12,7 @@ module AppCLI
       PID_FILE = "tmp/pids/server.pid".freeze
       # Log lines shown when a container fails its readiness check.
       LOG_TAIL = 40
+      BACKTRACE_FRAME = /\A\s+from \S+:\d+:in /
 
       # @param stop [#call] stops and removes the app container (AppService#stop)
       def initialize(runner:, shell:, app:, checkout_path:, readiness:, stop:)
@@ -148,8 +149,11 @@ module AppCLI
           "Its last log lines:\n#{logs.strip}\n\n#{outcome}"
       end
 
+      # The last LOG_TAIL lines without backtrace frames, so a boot
+      # exception's message is not pushed out by its own backtrace.
       def last_logs(name)
-        runner.capture("docker logs --tail #{LOG_TAIL} #{name}", quiet: true).to_s
+        output = runner.capture("docker logs --tail #{LOG_TAIL * 10} #{name}", quiet: true).to_s
+        output.lines.grep_v(BACKTRACE_FRAME).last(LOG_TAIL).join
       end
 
       def auto_removed?(name)
