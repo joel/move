@@ -200,6 +200,119 @@ RSpec.describe "FindLists" do
       expect(FindListEntry.where(move:, user_id: viewer.id, item:)).to exist
     end
 
+    # #732: the toggle renders the state actually in the DB after the action,
+    # never the intended one. A concurrent toggle from another tab/device is
+    # simulated by running the opposite mutation right after the action.
+    def toggle_stream(item, variant)
+      target = Components::FindLists::Toggle.dom_id(item, variant:)
+      response.body[%r{<turbo-stream action="replace" target="#{target}">.*?</turbo-stream>}m].to_s
+    end
+
+    # Every toggle variant must carry the DB state. Pin and unpin share one URL
+    # (POST vs DELETE), so the state shows as the button_to method override:
+    # the pinned control submits `_method=delete`, the unpinned one does not.
+    def expect_toggles(item, pinned:)
+      delete_override = %(name="_method" value="delete")
+      Components::FindLists::Toggle::VARIANTS.each do |variant|
+        stream = toggle_stream(item, variant)
+        expect(stream).to include(%(action="#{move_find_list_pin_path(move, item_id: item.id)}"))
+        pinned ? expect(stream).to(include(delete_override)) : expect(stream).not_to(include(delete_override))
+      end
+    end
+
+    context "when a concurrent toggle lands between the action and the render (#732)" do
+      let(:item) { create(:item, move:, box: create(:box, move:), name: "Kettle") }
+      let(:entries) { FindListEntry.where(move:, user_id: user.id, item:) }
+
+      # Wraps the real action so `race` runs right after it commits — the
+      # other device's opposite toggle landing before this request renders.
+      def race_after(action_class, race)
+        allow(action_class).to receive(:new).and_wrap_original do |original|
+          original.call.tap do |action|
+            allow(action).to(receive(:call).and_wrap_original { |call, **kwargs| call.call(**kwargs).tap { race.call } })
+          end
+        end
+      end
+
+      it "renders the unpinned control, without the pinned toast, when another tab unpinned" do
+        race_after(FindLists::Pin, -> { entries.delete_all })
+
+        post move_find_list_pin_path(move, item_id: item.id), as: :turbo_stream
+
+        aggregate_failures do
+          expect(entries).to be_empty
+          expect_toggles(item, pinned: false)
+          expect(response.body).not_to include(I18n.t("find_lists.search_link", count: 1))
+          expect(response.body).not_to include(I18n.t("find_lists.flash.pinned", name: "Kettle"))
+        end
+      end
+
+      it "renders the pinned control when another tab re-pinned during the unpin" do
+        create(:find_list_entry, move:, user:, item:)
+        race_after(FindLists::Unpin, -> { create(:find_list_entry, move:, user:, item:) })
+
+        delete move_find_list_unpin_path(move, item_id: item.id), as: :turbo_stream
+
+        aggregate_failures do
+          expect(entries).to exist
+          expect_toggles(item, pinned: true)
+          expect(response.body).to include(I18n.t("find_lists.search_link", count: 1))
+        end
+      end
+    end
+
+    context "when the action fails (#732)" do
+      let(:item) { create(:item, move:, box: create(:box, move:), name: "Kettle") }
+
+      def fail_action(action_class, error)
+        allow(action_class).to receive(:new)
+          .and_return(instance_double(action_class, call: Dry::Monads::Failure(error)))
+      end
+
+      it "renders the real (unpinned) state plus an error toast on a failed pin" do
+        fail_action(FindLists::Pin, :foreign_item)
+
+        post move_find_list_pin_path(move, item_id: item.id), as: :turbo_stream
+
+        aggregate_failures do
+          expect(response).to have_http_status(:unprocessable_content)
+          expect_toggles(item, pinned: false)
+          expect(response.body).to include(I18n.t("find_lists.flash.pin_failed", name: "Kettle"))
+          expect(response.body).not_to include(I18n.t("find_lists.flash.pinned", name: "Kettle"))
+          expect(response.body).not_to include(I18n.t("find_lists.flash.view"))
+        end
+      end
+
+      it "renders the real (still pinned) state plus an error toast on a failed unpin" do
+        create(:find_list_entry, move:, user:, item:)
+        fail_action(FindLists::Unpin, :boom)
+
+        delete move_find_list_unpin_path(move, item_id: item.id), as: :turbo_stream
+
+        aggregate_failures do
+          expect(response).to have_http_status(:unprocessable_content)
+          expect_toggles(item, pinned: true)
+          expect(response.body).to include(I18n.t("find_lists.search_link", count: 1))
+          expect(response.body).to include(I18n.t("find_lists.flash.unpin_failed", name: "Kettle"))
+        end
+      end
+
+      it "redirects to the list with the alert for HTML (pin and unpin)" do
+        fail_action(FindLists::Pin, :foreign_item)
+
+        post move_find_list_pin_path(move, item_id: item.id)
+
+        expect(response).to redirect_to(move_find_list_path(move))
+        expect(flash[:alert]).to eq(I18n.t("find_lists.flash.pin_failed", name: "Kettle"))
+
+        fail_action(FindLists::Unpin, :boom)
+        delete move_find_list_unpin_path(move, item_id: item.id)
+
+        expect(response).to redirect_to(move_find_list_path(move))
+        expect(flash[:alert]).to eq(I18n.t("find_lists.flash.unpin_failed", name: "Kettle"))
+      end
+    end
+
     it "lets a member pin on an archived move (personal rows only)" do
       archived = create(:move, :archived, created_by: user)
       item = create(:item, move: archived, box: create(:box, move: archived), name: "Kettle")

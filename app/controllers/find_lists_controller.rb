@@ -28,16 +28,28 @@ class FindListsController < MoveScopedController
 
   #: () -> untyped
   def pin
-    FindLists::Pin.new.call(move: @move, user: current_user, item: @item)
-    # A pin lands off-screen (the list page) — UX rule 1 wants a LINKING
-    # confirmation (Codex #733): the toast carries a View-list action.
-    # flash.now scopes it to the stream render; the HTML fallback needs none —
-    # its redirect lands ON the list.
-    flash.now[:action_href] = move_find_list_path(@move)
-    flash.now[:action_label] = t("find_lists.flash.view")
-    respond_with_streams(toggle_streams(pinned: true),
-                         redirect: move_find_list_path(@move), toast: true) do
-      [:notice, t("find_lists.flash.pinned", name: @item.name)]
+    result = FindLists::Pin.new.call(move: @move, user: current_user, item: @item)
+    # Render what the DB holds AFTER the action, never the intended state
+    # (#732): another tab/device can unpin between the action and this render.
+    pinned = pinned?
+    case result
+    in Dry::Monads::Success(_) if pinned
+      # A pin lands off-screen (the list page) — UX rule 1 wants a LINKING
+      # confirmation (Codex #733): the toast carries a View-list action.
+      # flash.now scopes it to the stream render; the HTML fallback needs none —
+      # its redirect lands ON the list.
+      flash.now[:action_href] = move_find_list_path(@move)
+      flash.now[:action_label] = t("find_lists.flash.view")
+      respond_with_streams(toggle_streams(pinned: true),
+                           redirect: move_find_list_path(@move), toast: true) do
+        [:notice, t("find_lists.flash.pinned", name: @item.name)]
+      end
+    in Dry::Monads::Success(_)
+      # Pinned, then unpinned elsewhere before we rendered: show reality, and
+      # no "Pinned" toast — it would contradict the control.
+      respond_with_streams(toggle_streams(pinned: false), redirect: move_find_list_path(@move))
+    in Dry::Monads::Failure(_)
+      respond_to_toggle_failure(pinned, "find_lists.flash.pin_failed")
     end
   end
 
@@ -45,8 +57,14 @@ class FindListsController < MoveScopedController
 
   #: () -> untyped
   def unpin
-    FindLists::Unpin.new.call(move: @move, user: current_user, item: @item)
-    respond_with_streams(toggle_streams(pinned: false), redirect: move_find_list_path(@move))
+    result = FindLists::Unpin.new.call(move: @move, user: current_user, item: @item)
+    pinned = pinned? # ground truth, as in #pin (#732)
+    case result
+    in Dry::Monads::Success(_)
+      respond_with_streams(toggle_streams(pinned: pinned), redirect: move_find_list_path(@move))
+    in Dry::Monads::Failure(_)
+      respond_to_toggle_failure(pinned, "find_lists.flash.unpin_failed")
+    end
   end
 
   # PATCH /moves/:move_id/find_list/items/:item_id/found
@@ -112,6 +130,24 @@ class FindListsController < MoveScopedController
                                                               variant: variant))
       )
     end + [search_link_stream, list_stream]
+  end
+
+  #: () -> bool
+  def pinned?
+    FindListEntry.exists?(move_id: @move.id, user_id: current_user.id, item_id: @item.id)
+  end
+
+  # A failed toggle still re-renders every surface from the DB (the control
+  # snaps back to the real state) and explains itself with an alert toast.
+  # 422 so the failure is visible on the wire; Turbo renders stream bodies
+  # whatever the status. The HTML fallback redirects with the same alert.
+
+  #: (bool pinned, String key) -> untyped
+  def respond_to_toggle_failure(pinned, key)
+    respond_with_streams(toggle_streams(pinned: pinned), redirect: move_find_list_path(@move),
+                                                         toast: true, status: :unprocessable_content) do
+      [:alert, t(key, name: @item.name)]
+    end
   end
 
   #: () -> untyped
