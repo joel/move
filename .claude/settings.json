@@ -12,5 +12,16 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(unset GITHUB_TOKEN)",
+      "Bash(gh run watch *)",
+      "Bash(gh pr checks *)",
+      "Bash(docker port *)",
+      "Bash(git check-ignore *)",
+      "Bash(mise x actionlint@1.7.12 -- actionlint)",
+      "Bash(mise x actionlint@1.7.12 -- actionlint *)"
+    ]
   }
 }
