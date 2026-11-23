@@ -146,7 +146,17 @@ RSpec.describe AppCLI::Services::WorktreeRun do
       %w[bin/rails db:version db:reset],
       # a free-form command earlier in the line does not hide a later one
       ["bash", "-c", "bin/rails runner 'puts 1' && bin/rails db:migrate"],
-      ["bash", "-c", "bin/rails generate model Box; rake db:rollback"]
+      ["bash", "-c", "bin/rails generate model Box; rake db:rollback"],
+      # grouping, subshells and command substitution (#883)
+      ["bash", "-c", "(bin/rails db:migrate)"],
+      ["sh", "-c", "(cd /rails && bin/rails db:migrate)"],
+      ["bash", "-c", "{ bin/rails db:reset; }"],
+      ["bash", "-c", "{bin/rails db:reset;}"],
+      ["bash", "-c", "echo $(bin/rails db:drop)"],
+      ["bash", "-c", "echo `bin/rails db:purge`"],
+      ["bash", "-c", "true && (bundle exec rake db:seed db:rollback)"],
+      ["(", "bin/rails", "db:migrate", ")"],
+      ["bash", "-c", "bin/rails runner 'puts 1' && (bin/rails db:migrate)"]
     ].each do |command|
       it "gates the task given to rails/rake in #{command.inspect}" do
         expect { worktree_run.run(command) }.to raise_error(Thor::Error, /without --yes/)
@@ -174,7 +184,11 @@ RSpec.describe AppCLI::Services::WorktreeRun do
       %w[bin/rails credentials:edit db:migrate],
       %w[bin/rails credentials:show db:migrate],
       %w[bin/rails encrypted:edit db:migrate],
-      ["bash", "-c", "bundle exec rails runner 'puts \"db:migrate\"'"]
+      ["bash", "-c", "bundle exec rails runner 'puts \"db:migrate\"'"],
+      # grouping around a free-form command or a mere mention stays ungated
+      ["bash", "-c", "(bin/rails runner 'puts \"db:migrate\"')"],
+      ["bash", "-c", "{ bin/rails generate migration db:reset; }"],
+      ["bash", "-c", "echo $(echo db:migrate)"]
     ].each do |command|
       it "lets #{command.inspect} through: no rails/rake runs the task" do
         expect(worktree_run.run(command)).to eq(0)

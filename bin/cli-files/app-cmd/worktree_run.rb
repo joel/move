@@ -46,8 +46,11 @@ module AppCLI
       # options), so a task-shaped word after them is not a task.
       FREE_FORM_COMMAND = /\A(?:runner|r|console|c|generate|g|destroy|d|server|s|dbconsole|db|
                              (?:credentials|encrypted):\w+)\z/x
-      # Shell operators that end one command and start the next.
-      COMMAND_SEPARATOR = /\A(?:&&|\|\||;|\||&)\z/
+      # Shell operators that end one command and start the next, including
+      # grouping and command substitution: `( … )`, `{ …; }`, `$( … )`, `` `…` ``.
+      OPERATOR = /&&|\|\||;|\||&|\$\(|[(){}`]/
+      COMMAND_SEPARATOR = /\A(?:#{OPERATOR})\z/
+      OPERATOR_SPLIT = /(#{OPERATOR})/
 
       # @param checkout [Checkout] the checkout to mount
       # @param main_path [String] the main checkout (fallback for gitignored files, lock home)
@@ -177,10 +180,11 @@ module AppCLI
       end
 
       # Each argument is split shell-style too, so `bash -c "bin/rails db:migrate && …"`
-      # is seen as its own commands; operators glued to a word (`db:migrate;`) are split off.
+      # is seen as its own commands; operators glued to a word (`db:migrate;`,
+      # `(bin/rails`, `db:migrate)`) are split off.
       def shell_tokens(command_parts)
         command_parts.flat_map { |part| split_words(part) }
-                     .flat_map { |word| word.split(/(&&|\|\||;|\||&)/) }
+                     .flat_map { |word| word.split(OPERATOR_SPLIT) }
                      .reject(&:empty?)
       end
 

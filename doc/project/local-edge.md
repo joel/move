@@ -115,7 +115,8 @@ namespaced variant (`db:reset:all`, `db:purge:all`, `db:migrate:primary`, …;
 `db:migrate:status` in any form stays ungated). Only a task given
 to `rails`/`rake` counts, including `bin/rails`, `bundle exec rake` and inside
 `bash -c "…"` (each argument is shell-split, and `&&`/`;`/`|` start a new
-command); a mere mention such as `echo db:migrate` or `rg db:migrate doc` runs
+command, as do the grouping and substitution marks `( … )`, `{ …; }`,
+`$( … )` and backticks, so `bash -c '(bin/rails db:migrate)'` is gated); a mere mention such as `echo db:migrate` or `rg db:migrate doc` runs
 without `--yes`. Several tasks in one call (`rake db:seed db:migrate`) are all
 checked. Once `rails`/`rake` gets a command whose arguments are free-form
 (`runner`/`r`, `console`/`c`, `generate`/`g`, `destroy`/`d`, `server`/`s`,
