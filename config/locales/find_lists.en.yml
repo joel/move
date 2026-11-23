@@ -28,6 +28,8 @@ en:
     flash:
       pinned: "Pinned “%{name}” to your find list"
       view: "View list"
+      pin_failed: "Couldn’t pin “%{name}” to your find list"
+      unpin_failed: "Couldn’t remove “%{name}” from your find list"
       box_opened: "Opened Box %{number} for unpacking"
       box_unpacked: "Box %{number} unpacked"
       view_box: "View box"

@@ -156,9 +156,9 @@ class ReviewsController < MoveScopedController
       # The page's subject is gone; in queue mode the queue page is "back".
       redirect_to (queue_mode? ? move_review_path(@move) : move_box_path(@move, @box)),
                   notice: t("reviews.flash.photo_deleted")
-    in Dry::Monads::Failure(:wrong_phase)
+    in Dry::Monads::Failure(:wrong_phase | :recognition_in_flight => reason)
       redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query),
-                  alert: t("reviews.flash.photo_delete_wrong_phase")
+                  alert: t("reviews.flash.photo_delete_#{reason}")
     in Dry::Monads::Failure(_)
       redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query),
                   alert: t("reviews.flash.photo_delete_failed")

@@ -586,6 +586,16 @@ RSpec.describe "Per-photo review" do
       expect(flash[:alert]).to eq(I18n.t("reviews.flash.photo_delete_wrong_phase"))
       expect(Media.kept.exists?(photo.id)).to be(true)
     end
+
+    it "refuses while the photo's recognition is still running and keeps the photo (#854)" do
+      create(:recognition_run, :processing, move:, box:, media:)
+
+      delete move_box_review_photo_path(move, box, media)
+
+      expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
+      expect(flash[:alert]).to eq(I18n.t("reviews.flash.photo_delete_recognition_in_flight"))
+      expect(Media.kept.exists?(media.id)).to be(true)
+    end
   end
 
   describe "POST .../review/photo/:media_id/retake (retake photo)" do
