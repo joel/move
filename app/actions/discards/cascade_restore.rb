@@ -6,17 +6,27 @@ module Discards
   # the `discarded_by_parent_*` trace (Technical Foundation §9, Domain §11). A child
   # discarded earlier for its own reasons carries a different batch id and so is
   # left discarded. Runs in a single transaction. Returns the restored record.
+  #
+  # The record is re-read under its row lock before anything is restored
+  # (#901): the caller loaded it before taking any lock (Items::Restore and
+  # Photos::Restore wait on the box lock first), so a concurrent restore +
+  # re-delete can land in between. Restoring from that stale copy would clear
+  # the NEWER deletion while cascading over the OLD batch. So: no longer
+  # discarded → Failure(:not_found); discarded under another batch →
+  # Failure(:stale). The batch the children are matched on is the re-read one.
   class CascadeRestore < BaseAction
     #: (record: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(record:, actor:, source: :web) # rubocop:disable Lint/UnusedMethodArgument
       yield ensure_writable(record.move)
       yield ensure_restorable(record)
-      batch_id = record.discard_batch_id
+      loaded_batch_id = record.discard_batch_id
       # requires_new: the error is rescued below, so when a caller already holds
       # a transaction (Items::Restore's box lock, #894) the restore sits in its
       # own savepoint — joined, a mid-tree failure would be swallowed into a
       # Failure while the outer commit kept the partial restore (cf. Cascade).
       ActiveRecord::Base.transaction(requires_new: true) do
+        yield ensure_current(record, loaded_batch_id)
+        batch_id = record.discard_batch_id
         record.undiscard_in_batch!
         restore_children(record, batch_id) if batch_id
       end
@@ -38,6 +48,21 @@ module Discards
       return Failure(:retention_expired) if record.retention_expired?
 
       Success()
+    end
+
+    # Locks and reloads the record (unscoped, so a discarded row is found). A
+    # row gone meanwhile was purged by Discards::PurgeExpired, which only takes
+    # rows past retention. A Failure halts out of the savepoint before any write.
+
+    #: (untyped record, untyped loaded_batch_id) -> (Dry::Monads::Failure[Symbol] | Dry::Monads::Success[nil])
+    def ensure_current(record, loaded_batch_id)
+      record.lock!(PARENT_ROW_LOCK)
+      return Failure(:not_found) unless record.discarded?
+      return Failure(:stale) unless record.discard_batch_id == loaded_batch_id
+
+      Success()
+    rescue ActiveRecord::RecordNotFound
+      Failure(:retention_expired)
     end
 
     #: (untyped parent, untyped batch_id) -> untyped
