@@ -55,16 +55,6 @@ module AppCLI
         app_service(env).teardown
       end
 
-      desc "connect [ENV]", "Connect to the application container"
-      def connect(env = nil)
-        app_service(env).connect
-      end
-
-      desc "console [ENV]", "Open a Rails console in the application container"
-      def console(env = nil)
-        app_service(env).console
-      end
-
       desc "migrate [ENV]", "Run database migrations inside the application container"
       def migrate(env = nil)
         app_service(env).migrate
@@ -84,6 +74,19 @@ module AppCLI
       REPO_OPTION_DESC = "Checkout to mount: a worktree branch or directory name, or a path " \
                          "(starts with /, . or ~). Default: the main checkout".freeze
 
+      desc "connect [ENV] [--repo T]", "Open a shell in the application container, or in a throwaway one for --repo"
+      method_option :repo, type: :string, desc: REPO_OPTION_DESC
+      def connect(env = nil)
+        interactive(:connect, env)
+      end
+
+      desc "console [ENV] [--repo T]",
+           "Open a Rails console in the application container, or in a throwaway one for --repo"
+      method_option :repo, type: :string, desc: REPO_OPTION_DESC
+      def console(env = nil)
+        interactive(:console, env)
+      end
+
       map "run" => :run_command
       desc "run [ENV] [--repo T] -- CMD...", "Run a command in a throwaway app container for a checkout"
       method_option :repo, type: :string, desc: REPO_OPTION_DESC
@@ -94,11 +97,14 @@ module AppCLI
       end
 
       map "test" => :test_command
-      desc "test [--repo T] [-- RSPEC_ARGS...]", "Run rspec (RAILS_ENV=test) in a throwaway container for a checkout"
+      desc "test [--repo T] [--system] [-- RSPEC_ARGS...]",
+           "Run rspec (RAILS_ENV=test) in a throwaway container for a checkout"
       method_option :repo, type: :string, desc: REPO_OPTION_DESC
+      method_option :system, type: :boolean, default: false,
+                             desc: "Run spec/system with TEST_BROWSER=rack_test, as CI does"
       def test_command(*rspec_args)
         checkout = CheckoutResolver.new.resolve(options[:repo])
-        exit(worktree_run(nil, checkout).test(rspec_args))
+        exit(worktree_run(nil, checkout).test(rspec_args, system: options[:system]))
       end
 
       desc "rebuild [ENV]", "Rebuild and restart the application"
@@ -122,6 +128,15 @@ module AppCLI
         normalized_env = Services.normalize_env(env)
         @app_services ||= {}
         @app_services[normalized_env] ||= AppService.new(shell: self, env: normalized_env)
+      end
+
+      # No --repo: attach to the long-lived app container, as before.
+      # --repo: a throwaway container for that checkout (dev only).
+      def interactive(kind, env)
+        return app_service(env).public_send(kind) unless options[:repo]
+
+        checkout = CheckoutResolver.new.resolve(options[:repo])
+        exit(worktree_run(env, checkout).interactive(kind))
       end
 
       def worktree_run(env, checkout)
