@@ -13,11 +13,13 @@ module Photos
   # Items::Remove) — a sealed/in-transit box is closed (unseal to edit) and an
   # unpacking box uses the reversible presence axis, not deletion. The guard lives
   # here so every caller inherits it, not just the phase-aware UI (a stale form or a
-  # direct request must not delete closed-box inventory). Caller owns tenant context.
+  # direct request must not delete closed-box inventory). Refuses while the photo's
+  # recognition is still running (#854). Caller owns tenant context.
   class Delete < BaseAction
     #: (media: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, actor:, source: :web)
       yield ensure_packing_phase(media.box)
+      yield ensure_recognition_settled(media)
       batch_id = yield Discards::Cascade.new.call(record: media, actor: actor, source: source)
       yield emit_event(media, actor, source, batch_id)
       Success(media)
@@ -28,6 +30,18 @@ module Photos
     #: (untyped box) -> Dry::Monads::Result[untyped, untyped]
     def ensure_packing_phase(box)
       return Failure(:wrong_phase) unless box.packing?
+
+      Success()
+    end
+
+    # A queued or processing run may still materialize items from this photo
+    # (#854), so wait for it to settle. A delete that races the check is still
+    # safe: RecognitionRuns::Process re-checks the photo under a row lock and
+    # fails the run with zero items.
+
+    #: (untyped media) -> Dry::Monads::Result[untyped, untyped]
+    def ensure_recognition_settled(media)
+      return Failure(:recognition_in_flight) if media.recognition_in_flight?
 
       Success()
     end
