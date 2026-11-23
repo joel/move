@@ -23,11 +23,13 @@ module AppCLI
 
       def master_key_path
         path = locate("config/master.key")
-        return path if path
+        raise Thor::Error, missing_key_message unless path
 
-        raise Thor::Error,
-              "Missing config/master.key in #{checkout_path}" \
-              "#{" and #{main_path}" unless same_checkout?}. Please add it before starting the app."
+        # The container gets the key through `$(cat …)`, which silently yields
+        # an empty key for a file it can't read; refuse up front instead.
+        raise Thor::Error, "#{path} is empty or not readable by #{ENV.fetch("USER", "this user")}." unless key_usable?(path)
+
+        path
       end
 
       # @return [String, nil] nil when no checkout has the file (it is optional)
@@ -62,6 +64,15 @@ module AppCLI
         raise Thor::Error,
               "#{path} is a directory, but it must be a file (Docker probably created it). " \
               "Remove it with `rmdir #{path}` and retry."
+      end
+
+      def missing_key_message
+        "Missing config/master.key in #{checkout_path}" \
+          "#{" and #{main_path}" unless same_checkout?}. Please add it before starting the app."
+      end
+
+      def key_usable?(path)
+        File.readable?(path) && !File.empty?(path)
       end
 
       def same_checkout?
