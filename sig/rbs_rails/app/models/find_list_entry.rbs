@@ -313,9 +313,12 @@ class ::FindListEntry < ::ApplicationRecord
   end
   include ::FindListEntry::GeneratedAssociationMethods
 
+  def self.live_for: (untyped move, untyped user) -> ::FindListEntry::ActiveRecord_Relation
   def self.rollup_for: (untyped move, untyped user) -> ::FindListEntry::ActiveRecord_Relation
 
   module ::FindListEntry::GeneratedRelationMethods
+    def live_for: (untyped move, untyped user) -> ::FindListEntry::ActiveRecord_Relation
+
     def rollup_for: (untyped move, untyped user) -> ::FindListEntry::ActiveRecord_Relation
   end
 
