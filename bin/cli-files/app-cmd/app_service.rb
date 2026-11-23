@@ -63,30 +63,31 @@ module AppCLI
         ensure_bundle_satisfied!
       end
 
-      # @param prepared [Boolean] the caller already ran #prepare (restart does,
-      #   before stopping the old container), so nothing can fail here first
-      def start(prepared: false)
-        prepare unless prepared
+      def start
+        prepare
 
         return shell.say("Application already running.") if runner.container_running?(env_config.app_container)
 
         FileUtils.rm_f(File.join(checkout_path, "tmp/pids/server.pid"))
+        runner.run(["docker run --rm --detach", *server_args(env_config.app_container)])
+        await_app
+      end
 
-        runner.run(
-          [
-            "docker run --rm --detach",
-            "--name #{env_config.app_container}",
-            # Direct fallback; the browser path is https://move.move-easy.docker via move-router.
-            "--publish 8080:9292",
-            *network_flags,
-            *app_env_flags,
-            *app_volume_flags,
-            "#{env_config.app_image} bin/rails s -p 9292 -b 0.0.0.0"
-          ]
-        )
+      # Replaces the running app container, or starts one. The caller runs
+      # #prepare first. The replacement is created (not started) under a
+      # temporary name while the old one still serves, so Docker has already
+      # accepted its flags, env file, image and network before anything is
+      # stopped. Only the rename and start run after the stop.
+      def replace
+        candidate = "#{env_config.app_container}-next"
+        runner.run("docker rm --force #{candidate}", allow_failure: true, quiet: true)
+        runner.run(["docker create --rm", *server_args(candidate)])
 
-        wait_for_app
-        runner.run("docker logs #{env_config.app_container}", allow_failure: true, quiet: true)
+        stop
+        runner.run("docker rename #{candidate} #{env_config.app_container}")
+        FileUtils.rm_f(File.join(checkout_path, "tmp/pids/server.pid"))
+        runner.run("docker start #{env_config.app_container}")
+        await_app
       end
 
       def stop
@@ -164,6 +165,23 @@ module AppCLI
       private
 
       attr_reader :runner, :shell, :env_config, :checkout_path
+
+      def server_args(name)
+        [
+          "--name #{name}",
+          # Direct fallback; the browser path is https://move.move-easy.docker via move-router.
+          "--publish 8080:9292",
+          *network_flags,
+          *app_env_flags,
+          *app_volume_flags,
+          "#{env_config.app_image} bin/rails s -p 9292 -b 0.0.0.0"
+        ]
+      end
+
+      def await_app
+        wait_for_app
+        runner.run("docker logs #{env_config.app_container}", allow_failure: true, quiet: true)
+      end
 
       def ensure_running!
         return if runner.container_running?(env_config.app_container)

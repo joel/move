@@ -174,7 +174,11 @@ that can fail (master key, image present or built, Ruby version, `bundle check`
 of the checkout's `Gemfile.lock` against the image's gems, router, db, storage)
 **before** stopping the running container, so a failed restart leaves the
 current app up. A lock the image doesn't satisfy is refused with a
-`bin/cli app build` hint. Put main back with `bin/cli app restart` from the main
+`bin/cli app build` hint. The replacement is then `docker create`d as
+`move-app-dev-next` while the old app still serves, so Docker has accepted its
+flags, `--env-file`, image and network before anything stops. Only then is the
+old container stopped (and awaited until `--rm` removed it, force-removed if it
+lingers), and the new one renamed to `move-app-dev` and started. Put main back with `bin/cli app restart` from the main
 checkout.
 
 **Not covered yet:** serving a worktree **in the browser** next to main. See

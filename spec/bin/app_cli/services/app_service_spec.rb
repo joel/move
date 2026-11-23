@@ -44,7 +44,8 @@ RSpec.describe AppCLI::Services::AppService do
 
   def main = File.join(tmp, "main")
   def worktree = File.join(tmp, "wt")
-  def stops = runner.commands.grep(/docker (stop|rm)\b/)
+  # Commands that take the running app container down.
+  def stops = runner.commands.grep(/\Adocker (stop|rm --force) move-app-dev\z/)
 
   before { FileUtils.mkdir_p([File.join(main, "config"), File.join(worktree, "config")]) }
   after { FileUtils.remove_entry(tmp) }
@@ -116,20 +117,37 @@ RSpec.describe AppCLI::Services::AppService do
       expect(manager).not_to have_received(:start_dependencies)
     end
 
-    it "uses the main checkout's key and stops the old container only after the checks" do
+    it "creates the replacement before stopping the old container, then swaps it in" do
       File.write(File.join(main, "config/master.key"), "k")
       stop_running_on_stop
 
       manager.restart_app
 
-      stop_at = runner.commands.index { |c| c.start_with?("docker stop move-app-dev") }
-      run_at = runner.commands.index { |c| c.start_with?("docker run --rm --detach") }
-      ruby_check_at = runner.commands.index { |c| c.include?("RUBY_VERSION") }
-      expect(ruby_check_at).to be < stop_at
-      expect(stop_at).to be < run_at
-      expect(runner.commands[run_at]).to include("RAILS_MASTER_KEY=$(cat #{main}/config/master.key)")
+      steps = [/RUBY_VERSION/, /bundle check\z/, /\Adocker create --rm --name move-app-dev-next /,
+               /\Adocker stop move-app-dev\z/, /\Adocker rename move-app-dev-next move-app-dev\z/,
+               /\Adocker start move-app-dev\z/]
+      positions = steps.map { |step| runner.commands.index { |c| c.match?(step) } }
+      expect(positions).to all(be_an(Integer))
+      expect(positions).to eq(positions.sort)
+      create = runner.commands.find { |c| c.start_with?("docker create") }
+      expect(create).to include("RAILS_MASTER_KEY=$(cat #{main}/config/master.key)", "--volume #{worktree}:/rails",
+                                "--publish 8080:9292", "bin/rails s -p 9292 -b 0.0.0.0")
+      expect(runner.commands).not_to include(a_string_starting_with("docker run --rm --detach"))
       expect(manager).to have_received(:start_dependencies)
       expect(runner.commands.grep(/bundle check|RUBY_VERSION/).size).to eq(2) # once each, before the stop
+    end
+
+    it "leaves the old container up when Docker rejects the replacement" do
+      File.write(File.join(main, "config/master.key"), "k")
+      stop_running_on_stop
+      allow(runner).to receive(:run).and_wrap_original do |original, command, **opts|
+        raise Thor::Error, "invalid env file" if Array(command).join(" ").start_with?("docker create")
+
+        original.call(command, **opts)
+      end
+
+      expect { manager.restart_app }.to raise_error(Thor::Error, "invalid env file")
+      expect(stops).to be_empty
     end
 
     it "refuses a checkout whose Gemfile.lock the image's gems don't satisfy, before stopping" do
@@ -150,8 +168,8 @@ RSpec.describe AppCLI::Services::AppService do
       manager.restart_app
 
       expect(runner.statuses).to be_empty
-      expect(runner.commands).not_to include(a_string_matching(/docker rm/))
-      expect(runner.commands).to include(a_string_starting_with("docker run --rm --detach"))
+      expect(stops).to eq(["docker stop move-app-dev"])
+      expect(runner.commands).to include("docker start move-app-dev")
     end
 
     it "removes a container that outlives the wait, and refuses to start if it is still there" do
@@ -162,7 +180,7 @@ RSpec.describe AppCLI::Services::AppService do
 
       expect { manager.restart_app }.to raise_error(Thor::Error, /move-app-dev is still there after `docker stop`/)
       expect(runner.commands).to include("docker rm --force move-app-dev")
-      expect(runner.commands).not_to include(a_string_matching(/docker run --rm --detach/))
+      expect(runner.commands).not_to include(a_string_matching(/docker (rename|start)/))
     end
 
     it "refuses an unreadable .env file before stopping the running container" do
