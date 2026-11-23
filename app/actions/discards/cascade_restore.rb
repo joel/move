@@ -52,12 +52,17 @@ module Discards
 
     # Locks and reloads the record (unscoped, so a discarded row is found). A
     # row gone meanwhile was purged by Discards::PurgeExpired, which only takes
-    # rows past retention. A Failure halts out of the savepoint before any write.
+    # rows past retention. Retention is re-checked under the lock (#907): the
+    # wait can span the cutoff while the purge's child-first passes delete the
+    # batch's children, leaving the parent row lockable but no longer whole —
+    # the early ensure_restorable is only a fast path. A Failure halts out of
+    # the savepoint before any write.
 
     #: (untyped record, untyped loaded_batch_id) -> (Dry::Monads::Failure[Symbol] | Dry::Monads::Success[nil])
     def ensure_current(record, loaded_batch_id)
       record.lock!(PARENT_ROW_LOCK)
       return Failure(:not_found) unless record.discarded?
+      return Failure(:retention_expired) if record.retention_expired?
       return Failure(:stale) unless record.discard_batch_id == loaded_batch_id
 
       Success()
