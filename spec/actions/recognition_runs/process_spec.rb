@@ -404,6 +404,17 @@ RSpec.describe RecognitionRuns::Process do
       expect(run.recognition_suggestions).to be_empty
     end
 
+    it "fails a superseded older run without calling the provider" do
+      older = travel_to(1.hour.ago) { create(:recognition_run, move:, box:, media:, status: "queued") }
+      create(:recognition_run, :succeeded, move:, box:, media:)
+      provider = instance_double(RecognitionProviders::Fake, identify: nil)
+
+      expect(described_class.new.call(run: older, provider:)).to be_failure
+      expect(provider).not_to have_received(:identify)
+      expect(older.reload).to have_attributes(status: "failed", error_code: "superseded")
+      expect(Item.with_discarded.where(source_media_id: media.id)).to be_empty
+    end
+
     it "never calls the provider for a run the reaper already failed" do
       stale_reap.call
       provider = instance_double(RecognitionProviders::Fake, identify: nil)

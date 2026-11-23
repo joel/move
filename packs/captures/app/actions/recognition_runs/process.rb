@@ -12,11 +12,13 @@ module RecognitionRuns
     # broad rescue records a failed run with zero inventory.
     class SourceDiscarded < StandardError; end
 
-    # The run left `processing` while the provider call was in flight — the
-    # stale-run reaper (RecognitionRuns::FailStale, #871) failed it, which
-    # armed Retry. Raised inside the materialize transaction so nothing
-    # commits; the run keeps the terminal state the reaper gave it.
+    # The run may no longer commit inventory (#871): the stale-run reaper
+    # (RecognitionRuns::FailStale) failed it while the provider call was in
+    # flight, which armed Retry, or a newer run on the same photo superseded
+    # it. Raised inside the materialize transaction so nothing commits.
     class RunSuperseded < StandardError; end
+
+    SUPERSEDED_CODE = "superseded"
 
     #: (run: untyped, ?provider: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(run:, provider: nil)
@@ -75,6 +77,7 @@ module RecognitionRuns
       announce(run, result, backfilled)
       Success(run)
     rescue RunSuperseded
+      supersede(run)
       Failure(run)
     rescue StandardError => e # rubocop:disable Move/BroadRescue -- any failure marks the run failed (Failure)
       fail_run(run, e)
@@ -83,13 +86,21 @@ module RecognitionRuns
 
     private
 
-    # Moves the run to `processing` only while it is still in flight: a run
-    # the reaper already failed (#871) is left alone and nothing runs. A
-    # `processing` run is re-claimed so an execution re-released after a
-    # worker crash can finish it.
+    # Moves the run to `processing` only while it is still in flight and is
+    # the photo's latest run (#871). A run the reaper already failed is left
+    # alone; an older run that a newer one superseded is failed without
+    # calling the provider — Media#recognition_in_flight? stopped guarding the
+    # photo against it (only the latest run counts), so it must never scan a
+    # retaken image or duplicate the newer run's items. A `processing` run is
+    # re-claimed so an execution re-released after a worker crash can finish.
 
     #: (untyped run) -> bool
     def claimed?(run)
+      unless latest_for_media?(run)
+        supersede(run)
+        return false
+      end
+
       now = Time.current
       claimed = RecognitionRun.where(id: run.id, status: RecognitionRun::IN_FLIGHT)
                               .update_all(status: "processing", started_at: now, updated_at: now) # rubocop:disable Rails/SkipsModelValidations
@@ -109,9 +120,32 @@ module RecognitionRuns
 
     #: (untyped run) -> void
     def ensure_still_processing(run)
-      return if RecognitionRun.lock.where(id: run.id).pick(:status) == "processing"
+      status = RecognitionRun.lock.where(id: run.id).pick(:status)
+      return if status == "processing" && latest_for_media?(run)
 
-      raise RunSuperseded, "The run was failed while recognition was running"
+      raise RunSuperseded, "The run was failed or superseded while recognition was running"
+    end
+
+    # Same "latest" as Media#recognition_state / #recognition_in_flight?.
+
+    #: (untyped run) -> bool
+    def latest_for_media?(run)
+      RecognitionRun.where(media_id: run.media_id).order(created_at: :desc, id: :desc).pick(:id) == run.id
+    end
+
+    # Fails a superseded run that is still in flight (guarded, so a run the
+    # reaper already failed keeps its own failure).
+
+    #: (untyped run) -> void
+    def supersede(run)
+      updated = RecognitionRun.where(id: run.id, status: RecognitionRun::IN_FLIGHT).update_all( # rubocop:disable Rails/SkipsModelValidations
+        status: "failed", completed_at: Time.current, updated_at: Time.current,
+        error_code: SUPERSEDED_CODE, error_message: "Superseded by a newer recognition run"
+      )
+      run.reload
+      return if updated.zero?
+
+      notify_isolated(run, "recognition_run.failed", { recognition_run_id: run.id, error_code: SUPERSEDED_CODE })
     end
 
     # identify takes seconds, and a photo or box delete in that window must not
