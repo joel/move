@@ -115,8 +115,15 @@ namespaced variant (`db:reset:all`, `db:purge:all`, `db:migrate:primary`, …;
 `db:migrate:status` in any form stays ungated). Only a task given
 to `rails`/`rake` counts, including `bin/rails`, `bundle exec rake` and inside
 `bash -c "…"` (each argument is shell-split, and `&&`/`;`/`|` start a new
-command); a mere mention such as `echo db:migrate` or `rg db:migrate doc` runs
-without `--yes`. stdin is
+command, as do the grouping and substitution marks `( … )`, `{ …; }`,
+`$( … )` and backticks, so `bash -c '(bin/rails db:migrate)'` is gated); a mere mention such as `echo db:migrate` or `rg db:migrate doc` runs
+without `--yes`. Several tasks in one call (`rake db:seed db:migrate`) are all
+checked. Once `rails`/`rake` gets a command whose arguments are free-form
+(`runner`/`r`, `console`/`c`, `generate`/`g`, `destroy`/`d`, `server`/`s`,
+`dbconsole`/`db`, `credentials:*`, `encrypted:*`), the rest of that command is
+not scanned, so `bin/rails runner 'puts "db:migrate"'` and
+`bin/rails generate migration db:reset` run without `--yes`; a later
+`&& bin/rails db:migrate` is still gated. stdin is
 attached only when it is a TTY (`--tty` only when stdout is one too), so it
 works in pipes and agent shells. It is **dev-only**: `app run prod …` is
 refused, because the prod image runs its baked-in build rather than a mounted
@@ -183,10 +190,55 @@ image's gems. `restart` and `rebuild` run it, then start router/db/storage,
 current app up. A lock the image doesn't satisfy is refused with a
 `bin/cli app build` hint. The replacement is then `docker create`d as
 `move-app-dev-next` while the old app still serves, so Docker has accepted its
-flags, `--env-file`, image and network before anything stops. Only then is the
-old container stopped (and awaited until `--rm` removed it, force-removed if it
-lingers), and the new one renamed to `move-app-dev` and started. Put main back with `bin/cli app restart` from the main
+flags, `--env-file`, image and network before anything stops.
+
+The swap is a **rollback, not blue/green**: a candidate booted next to the
+live app would migrate the shared `move_development` under it. The old
+container is renamed `move-app-dev-prev` and stopped (not removed); the new
+one is renamed to `move-app-dev`, started, and must answer `GET /up` (a
+`curl` run with `docker exec` inside it) within `MOVE_APP_READY_TIMEOUT`
+seconds (default 60; the wait ends early when the container exits).
+
+- **Ready:** `move-app-dev-prev` is removed.
+- **Not ready** (a wrong master key, an exception while Rails boots, a slow
+  boot past the timeout): the replacement is removed, `move-app-dev-prev` is
+  renamed back, its checkout's stale `tmp/pids/server.pid` is removed, and it
+  is started and checked again. The command then **exits non-zero** with the
+  replacement's last 40 log lines and says whether the old app is back.
+- **A stale `move-app-dev-prev`** (a restart killed mid-swap) makes `start`
+  and `restart` stop before touching anything, with the fix for the state it
+  finds: `docker rm --force move-app-dev-prev` when `move-app-dev` runs, or
+  the `docker rename … && docker start …` that brings it back when it does not.
+
+`app start` uses the same readiness check: when the new container does not
+answer, it is removed and the command exits non-zero with its logs. App
+containers no longer run with `--rm` (the logs of a failed boot would vanish
+with it), so `app stop` removes the container after stopping it. A container
+started with `--rm` by an older `bin/cli` can't be kept, so its first restart
+has no rollback. The reverse also holds: an older `bin/cli` (a main checkout not yet
+pulled past #879) only `docker stop`s before its `docker run --name`, so it
+can't replace a container started by this one. Run `docker rm move-app-dev`
+after that stop, or pull main first. Put main back with `bin/cli app restart` from the main
 checkout.
+
+```mermaid
+sequenceDiagram
+  participant CLI as bin/cli app restart
+  participant Old as move-app-dev (old)
+  participant New as move-app-dev-next
+  CLI->>CLI: preflight, router/db/storage, refuse a stale -prev
+  CLI->>New: docker create (old still serves)
+  CLI->>Old: rename to move-app-dev-prev, docker stop
+  CLI->>New: rename to move-app-dev, docker start
+  CLI->>New: docker exec curl /up until MOVE_APP_READY_TIMEOUT
+  alt answers /up
+    CLI->>Old: docker rm move-app-dev-prev
+  else exits or times out
+    CLI->>New: docker logs --tail 40, docker rm --force
+    CLI->>Old: rename back to move-app-dev, docker start, check /up
+    CLI-->>CLI: exit non-zero with the logs
+  end
+```
 
 **Not covered yet:** serving a worktree **in the browser** next to main. See
 the proposal below (#869 part 3).

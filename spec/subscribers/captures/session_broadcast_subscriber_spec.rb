@@ -23,6 +23,22 @@ RSpec.describe Captures::SessionBroadcastSubscriber do
       .with(box, :recognition, hash_including(target: Views::Captures::SessionPanel::ID, html: kind_of(String)))
   end
 
+  # #872 — the live push is how the user first sees a conflict-only result, so the
+  # broadcast panel must carry the same conflict caption + matched-item link.
+  it "broadcasts the conflict-only caption linking to the matched item" do
+    existing = create(:item, move:, box:, name: "Lamp", review_state: "confirmed")
+    run.update!(status: "succeeded")
+    create(:recognition_suggestion, :conflict, move:, box:, media:, recognition_run: run, item: existing)
+    html = nil
+    allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to) { |*, **opts| html = opts[:html] }
+
+    emit("recognition_run.succeeded", recognition_run_id: run.id, item_count: 0)
+
+    expect(html).to include(I18n.t("captures.session.conflict_only"))
+    expect(html).to include(%(href="/moves/#{move.id}/items/#{existing.id}"))
+    expect(html).not_to include(I18n.t("captures.session.no_items"))
+  end
+
   it "broadcasts on processing and failed too" do
     allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
 
