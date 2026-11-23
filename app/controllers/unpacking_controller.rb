@@ -383,7 +383,9 @@ class UnpackingController < MoveScopedController
   #: (untyped media_id) -> untyped
   def departed_photo_stream(media_id)
     target = Components::Boxes::PhotoCard.dom_id_for(media_id)
-    left = authorized_scope(@box.items).where(source_media_id: media_id).order(created_at: :desc, id: :desc).to_a
+    # The cards read their (shared) source photo + blob for the tile (#416).
+    left = authorized_scope(@box.items).where(source_media_id: media_id).order(created_at: :desc, id: :desc)
+                                       .includes(source_media: { image_attachment: :blob }).to_a
     return turbo_stream.remove(target) if left.empty?
 
     turbo_stream.replace(target, view_context.safe_join(left.map { |item| view_context.render(item_card(item)) }))
