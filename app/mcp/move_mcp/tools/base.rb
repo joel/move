@@ -50,7 +50,8 @@ module MoveMcp
             no_file: "No upload was provided.",
             invalid_upload: "The upload could not be found — presign and PUT the bytes first.",
             image_too_large: "Image is too large (max #{Media::MAX_IMAGE_BYTES_LABEL}).",
-            unsupported_image: "That file isn't a supported image (use JPEG, PNG, WEBP, HEIC, or TIFF)."
+            unsupported_image: "That file isn't a supported image (use JPEG, PNG, WEBP, HEIC, or TIFF).",
+            enqueue_failed: "The photo was saved, but recognition couldn't be queued. Retry it from the capture screen."
           }[failure]
           error_response(message || "Action failed: #{failure}")
         end

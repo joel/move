@@ -12,7 +12,7 @@ module Captures
     def call(media:, normalized:, captured_by_id: nil)
       media.image.attach(normalized)
       media.update!(status: "ready", optimized_at: Time.current)
-      yield RecognitionRuns::Enqueue.new.call(media: media)
+      yield enqueue_recognition(media)
       yield emit_event(media, captured_by_id)
       Success(media)
     rescue ActiveRecord::RecordInvalid => e
@@ -20,6 +20,19 @@ module Captures
     end
 
     private
+
+    # The photo is already attached and ready, so a recognition job that could
+    # not be queued (#871) must not fail the ingest — IngestJob would flip a
+    # good photo to `failed` and hide it. Enqueue has already failed the run,
+    # so the photo shows a retryable failed recognition instead.
+
+    #: (untyped media) -> Dry::Monads::Result[untyped, untyped]
+    def enqueue_recognition(media)
+      result = RecognitionRuns::Enqueue.new.call(media: media)
+      return Success() if result.failure? && result.failure == :enqueue_failed
+
+      result
+    end
 
     #: (untyped media, untyped captured_by_id) -> Dry::Monads::Success[nil]
     def emit_event(media, captured_by_id)
