@@ -57,6 +57,76 @@ so the trusted CA stays put.
 Overrides: `MOVE_EDGE_IP` (default `127.0.0.2`; keep `config/dns/dnsmasq.conf`
 in sync), `MOVE_TRAEFIK_VERSION`, `MOVE_APP_UPSTREAM`.
 
+## Worktrees
+
+`bin/cli app start` serves **one** checkout in the single `move-app-dev`
+container. To live-check or test another git worktree without replacing it, use
+the throwaway commands. Each starts a one-off app container on the Docker
+network with the chosen checkout mounted at `/rails`, and leaves `move-app-dev`
+alone.
+
+```bash
+bin/cli app run  --repo fix/862-cli -- bin/rails runner 'puts Item.count'
+bin/cli app test --repo fix/862-cli -- spec/actions/items
+bin/cli app test --repo ../move-wt-foo        # whole unit suite (no system specs)
+```
+
+```mermaid
+flowchart LR
+  CLI["bin/cli app run|test --repo T"] --> RES["CheckoutResolver<br/>git worktree list of the main checkout"]
+  RES -->|"path"| RUN["docker run --rm<br/>worktree → /rails"]
+  MAIN["main checkout<br/>config/master.key, .env.&lt;env&gt;"] -.->|"read when the worktree lacks them"| RUN
+  RUN --> DB["move-db-dev"]
+  DEV["move-app-dev<br/>(main checkout, untouched)"] --> DB
+```
+
+**`--repo <target>`** (default: the main checkout, i.e. the first
+`git worktree list` entry, even when `bin/cli` is run from a worktree):
+
+- starts with `/`, `.` or `~`: a path to a checkout (must have a `Gemfile`);
+- anything else: a worktree **name**, matched on branch first (slashes
+  included), then on directory name. The current directory is never used
+  implicitly.
+- An unknown name fails before any container starts and lists the worktrees;
+  an ambiguous one names the matching paths; a registered but missing
+  worktree suggests `git worktree prune`.
+
+**`app run [ENV] [--repo T] -- CMD...`** prints `Running in <path> (branch <b>)`
+first, brings up the database, and exits with the command's status. stdin is
+attached only when it is a TTY (`--tty` only when stdout is one too), so it
+works in pipes and agent shells. `app console` / `app connect` still target the
+long-lived container.
+
+**`app test [--repo T] [-- RSPEC_ARGS...]`** runs
+`bin/rails db:test:prepare && bundle exec rspec …` under `RAILS_ENV=test` in a
+container named `move-app-test`, and exits with rspec's status. With no
+arguments it runs the unit suite (`spec --exclude-pattern "spec/system/**/*_spec.rb"`).
+All worktrees share the one `move_test` database, so runs are serialised:
+
+- an `flock` on `<main>/tmp/bin-cli-app-test.lock` names its holder (pid,
+  checkout, branch, start time); an overlapping run is refused with that
+  holder. The kernel drops the lock when the holder dies.
+- the fixed container name catches a leftover run:
+  `docker rm -f move-app-test`.
+- a plain `bundle exec rspec` inside `move-app-dev` does **not** take the lock.
+
+**Gitignored files.** A fresh worktree has no `config/master.key` or
+`.env.<env>`. They are read from the worktree when present, otherwise from the
+main checkout, and are never copied into the worktree (`git status` stays
+clean). A directory where one of them should be (Docker creates a missing bind
+source as an empty directory) is refused with an `rmdir` hint. `tmp/` and
+`log/` are pre-created as the host user.
+
+**Gemfile.lock drift.** The container runs the gems baked into
+`workeverywhere/move-app:latest`. When the worktree's `Gemfile.lock` differs
+from the image's, a warning is printed; if gems changed, `bin/cli app build`
+(which also changes the image the main checkout uses).
+
+**Not covered:** serving a worktree **in the browser** next to main. That needs a
+second routed app container, and host-only sessions (#280), the Apartment
+subdomain elevator and the ActionCable `allowed_request_origins` all depend on
+the hostname, so it needs its own design note.
+
 ## Gotchas
 
 | Symptom | Cause | Fix |
@@ -65,5 +135,6 @@ in sync), `MOVE_TRAEFIK_VERSION`, `MOVE_APP_UPSTREAM`.
 | move-dns and isms-dns get mixed up | a `resolved.conf.d` drop-in was used: drop-ins merge into **one global** server list | use a DNS **delegate**, which is scoped to its zone |
 | `docker stop move-dns` hangs | dnsmasq started with `--no-daemon` serves TCP in the main process; resolved's kept-open TCP fallback stalls SIGTERM | the image uses `--keep-in-foreground` |
 | `https://mail.move-easy.docker` returns 502 just after `mail start` | mailcatcher not listening yet | retry after a second |
+| `bin/cli app run --repo …` fails with `Could not find <gem>-x.y.z in locally installed gems` | the worktree's `Gemfile.lock` is ahead of the image's bundle (the drift warning says so) | `bin/cli app build`, or run against a checkout whose lock matches the image |
 | `dig` works but the browser doesn't | `dig`/`nslookup` bypass NSS | check with `getent ahostsv4 <name>` (what `dns check` uses) |
 | `systemctl` warns that the unit "changed on disk" during bootstrap | resolved's unit config changed | `sudo systemctl daemon-reload` before the restart |
