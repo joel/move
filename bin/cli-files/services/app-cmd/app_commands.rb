@@ -3,6 +3,8 @@
 require "thor"
 require_relative "../helpers"
 require_relative "../../app-cmd/app_service"
+require_relative "../../app-cmd/checkout_resolver"
+require_relative "../../app-cmd/worktree_run"
 require_relative "../services_manager"
 
 module AppCLI
@@ -79,6 +81,26 @@ module AppCLI
         app_service(env).exec(command_parts)
       end
 
+      REPO_OPTION_DESC = "Checkout to mount: a worktree branch or directory name, or a path " \
+                         "(starts with /, . or ~). Default: the main checkout".freeze
+
+      map "run" => :run_command
+      desc "run [ENV] [--repo T] -- CMD...", "Run a command in a throwaway app container for a checkout"
+      method_option :repo, type: :string, desc: REPO_OPTION_DESC
+      def run_command(*args)
+        env, command_parts = parse_env_and_command(args)
+        checkout = CheckoutResolver.new.resolve(options[:repo])
+        exit(worktree_run(env, checkout).run(command_parts))
+      end
+
+      map "test" => :test_command
+      desc "test [--repo T] [-- RSPEC_ARGS...]", "Run rspec (RAILS_ENV=test) in a throwaway container for a checkout"
+      method_option :repo, type: :string, desc: REPO_OPTION_DESC
+      def test_command(*rspec_args)
+        checkout = CheckoutResolver.new.resolve(options[:repo])
+        exit(worktree_run(nil, checkout).test(rspec_args))
+      end
+
       desc "rebuild [ENV]", "Rebuild and restart the application"
       def rebuild(env = nil)
         service = app_service(env)
@@ -100,6 +122,11 @@ module AppCLI
         normalized_env = Services.normalize_env(env)
         @app_services ||= {}
         @app_services[normalized_env] ||= AppService.new(shell: self, env: normalized_env)
+      end
+
+      def worktree_run(env, checkout)
+        main_path = CheckoutResolver.new.main_checkout.path
+        WorktreeRun.new(shell: self, env: Services.normalize_env(env), checkout: checkout, main_path: main_path)
       end
 
       def parse_env_and_command(args)
