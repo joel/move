@@ -4,6 +4,7 @@ require "fileutils"
 require_relative "../services/helpers"
 require_relative "app_preflight"
 require_relative "checkout_resolver"
+require_relative "container_swap"
 require_relative "container_flags"
 require_relative "mount_sources"
 
@@ -42,15 +43,6 @@ module AppCLI
           build_args << "--build-arg RUBY_VERSION=#{ruby_version}"
         end
         runner.run(build_args)
-
-        shell.say("Building wait helper image")
-        runner.run(
-          [
-            "docker build #{AppCLI::ROOT}",
-            "--tag #{env_config.wait_image}",
-            "-f #{File.join(AppCLI::ROOT, "dockerfiles/Dockerfile-wait")}"
-          ]
-        )
       end
 
       # Resolves and validates every input of the app container (network +
@@ -62,12 +54,14 @@ module AppCLI
 
       def start
         preflight
+        swap.refuse_stale_previous!
 
-        return shell.say("Application already running.") if runner.container_running?(env_config.app_container)
+        return shell.say("Application already running.") if runner.container_running?(app)
 
-        FileUtils.rm_f(File.join(checkout_path, "tmp/pids/server.pid"))
-        runner.run(["docker run --rm --detach", *server_args(env_config.app_container)])
-        await_app
+        swap.discard_leftover(app)
+        FileUtils.rm_f(File.join(checkout_path, ContainerSwap::PID_FILE))
+        runner.run(["docker run --detach", *server_args(app)])
+        swap.await_started
       end
 
       # Replaces the running app container, or starts one. The caller runs
@@ -75,36 +69,35 @@ module AppCLI
       # temporary name while the old one still serves, so Docker has accepted
       # its flags, env file, image and network before anything is stopped.
       #
-      # After the stop, nothing reads an input any more: the removal wait
-      # (bounded, see #wait_until_removed), the rename, the pid-file cleanup
-      # (rm_f ignores errors), `docker start` of the created container and the
-      # readiness wait.
+      # The old container is then stopped and kept as -prev (not removed)
+      # until the replacement answers /up. If it doesn't, the replacement is
+      # removed, -prev is renamed back and started, and this raises with the
+      # replacement's last log lines.
       def replace
-        candidate = "#{env_config.app_container}-next"
-        discard_leftover(candidate)
-        runner.run(["docker create --rm", *server_args(candidate)])
+        swap.refuse_stale_previous!
+        candidate = "#{app}-next"
+        swap.discard_leftover(candidate)
+        runner.run(["docker create", *server_args(candidate)])
 
-        stop
-        runner.run("docker rename #{candidate} #{env_config.app_container}")
-        FileUtils.rm_f(File.join(checkout_path, "tmp/pids/server.pid"))
-        runner.run("docker start #{env_config.app_container}")
-        await_app
+        swap.replace_with(candidate)
       end
 
       def stop
-        if runner.container_running?(env_config.app_container)
+        status = runner.container_status(app)
+        return shell.say("Application not running, skipping stop.") if status == "missing"
+
+        if status == "running"
           shell.say("Stopping application container")
-          runner.run("docker stop #{env_config.app_container}")
-          wait_until_removed
-        else
-          shell.say("Application not running, skipping stop.")
+          runner.run("docker stop #{app}")
         end
+        # Containers started before #879 run with --rm and go on their own.
+        runner.run("docker rm #{app}", allow_failure: true, quiet: true) unless container_removed?
+        wait_until_removed
       end
 
       def teardown
         stop
         runner.remove_image(env_config.app_image)
-        runner.remove_image(env_config.wait_image)
       end
 
       def logs(follow: true)
@@ -167,6 +160,17 @@ module AppCLI
 
       attr_reader :runner, :shell, :env_config, :checkout_path
 
+      def app = env_config.app_container
+
+      # Built (and MOVE_APP_READY_TIMEOUT read) before anything is stopped, so
+      # a bad timeout fails early.
+      def swap
+        @swap ||= ContainerSwap.new(
+          runner: runner, shell: shell, app: app, checkout_path: checkout_path, stop: method(:stop),
+          readiness: ReadinessCheck.new(runner: runner, shell: shell, timeout: ReadinessCheck.timeout)
+        )
+      end
+
       def server_args(name)
         [
           "--name #{name}",
@@ -179,26 +183,14 @@ module AppCLI
         ]
       end
 
-      def await_app
-        wait_for_app
-        runner.run("docker logs #{env_config.app_container}", allow_failure: true, quiet: true)
-      end
-
       def ensure_running!
         return if runner.container_running?(env_config.app_container)
 
         raise Thor::Error, "App container is not running. Start it with `bin/cli app start`."
       end
 
-      # A -next container left by an interrupted restart would block the create.
-      def discard_leftover(candidate)
-        return if runner.container_status(candidate) == "missing"
-
-        runner.run("docker rm --force #{candidate}", allow_failure: true, quiet: true)
-      end
-
-      # The container runs with --rm, and Docker removes it only after
-      # `docker stop` returns; a `docker run --name` before then would conflict.
+      # A --rm container is removed by Docker only after `docker stop` returns;
+      # a `docker run --name` before then would conflict.
       def wait_until_removed
         REMOVAL_POLLS.times do
           return if container_removed?
@@ -256,31 +248,6 @@ module AppCLI
       def copy_schema_from_container(container_name)
         # schema_format is :sql, so db:schema:dump writes db/structure.sql.
         runner.run("docker cp #{container_name}:/rails/db/structure.sql db/structure.sql")
-      end
-
-      def wait_for_app
-        unless runner.image_exists?(env_config.wait_image)
-          shell.say("Wait helper image missing, skipping readiness check.")
-          return
-        end
-
-        shell.say("Waiting for the web service to be ready")
-
-        runner.run(
-          [
-            "docker run --rm",
-            "--name #{env_config.app_container}-wait",
-            "--network #{env_config.network_name}",
-            "--env WAIT_HOSTS=#{env_config.app_container}:9292",
-            "--env WAIT_TIMEOUT=10",
-            "--env WAIT_BEFORE=1",
-            "--env WAIT_SLEEP_INTERVAL=2",
-            "--env WAIT_COMMAND=\"/health_check.sh\"",
-            "--env WAIT_LOGGER_LEVEL=debug",
-            env_config.wait_image
-          ],
-          allow_failure: true
-        )
       end
     end
   end
