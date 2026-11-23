@@ -39,4 +39,25 @@ RSpec.describe FindListEntry do
       expect(described_class.rollup_for(move, user)).to contain_exactly(kept)
     end
   end
+
+  describe ".snapshot_for" do
+    it "returns the rollup rows, each carrying the DB-counted kept-only total (#873)" do
+      box = create(:box, move:)
+      create(:find_list_entry, move:, user:, item: create(:item, move:, box:, name: "Mug"))
+      create(:find_list_entry, move:, user:, item: create(:item, move:, box:, name: "Bowl"))
+      gone = create(:item, move:, box:, name: "Gone")
+      create(:find_list_entry, move:, user:, item: gone)
+      create(:find_list_entry, move:, user: create(:user), item: create(:item, move:, box:))
+      gone.discard!
+
+      snapshot = described_class.snapshot_for(move, user)
+
+      expect(snapshot.map { |entry| entry.item.name }).to eq(%w[Bowl Mug])
+      expect(snapshot.map(&:pinned_total)).to eq([2, 2])
+    end
+
+    it "is empty when nothing is pinned" do
+      expect(described_class.snapshot_for(move, user)).to eq([])
+    end
+  end
 end

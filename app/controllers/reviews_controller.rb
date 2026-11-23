@@ -9,6 +9,7 @@
 # schema. Thin: authorize, call the action, render/redirect.
 class ReviewsController < MoveScopedController
   include FindListPinnable
+  include ReviewPhotoMoveResponses
 
   # ?queue=move flips the photo screen into the Move-wide review-queue walk
   # (#654): Next crosses box boundaries, advancing strictly forward in capture
@@ -49,7 +50,7 @@ class ReviewsController < MoveScopedController
     walk = review_media
     next_media = next_after(@media, walk)
     render Views::Reviews::Photo.new(
-      move: @move, box: @box, media: @media, items: photo_items(@media),
+      move: @move, box: @box, media: @media, items: photo_items(@media), conflict_items: conflict_items,
       position: position_of(@media, walk), total: walk.size,
       next_media: next_media, editable: editable_move?,
       move_boxes: other_boxes, pending_review: pending_review?, pinnable: pinnable?,
@@ -140,6 +141,8 @@ class ReviewsController < MoveScopedController
     case Photos::Move.new.call(media: @media, target_box: target, mover: current_user)
     in Dry::Monads::Success({ source_box:, source_completed: })
       photo_moved_response(target, completed_source: source_completed ? source_box : nil)
+    in Dry::Monads::Failure(:not_found | :box_changed)
+      photo_move_lost_race
     in Dry::Monads::Failure(reason)
       redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query), alert: move_photo_error(reason)
     end
@@ -198,9 +201,8 @@ class ReviewsController < MoveScopedController
   def render_queue_photo
     next_media = queue_next_media
     render Views::Reviews::Photo.new(
-      move: @move, box: @box, media: @media, items: photo_items(@media),
-      position: nil, total: nil,
-      next_media: next_media,
+      move: @move, box: @box, media: @media, items: photo_items(@media), conflict_items: conflict_items,
+      position: nil, total: nil, next_media: next_media,
       editable: editable_move?, move_boxes: other_boxes,
       queue: true, queue_remaining: forward_scope(pending_remaining).count,
       pending_review: pending_review?, pinnable: pinnable?, pinned_item_ids: pinned_item_ids,
@@ -318,7 +320,7 @@ class ReviewsController < MoveScopedController
 
   #: (untyped reason) -> String
   def retake_error(reason)
-    known = %i[no_file recognition_in_flight rescan_wrong_phase image_too_large unsupported_image]
+    known = %i[no_file recognition_in_flight rescan_wrong_phase image_too_large unsupported_image enqueue_failed]
     t("reviews.flash.retake_errors.#{known.include?(reason) ? reason : :failed}")
   end
 
@@ -344,35 +346,11 @@ class ReviewsController < MoveScopedController
     turbo_stream.replace(
       Components::Reviews::ItemList::ID,
       view_context.render(Components::Reviews::ItemList.new(
-                            move: @move, box: @box, media: @media, items: items, editable: editable_move?,
+                            move: @move, box: @box, media: @media, items: items, editable: editable_move?, conflict_items:,
                             highlight_id: highlight_id, queue: queue_mode?,
                             pinnable: pinnable?, pinned_item_ids: pinned_item_ids
                           ))
     )
-  end
-
-  # The photo-move success response. In queue mode stay in the walk: the photo
-  # now lives in the target box, so continue on its review URL there (re-opening
-  # is idempotent) instead of ejecting the reviewer to the target box page
-  # mid-queue. Moving the photo whose items were the last in-box items of an
-  # unpacking box completes that SOURCE box (#838, Photos::Move); that happens
-  # off-screen, so it surfaces with a LINKING toast to the source box (UX rule 1)
-  # instead of the plain moved toast — built from the box's reality, as
-  # ItemsController#moved_response does.
-
-  #: (untyped target, completed_source: untyped) -> untyped
-  def photo_moved_response(target, completed_source:)
-    path = queue_mode? ? move_box_review_photo_path(@move, target, @media, queue: QUEUE_PARAM) : move_box_path(@move, target)
-    return redirect_to(path, notice: t("reviews.flash.photo_moved", number: target.number)) unless completed_source
-
-    redirect_to path, notice: t("reviews.flash.photo_moved_box_unpacked", number: target.number, source: completed_source.number),
-                      flash: { action_href: move_box_path(@move, completed_source), action_label: t("reviews.flash.view_box") }
-  end
-
-  #: (untyped reason) -> String
-  def move_photo_error(reason)
-    key = %i[box_missing same_box cross_move move_archived].include?(reason) ? reason : :failed
-    t("reviews.flash.move_photo_errors.#{key}")
   end
 
   # Boxes (other than this one) the photo can be moved to, numerically ordered — a
@@ -414,6 +392,14 @@ class ReviewsController < MoveScopedController
 
     review_media.find { |m| ids.include?(m.id) }
   end
+
+  # The confirmed items this photo's LATEST run matched instead of creating its
+  # own (#891, the capture panel's #872 rule): the empty state explains the
+  # match and links to them. The match must still be in this box (kept, in_box).
+  # A lazy relation — ItemList loads it only when the photo has no items.
+
+  #: () -> untyped
+  def conflict_items = @box.items.in_box.where(id: RecognitionSuggestion.latest_conflicts_for(@media.id).select(:item_id)).order(:name)
 
   # Every in-box item detected in (or hand-added to) this photo, in detection
   # order. Manual review-time additions carry source_media so they join the list.

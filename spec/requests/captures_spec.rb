@@ -176,6 +176,105 @@ RSpec.describe "Captures" do
       end
     end
 
+    # #872 — a run whose only detections matched an already-confirmed item records
+    # `conflict` suggestions and creates no item (no-overwrite). The card must not
+    # claim nothing was detected (that nudges a duplicate add): it says the item is
+    # already here and links to the matched item.
+    describe "conflict-only photo (#872)" do
+      let(:existing) { create(:item, move:, box:, name: "Lamp", review_state: "confirmed") }
+      let(:media) { create(:media, move:, box:) }
+
+      def panel
+        response.parsed_body.at_css("##{Views::Captures::SessionPanel::ID}")
+      end
+
+      def conflict_run(created_at: Time.current)
+        run = create(:recognition_run, :succeeded, move:, box:, media:, created_at:)
+        create(:recognition_suggestion, :conflict, move:, box:, media:, recognition_run: run,
+                                                   item: existing, proposed_name: "Lamp")
+        run
+      end
+
+      it "shows the 'already in this box' caption linking to the matched item" do
+        conflict_run
+
+        get move_box_capture_path(move, box)
+
+        link = panel.at_css(%(a[href="#{move_item_path(move, existing)}"]))
+        expect(link).to be_present
+        expect(link.text).to include(I18n.t("captures.session.conflict_only"))
+        expect(panel.text).not_to include(I18n.t("captures.session.no_items"))
+      end
+
+      # #891 — the matched-item link must not strand the photo: a secondary link
+      # opens its review page, where an editor retakes, re-scans or deletes it.
+      it "links 'Manage photo' to the photo's review page, which carries retake and delete" do
+        conflict_run
+
+        get move_box_capture_path(move, box)
+
+        review_path = move_box_review_photo_path(move, box, media_id: media.id)
+        manage = panel.at_css(%(a[href="#{review_path}"]))
+        expect(manage&.text).to eq(I18n.t("captures.session.manage_photo"))
+
+        get review_path
+
+        page = response.parsed_body
+        expect(page.at_css(%(form[action="#{move_box_review_retake_photo_path(move, box, media)}"]))).to be_present
+        expect(page.at_css(%(form[action="#{move_box_review_photo_path(move, box, media)}"] input[name="_method"][value="delete"]))).to be_present
+      end
+
+      it "keeps 'No items detected' when only an older run recorded the conflict" do
+        conflict_run(created_at: 1.hour.ago)
+        create(:recognition_run, :succeeded, move:, box:, media:)
+
+        get move_box_capture_path(move, box)
+
+        expect(panel.text).to include(I18n.t("captures.session.no_items"))
+        expect(panel.text).not_to include(I18n.t("captures.session.conflict_only"))
+      end
+
+      it "falls back to 'No items detected' once the matched item is deleted" do
+        conflict_run
+        existing.discard!
+
+        get move_box_capture_path(move, box)
+
+        expect(panel.text).to include(I18n.t("captures.session.no_items"))
+        expect(panel.at_css(%(a[href="#{move_box_review_photo_path(move, box, media_id: media.id)}"]))).to be_present
+      end
+
+      it "falls back to 'No items detected' once the matched item moved to another box" do
+        conflict_run
+        existing.update!(box: create(:box, move:, number: "2", status: "packing"))
+
+        get move_box_capture_path(move, box)
+
+        expect(panel.text).to include(I18n.t("captures.session.no_items"))
+        expect(panel.text).not_to include(I18n.t("captures.session.conflict_only"))
+      end
+
+      it "falls back to 'No items detected' once the matched item is marked removed" do
+        conflict_run
+        existing.update!(presence_state: "removed")
+
+        get move_box_capture_path(move, box)
+
+        expect(panel.text).to include(I18n.t("captures.session.no_items"))
+        expect(panel.text).not_to include(I18n.t("captures.session.conflict_only"))
+      end
+
+      it "prefers the photo's own item chips when it also has linked items" do
+        conflict_run
+        create(:item, move:, box:, name: "Rug", source_media: media)
+
+        get move_box_capture_path(move, box)
+
+        expect(panel.text).to include("Rug")
+        expect(panel.text).not_to include(I18n.t("captures.session.conflict_only"))
+      end
+    end
+
     # The zero-items link is gated on success: a run still in flight keeps the
     # non-link status row with its state badge.
     %w[queued processing].each do |status|

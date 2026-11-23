@@ -23,13 +23,14 @@ module Components
       # @rbs items: untyped
       # @rbs reviewable_media_ids: untyped
       # @rbs recoverable_media_ids: untyped
+      # @rbs conflict_media_ids: untyped
       # @rbs unpacked_media_ids: untyped
       # @rbs editable: bool
       # @rbs pinnable: bool
       # @rbs pinned_item_ids: untyped
       # @rbs return: void
       def initialize(move:, box:, media:, items:, reviewable_media_ids: [],
-                     recoverable_media_ids: [], unpacked_media_ids: [], editable: false,
+                     recoverable_media_ids: [], conflict_media_ids: [], unpacked_media_ids: [], editable: false,
                      pinnable: false, pinned_item_ids: Set.new)
         @move = move
         @box = box
@@ -37,6 +38,7 @@ module Components
         @items = items # all in-box items (removed ride along while unpacking, #727)
         @reviewable_media_ids = reviewable_media_ids.to_set
         @recoverable_media_ids = recoverable_media_ids.to_set
+        @conflict_media_ids = conflict_media_ids.to_set
         @unpacked_media_ids = unpacked_media_ids.to_set
         # In-place checklist mode (#727): checked states render for anyone
         # viewing an unpacking box; the toggles need an editable Move too.
@@ -87,6 +89,7 @@ module Components
               items: @items_by_media[media.id] || [],
               reviewable: @reviewable_media_ids.include?(media.id),
               recoverable: @recoverable_media_ids.include?(media.id),
+              conflict: @conflict_media_ids.include?(media.id),
               unpacked: @unpacked_media_ids.include?(media.id),
               eager: index < EAGER_TILES,
               unpacking: @unpacking, interactive: @interactive,

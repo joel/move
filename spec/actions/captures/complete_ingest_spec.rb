@@ -29,4 +29,20 @@ RSpec.describe Captures::CompleteIngest do
     expect(media.optimized_at).to be_present
     expect(RecognitionRuns::Enqueue).to have_received(:new)
   end
+
+  it "still completes the ingest when the recognition job could not be queued (#871)" do
+    allow(RecognitionRuns::Enqueue).to receive(:new)
+      .and_return(instance_double(RecognitionRuns::Enqueue, call: Dry::Monads::Failure(:enqueue_failed)))
+
+    expect(described_class.new.call(media:, normalized:, captured_by_id: nil)).to be_success
+    expect(media.reload).to be_ready
+  end
+
+  it "propagates any other recognition enqueue failure" do
+    errors = ActiveModel::Errors.new(media)
+    allow(RecognitionRuns::Enqueue).to receive(:new)
+      .and_return(instance_double(RecognitionRuns::Enqueue, call: Dry::Monads::Failure(errors)))
+
+    expect(described_class.new.call(media:, normalized:, captured_by_id: nil).failure).to eq(errors)
+  end
 end

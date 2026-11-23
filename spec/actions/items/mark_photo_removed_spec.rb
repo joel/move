@@ -79,6 +79,37 @@ RSpec.describe Items::MarkPhotoRemoved do
     expect([plates.reload, mugs.reload].map(&:presence_state)).to all(eq("in_box"))
   end
 
+  it "reports photo_moved when a photo move lands between two removals (#877)" do
+    photo = create(:media, move:, box:)
+    plates = create(:item, :confirmed, move:, box:, source_media: photo, name: "Plates")
+    mugs = create(:item, :confirmed, move:, box:, source_media: photo, name: "Mugs")
+    create(:item, :confirmed, move:, box:, name: "Lamp") # keeps the box open
+    destination = create(:box, move:, status: "unpacking")
+    # A real Photos::Move commits right after the first per-item removal
+    # (with_lock #2): it takes the photo and its remaining in-box item along.
+    calls = 0
+    allow(box).to receive(:with_lock).and_wrap_original do |original, *args, &block|
+      result = original.call(*args, &block)
+      if (calls += 1) == 2
+        Photos::Move.new.call(media: Media.find(photo.id), target_box: Box.find(destination.id), mover: actor)
+      end
+      result
+    end
+
+    result = described_class.new.call(box:, media: photo, actor:)
+
+    expect(result.value!).to include(photo_moved: true, items: [plates])
+    expect(mugs.reload).to have_attributes(box_id: destination.id, presence_state: "in_box")
+  end
+
+  it "reports photo_moved false when the photo stayed in the box" do
+    photo = create(:media, move:, box:)
+    create(:item, :confirmed, move:, box:, source_media: photo, name: "Plates")
+    create(:item, :confirmed, move:, box:, name: "Lamp")
+
+    expect(described_class.new.call(box:, media: photo, actor:).value![:photo_moved]).to be(false)
+  end
+
   it "refuses while the box is not unpacking" do
     packing_box = create(:box, move:, status: "packing")
     photo = create(:media, move:, box: packing_box)

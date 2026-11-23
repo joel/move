@@ -9,12 +9,13 @@ module Views
       include Phlex::Rails::Helpers::FormWith
       include Phlex::Rails::Helpers::TurboStreamFrom
 
-      #: (move: untyped, box: untyped, media: untyped, ?items_by_media: untyped) -> void
-      def initialize(move:, box:, media:, items_by_media: {})
+      #: (move: untyped, box: untyped, media: untyped, ?items_by_media: untyped, ?conflict_item_by_media: untyped) -> void
+      def initialize(move:, box:, media:, items_by_media: {}, conflict_item_by_media: {})
         @move = move
         @box = box
         @media = media
         @items_by_media = items_by_media
+        @conflict_item_by_media = conflict_item_by_media
       end
 
       #: () -> void
@@ -221,7 +222,8 @@ module Views
           # subscriber replaces the panel by its stable id.
           turbo_stream_from(@box, :recognition)
           render Views::Captures::SessionPanel.new(
-            box: @box, media: @media, items_by_media: @items_by_media
+            box: @box, media: @media, items_by_media: @items_by_media,
+            conflict_item_by_media: @conflict_item_by_media
           )
           render Components::Ui::Button.new(
             label: I18n.t("captures.finish"), variant: :secondary, full_width: true,

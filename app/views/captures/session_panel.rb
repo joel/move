@@ -13,17 +13,20 @@ module Views
 
       ID = "capture-session-panel"
       CHIP_CAP = 4 # name chips shown per photo card before collapsing to "+N more"
+      CARD_CLASSES = "flex items-center gap-3 rounded-xl border border-card-border bg-surface-container p-3"
+      CARD_HOVER = "transition hover:border-accent-sage hover:bg-surface-container-high"
 
       RUN_TO_STATE = {
         "queued" => :queued, "processing" => :processing,
         "succeeded" => :succeeded, "partially_succeeded" => :succeeded, "failed" => :failed
       }.freeze
 
-      #: (box: untyped, media: untyped, ?items_by_media: untyped) -> void
-      def initialize(box:, media:, items_by_media: {})
+      #: (box: untyped, media: untyped, ?items_by_media: untyped, ?conflict_item_by_media: untyped) -> void
+      def initialize(box:, media:, items_by_media: {}, conflict_item_by_media: {})
         @box = box
         @media = media
         @items_by_media = items_by_media
+        @conflict_item_by_media = conflict_item_by_media
       end
 
       #: () -> void
@@ -56,8 +59,9 @@ module Views
       end
 
       # A succeeded photo becomes one card with its recognised names as chips (or
-      # a "no items detected" caption when it found nothing, #856); otherwise a
-      # single status row (queued / recognising / failed).
+      # a "no items detected" caption when it found nothing, #856, or an "already
+      # in this box" caption when it only matched a confirmed item, #872);
+      # otherwise a single status row (queued / recognising / failed).
 
       #: (untyped media) -> untyped
       def rows(media)
@@ -76,20 +80,58 @@ module Views
 
       # Photo-first card: the photo + its recognised names as chips, tapping into
       # the per-photo detail (C2) where a wrong name can be fixed — no separate
-      # per-item rows.
+      # per-item rows. A conflict-only photo (no items of its own, its latest run
+      # matched a confirmed item) taps into that matched item instead (#872), with
+      # a secondary "Manage photo" link to its review page so retake / rescan /
+      # delete stay reachable (#891).
 
       #: (untyped media, untyped items) -> untyped
       def photo_card(media, items)
-        a(
-          href: view_context.move_box_review_photo_path(@box.move, @box, media_id: media.id),
-          class: "flex items-center gap-3 rounded-xl border border-card-border " \
-                 "bg-surface-container p-3 transition hover:border-accent-sage " \
-                 "hover:bg-surface-container-high"
-        ) do
-          thumb(media)
-          items.any? ? name_chips(items) : no_items_caption
-          render Components::Icons::ChevronRight.new(css: "h-4 w-4 shrink-0 text-muted")
+        conflict_item_id = (@conflict_item_by_media[media.id] if items.empty?)
+        return conflict_card(media, conflict_item_id) if conflict_item_id
+
+        a(href: review_href(media), class: "#{CARD_CLASSES} #{CARD_HOVER}") do
+          card_inner(media) { card_body(items, nil) }
         end
+      end
+
+      # Two sibling links (an anchor can't nest another): the top row opens the
+      # matched item, the link under it opens this photo's own review page.
+
+      #: (untyped media, untyped conflict_item_id) -> untyped
+      def conflict_card(media, conflict_item_id)
+        # Stacked: the panel column is narrow, so a side-by-side pill would
+        # squeeze the caption to one word per line.
+        div(class: "flex flex-col gap-2 rounded-xl border border-card-border bg-surface-container p-3") do
+          a(href: view_context.move_item_path(@box.move_id, conflict_item_id),
+            class: "flex min-w-0 items-center gap-3 transition hover:text-accent-sage") do
+            card_inner(media) { card_body([], conflict_item_id) }
+          end
+          a(href: review_href(media),
+            class: "self-end rounded-full border border-card-border px-3 py-1 text-label-caps uppercase " \
+                   "text-muted transition hover:border-accent-sage hover:text-accent-sage") do
+            I18n.t("captures.session.manage_photo")
+          end
+        end
+      end
+
+      #: (untyped media) { () -> untyped } -> untyped
+      def card_inner(media, &)
+        thumb(media)
+        yield
+        render Components::Icons::ChevronRight.new(css: "h-4 w-4 shrink-0 text-muted")
+      end
+
+      #: (untyped media) -> String
+      def review_href(media)
+        view_context.move_box_review_photo_path(@box.move, @box, media_id: media.id)
+      end
+
+      #: (untyped items, untyped conflict_item_id) -> untyped
+      def card_body(items, conflict_item_id)
+        return name_chips(items) if items.any?
+
+        caption(conflict_item_id ? "captures.session.conflict_only" : "captures.session.no_items")
       end
 
       #: (untyped items) -> untyped
@@ -100,12 +142,13 @@ module Views
         end
       end
 
-      # Nothing recognised: say so instead of a bare success tick, so the user
-      # knows to open the photo and add what the model missed.
+      # No chips to show: say why instead of a bare success tick — nothing was
+      # recognised (open the photo and add what the model missed), or it all
+      # matched an item already in this box (review the match, #872).
 
-      #: () -> untyped
-      def no_items_caption
-        span(class: "min-w-0 flex-1 text-body-sm text-muted") { I18n.t("captures.session.no_items") }
+      #: (String key) -> untyped
+      def caption(key)
+        span(class: "min-w-0 flex-1 text-body-sm text-muted") { I18n.t(key) }
       end
 
       #: (untyped label) -> untyped
