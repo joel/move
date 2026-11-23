@@ -501,6 +501,42 @@ RSpec.describe "Boxes" do
       expect(response.body).not_to include(move_box_recovery_photo_path(move, box, media_id: photo.id))
     end
 
+    # #891 — a conflict-only photo is neither reviewable (no item) nor recoverable
+    # (it has suggestions); it must still link to its review page, where an editor
+    # retakes or deletes it.
+    it "links a conflict-only photo to its review page, which carries retake and delete" do
+      box = create(:box, move:, number: "1", status: "packing")
+      existing = create(:item, move:, box:, name: "Lamp", review_state: "confirmed")
+      photo = create(:media, move:, box:)
+      run = create(:recognition_run, :succeeded, move:, box:, media: photo)
+      create(:recognition_suggestion, :conflict, move:, box:, media: photo, recognition_run: run, item: existing)
+
+      get move_box_path(move, box)
+
+      review_path = move_box_review_photo_path(move, box, media_id: photo.id)
+      tile = response.parsed_body.at_css("##{Components::Boxes::PhotoCard.dom_id(photo)}")
+      expect(tile.name).to eq("a")
+      expect(tile["href"]).to eq(review_path)
+
+      get review_path
+
+      page = response.parsed_body
+      expect(page.at_css(%(form[action="#{move_box_review_retake_photo_path(move, box, photo)}"]))).to be_present
+      expect(page.at_css(%(form[action="#{move_box_review_photo_path(move, box, photo)}"] input[name="_method"][value="delete"]))).to be_present
+    end
+
+    it "does not link a photo whose conflict was only on an older run" do
+      box = create(:box, move:, number: "1")
+      photo = create(:media, move:, box:)
+      old_run = create(:recognition_run, :succeeded, move:, box:, media: photo, created_at: 1.hour.ago)
+      create(:recognition_suggestion, :conflict, move:, box:, media: photo, recognition_run: old_run)
+      create(:recognition_run, :processing, move:, box:, media: photo)
+
+      get move_box_path(move, box)
+
+      expect(response.body).not_to include(move_box_review_photo_path(move, box, media_id: photo.id))
+    end
+
     it "badges a gallery photo whose every item is unpacked, but not one with an in-box item" do
       box = create(:box, move:, number: "1", status: "unpacking")
       all_unpacked = create(:media, move:, box:)
