@@ -109,8 +109,8 @@ module Components
       #: () -> untyped
       def medallion
         div(class: "flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full " \
-                   "#{Components::Ui::Chip::KINDS[@vocabulary.chip_kind]}") do
-          render @vocabulary.icon.new(css: "h-6 w-6")
+                   "#{Components::Ui::Chip::KINDS[Presentation.chip_kind(@vocabulary)]}") do
+          render Presentation.icon(@vocabulary).new(css: "h-6 w-6")
         end
       end
 
