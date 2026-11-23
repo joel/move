@@ -34,12 +34,23 @@ module Captures
       return Failure(:rescan_wrong_phase) if rerun_recognition && !media.box.capturable?
 
       yield swap_image(media, file)
-      yield RecognitionRuns::Enqueue.new.call(media: media) if rerun_recognition
-      yield emit_event(media, actor)
-      Success(media)
+      rescan = rerun_recognition ? RecognitionRuns::Enqueue.new.call(media: media) : Success()
+      finish(media, actor, rescan)
     end
 
     private
+
+    # The swap has persisted even when the re-scan job could not be queued
+    # (#871: the run is failed and retryable), so the retake is still announced
+    # before that failure is returned. Any other re-scan failure stops here.
+
+    #: (untyped media, untyped actor, Dry::Monads::Result[untyped, untyped] rescan) -> Dry::Monads::Result[untyped, untyped]
+    def finish(media, actor, rescan)
+      return rescan if rescan.failure? && rescan.failure != :enqueue_failed
+
+      emit_event(media, actor)
+      rescan.failure? ? rescan : Success(media)
+    end
 
     # ImageNormalizer sniffs the real type from the bytes (never the client-declared
     # one), strips EXIF/GPS, caps the size, and transcodes to JPEG — the same

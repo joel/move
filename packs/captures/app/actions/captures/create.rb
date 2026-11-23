@@ -42,9 +42,14 @@ module Captures
       return Failure(:no_file) if file.blank? && signed_id.blank?
 
       media = yield persist(box, file, signed_id, captured_via)
-      yield RecognitionRuns::Enqueue.new.call(media: media)
+      enqueued = RecognitionRuns::Enqueue.new.call(media: media)
+      return enqueued if enqueued.failure? && enqueued.failure != :enqueue_failed
+
+      # The photo is saved even when its recognition job could not be queued
+      # (#871: the run is failed and retryable), so the capture is still
+      # announced before the caller hears about the recognition failure.
       yield emit_event(media, captured_by)
-      Success(media)
+      enqueued.failure? ? enqueued : Success(media)
     end
 
     private
