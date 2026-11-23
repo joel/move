@@ -60,6 +60,27 @@ RSpec.describe Photos::Delete do
     expect(Item.kept.exists?(item.id)).to be(true)
   end
 
+  %w[queued processing].each do |status|
+    it "refuses while the photo has a #{status} recognition run and discards nothing (#854)" do
+      create(:recognition_run, move:, box:, media:, status:)
+      item = create(:item, move:, box:, source_media: media)
+
+      result = call
+      expect(result).to be_failure
+      expect(result.failure).to eq(:recognition_in_flight)
+
+      expect(Media.kept.exists?(media.id)).to be(true)
+      expect(Item.kept.exists?(item.id)).to be(true)
+    end
+  end
+
+  it "deletes once the photo's recognition run has settled (#854)" do
+    create(:recognition_run, move:, box:, media:, status: "failed")
+
+    expect(call).to be_success
+    expect(Media.kept.exists?(media.id)).to be(false)
+  end
+
   it "restores the photo and its items together (Photos::Restore)" do
     item = create(:item, move:, box:, source_media: media)
     call
