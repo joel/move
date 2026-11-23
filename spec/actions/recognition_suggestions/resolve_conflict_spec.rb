@@ -53,6 +53,14 @@ RSpec.describe RecognitionSuggestions::ResolveConflict do
       expect(suggestion.reload.state).to eq("conflict")
     end
 
+    it "refuses as :stale when the matched item was marked removed while unpacking" do
+      box.update_column(:status, "unpacking") # rubocop:disable Rails/SkipsModelValidations
+      lamp.update!(presence_state: "removed")
+
+      expect { expect(resolve(outcome).failure).to eq(:stale) }.not_to change(Item, :count)
+      expect(suggestion.reload.state).to eq("conflict")
+    end
+
     it "settles once when submitted twice" do
       resolve(outcome, on: RecognitionSuggestion.find(suggestion.id))
 
