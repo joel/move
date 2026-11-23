@@ -45,7 +45,7 @@ module Components
       #: () -> untyped
       def empty_state
         render Components::Ui::EmptyState.new(
-          icon: @vocabulary.icon,
+          icon: Presentation.icon(@vocabulary),
           title: I18n.t("vocabularies.#{@vocabulary.kind}.empty_title"),
           description: I18n.t("vocabularies.#{@vocabulary.kind}.empty_description")
         )
