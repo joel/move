@@ -598,6 +598,24 @@ RSpec.describe "Unpacking" do
       expect(response.body).not_to include(Components::Boxes::ItemCard.dom_id(mugs))
     end
 
+    it "redirects a refused photo unpack whose concurrent move completed the box (Codex #886 R2)" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      plates = create(:item, :confirmed, move:, box:, source_media: photo, name: "Plates")
+      create(:item, :confirmed, move:, box:, source_media: photo, name: "Mugs", presence_state: "removed")
+      # The move takes the photo + Plates (its last in-box item) and completes
+      # the source box before the action's ownership check refuses.
+      refuse_after(Items::MarkPhotoRemoved, :not_found) do
+        Photos::Move.new.call(media: Media.find(photo.id), target_box: create(:box, :with_room, move:), mover: user)
+      end
+
+      patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id), as: :turbo_stream
+
+      expect(response).to redirect_to(move_box_path(move, box))
+      expect(flash[:notice]).to eq(I18n.t("unpacking.flash.completed"))
+      expect([box.reload.status, plates.reload.box_id]).not_to include("unpacking", box.id)
+    end
+
     it "redraws a refused standalone card from the DB, not the pre-action item" do
       box = create(:box, :with_room, move:, status: "unpacking")
       lamp = create(:item, :manual, move:, box:, name: "Lamp")

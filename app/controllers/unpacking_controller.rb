@@ -38,17 +38,16 @@ class UnpackingController < MoveScopedController
   def remove
     # Items::Unpack owns the pair: MarkRemoved + the last-item auto-complete
     # (#755/#756 — the lifecycle rule lives in the action, not per adapter).
-    case Items::Unpack.new.call(item: @item, actor: current_user)
+    result = Items::Unpack.new.call(item: @item, actor: current_user)
+    return redirect_to_current_phase unless box_still_unpacking?
+
+    case result
     in Dry::Monads::Success(_)
       respond_to_removed
     in Dry::Monads::Failure(_)
-      # Nothing was removed (e.g. the box left `unpacking` between
-      # require_active_checklist and the action's own phase guard, #729):
-      # re-render the real state with an alert instead of success streams.
-      # A box that has left the checklist phase meanwhile gets its current
-      # phase's page instead — active toggles would contradict it (#877).
-      return redirect_to_current_phase unless box_still_unpacking?
-
+      # Nothing was removed (e.g. a concurrent change the action's own guard
+      # caught, #729): re-render the real state with an alert instead of
+      # success streams.
       respond_to_toggle_failure(t("unpacking.flash.remove_failed", name: @item.name)) do
         box_origin? ? box_streams : checklist_streams
       end
@@ -59,18 +58,15 @@ class UnpackingController < MoveScopedController
 
   #: () -> untyped
   def restore
-    case Items::RestoreToBox.new.call(item: @item, actor: current_user)
+    result = Items::RestoreToBox.new.call(item: @item, actor: current_user)
+    return redirect_to_current_phase unless box_still_unpacking?
+
+    case result
     in Dry::Monads::Success(_)
-      return redirect_to_current_phase unless box_still_unpacking?
       return respond_from_box if box_origin?
 
       respond_with_streams(move_item_streams(from: :unpacked, to: :remaining),
                            redirect: move_box_unpacking_path(@move, @box))
-    in Dry::Monads::Failure(:box_unpacked)
-      # The box completed between require_active_checklist and the box-locked
-      # guard (#756 R3): nothing mutated — success streams would strip a row
-      # the DB still holds. Land on the surface that shows the terminal state.
-      redirect_to box_origin? ? move_box_path(@move, @box) : move_box_unpacking_path(@move, @box)
     in Dry::Monads::Failure(_)
       redirect_to move_box_unpacking_path(@move, @box), alert: t("unpacking.not_available")
     end
@@ -85,10 +81,12 @@ class UnpackingController < MoveScopedController
   def remove_photo
     # MarkPhotoRemoved owns its completion (the bulk counterpart of
     # Items::Unpack); unpacking the last photo redirects like the last chip.
-    case Items::MarkPhotoRemoved.new.call(box: @box, media: @media, actor: current_user)
-    in Dry::Monads::Success(result)
-      return redirect_to_current_phase unless box_still_unpacking?
-      return respond_to_photo_moved if result[:photo_moved]
+    result = Items::MarkPhotoRemoved.new.call(box: @box, media: @media, actor: current_user)
+    return redirect_to_current_phase unless box_still_unpacking?
+
+    case result
+    in Dry::Monads::Success(removal)
+      return respond_to_photo_moved if removal[:photo_moved]
 
       respond_with_streams([contents_header_stream, review_badge_stream, photo_card_stream(@media)],
                            redirect: move_box_path(@move, @box))
@@ -137,10 +135,6 @@ class UnpackingController < MoveScopedController
 
   #: () -> untyped
   def respond_to_removed
-    # The response is a full navigation when the box completed — the
-    # celebration (checklist) or the unpacked box summary (grid origin) are
-    # page-level changes no region stream expresses.
-    return redirect_to_current_phase unless box_still_unpacking?
     return respond_from_box if box_origin?
 
     respond_with_streams(move_item_streams(from: :remaining, to: :unpacked),
@@ -179,14 +173,17 @@ class UnpackingController < MoveScopedController
     ]
   end
 
-  # The response follows the box's REALITY after the action ran, not whether
-  # THIS request won the completion race (#756 P2): the loser of two
-  # concurrent last-item removals gets completed_box nil — the post-lock
-  # re-read saw `unpacked` — but its checklist/grid streams would render an
-  # active surface for a terminal box, so it must redirect just the same.
-  # Reload: the action ran on its own box object (and a concurrent writer may
-  # have committed since set_box), so every stream below renders from this
-  # post-action read, never the pre-action @box (#877).
+  # Every toggle response, success or failure, first follows the box's
+  # REALITY after the action ran (#877, Codex #886 R2). A box that left
+  # `unpacking` (in practice: completed by this request, a concurrent one,
+  # or a photo move that emptied it) gets a full navigation: the celebration
+  # or the unpacked box summary are page-level changes no region stream
+  # expresses. The reality, not whether THIS request won the completion race
+  # (#756 P2): the loser of two concurrent last-item removals gets
+  # completed_box nil, yet its streams would render an active surface for a
+  # terminal box. Reload: the action ran on its own box object and a
+  # concurrent writer may have committed since set_box, so every stream
+  # renders from this post-action read, never the pre-action @box.
 
   #: () -> bool
   def box_still_unpacking? = @box.reload.unpacking?
