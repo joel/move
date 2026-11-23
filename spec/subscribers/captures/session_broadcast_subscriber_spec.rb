@@ -39,6 +39,35 @@ RSpec.describe Captures::SessionBroadcastSubscriber do
     expect(html).not_to include(I18n.t("captures.session.no_items"))
   end
 
+  # #881 — settling the conflict drops the caption back to the normal states,
+  # live, on the open capture panel.
+  it "re-broadcasts the panel without the conflict caption once the conflict is dismissed" do
+    existing = create(:item, move:, box:, name: "Lamp", review_state: "confirmed")
+    run.update!(status: "succeeded")
+    suggestion = create(:recognition_suggestion, :conflict, move:, box:, media:, recognition_run: run, item: existing)
+    html = nil
+    allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to) { |*, **opts| html = opts[:html] }
+
+    RecognitionSuggestions::ResolveConflict.new.call(suggestion:, actor: nil, outcome: :same)
+
+    expect(html).to include(I18n.t("captures.session.no_items"))
+    expect(html).not_to include(I18n.t("captures.session.conflict_only"))
+  end
+
+  it "re-broadcasts the panel with the second item's name once both are kept" do
+    existing = create(:item, move:, box:, name: "Lamp", review_state: "confirmed")
+    run.update!(status: "succeeded")
+    suggestion = create(:recognition_suggestion, :conflict, move:, box:, media:, recognition_run: run, item: existing,
+                                                            proposed_name: "Desk lamp")
+    html = nil
+    allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to) { |*, **opts| html = opts[:html] }
+
+    RecognitionSuggestions::ResolveConflict.new.call(suggestion:, actor: nil, outcome: :second)
+
+    expect(html).to include("Desk lamp")
+    expect(html).not_to include(I18n.t("captures.session.conflict_only"))
+  end
+
   it "broadcasts on processing and failed too" do
     allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
 

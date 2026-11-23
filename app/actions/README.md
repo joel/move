@@ -163,7 +163,7 @@ action emits and returns; it **never** calls a subscriber directly.
 | `Activity::RecordSubscriber` | `activity_log.rb` | `Activity::Builder.records?` | Appends the activity-feed row (sync, in-request) |
 | `Search::IndexSubscriber` | `search_indexing.rb` | `item.*` (`created`/`updated`/`moved`/`family_backfilled`) | Enqueues `Search::RefreshDocumentJob` (async) |
 | `Clusters::RefreshSubscriber` | `clustering.rb` | item lifecycle (incl. `family_backfilled`) + box cascades + embedding-space `move.*` | Debounced cluster recompute request (#631) |
-| `Captures::SessionBroadcastSubscriber` | `recognition_broadcast.rb` | `recognition_run.*` | Re-renders + broadcasts the capture session panel (#241) |
+| `Captures::SessionBroadcastSubscriber` | `recognition_broadcast.rb` | `recognition_run.*`, `recognition_suggestion.conflict_*` | Re-renders + broadcasts the capture session panel (#241; conflict resolution #881) |
 | `Manifests::AuditSubscriber` | `manifest_audit.rb` | `manifest.*` | Logs the authenticated sensitive read |
 | `MoveMcp::AuditSubscriber` | `mcp_audit.rb` | `integration_token.` / `mcp.` | MCP / token audit trail |
 | `DemoData::ProvisionSubscriber` | `demo_data.rb` | `organization.created` | Enqueues `DemoData::ProvisionJob` to build + live-reveal the onboarding sample Move (async, #432) |
@@ -183,6 +183,7 @@ action emits and returns; it **never** calls a subscriber directly.
 | `manifest` | `viewed` | `box_id, move_id, actor_id` | A (low-signal), **M** |
 | `qr` | `resolved` | `box_id, move_id, actor_id` | A (low-signal) |
 | `recognition_run` | `queued` `processing` `succeeded` `failed` | `recognition_run_id` (+ `box_id` on `queued`, `item_count`/`error_code`) | capture panel broadcast (`Captures::SessionBroadcastSubscriber`); `succeeded` announces post-commit, isolated — a lost announcement is re-emitted by `ProcessJob` on a duplicate delivery (#649) |
+| `recognition_suggestion` | `conflict_dismissed` `conflict_kept_both` | `suggestion_id, media_id, box_id, move_id, actor_id, item_id` (+ `new_item_id` for `conflict_kept_both`) | capture panel broadcast; no feed row of its own — `conflict_kept_both` is preceded by an `item.created` (A, **S**) for the second item, and a dismissal changes no inventory (#881) |
 | `session_handoff` | `minted` `consumed` | `token_id, user_id, organization_slug` | — (audit trail; apex→subdomain handoff, #280) |
 | `organization` | `created` | `organization_id, slug` | **D** — provisions the onboarding sample Move (#432) |
 | `discards` | `purged` `purge_failed` | per-model counts / `record_type, record_id, error` | — (observability; the nightly retention sweep, #582) |

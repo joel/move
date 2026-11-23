@@ -67,6 +67,11 @@ Rails.application.routes.draw do
       patch "review/photo/:media_id/items/:id/rename", to: "reviews#rename_item", as: :review_rename_item
       patch "review/photo/:media_id/items/:id/remove", to: "reviews#remove_item", as: :review_remove_item
       post "review/photo/:media_id/items", to: "reviews#add_item", as: :review_add_item
+      # Settle a conflict the photo's latest run left (#881): "Same item" or "Keep both".
+      post "review/photo/:media_id/conflicts/:id/dismiss", to: "reviews#dismiss_conflict",
+                                                           as: :review_dismiss_conflict
+      post "review/photo/:media_id/conflicts/:id/keep_both", to: "reviews#keep_both_conflict",
+                                                             as: :review_keep_both_conflict
       # C3 — move a whole photo (and its co-located items) to another box (#317).
       patch "review/photo/:media_id/move", to: "reviews#move_photo", as: :review_move_photo
       # Retake — replace a photo's image in place (recover a corrupt master); any

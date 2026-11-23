@@ -284,18 +284,22 @@ class BoxesController < MoveScopedController
         .pluck(:id)
   end
 
-  # Photos whose LATEST run recorded a conflict (it matched an already-confirmed
-  # item and created none of its own, #872) and that aren't already in the review
-  # walk. recoverable_media_ids excludes them (they have suggestions), so without
-  # this set the tile is a dead end and the photo can't be retaken or deleted
-  # (#891). One SQL query; the matched item's current state doesn't matter here —
-  # the photo itself still needs managing.
+  # Photos whose LATEST run matched already-confirmed items instead of creating
+  # its own (#872): a conflict still to settle, or one settled as "the same
+  # item" (#881) — either way the run left suggestions but the photo sources no
+  # item. recoverable_media_ids excludes them (they have suggestions), and they
+  # aren't in the review walk (no item), so without this set the tile is a dead
+  # end and the photo can't be retaken or deleted (#891). The item check is
+  # MOVE-wide and `with_discarded`, as in recoverable_media_ids. One SQL query;
+  # the matched item's current state doesn't matter — the photo still needs
+  # managing.
 
   #: (untyped review_media_ids) -> untyped
   def conflict_media_ids(review_media_ids)
     photos = @box.media.not_generated
     photos.where.not(id: review_media_ids)
-          .where(id: RecognitionSuggestion.latest_conflicts_for(photos.select(:id)).select(:media_id))
+          .where.not(id: @move.items.with_discarded.where.not(source_media_id: nil).select(:source_media_id))
+          .where(id: RecognitionSuggestion.from_latest_runs_of(photos.select(:id)).select(:media_id))
           .pluck(:id)
   end
 

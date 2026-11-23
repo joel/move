@@ -27,6 +27,7 @@ Deliver the review experience that resolves uncertain recognition suggestions �
 ## 5. Domain & actions required
 - `App::RecognitionSuggestions::Keep` / `Correct` / `MarkFalsePositive`; correct routes into `App::Items::Update` with prefilled proposed data.
 - **No-overwrite / conflict:** suggestions completing after a user confirmed/edited a similar item must not overwrite — mark suggestion `conflict` or item `needs_correction` and present a human resolution path (Domain §6.4, §10; Technical Foundation §8.3).
+  - **Resolution path (#881):** the conflicting photo's review page lists each latest-run conflict with its matched item and two calls, both `RecognitionSuggestions::ResolveConflict` — **Same item** (outcome `:same`: suggestion → `accepted`, still linked to the matched item, nothing created) and **Keep both** (outcome `:second`: a confirmed second item sourced to the photo and the suggestion; suggestion → `accepted`, linked to it). It runs under the box lock, refuse a settled, superseded (re-scanned) or unpacked-box conflict, and re-broadcast the capture panel, whose #872 caption then drops back to the normal states.
 - Queue ordering lowest-confidence-first; counts feed Boxes Home / Box Detail badges.
 - Activity feed records keep/correct/false actions.
 

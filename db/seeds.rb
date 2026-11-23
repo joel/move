@@ -415,10 +415,13 @@ Apartment::Tenant.switch(organization.slug) do # rubocop:disable Metrics/BlockLe
   # #872 — a conflict-only photo: its run matched an item already confirmed in a
   # packing box, so it recorded a `conflict` suggestion and created no item (the
   # no-overwrite rule). The box's capture panel shows "Already in this box —
-  # review the match" linking to that item. Idempotent: skipped once the Move has
-  # any conflict suggestion. Runs after the activity showcase, which seals box 2,
-  # so it picks a box that stays packing (capture is blocked on a sealed box).
-  unless RecognitionSuggestion.exists?(move: move, state: "conflict")
+  # review the match" linking to that item; the photo's review page offers
+  # "Same item" / "Keep both" to settle it (#881). Idempotent: skipped once the
+  # Move has any conflict suggestion, settled (`accepted`) ones included, so
+  # re-seeding after playing with the controls adds no second photo. Runs after
+  # the activity showcase, which seals box 2, so it picks a box that stays
+  # packing (capture is blocked on a sealed box).
+  unless RecognitionSuggestion.exists?(move: move, state: %w[conflict accepted])
     existing = move.items.in_box.joins(:box).where(boxes: { status: "packing" }, review_state: "confirmed")
                    .order(:created_at).first
     if existing

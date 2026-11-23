@@ -10,6 +10,8 @@
 class ReviewsController < MoveScopedController
   include FindListPinnable
   include ReviewPhotoMoveResponses
+  include ReviewItemListing
+  include ReviewConflictResponses
 
   # ?queue=move flips the photo screen into the Move-wide review-queue walk
   # (#654): Next crosses box boundaries, advancing strictly forward in capture
@@ -20,10 +22,13 @@ class ReviewsController < MoveScopedController
 
   before_action :set_box
   before_action :set_media,
-                only: %i[photo mark_reviewed rename_item remove_item add_item move_photo delete_photo retake_photo]
+                only: %i[photo mark_reviewed rename_item remove_item add_item move_photo delete_photo retake_photo
+                         dismiss_conflict keep_both_conflict]
   before_action :set_item, only: %i[rename_item remove_item]
+  before_action :set_suggestion, only: %i[dismiss_conflict keep_both_conflict]
   before_action :require_writable_move!,
-                only: %i[mark_reviewed rename_item remove_item add_item move_photo delete_photo retake_photo]
+                only: %i[mark_reviewed rename_item remove_item add_item move_photo delete_photo retake_photo
+                         dismiss_conflict keep_both_conflict]
 
   # GET /moves/:move_id/boxes/:box_id/review
   # Enter at the first photo that still has *unreviewed* items (resuming a
@@ -50,7 +55,7 @@ class ReviewsController < MoveScopedController
     walk = review_media
     next_media = next_after(@media, walk)
     render Views::Reviews::Photo.new(
-      move: @move, box: @box, media: @media, items: photo_items(@media), conflict_items: conflict_items,
+      move: @move, box: @box, media: @media, items: photo_items(@media), conflicts: conflict_suggestions,
       position: position_of(@media, walk), total: walk.size,
       next_media: next_media, editable: editable_move?,
       move_boxes: other_boxes, pending_review: pending_review?, pinnable: pinnable?,
@@ -130,6 +135,32 @@ class ReviewsController < MoveScopedController
     end
   end
 
+  # POST .../review/photo/:media_id/conflicts/:id/dismiss — "Same item" (#881):
+  # the detection is the matched item already in the box; nothing is created.
+
+  #: () -> untyped
+  def dismiss_conflict
+    case resolve_conflict(:same)
+    in Dry::Monads::Success(item)
+      conflict_resolved_response(t("reviews.flash.conflict_dismissed", name: item.name), item)
+    in Dry::Monads::Failure(reason)
+      conflict_refused_response(reason)
+    end
+  end
+
+  # POST .../review/photo/:media_id/conflicts/:id/keep_both — "Keep both" (#881):
+  # the box holds a second one, so add it (highlighted in the re-rendered list).
+
+  #: () -> untyped
+  def keep_both_conflict
+    case resolve_conflict(:second)
+    in Dry::Monads::Success(item)
+      conflict_resolved_response(t("reviews.flash.conflict_kept_both", name: item.name), item, highlight_id: item.id)
+    in Dry::Monads::Failure(reason)
+      conflict_refused_response(reason)
+    end
+  end
+
   # PATCH .../review/photo/:media_id/move — move this photo (and its co-located
   # items) to another box in the same Move (#317). On success the photo now lives
   # in the target box, so redirect there (its review URL under @box would 404).
@@ -201,7 +232,7 @@ class ReviewsController < MoveScopedController
   def render_queue_photo
     next_media = queue_next_media
     render Views::Reviews::Photo.new(
-      move: @move, box: @box, media: @media, items: photo_items(@media), conflict_items: conflict_items,
+      move: @move, box: @box, media: @media, items: photo_items(@media), conflicts: conflict_suggestions,
       position: nil, total: nil, next_media: next_media,
       editable: editable_move?, move_boxes: other_boxes,
       queue: true, queue_remaining: forward_scope(pending_remaining).count,
@@ -306,18 +337,6 @@ class ReviewsController < MoveScopedController
     advance_href_for(queue_mode? ? queue_next_media : next_after(@media, review_media))
   end
 
-  #: () -> bool
-  def queue_mode?
-    params[:queue] == QUEUE_PARAM
-  end
-
-  # Splat into path helpers so box-mode URLs stay byte-identical (no ?queue=).
-
-  #: () -> Hash[Symbol, String]
-  def queue_query
-    queue_mode? ? { queue: QUEUE_PARAM } : {}
-  end
-
   #: (untyped reason) -> String
   def retake_error(reason)
     known = %i[no_file recognition_in_flight rescan_wrong_phase image_too_large unsupported_image enqueue_failed]
@@ -339,18 +358,6 @@ class ReviewsController < MoveScopedController
                          redirect: move_box_review_photo_path(@move, @box, @media, **queue_query), toast: true) do
       [:notice, t("reviews.flash.item_added", name: item.name)]
     end
-  end
-
-  #: (Array[untyped] items, ?highlight_id: untyped) -> untyped
-  def review_list_stream(items, highlight_id: nil)
-    turbo_stream.replace(
-      Components::Reviews::ItemList::ID,
-      view_context.render(Components::Reviews::ItemList.new(
-                            move: @move, box: @box, media: @media, items: items, editable: editable_move?, conflict_items:,
-                            highlight_id: highlight_id, queue: queue_mode?,
-                            pinnable: pinnable?, pinned_item_ids: pinned_item_ids
-                          ))
-    )
   end
 
   # Boxes (other than this one) the photo can be moved to, numerically ordered — a
@@ -391,22 +398,6 @@ class ReviewsController < MoveScopedController
     return nil if ids.empty?
 
     review_media.find { |m| ids.include?(m.id) }
-  end
-
-  # The confirmed items this photo's LATEST run matched instead of creating its
-  # own (#891, the capture panel's #872 rule): the empty state explains the
-  # match and links to them. The match must still be in this box (kept, in_box).
-  # A lazy relation — ItemList loads it only when the photo has no items.
-
-  #: () -> untyped
-  def conflict_items = @box.items.in_box.where(id: RecognitionSuggestion.latest_conflicts_for(@media.id).select(:item_id)).order(:name)
-
-  # Every in-box item detected in (or hand-added to) this photo, in detection
-  # order. Manual review-time additions carry source_media so they join the list.
-
-  #: (untyped media) -> untyped
-  def photo_items(media)
-    @box.items.in_box.where(source_media_id: media.id).order(:created_at)
   end
 
   # The one identity rule for locating a photo in the walk — position, next
@@ -458,6 +449,15 @@ class ReviewsController < MoveScopedController
   #: () -> untyped
   def set_item
     @item = @box.items.find(params.expect(:id))
+  rescue ActiveRecord::RecordNotFound
+    head :not_found
+  end
+
+  # Reached through the already-authorized box and photo (the tenant boundary).
+
+  #: () -> untyped
+  def set_suggestion
+    @suggestion = RecognitionSuggestion.where(box_id: @box.id, media_id: @media.id).find(params.expect(:id))
   rescue ActiveRecord::RecordNotFound
     head :not_found
   end
