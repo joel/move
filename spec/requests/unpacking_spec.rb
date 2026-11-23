@@ -381,6 +381,115 @@ RSpec.describe "Unpacking" do
     end
   end
 
+  describe "refused toggles (#729)" do
+    # The action refuses after the controller's guards passed (a phase race
+    # between require_active_checklist and the action's own guard). Stubbed:
+    # the race window is not reproducible in a request spec.
+    def refuse(action_class, reason = :wrong_phase)
+      refused = instance_double(action_class)
+      allow(action_class).to receive(:new).and_return(refused)
+      allow(refused).to receive(:call).and_return(Dry::Monads::Failure(reason))
+    end
+
+    let(:checklist_regions) do
+      [Components::Unpacking::ProgressCard::ID, Components::Unpacking::RemainingSection::ID,
+       Components::Unpacking::UnpackedSection::ID]
+    end
+
+    it "re-streams the checklist's real state with an alert when a remove is refused" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      item = create(:item, move:, box:, presence_state: "in_box", name: "Plates")
+      create(:item, move:, box:, presence_state: "removed")
+      refuse(Items::Unpack)
+
+      patch move_box_unpacking_remove_path(move, box, item), as: :turbo_stream
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+      body = response.body
+      aggregate_failures do
+        # Every region re-rendered from the DB, morphed (focus + scroll kept).
+        checklist_regions.each do |id|
+          expect(body).to match(/<turbo-stream (?=[^>]*action="replace")(?=[^>]*method="morph")[^>]*target="#{id}"/)
+        end
+        # The tapped row is still in Remaining — never streamed out.
+        expect(body).not_to include(%(action="remove"))
+        expect(body).to include(Components::Unpacking::ItemRow.dom_id(item, :remaining))
+        expect(body).to include(ERB::Util.h(I18n.t("unpacking.flash.remove_failed", name: "Plates")))
+        expect(body).not_to include(ERB::Util.h(I18n.t("unpacking.flash.completed")))
+      end
+      expect(item.reload.presence_state).to eq("in_box")
+    end
+
+    it "re-streams the grid card with an alert for a refused origin=box remove" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      item = create(:item, move:, box:, source_media: photo, name: "Plates")
+      refuse(Items::Unpack)
+
+      patch move_box_unpacking_remove_path(move, box, item, params: { origin: "box" }), as: :turbo_stream
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body)
+        .to include(%(target="#{Components::Boxes::PhotoCard.dom_id(photo)}"))
+        .and include(ERB::Util.h(I18n.t("unpacking.flash.remove_failed", name: "Plates")))
+      expect(response.body).not_to include(Components::Unpacking::UnpackedSection::ID)
+    end
+
+    it "redirects a refused HTML remove back to the checklist with the alert" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      item = create(:item, move:, box:, presence_state: "in_box", name: "Plates")
+      refuse(Items::Unpack)
+
+      patch move_box_unpacking_remove_path(move, box, item)
+
+      expect(response).to redirect_to(move_box_unpacking_path(move, box))
+      expect(flash[:alert]).to eq(I18n.t("unpacking.flash.remove_failed", name: "Plates"))
+    end
+
+    it "re-streams the photo card with an alert when a photo unpack is refused" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      item = create(:item, move:, box:, source_media: photo, name: "Plates")
+      refuse(Items::MarkPhotoRemoved)
+
+      patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id), as: :turbo_stream
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body)
+        .to include(%(target="#{Components::Boxes::PhotoCard.dom_id(photo)}"))
+        .and include(%(target="#{Components::Boxes::ContentsHeader::ID}"))
+        .and include(ERB::Util.h(I18n.t("unpacking.flash.photo_remove_failed")))
+      expect(response.body).not_to include(ERB::Util.h(I18n.t("unpacking.flash.completed")))
+      expect(item.reload.presence_state).to eq("in_box")
+    end
+
+    it "drops the card when the photo left the box before the action ran (Failure(:not_found))" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      create(:item, move:, box:, source_media: photo, name: "Plates")
+      refuse(Items::MarkPhotoRemoved, :not_found)
+
+      patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id), as: :turbo_stream
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body)
+        .to include(%(action="remove" target="#{Components::Boxes::PhotoCard.dom_id(photo)}"))
+        .and include(ERB::Util.h(I18n.t("unpacking.flash.photo_gone")))
+    end
+
+    it "redirects a refused HTML photo unpack to the box detail with the alert" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      photo = create(:media, move:, box:)
+      refuse(Items::MarkPhotoRemoved)
+
+      patch move_box_unpacking_photo_remove_path(move, box, media_id: photo.id)
+
+      expect(response).to redirect_to(move_box_path(move, box))
+      expect(flash[:alert]).to eq(I18n.t("unpacking.flash.photo_remove_failed"))
+    end
+  end
+
   describe "origin=box toggles (#727 — B1 grid)" do
     it "streams the photo card + header for a photo item's remove, not the checklist" do
       box = create(:box, :with_room, move:, status: "unpacking")
