@@ -227,6 +227,26 @@ RSpec.describe "Captures" do
         expect(panel.at_css(%(a[href="#{move_box_review_photo_path(move, box, media_id: media.id)}"]))).to be_present
       end
 
+      it "falls back to 'No items detected' once the matched item moved to another box" do
+        conflict_run
+        existing.update!(box: create(:box, move:, number: "2", status: "packing"))
+
+        get move_box_capture_path(move, box)
+
+        expect(panel.text).to include(I18n.t("captures.session.no_items"))
+        expect(panel.text).not_to include(I18n.t("captures.session.conflict_only"))
+      end
+
+      it "falls back to 'No items detected' once the matched item is marked removed" do
+        conflict_run
+        existing.update!(presence_state: "removed")
+
+        get move_box_capture_path(move, box)
+
+        expect(panel.text).to include(I18n.t("captures.session.no_items"))
+        expect(panel.text).not_to include(I18n.t("captures.session.conflict_only"))
+      end
+
       it "prefers the photo's own item chips when it also has linked items" do
         conflict_run
         create(:item, move:, box:, name: "Rug", source_media: media)

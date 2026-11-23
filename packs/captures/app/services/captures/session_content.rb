@@ -34,15 +34,14 @@ module Captures
     # Photos whose LATEST run matched an already-confirmed item (#872): media id →
     # the matched item's id. Such a run records `conflict` suggestions and creates
     # no item (no-overwrite, Domain §6.4), so without this the panel would say
-    # "No items detected" and nudge a duplicate add. One SQL round trip (DISTINCT
-    # ON picks the earliest conflict per photo); the join drops a matched item that
-    # was since deleted (Item's kept default scope), which falls back to the
-    # zero-detection caption. Latest-run ids come from the already-preloaded runs.
+    # "No items detected" and nudge a duplicate add. All in SQL (AGENTS.md rule 5):
+    # a DISTINCT ON subquery picks each photo's latest run, a second DISTINCT ON
+    # the earliest conflict per photo. The match must still be in THIS box — kept
+    # (Item's default scope), in_box, same box_id — so a deleted, removed or moved
+    # item falls back to the zero-detection caption instead of a false claim.
     def conflict_item_by_media
-      latest_run_ids = media.filter_map { |m| m.recognition_runs.max_by(&:created_at)&.id }
-      return {} if latest_run_ids.empty?
-
       RecognitionSuggestion.joins(:item)
+                           .merge(Item.in_box.where(box_id: @box.id))
                            .where(state: "conflict", recognition_run_id: latest_run_ids)
                            .select("DISTINCT ON (recognition_suggestions.media_id) " \
                                    "recognition_suggestions.media_id, recognition_suggestions.item_id")
@@ -56,6 +55,15 @@ module Captures
         box: @box, media: media, items_by_media: items_by_media,
         conflict_item_by_media: conflict_item_by_media
       )
+    end
+
+    private
+
+    # The panel's photos' latest run ids, as a subquery (never loaded into Ruby).
+    def latest_run_ids
+      RecognitionRun.where(media_id: media.map(&:id))
+                    .select("DISTINCT ON (recognition_runs.media_id) recognition_runs.id")
+                    .order("recognition_runs.media_id", "recognition_runs.created_at DESC")
     end
   end
 end
