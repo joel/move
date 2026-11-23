@@ -161,13 +161,21 @@ module Views
           render Components::Ui::Card.new(padding: "p-6") do
             header
             list
-            add_form if @editable
+            add_form if can_add_item?
             move_photo_control if @editable && @move_boxes.any?
             retake_control if @editable
             delete_photo_control if @editable && @box.packing?
             footer
           end
         end
+      end
+
+      # No adds into a terminal (unpacked) box (#855); Items::CreateManual refuses
+      # them too. Sealed / in-transit boxes keep the form for corrections.
+
+      #: () -> bool
+      def can_add_item?
+        @editable && !@box.unpacked?
       end
 
       # pending-add (#690) auto-adds typed-but-unsubmitted text before any

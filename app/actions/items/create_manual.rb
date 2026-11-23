@@ -9,13 +9,27 @@ module Items
     #: (box: untyped, params: untyped, creator: untyped, ?source_media: untyped, ?require_open: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, params:, creator:, source_media: nil, require_open: false)
       yield ensure_writable(box.move)
-      yield ensure_open(box) if require_open
-      item = yield with_responsible(creator) { persist(box, params, source_media) }
+      item = box.with_lock(PARENT_ROW_LOCK) do
+        yield ensure_not_unpacked(box)
+        yield ensure_open(box) if require_open
+        yield with_responsible(creator) { persist(box, params, source_media) }
+      end
       yield emit_event(item, creator)
       Success(item)
     end
 
     private
+
+    # An `unpacked` box is terminal (#855): a new in-box item would contradict the
+    # completed lifecycle and skew unpacking progress. Refused for EVERY caller,
+    # including the photo-correction ones that may still fix a sealed / in-transit
+    # box. Checked under the box lock (with_lock re-reads the row), so an add
+    # racing "mark box unpacked" either lands first or is refused, never after.
+
+    #: (untyped box) -> Dry::Monads::Result[untyped, untyped]
+    def ensure_not_unpacked(box)
+      box.unpacked? ? Failure(:box_unpacked) : Success()
+    end
 
     # A *pure* manual add (box-detail "Add manually" / the MCP add_item_to_box
     # tool) only makes sense while the box is open — the same gate as capture

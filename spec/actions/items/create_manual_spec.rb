@@ -67,6 +67,36 @@ RSpec.describe Items::CreateManual do
     end
   end
 
+  context "with an unpacked (terminal) box (#855)" do
+    let(:unpacked) { create(:box, :with_room, move:, status: "unpacked") }
+
+    it "refuses the add even for photo-correction callers (require_open false)" do
+      result = described_class.new.call(box: unpacked, params: { name: "Missed mug" }, creator:)
+
+      expect(result).to be_failure
+      expect(result.failure).to eq(:box_unpacked)
+      expect(unpacked.items.reload).to be_empty
+    end
+
+    it "refuses the add for a pure manual add too (require_open true)" do
+      result = described_class.new.call(box: unpacked, params: { name: "Lamp" }, creator:, require_open: true)
+
+      expect(result.failure).to eq(:box_unpacked)
+      expect(unpacked.items.reload).to be_empty
+    end
+
+    it "reads the status under the box lock, not the caller's stale copy" do
+      stale = Box.find(box.id) # loaded while still packing
+      # A concurrent "mark unpacked" committed after the caller loaded the box.
+      box.update_columns(status: "unpacked") # rubocop:disable Rails/SkipsModelValidations
+
+      result = described_class.new.call(box: stale, params: { name: "Late" }, creator:)
+
+      expect(result.failure).to eq(:box_unpacked)
+      expect(box.items.reload).to be_empty
+    end
+  end
+
   it "emits an item.created event" do
     allow(Rails.event).to receive(:notify)
 
