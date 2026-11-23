@@ -9,6 +9,10 @@ require_relative "mount_sources"
 module AppCLI
   module Services
     class AppService
+      # How long #stop waits for Docker to remove the --rm container.
+      REMOVAL_POLLS = 20
+      REMOVAL_POLL_INTERVAL = 0.5
+
       # @param checkout_path [String] the checkout mounted at /rails (the one bin/cli lives in)
       # @param main_path [String, nil] fallback for gitignored files; default: the main checkout
       def initialize(shell:, env:, runner: nil, checkout_path: AppCLI::ROOT, main_path: nil)
@@ -59,8 +63,10 @@ module AppCLI
         ensure_bundle_satisfied!
       end
 
-      def start
-        prepare
+      # @param prepared [Boolean] the caller already ran #prepare (restart does,
+      #   before stopping the old container), so nothing can fail here first
+      def start(prepared: false)
+        prepare unless prepared
 
         return shell.say("Application already running.") if runner.container_running?(env_config.app_container)
 
@@ -207,12 +213,21 @@ module AppCLI
 
       # The container runs with --rm, and Docker removes it only after
       # `docker stop` returns; a `docker run --name` before then would conflict.
-      def wait_until_removed(attempts: 20, interval: 0.5)
-        attempts.times do
-          return if runner.container_status(env_config.app_container) == "missing"
+      def wait_until_removed
+        REMOVAL_POLLS.times do
+          return if container_removed?
 
-          sleep(interval)
+          sleep(REMOVAL_POLL_INTERVAL)
         end
+        runner.run("docker rm --force #{env_config.app_container}", allow_failure: true)
+        return if container_removed?
+
+        raise Thor::Error, "#{env_config.app_container} is still there after `docker stop`. " \
+                           "Remove it with `docker rm -f #{env_config.app_container}`, then run `bin/cli app start`."
+      end
+
+      def container_removed?
+        runner.container_status(env_config.app_container) == "missing"
       end
 
       def ensure_sqlite_db_dir

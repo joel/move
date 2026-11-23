@@ -60,7 +60,7 @@ module AppCLI
         app.prepare
         start_dependencies
         app.stop
-        app.start
+        app.start(prepared: true)
       end
 
       def stop_all
