@@ -57,6 +57,15 @@ RSpec.describe Captures::Retake do
     expect(enqueue).to have_received(:call).with(media:)
   end
 
+  it "keeps the swap and still emits media.retaken when the re-scan job can't be queued (#871)" do
+    enqueue = instance_double(RecognitionRuns::Enqueue, call: Dry::Monads::Failure(:enqueue_failed))
+    allow(RecognitionRuns::Enqueue).to receive(:new).and_return(enqueue)
+    allow(Rails.event).to receive(:notify).and_call_original
+
+    expect(retake(rerun_recognition: true).failure).to eq(:enqueue_failed)
+    expect(Rails.event).to have_received(:notify).with("media.retaken", hash_including(media_id: media.id))
+  end
+
   it "is allowed in any phase (recovery of existing data)" do
     sealed = create(:box, :sealed, move:)
     photo = create(:media, move:, box: sealed)

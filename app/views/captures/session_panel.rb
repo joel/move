@@ -19,11 +19,12 @@ module Views
         "succeeded" => :succeeded, "partially_succeeded" => :succeeded, "failed" => :failed
       }.freeze
 
-      #: (box: untyped, media: untyped, ?items_by_media: untyped) -> void
-      def initialize(box:, media:, items_by_media: {})
+      #: (box: untyped, media: untyped, ?items_by_media: untyped, ?conflict_item_by_media: untyped) -> void
+      def initialize(box:, media:, items_by_media: {}, conflict_item_by_media: {})
         @box = box
         @media = media
         @items_by_media = items_by_media
+        @conflict_item_by_media = conflict_item_by_media
       end
 
       #: () -> void
@@ -56,8 +57,9 @@ module Views
       end
 
       # A succeeded photo becomes one card with its recognised names as chips (or
-      # a "no items detected" caption when it found nothing, #856); otherwise a
-      # single status row (queued / recognising / failed).
+      # a "no items detected" caption when it found nothing, #856, or an "already
+      # in this box" caption when it only matched a confirmed item, #872);
+      # otherwise a single status row (queued / recognising / failed).
 
       #: (untyped media) -> untyped
       def rows(media)
@@ -76,20 +78,37 @@ module Views
 
       # Photo-first card: the photo + its recognised names as chips, tapping into
       # the per-photo detail (C2) where a wrong name can be fixed — no separate
-      # per-item rows.
+      # per-item rows. A conflict-only photo (no items of its own, its latest run
+      # matched a confirmed item) taps into that matched item instead: the photo's
+      # own review would be empty and invite a duplicate add.
 
       #: (untyped media, untyped items) -> untyped
       def photo_card(media, items)
+        conflict_item_id = (@conflict_item_by_media[media.id] if items.empty?)
         a(
-          href: view_context.move_box_review_photo_path(@box.move, @box, media_id: media.id),
+          href: card_href(media, conflict_item_id),
           class: "flex items-center gap-3 rounded-xl border border-card-border " \
                  "bg-surface-container p-3 transition hover:border-accent-sage " \
                  "hover:bg-surface-container-high"
         ) do
           thumb(media)
-          items.any? ? name_chips(items) : no_items_caption
+          card_body(items, conflict_item_id)
           render Components::Icons::ChevronRight.new(css: "h-4 w-4 shrink-0 text-muted")
         end
+      end
+
+      #: (untyped media, untyped conflict_item_id) -> String
+      def card_href(media, conflict_item_id)
+        return view_context.move_item_path(@box.move_id, conflict_item_id) if conflict_item_id
+
+        view_context.move_box_review_photo_path(@box.move, @box, media_id: media.id)
+      end
+
+      #: (untyped items, untyped conflict_item_id) -> untyped
+      def card_body(items, conflict_item_id)
+        return name_chips(items) if items.any?
+
+        caption(conflict_item_id ? "captures.session.conflict_only" : "captures.session.no_items")
       end
 
       #: (untyped items) -> untyped
@@ -100,12 +119,13 @@ module Views
         end
       end
 
-      # Nothing recognised: say so instead of a bare success tick, so the user
-      # knows to open the photo and add what the model missed.
+      # No chips to show: say why instead of a bare success tick — nothing was
+      # recognised (open the photo and add what the model missed), or it all
+      # matched an item already in this box (review the match, #872).
 
-      #: () -> untyped
-      def no_items_caption
-        span(class: "min-w-0 flex-1 text-body-sm text-muted") { I18n.t("captures.session.no_items") }
+      #: (String key) -> untyped
+      def caption(key)
+        span(class: "min-w-0 flex-1 text-body-sm text-muted") { I18n.t(key) }
       end
 
       #: (untyped label) -> untyped

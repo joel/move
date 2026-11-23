@@ -31,3 +31,6 @@ production:
   purge_expired_discards:
     class: PurgeExpiredDiscardsJob
     schedule: every day at 4am
+  fail_stale_recognition_runs:
+    class: FailStaleRecognitionRunsJob
+    schedule: every 10 minutes

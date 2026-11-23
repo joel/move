@@ -25,6 +25,20 @@ class FindListEntry < ApplicationRecord
       .order(Arel.sql("boxes.number::bigint"), "items.name")
   }
 
+  # The roll-up as ONE consistent read (#873): the rows plus their total,
+  # counted by Postgres in the same statement (a window COUNT, so no second
+  # query and no Ruby counting). A pin response derives the control, toast,
+  # badge and list from this single result, so a concurrent toggle from
+  # another tab can never make one response mix two states. Every row carries
+  # `pinned_total`; an empty result means zero. (The rollup's box join drops
+  # nothing the badge's item join keeps: a kept item always has a kept box —
+  # box discard cascades to its items.)
+
+  #: (untyped move, untyped user) -> Array[untyped]
+  def self.snapshot_for(move, user)
+    rollup_for(move, user).select("find_list_entries.*", "COUNT(*) OVER () AS pinned_total").to_a
+  end
+
   # The user's pinned item ids for a Move, as a membership set — what the pin
   # toggles on search (#730), the box grid (#747) and the review rows (#749)
   # render against. :item join (kept scope): dangling pins never count.

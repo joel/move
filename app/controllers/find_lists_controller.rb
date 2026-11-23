@@ -21,7 +21,7 @@ class FindListsController < MoveScopedController
 
   #: () -> untyped
   def show
-    render Views::FindLists::Show.new(move: @move, entries: rollup, editable: editable_move?)
+    render Views::FindLists::Show.new(move: @move, entries: snapshot, editable: editable_move?)
   end
 
   # POST /moves/:move_id/find_list/items/:item_id
@@ -31,6 +31,7 @@ class FindListsController < MoveScopedController
     result = FindLists::Pin.new.call(move: @move, user: current_user, item: @item)
     # Render what the DB holds AFTER the action, never the intended state
     # (#732): another tab/device can unpin between the action and this render.
+    # Control, toast, badge and list all derive from ONE snapshot (#873).
     pinned = pinned?
     case result
     in Dry::Monads::Success(_) if pinned
@@ -132,9 +133,23 @@ class FindListsController < MoveScopedController
     end + [search_link_stream, list_stream]
   end
 
+  # The request's ONE read of the user's pins (#873), taken after the action
+  # ran: the toggle state, the "Pinned" toast, the badge count and the list
+  # rows all come from this single statement, so a concurrent toggle from
+  # another tab can't make one response mix two states. Memoised: every
+  # surface of the response reuses it.
+
+  #: () -> Array[untyped]
+  def snapshot
+    @snapshot ||= FindListEntry.snapshot_for(@move, current_user)
+  end
+
+  # Membership in the already-loaded snapshot (not a second query). @item is
+  # kept (set_item), so the rollup's kept-only joins can't hide its pin.
+
   #: () -> bool
   def pinned?
-    FindListEntry.exists?(move_id: @move.id, user_id: current_user.id, item_id: @item.id)
+    snapshot.any? { |entry| entry.item_id == @item.id }
   end
 
   # A failed toggle still re-renders every surface from the DB (the control
@@ -152,8 +167,9 @@ class FindListsController < MoveScopedController
 
   #: () -> untyped
   def search_link_stream
-    # :item join (kept scope): dangling pins never inflate the pill count.
-    count = FindListEntry.where(move_id: @move.id, user_id: current_user.id).joins(:item).count
+    # Postgres counted it in the snapshot's own statement (window COUNT);
+    # kept items only, so dangling pins never inflate the pill.
+    count = snapshot.first&.pinned_total.to_i #: Integer
     turbo_stream.replace(
       Components::FindLists::SearchLink::ID,
       view_context.render(Components::FindLists::SearchLink.new(move: @move, count: count))
@@ -196,14 +212,9 @@ class FindListsController < MoveScopedController
   def list_stream
     turbo_stream.replace(
       Components::FindLists::List::ID,
-      view_context.render(Components::FindLists::List.new(move: @move, entries: rollup,
+      view_context.render(Components::FindLists::List.new(move: @move, entries: snapshot,
                                                           editable: editable_move?))
     )
-  end
-
-  #: () -> untyped
-  def rollup
-    FindListEntry.rollup_for(@move, current_user)
   end
 
   # Kept items only (Item's default scope): pinning a discarded/foreign item 404s.
