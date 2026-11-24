@@ -242,4 +242,31 @@ RSpec.describe Captures::Retake do
     expect(media.reload.image.blob.id).to eq(old_blob_id)
     expect(media.recognition_runs).to be_empty
   end
+
+  # #961 — a refusal that comes after the first write (the replaced
+  # attachment row is deleted before the new one is saved) must roll the
+  # swap back, not commit the removal with a Failure.
+  context "when the new attachment fails to persist with RecordInvalid" do
+    before do
+      media # created (and its image attached) before the failure is stubbed
+      allow(RecognitionRuns::ProcessJob).to receive(:perform_later).and_return(true)
+      allow_any_instance_of(ActiveStorage::Attachment).to receive(:save) do |attachment| # rubocop:disable RSpec/AnyInstance
+        attachment.errors.add(:base, "refused at persistence")
+        raise ActiveRecord::RecordInvalid, attachment
+      end
+    end
+
+    [false, true].each do |rescan|
+      it "writes nothing and keeps the original image (rerun_recognition: #{rescan})" do
+        old_blob_id = media.image.blob.id
+
+        expect(retake(rerun_recognition: rescan)).to be_failure
+
+        media.reload
+        expect(ActiveStorage::Attachment.where(record: media, name: "image").count).to eq(1)
+        expect(media.image.blob.id).to eq(old_blob_id)
+        expect(media.recognition_runs).to be_empty
+      end
+    end
+  end
 end

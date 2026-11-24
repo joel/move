@@ -217,11 +217,24 @@ module Captures
       media.image = blob
       media.assign_attributes(image_unavailable: false, optimized_at: Time.current, status: "ready")
       media.validate!
-      detach_replaced(media, old_attachment)
-      media.save!(validate: false)
+      persist_swap(media, old_attachment)
       Success(old_blob)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
+    end
+
+    # The writes run in their own savepoint (#961). A Failure returned from
+    # the lock transaction does not roll it back, so a RecordInvalid raised
+    # while the new attachment is saved would otherwise commit the removal
+    # of the old one. The savepoint is rolled back before the error reaches
+    # swap_image's rescue, so a refused swap writes nothing.
+
+    #: (untyped media, untyped old_attachment) -> void
+    def persist_swap(media, old_attachment)
+      media.transaction(requires_new: true) do
+        detach_replaced(media, old_attachment)
+        media.save!(validate: false)
+      end
     end
 
     # Removes the replaced attachment row in the swap's transaction, without
