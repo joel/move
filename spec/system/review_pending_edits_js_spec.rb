@@ -419,6 +419,82 @@ RSpec.describe "Review pending edits (JS)", :js do
     expect(page).to have_css('input[aria-invalid="true"]')
   end
 
+  # #934: the rename PATCH reaches the server, but its response is held from the
+  # controller until the spec releases it. Meanwhile `__otherTabRename` renames
+  # the same item straight through the original fetch, as a second tab would,
+  # outside the controller and outside the count. Every request still runs
+  # serially on the server (see the shared-connection note above).
+  def hold_rename_response
+    page.execute_script(<<~JS)
+      let release; const gate = new Promise((r) => { release = r });
+      window.__releaseRename = release;
+      window.__renamePatches = 0;
+      const of_ = window.fetch;
+      window.__otherTabRename = (name) => {
+        const input = document.querySelector('[data-inline-rename-target="input"]');
+        const url = input.closest('[data-controller~="inline-rename"]').dataset.inlineRenameUrlValue;
+        const token = document.querySelector('meta[name="csrf-token"]').content;
+        return of_(url, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Accept: "application/json", "X-CSRF-Token": token },
+          body: JSON.stringify({ name }),
+        }).then((res) => { window.__otherTabDone = res.ok });
+      };
+      window.fetch = (...args) => {
+        const url = String(args[0] instanceof Request ? args[0].url : args[0]);
+        const method = ((args[0] instanceof Request ? args[0].method : args[1]?.method) || "GET").toLowerCase();
+        if (url.includes("/rename") && method === "patch") {
+          window.__renamePatches += 1;
+          return of_(...args).then(async (res) => {
+            window.__renameOnServer = true;
+            await gate;
+            return res;
+          });
+        }
+        return of_(...args);
+      };
+    JS
+  end
+
+  def rename_here_then_in_other_tab(here, other)
+    page.execute_script(<<~JS)
+      const input = document.querySelector('[data-inline-rename-target="input"]');
+      input.value = #{here.to_json};
+      input.dispatchEvent(new Event("blur"));
+    JS
+    eventually { page.evaluate_script("window.__renameOnServer === true") }
+    page.execute_script("window.__otherTabRename(#{other.to_json})")
+    eventually { page.evaluate_script("window.__otherTabDone === true") }
+  end
+
+  it "does not re-send an older rename over a newer edit a list replacement brought in" do
+    move, box, media, item = seed_review_photo
+
+    login_as(user: user)
+    visit move_box_review_photo_path(move, box, media)
+    hold_rename_response
+
+    # 1. This tab renames; the server commits it, the response is held.
+    # 2. Another tab renames the same item afterwards (a newer version).
+    rename_here_then_in_other_tab("Espresso machine", "Coffee grinder")
+
+    # 3. An add lands: its stream replaces the list, so the row reconnects
+    #    carrying the newer version ("Coffee grinder").
+    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
+    click_button I18n.t("reviews.photo.add")
+    expect(page).to have_field(with: "Cutting board")
+
+    # 4. The older echo arrives: the field follows the newer confirmed state,
+    #    and no second PATCH re-sends "Espresso machine".
+    page.execute_script("window.__releaseRename()")
+    expect(page).to have_field(with: "Coffee grinder")
+    expect(page).to have_no_field(with: "Espresso machine")
+    expect(page).to have_no_css('input[aria-invalid="true"]')
+    sleep 0.5 # a re-send would leave synchronously from the settle handler
+    expect(page.evaluate_script("window.__renamePatches")).to eq(1)
+    eventually { Apartment::Tenant.switch(slug) { item.reload.name == "Coffee grinder" } }
+  end
+
   it "keeps a deliberately re-typed duplicate name typed during an in-flight add" do
     move, box, _media, _item = seed_review_photo
 

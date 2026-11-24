@@ -77,8 +77,12 @@ function pump(url) {
   patch(url, name)
     .then((state) => {
       confirm(url, state)
-      // The server may canonicalize: follow its echo unless the user moved on.
-      if (session.wanted === name) session.wanted = state.name
+      // The server may canonicalize: follow the confirmed state unless the user
+      // moved on. That's the echo, or a newer row (e.g. an edit from another tab
+      // that a list replacement brought in while this PATCH was in flight). This
+      // PATCH didn't win then, and re-sending the older name would overwrite a
+      // save the user never asked to undo (#934).
+      if (session.wanted === name) session.wanted = confirmed.get(url).name
       session.sending = null
       failedRenames.delete(url)
       announce(url, true)
