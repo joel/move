@@ -56,9 +56,12 @@ module Views
           div(class: "flex items-center gap-3 rounded-card border border-card-border bg-card " \
                      "px-5 py-4 focus-within:border-accent-sage transition") do
             render Components::Icons::Search.new(css: "h-6 w-6 text-accent-sage")
+            # Focus only the landing state: refocusing after a search reopens the
+            # phone keyboard over the results (#915, ux rule 5).
             input(
               type: "search", name: "q", value: @query,
-              placeholder: I18n.t("searches.placeholder"), autofocus: true,
+              placeholder: I18n.t("searches.placeholder"), autofocus: !searched?,
+              aria: { label: I18n.t("searches.input_label") },
               class: "w-full bg-transparent text-headline-md text-text-warm " \
                      "placeholder:text-muted focus:outline-none"
             )
