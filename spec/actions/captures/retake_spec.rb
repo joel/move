@@ -48,22 +48,36 @@ RSpec.describe Captures::Retake do
     expect(RecognitionRuns::Enqueue).not_to have_received(:new)
   end
 
-  it "re-runs recognition when asked" do
-    enqueue = instance_double(RecognitionRuns::Enqueue, call: Dry::Monads::Success())
-    allow(RecognitionRuns::Enqueue).to receive(:new).and_return(enqueue)
+  it "re-runs recognition when asked, swapping the image inside the guarded enqueue (#929)" do
+    allow(RecognitionRuns::ProcessJob).to receive(:perform_later).and_return(true)
+    allow(RecognitionRuns::Enqueue).to receive(:new).and_call_original
+    old_blob_id = media.image.blob.id
 
-    retake(rerun_recognition: true)
+    expect(retake(rerun_recognition: true)).to be_success
 
     # A re-scan run (#897), created through the guarded path (#919).
-    expect(enqueue).to have_received(:call).with(media:, rescan: true, guard: instance_of(Proc))
+    expect(RecognitionRuns::Enqueue).to have_received(:new)
+    expect(media.recognition_runs.sole).to have_attributes(status: "queued", rescan: true)
+    expect(media.reload.image.blob.id).not_to eq(old_blob_id)
   end
 
   it "keeps the swap and still emits media.retaken when the re-scan job can't be queued (#871)" do
-    enqueue = instance_double(RecognitionRuns::Enqueue, call: Dry::Monads::Failure(:enqueue_failed))
-    allow(RecognitionRuns::Enqueue).to receive(:new).and_return(enqueue)
+    allow(RecognitionRuns::ProcessJob).to receive(:perform_later).and_return(false)
     allow(Rails.event).to receive(:notify).and_call_original
 
     expect(retake(rerun_recognition: true).failure).to eq(:enqueue_failed)
+    expect(Rails.event).to have_received(:notify).with("media.retaken", hash_including(media_id: media.id))
+  end
+
+  it "reports any other re-scan failure after the swap as :rescan_failed and still announces it (#933)" do
+    allow(RecognitionRuns::Enqueue).to receive(:new).and_wrap_original do |original|
+      original.call.tap { |enqueue| allow(enqueue).to receive(:create_run).and_return(Dry::Monads::Failure(:boom)) }
+    end
+    allow(Rails.event).to receive(:notify).and_call_original
+    old_blob_id = media.image.blob.id
+
+    expect(retake(rerun_recognition: true).failure).to eq(:rescan_failed)
+    expect(media.reload.image.blob.id).not_to eq(old_blob_id)
     expect(Rails.event).to have_received(:notify).with("media.retaken", hash_including(media_id: media.id))
   end
 
@@ -112,21 +126,53 @@ RSpec.describe Captures::Retake do
     expect(result.failure).to eq(:recognition_in_flight)
   end
 
-  # #919 — the guarded enqueue only takes the locks; it re-checks nothing. A
-  # run that went in flight after the up-front check may be scanning the OLD
-  # image. The re-scan still creates its run, which is then the latest, so
-  # Process supersedes the older one instead of letting it put old-image items
-  # on the new photo.
-  it "still re-scans when a run went in flight during the swap, so the newer run supersedes it" do
-    allow(RecognitionRuns::ProcessJob).to receive(:perform_later).and_return(true)
-    concurrent = nil
-    allow(media).to receive(:update!).and_wrap_original do |original, *args, **kw|
-      concurrent = create(:recognition_run, move:, box:, media:, status: "processing")
-      original.call(*args, **kw)
+  # #929 — the checks run again under the box and photo locks, before the
+  # swap: a run that went in flight, or a box sealed, after the cheap
+  # pre-check refuses the retake and leaves the image as it was.
+  it "refuses, without swapping, a run that went in flight after the pre-check" do
+    old_blob_id = media.image.blob.id
+    action = described_class.new
+    allow(action).to receive(:upload).and_wrap_original do |original, *args|
+      create(:recognition_run, move:, box:, media:, status: "processing")
+      original.call(*args)
     end
 
-    expect(retake(rerun_recognition: true)).to be_success
-    expect(RecognitionRun.latest_for?(concurrent)).to be(false)
-    expect(RecognitionRun.latest_for(media.id).pick(:rescan)).to be(true)
+    result = nil
+    # The blob stored for the refused retake is dropped again.
+    expect { result = action.call(media:, actor: user, file: upload) }.not_to change(ActiveStorage::Blob, :count)
+
+    expect(result.failure).to eq(:recognition_in_flight)
+    expect(media.reload.image.blob.id).to eq(old_blob_id)
+  end
+
+  # The new file is stored before anything is written: attaching an IO would
+  # upload it after the ready flags (and a re-scan run) had committed.
+  it "writes nothing when storing the new image fails" do
+    allow(RecognitionRuns::ProcessJob).to receive(:perform_later).and_return(true)
+    media.update!(image_unavailable: true)
+    old_blob_id = media.image.blob.id
+    allow(ActiveStorage::Blob.service).to receive(:upload).and_raise(Errno::ENOSPC)
+
+    expect { retake(rerun_recognition: true) }.to raise_error(Errno::ENOSPC)
+
+    media.reload
+    expect(media).to have_attributes(image_unavailable: true)
+    expect(media.image.blob.id).to eq(old_blob_id)
+    expect(media.recognition_runs).to be_empty
+  end
+
+  it "refuses a re-scan, without swapping, when the box was sealed after the pre-check" do
+    old_blob_id = media.image.blob.id
+    action = described_class.new
+    allow(action).to receive(:upload).and_wrap_original do |original, *args|
+      Box.find(box.id).update!(status: "sealed")
+      original.call(*args)
+    end
+
+    result = action.call(media:, actor: user, file: upload, rerun_recognition: true)
+
+    expect(result.failure).to eq(:rescan_wrong_phase)
+    expect(media.reload.image.blob.id).to eq(old_blob_id)
+    expect(media.recognition_runs).to be_empty
   end
 end

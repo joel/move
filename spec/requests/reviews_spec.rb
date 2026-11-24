@@ -874,6 +874,27 @@ RSpec.describe "Per-photo review" do
       expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
       expect(flash[:alert]).to eq(I18n.t("reviews.flash.retake_errors.no_file"))
     end
+
+    # #933 — the photo was deleted between the page load and the retake's lock:
+    # going back to the photo page would 404.
+    it "redirects to the box when a concurrent delete won the race" do
+      allow(Captures::Retake).to receive(:new)
+        .and_return(instance_double(Captures::Retake, call: Dry::Monads::Failure(:not_found)))
+
+      post move_box_review_retake_photo_path(move, box, media), params: { file: upload }
+
+      expect(response).to redirect_to(move_box_path(move, box))
+      expect(flash[:alert]).to eq(I18n.t("reviews.flash.retake_errors.not_found"))
+    end
+
+    it "redirects to the review queue in queue mode when a concurrent delete won the race" do
+      allow(Captures::Retake).to receive(:new)
+        .and_return(instance_double(Captures::Retake, call: Dry::Monads::Failure(:not_found)))
+
+      post move_box_review_retake_photo_path(move, box, media, queue: "move"), params: { file: upload }
+
+      expect(response).to redirect_to(move_review_path(move))
+    end
   end
 
   describe "queue mode (?queue=move) — the Move-wide walk (#654)" do
