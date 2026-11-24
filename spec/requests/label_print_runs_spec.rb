@@ -129,6 +129,43 @@ RSpec.describe "Label Print Runs" do
     end
   end
 
+  # UX rule 4 (remember the user's context, #959): every link back to the range
+  # picker carries the range the user chose, so the picker comes back pre-filled
+  # (LabelPrintForm#label_print_form reads params[:from]/params[:to]).
+  describe "links back to the range picker keep the chosen range (#959)" do
+    def picker_hrefs
+      response.parsed_body.css("a[href]").pluck("href")
+              .select { |href| href.start_with?(move_label_print_path(move)) }
+              .reject { |href| href.start_with?(move_label_print_runs_path(move)) }
+    end
+
+    it "the large-batch confirmation's Back link carries from/to" do
+      stub_const("LabelPrintRuns::Start::WARN_LABELS", 5)
+      post move_label_print_runs_path(move), params: { from: 2, to: 5 }
+      expect(picker_hrefs).to eq([move_label_print_path(move, from: 2, to: 5)])
+    end
+
+    it "the failed run's Try again link carries the run's range" do
+      run = create(:label_print_run, :failed, move:, from_number: 2, to_number: 5)
+      get move_label_print_run_path(move, run)
+      expect(picker_hrefs).to all(eq(move_label_print_path(move, from: 2, to: 5)))
+      expect(picker_hrefs.size).to eq(2) # Try again + the page's own Back link
+    end
+
+    it "the run page's own Back link carries the run's range" do
+      run = create(:label_print_run, :completed, move:, from_number: 2, to_number: 5)
+      get move_label_print_run_path(move, run)
+      expect(picker_hrefs).to eq([move_label_print_path(move, from: 2, to: 5)])
+    end
+
+    it "the picker pre-fills from those params" do
+      get move_label_print_path(move, from: 2, to: 5)
+      doc = response.parsed_body
+      expect(doc.at_css("input[name=from]")["value"]).to eq("2")
+      expect(doc.at_css("input[name=to]")["value"]).to eq("5")
+    end
+  end
+
   describe "GET download before ready" do
     it "redirects back to the progress page while still generating" do
       run = create(:label_print_run, :processing, move:)

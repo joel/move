@@ -32,10 +32,12 @@ module Views
       # @rbs boxes: untyped
       # @rbs pinnable: bool
       # @rbs pinned_item_ids: untyped
+      # @rbs highlight_item_id: untyped
       # @rbs return: void
       def initialize(move:, box:, items: [], media: [], editable: false, pending_count: 0,
                      reviewable: false, reviewable_media_ids: [], recoverable_media_ids: [], conflict_media_ids: [],
-                     unpacked_media_ids: [], boxes: [], pinnable: false, pinned_item_ids: Set.new)
+                     unpacked_media_ids: [], boxes: [], pinnable: false, pinned_item_ids: Set.new,
+                     highlight_item_id: nil)
         @move = move
         @box = box
         @items = items
@@ -62,6 +64,8 @@ module Views
         # pinned_item_ids is the CURRENT USER's pins only.
         @pinnable = pinnable
         @pinned_item_ids = pinned_item_ids
+        # The just-added manual item (#958) — its card scrolls into view + flashes once.
+        @highlight_item_id = highlight_item_id
       end
 
       #: () -> void
@@ -110,7 +114,8 @@ module Views
           reviewable_media_ids: @reviewable_media_ids,
           recoverable_media_ids: @recoverable_media_ids, conflict_media_ids: @conflict_media_ids,
           unpacked_media_ids: @unpacked_media_ids,
-          editable: @editable, pinnable: @pinnable, pinned_item_ids: @pinned_item_ids
+          editable: @editable, pinnable: @pinnable, pinned_item_ids: @pinned_item_ids,
+          highlight_item_id: @highlight_item_id
         )
       end
 

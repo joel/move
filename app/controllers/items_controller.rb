@@ -5,6 +5,8 @@
 # survives a box-to-box move). Runs inside an Organization tenant schema. Thin:
 # authorize, call the action, pattern-match, render.
 class ItemsController < MoveScopedController
+  include ManualItemShowcase
+
   before_action :set_box, only: %i[new create]
   before_action :set_item, only: %i[show update destroy move mark_removed restore generate_image]
   before_action :require_writable_move!,
@@ -50,7 +52,7 @@ class ItemsController < MoveScopedController
 
     case result
     in Dry::Monads::Success(item)
-      redirect_to move_box_path(@move, @box), notice: t(".created", name: item.name)
+      redirect_to_box_showcasing(item)
     in Dry::Monads::Failure(:not_capturable | :box_unpacked)
       redirect_to move_box_path(@move, @box), alert: t(".box_closed")
     in Dry::Monads::Failure(errors)

@@ -29,7 +29,8 @@ module Views
           div(class: "ha-card p-6 flex flex-col gap-stack-gap") do
             render Components::Ui::LabelPrintStatus.new(run: @run)
           end
-          a(href: move_label_print_path(@move),
+          # Back to the picker pre-filled with this run's range (#959, UX rule 4).
+          a(href: move_label_print_path(@move, from: @run.from_number, to: @run.to_number),
             class: "text-body-md font-semibold text-on-surface-variant transition hover:text-text-warm") do
             plain I18n.t("label_print.run.back")
           end

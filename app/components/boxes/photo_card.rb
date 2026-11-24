@@ -48,10 +48,11 @@ module Components
       # @rbs interactive: bool
       # @rbs pinnable: bool
       # @rbs pinned_item_ids: untyped
+      # @rbs highlight: bool
       # @rbs return: void
       def initialize(move:, box:, media:, items:, reviewable: false, recoverable: false, conflict: false,
                      unpacked: false, eager: false, unpacking: false, interactive: false,
-                     pinnable: false, pinned_item_ids: Set.new)
+                     pinnable: false, pinned_item_ids: Set.new, highlight: false)
         @move = move
         @box = box
         @media = media
@@ -65,6 +66,10 @@ module Components
         @interactive = interactive
         @pinnable = pinnable
         @pinned_item_ids = pinned_item_ids # the CURRENT USER's pins (personal rows)
+        # Holds the just-added item (#958 — a recovery add stays bound to its
+        # photo, so it renders as a chip here, possibly behind the "+N more"
+        # cap): the whole card takes the shared `highlight` scroll + ring.
+        @highlight = highlight
       end
 
       #: () -> void
@@ -74,7 +79,7 @@ module Components
         href = photo_href
         attrs = href ? { href: href } : {}
         tag = href ? :a : :div
-        public_send(tag, id: self.class.dom_id(@media),
+        public_send(tag, id: self.class.dom_id(@media), data: highlight_data,
                          class: card_classes(interactive: href.present?), **attrs) do
           tile
           names_caption
@@ -82,6 +87,11 @@ module Components
       end
 
       private
+
+      #: () -> Hash[Symbol, String]
+      def highlight_data
+        @highlight ? { controller: "highlight" } : {}
+      end
 
       # Split layout (unpacking #727 / pinnable #747): root div, tile-only
       # anchor, chip toggles + the photo-level unpack row as siblings of the
@@ -92,7 +102,7 @@ module Components
       #: () -> untyped
       def split_card
         href = photo_href
-        div(id: self.class.dom_id(@media), class: card_classes(interactive: href.present?)) do
+        div(id: self.class.dom_id(@media), data: highlight_data, class: card_classes(interactive: href.present?)) do
           href ? a(href: href, class: "block") { tile } : tile
           names_caption
           unpack_control
