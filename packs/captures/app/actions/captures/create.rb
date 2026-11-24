@@ -18,6 +18,8 @@ module Captures
   #                    a non-native format, transcoded to JPEG (parity with the
   #                    web path); the original blob is then purged.
   class Create < BaseAction
+    include BestEffortPurge
+
     # Active Storage signed_ids are signed with the global secret and ActiveStorage::Blob
     # lives in the shared `public` schema (Apartment-excluded), so a bare signed_id is
     # valid across every Organization/Move. Bind direct-upload ids to the Move via a
@@ -68,10 +70,10 @@ module Captures
            ActiveStorage::FileNotFoundError
       Failure(:invalid_upload)
     rescue ImageNormalizer::ImageTooLarge
-      upload&.dig(:blob)&.purge_later # rejected direct-upload: don't leave the blob orphaned
+      drop_reserved(upload) # rejected direct-upload: don't leave the blob orphaned
       Failure(:image_too_large)
     rescue ImageNormalizer::UnsupportedFormat
-      upload&.dig(:blob)&.purge_later
+      drop_reserved(upload)
       Failure(:unsupported_image)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
@@ -112,8 +114,19 @@ module Captures
       )
       media.image.attach(normalized)
       media.save!
-      upload[:blob]&.purge_later
+      drop_reserved(upload)
       media
+    end
+
+    # The reserved direct-upload blob is dropped once it has been copied or
+    # rejected. Best-effort (#955): a purge that can't be queued must neither
+    # turn a saved capture into an error (skipping its recognition run and
+    # media.captured) nor replace a rejection with an exception.
+
+    #: (untyped upload) -> void
+    def drop_reserved(upload)
+      blob = upload&.dig(:blob)
+      purge_best_effort(blob, "captures.create") if blob
     end
 
     #: (untyped media, untyped captured_by) -> Dry::Monads::Success[nil]

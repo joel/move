@@ -10,6 +10,8 @@ module Captures
   # image_ingest pool (#543). Idempotent: a retry once the media has left
   # `pending` no-ops.
   class IngestJob < ApplicationJob
+    include BestEffortPurge
+
     queue_as :image_ingest
 
     def perform(media_id, blob_id, captured_by_id:, tenant:)
@@ -51,7 +53,9 @@ module Captures
 
       case result
       in Dry::Monads::Success(_)
-        blob.purge_later
+        # Best-effort (#955): the capture is done; a purge that can't be
+        # queued must not skip the broadcast or fail the job.
+        purge_best_effort(blob, "captures:ingest_job")
       in Dry::Monads::Failure(_)
         media.update!(status: "failed")
       end

@@ -60,6 +60,34 @@ RSpec.describe Captures::Create do
     expect(result.value!.image.content_type).to eq("image/jpeg")
   end
 
+  # #955 — dropping the reserved direct-upload blob is best-effort cleanup.
+  context "when the queue refuses every job" do
+    def reserved_signed_id(name, type)
+      blob = ActiveStorage::Blob.create_and_upload!(
+        io: Rails.root.join("spec/fixtures/files", name).open, filename: name, content_type: type
+      )
+      blob.signed_id(purpose: described_class.signed_id_purpose(move))
+    end
+
+    it "still returns the saved capture and emits media.captured" do
+      signed_id = reserved_signed_id("sample_image.png", "image/png")
+      allow(Rails.event).to receive(:notify).and_call_original
+      fail_every_enqueue
+
+      result = described_class.new.call(box:, signed_id:, captured_by: user)
+
+      expect(result.value!).to eq(box.media.sole)
+      expect(Rails.event).to have_received(:notify).with("media.captured", hash_including(media_id: result.value!.id))
+    end
+
+    it "still returns the rejection of an unsupported direct upload" do
+      signed_id = reserved_signed_id("not.txt", "text/plain")
+      fail_every_enqueue
+
+      expect(described_class.new.call(box:, signed_id:, captured_by: user).failure).to eq(:unsupported_image)
+    end
+  end
+
   it "rejects an upload larger than the size limit" do
     stub_const("Media::MAX_IMAGE_BYTES", 5)
     result = described_class.new.call(box:, file: upload, captured_by: user)

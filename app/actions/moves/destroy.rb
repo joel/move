@@ -17,6 +17,8 @@ module Moves
   # FK order (which also reaches discarded rows and skips readonly callbacks), purging
   # Active Storage blobs by hand since `delete_all` fires no Active Storage callbacks.
   class Destroy < BaseAction
+    include BestEffortPurge
+
     # Move-owned tables in child-first order: no row is deleted while a still-present,
     # no-`ON DELETE` FK references it. (`item_search_documents` and
     # `find_list_entries` are omitted — their item_id/move_id FKs are
@@ -72,11 +74,15 @@ module Moves
       end
     end
 
-    # After the rows are gone, purge the (now-orphaned) attachments + their blobs.
+    # After the rows are gone, purge the (now-orphaned) attachments + their
+    # blobs. Best-effort (#955): the Move is already deleted, so a purge that
+    # can't be queued must not fail the action or skip move.destroyed.
 
     #: (untyped attachment_ids) -> untyped
     def purge_blobs(attachment_ids)
-      ActiveStorage::Attachment.where(id: attachment_ids).find_each(&:purge_later)
+      ActiveStorage::Attachment.where(id: attachment_ids).find_each do |attachment|
+        purge_best_effort(attachment, "moves.destroy")
+      end
     end
 
     #: (untyped move_id) -> Dry::Monads::Success[nil]

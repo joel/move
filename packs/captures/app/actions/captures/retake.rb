@@ -40,6 +40,7 @@ module Captures
   #   before (the conflict is refused as :superseded) or after the decision.
   class Retake < BaseAction
     include Items::CurrentBoxLock
+    include BestEffortPurge
 
     #: (media: untyped, actor: untyped, ?file: untyped, ?rerun_recognition: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, actor:, file: nil, rerun_recognition: false)
@@ -140,11 +141,31 @@ module Captures
 
     #: (untyped file) -> Dry::Monads::Result[untyped, untyped]
     def upload(file)
-      Success(ActiveStorage::Blob.create_and_upload!(**blob_params(ImageNormalizer.call(file)))) # steep:ignore InsufficientKeywordArguments
+      Success(store(blob_params(ImageNormalizer.call(file))))
     rescue ImageNormalizer::ImageTooLarge
       Failure(:image_too_large)
     rescue ImageNormalizer::UnsupportedFormat
       Failure(:unsupported_image)
+    end
+
+    # Blob.create_and_upload! in two steps (#956): it saves the blob row
+    # before the storage write, so a write that raises would leave a row with
+    # no file and nothing pointing at it. The row is deleted again and the
+    # storage error propagates unchanged. `ensure` rather than a rescue: any
+    # exception class can come out of a storage service, and none is handled
+    # here.
+
+    #: (Hash[Symbol, untyped] params) -> untyped
+    def store(params)
+      blob = ActiveStorage::Blob.create_after_unfurling!(**params) # steep:ignore InsufficientKeywordArguments
+      stored = false
+      begin
+        blob.upload_without_unfurling(params.fetch(:io))
+        stored = true
+      ensure
+        ActiveStorage::Blob.where(id: blob.id).delete_all unless stored # steep:ignore NoMethod
+      end
+      blob
     end
 
     # ImageNormalizer returns an {io:, filename:, content_type:, metadata:}
@@ -158,27 +179,50 @@ module Captures
     end
 
     # A retake refused under the locks (or rolled back) leaves its stored
-    # blob unattached; drop it.
+    # blob unattached; drop it. Best-effort (#955): this runs in an `ensure`,
+    # so a purge that raised would replace the retake's real result.
 
     #: (untyped blob) -> void
     def discard_unused(blob)
       return if ActiveStorage::Attachment.exists?(blob_id: blob.id) # steep:ignore NoMethod
 
-      blob.purge_later
+      purge_best_effort(blob, "captures.retake")
     end
 
-    # One save writes the new attachment and the flags, so a validation
-    # failure writes neither. Returns the replaced blob (nil when there was
-    # none); it is purged once the locks are released.
+    # One save writes the new attachment and the flags, validated first, so a
+    # validation failure writes nothing. Returns the replaced blob (nil when
+    # there was none); it is purged once the locks are released.
 
     #: (untyped media, untyped blob) -> Dry::Monads::Result[untyped, untyped]
     def swap_image(media, blob)
-      old_blob = media.image.attached? ? media.image.blob : nil
+      old_attachment = media.image_attachment
+      old_blob = old_attachment&.blob
       media.image = blob
-      media.update!(image_unavailable: false, optimized_at: Time.current, status: "ready")
+      media.assign_attributes(image_unavailable: false, optimized_at: Time.current, status: "ready")
+      media.validate!
+      detach_replaced(media, old_attachment)
+      media.save!(validate: false)
       Success(old_blob)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
+    end
+
+    # Removes the replaced attachment row in the swap's transaction, without
+    # its callbacks (#955). Left to has_one_attached, replacing the image
+    # destroys the old attachment, whose after-commit callback queues the old
+    # blob's purge: a queue that refuses the job then raises out of the
+    # commit, after the swap is durable, and skips media.retaken and the
+    # result. purge_replaced is the one place the old blob is purged, as
+    # best-effort cleanup. The association caches are reset so the save sees
+    # no attachment to replace.
+
+    #: (untyped media, untyped old_attachment) -> void
+    def detach_replaced(media, old_attachment)
+      return unless old_attachment
+
+      ActiveStorage::Attachment.where(id: old_attachment.id).delete_all
+      media.association(:image_attachment).reset
+      media.association(:image_blob).reset
     end
 
     #: (untyped media, untyped actor, untyped old_blob) -> void
@@ -187,10 +231,12 @@ module Captures
       emit_event(media, actor)
     end
 
-    # has_one_attached replace usually purges the prior blob, but the corrupt master
-    # this recovers from may itself be half-broken in storage — guard the purge
-    # explicitly (mirrors lib/tasks/images.rake optimize): only when a NEW blob was
-    # attached and the old one still exists.
+    # The swap leaves the prior blob to this purge (detach_replaced). The corrupt
+    # master this recovers from may itself be half-broken in storage — guard the
+    # purge explicitly (mirrors lib/tasks/images.rake optimize): only when a NEW blob
+    # was attached and the old one still exists. Best-effort (#955): the swap has
+    # committed, so a purge that can't be queued must not stop media.retaken
+    # or hide the result (an :enqueue_failed re-scan included).
 
     #: (untyped old_blob, untyped media) -> void
     def purge_replaced(old_blob, media)
@@ -198,7 +244,7 @@ module Captures
       return if old_blob.id == media.image.blob.id
       return unless ActiveStorage::Blob.exists?(old_blob.id) # steep:ignore NoMethod
 
-      old_blob.purge_later
+      purge_best_effort(old_blob, "captures.retake")
     end
 
     # `media.retaken` (not `media.captured`) so the activity feed reads "re-took a

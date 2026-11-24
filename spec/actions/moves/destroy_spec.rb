@@ -33,6 +33,19 @@ RSpec.describe Moves::Destroy do
     expect(Room.unscoped.where(move_id: move_id)).to be_empty
   end
 
+  # #955 — purging the deleted Move's files is best-effort cleanup.
+  it "still deletes the Move and emits move.destroyed when the purge jobs can't be queued" do
+    move = create(:move, :sample)
+    box = create(:box, move: move)
+    create(:media, box: box, move: move)
+    allow(Rails.event).to receive(:notify).and_call_original
+    fail_every_enqueue
+
+    expect(described_class.new.call(move: move)).to be_success
+    expect(Move.unscoped.where(id: move.id)).to be_empty
+    expect(Rails.event).to have_received(:notify).with("move.destroyed", move_id: move.id)
+  end
+
   it "cascades every cluster table (#629 — no DELETE_ORDER entries needed)" do
     move = create(:move, :sample)
     box = create(:box, move: move)
