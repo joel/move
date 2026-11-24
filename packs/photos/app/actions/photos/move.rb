@@ -10,8 +10,10 @@ module Photos
   # class as a module). Decisions (#317): only items still *co-located* with the
   # photo travel (source_media_id = this photo AND still in its box AND in_box) —
   # items moved away individually or marked removed stay put; allowed in any box
-  # phase (only the writable-Move guard applies, like Items::Move); recognition rows
-  # keep their historical box.
+  # source phase (only the writable-Move guard applies, like Items::Move), but an
+  # `unpacked` destination is refused (Failure(:box_unpacked), #947): its items
+  # would land in_box inside a completed box. Recognition rows keep their
+  # historical box.
   #
   # The photo and its items move in one locked transaction so they can never split
   # across boxes; the domain events (`item.moved` per item, `media.moved` for the
@@ -81,9 +83,9 @@ module Photos
     # like Items::Move, so it serializes with a concurrent "mark box unpacked"
     # cascade, an Items::Move out of the same box, and another move of the same
     # photo (whose commit re-boxes it — the lock helper then re-locks the photo's
-    # new box). FOR NO KEY UPDATE (the helper's default): the box_id writes' FK
-    # check takes FOR KEY SHARE on the TARGET box, so two crossing moves can't
-    # deadlock. Emits NO events in here on purpose: an `item.moved` inside this
+    # new box). The destination is locked too (`also_lock:`, #947), so its
+    # `unpacked` guard holds until commit; the helper takes both FOR NO KEY
+    # UPDATE locks in box id order, so two crossing moves can't deadlock. Emits NO events in here on purpose: an `item.moved` inside this
     # transaction enqueues the search reindex job, which lives in a *separate*
     # queue DB and so isn't covered by this app-DB transaction — it could run
     # before the move commits and index the items under the stale source box
@@ -94,7 +96,7 @@ module Photos
 
     #: (untyped media, untyped target_box) -> Dry::Monads::Result[untyped, untyped]
     def relocate(media, target_box)
-      with_current_box_lock(media) { |box| locked_relocate(media, box, target_box) }
+      with_current_box_lock(media, also_lock: target_box) { |box| locked_relocate(media, box, target_box) }
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
     end
@@ -117,6 +119,9 @@ module Photos
       media.lock!(PARENT_ROW_LOCK) # reloads (unscoped): sees a concurrent discard
       return Failure(:not_found) if media.discarded?
       return Success(:noop) if box.id == target_box.id
+      # Read as the destination's lock reloaded it (#947, like Items::Move #839).
+      return Failure(:box_missing) if target_box.discarded?
+      return Failure(:box_unpacked) if target_box.unpacked?
 
       moved_ids = move_rows(media, target_box)
       Success([box, moved_ids, moved_ids.any? && box.unpacking?])

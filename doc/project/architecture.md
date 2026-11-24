@@ -639,7 +639,9 @@ per adapter, so no surface can drift:
   moves (3→8 and 8→3) queue on the same first row instead of deadlocking. A
   concurrent "mark box unpacked" on the destination therefore either commits
   first (the move refuses) or waits for the move (its cascade sweeps the
-  arrived item to `removed`). The review walk's mis-detection removal
+  arrived item to `removed`). `Photos::Move` applies the same guard and lock
+  order to its destination (#947); the review walk's photo picker also lists
+  unpacked boxes disabled. The review walk's mis-detection removal
   deliberately does **not** complete (packing-phase cleanup), and reopen never
   re-completes an emptied box.
 - `Boxes::CompleteIfEmpty` re-checks `unpacking? && items.in_box.none?` under

@@ -61,7 +61,7 @@ module ReviewPhotoMoveResponses
   end
 
   def move_photo_error(reason)
-    key = %i[box_missing same_box cross_move move_archived photo_deleted box_deleted].include?(reason) ? reason : :failed
+    key = %i[box_missing same_box cross_move box_unpacked move_archived photo_deleted box_deleted].include?(reason) ? reason : :failed
     t("reviews.flash.move_photo_errors.#{key}")
   end
 end
