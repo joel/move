@@ -112,23 +112,12 @@ RSpec.describe Captures::Retake do
     expect(result.failure).to eq(:recognition_in_flight)
   end
 
-  # #919 — the checks run again under the box and photo locks the guarded
-  # enqueue takes. A run that went in flight after the up-front check (here,
-  # during the swap) refuses the re-scan with its own code: the swap has
-  # persisted, so the caller can say so, and the retake is still announced.
-  it "re-checks under the lock and creates no run when one went in flight meanwhile" do
-    allow(Rails.event).to receive(:notify).and_call_original
-    allow(media).to receive(:update!).and_wrap_original do |original, *args, **kw|
-      create(:recognition_run, move:, box:, media:, status: "queued")
-      original.call(*args, **kw)
-    end
-
-    expect(retake(rerun_recognition: true).failure).to eq(:replaced_recognition_in_flight)
-    expect(media.recognition_runs.count).to eq(1) # only the concurrent one
-    expect(Rails.event).to have_received(:notify).with("media.retaken", hash_including(media_id: media.id))
-  end
-
+  # #919 — the guarded enqueue re-checks the box phase under the box and
+  # photo locks. A box sealed after the up-front check (here, during the swap)
+  # refuses the re-scan with its own code: the swap has persisted, so the
+  # caller can say so, and the retake is still announced.
   it "re-checks the box phase under the lock" do
+    allow(Rails.event).to receive(:notify).and_call_original
     allow(media).to receive(:update!).and_wrap_original do |original, *args, **kw|
       Box.where(id: box.id).update_all(status: "sealed") # rubocop:disable Rails/SkipsModelValidations
       original.call(*args, **kw)
@@ -136,5 +125,23 @@ RSpec.describe Captures::Retake do
 
     expect(retake(rerun_recognition: true).failure).to eq(:replaced_rescan_wrong_phase)
     expect(media.recognition_runs).to be_empty
+    expect(Rails.event).to have_received(:notify).with("media.retaken", hash_including(media_id: media.id))
+  end
+
+  # A run that went in flight after the up-front check may be scanning the
+  # OLD image. The re-scan still creates its run, which is then the latest,
+  # so Process supersedes the older one instead of letting it put old-image
+  # items on the new photo.
+  it "still re-scans when a run went in flight during the swap, so the newer run supersedes it" do
+    allow(RecognitionRuns::ProcessJob).to receive(:perform_later).and_return(true)
+    concurrent = nil
+    allow(media).to receive(:update!).and_wrap_original do |original, *args, **kw|
+      concurrent = create(:recognition_run, move:, box:, media:, status: "processing")
+      original.call(*args, **kw)
+    end
+
+    expect(retake(rerun_recognition: true)).to be_success
+    expect(RecognitionRun.latest_for?(concurrent)).to be(false)
+    expect(RecognitionRun.latest_for(media.id).pick(:rescan)).to be(true)
   end
 end

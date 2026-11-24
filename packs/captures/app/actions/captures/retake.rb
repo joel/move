@@ -26,32 +26,26 @@ module Captures
   # tenant context.
   #
   # The re-scan run is created through Enqueue's guarded path (#919), like
-  # Retry (#896): box lock, then photo lock, the checks again under them, and
-  # the run commits before the locks are released. Those are the locks
+  # Retry (#896): box lock, then photo lock, and the run commits before the
+  # locks are released. Those are the locks
   # RecognitionSuggestions::ResolveConflict holds from its latest-run check to
   # its "Keep both" item, so a re-scan cannot commit in between: it either
   # lands first (and the conflict is refused as :superseded) or waits for the
   # decision to commit.
   class Retake < BaseAction
-    # The same refusals from the guard, under the lock: the swap has already
-    # persisted, so they get their own codes and the caller can say the photo
-    # was replaced and only the re-scan did not start.
-    LATE_REFUSALS = {
-      recognition_in_flight: :replaced_recognition_in_flight, rescan_wrong_phase: :replaced_rescan_wrong_phase
-    }.freeze
-
     # Re-scan failures after the swap has persisted: the retake is still
     # announced (see #finish).
-    SWAP_KEPT_FAILURES = [:enqueue_failed, *LATE_REFUSALS.values].freeze
+    SWAP_KEPT_FAILURES = %i[enqueue_failed replaced_rescan_wrong_phase].freeze
 
     #: (media: untyped, actor: untyped, ?file: untyped, ?rerun_recognition: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, actor:, file: nil, rerun_recognition: false)
       yield ensure_writable(media.move)
       return Failure(:no_file) if file.blank?
-
-      # Checked before the swap (and again under the lock, see #rescan), so a
-      # refusal on what we already know never leaves the image swapped.
-      yield rescan_allowed(media, rerun_recognition:)
+      return Failure(:recognition_in_flight) if media.recognition_in_flight?
+      # Re-scan adds items → only into a capturable (packing) box (mirrors
+      # Captures::Create's not_capturable guard). Validated up front so a rejected
+      # re-scan never leaves the image half-swapped.
+      return Failure(:rescan_wrong_phase) if rerun_recognition && !media.box.capturable?
 
       yield swap_image(media, file)
       finish(media, actor, rerun_recognition ? rescan(media) : Success())
@@ -59,35 +53,20 @@ module Captures
 
     private
 
-    # Re-scan adds items → only into a capturable (packing) box (mirrors
-    # Captures::Create's not_capturable guard).
-
-    #: (untyped media, rerun_recognition: bool) -> Dry::Monads::Result[untyped, untyped]
-    def rescan_allowed(media, rerun_recognition:)
-      return Failure(:recognition_in_flight) if media.recognition_in_flight?
-      return Failure(:rescan_wrong_phase) if rerun_recognition && !media.box.capturable?
-
-      Success()
-    end
-
-    # The guard re-runs the checks on the locked photo (and its freshly
-    # locked box), so a run or phase change that committed since the
-    # up-front check is seen.
+    # Under the lock the guard re-checks only the box phase, so no items go
+    # into a box sealed since the up-front check. That refusal comes after the
+    # swap, so it has its own code and the caller can say the photo was
+    # replaced. A run that went in flight since the up-front check is NOT a
+    # refusal here: it may be processing the old image, and the re-scan's
+    # newer run is what supersedes it (Process re-checks the latest run under
+    # the photo lock before it materializes).
 
     #: (untyped media) -> Dry::Monads::Result[untyped, untyped]
     def rescan(media)
       RecognitionRuns::Enqueue.new.call(
-        media:, rescan: true, guard: ->(locked) { recheck(locked) }
+        media:, rescan: true,
+        guard: ->(locked) { locked.box.capturable? ? Success() : Failure(:replaced_rescan_wrong_phase) }
       )
-    end
-
-    # A refusal here comes after the swap, so it is reported with its
-    # LATE_REFUSALS code.
-
-    #: (untyped media) -> Dry::Monads::Result[untyped, untyped]
-    def recheck(media)
-      result = rescan_allowed(media, rerun_recognition: true)
-      result.success? ? result : Failure(LATE_REFUSALS.fetch(result.failure))
     end
 
     # The swap has persisted whenever the re-scan fails: a job that could not
