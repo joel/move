@@ -33,7 +33,7 @@ class BoxManifestPdf
   private
 
   def title(doc)
-    doc.text "Box ##{format("%03d", @box.number.to_i)} — Manifest", size: 22, style: :bold
+    doc.text "Box ##{@box.padded_number} — Manifest", size: 22, style: :bold
     doc.move_down 4
   end
 

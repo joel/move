@@ -66,7 +66,7 @@ module Views
 
       #: () -> String
       def box_title
-        "Box ##{Kernel.format("%03d", @box.number.to_i)}"
+        "Box ##{@box.padded_number}"
       end
     end
   end

@@ -21,7 +21,7 @@ module Views
         ) { I18n.t("boxes.edit.back") }
 
         render Components::Ui::SectionHeader.new(
-          eyebrow: I18n.t("boxes.show.title", number: Kernel.format("%03d", @box.number.to_i)),
+          eyebrow: I18n.t("boxes.show.title", number: @box.padded_number),
           title: I18n.t("boxes.edit.title"),
           subtitle: I18n.t("boxes.edit.subtitle")
         )

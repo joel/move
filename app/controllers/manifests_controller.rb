@@ -27,6 +27,6 @@ class ManifestsController < MoveScopedController
 
   #: () -> String
   def filename
-    "box-#{format("%03d", @box.number.to_i)}-manifest.pdf"
+    "box-#{@box.padded_number}-manifest.pdf"
   end
 end

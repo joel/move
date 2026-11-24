@@ -237,7 +237,7 @@ module Views
 
       #: () -> untyped
       def title
-        I18n.t("captures.title", number: Kernel.format("%03d", @box.number.to_i), room: room_label)
+        I18n.t("captures.title", number: @box.padded_number, room: room_label)
       end
 
       #: () -> String

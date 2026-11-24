@@ -68,7 +68,7 @@ class InsuranceDossierPdf
     doc.start_new_page if doc.cursor < SECTION_MIN_CURSOR
     box = section[:box]
     room = pdf_text(box.room&.name.presence || "Unassigned", ROOM_MAX)
-    doc.text "Box ##{format("%03d", box.number.to_i)} — #{room}", size: 13, style: :bold
+    doc.text "Box ##{box.padded_number} — #{room}", size: 13, style: :bold
     doc.text "#{section[:items].size} items", size: 9, color: "6B6B6B"
     doc.move_down 8
     section[:items].each { |item| item_row(doc, item) }

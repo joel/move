@@ -282,7 +282,7 @@ module Components
 
       #: () -> untyped
       def box_title
-        I18n.t("boxes.show.title", number: Kernel.format("%03d", @box.number.to_i))
+        I18n.t("boxes.show.title", number: @box.padded_number)
       end
     end
   end
