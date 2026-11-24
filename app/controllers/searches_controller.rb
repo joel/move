@@ -31,11 +31,24 @@ class SearchesController < MoveScopedController
 
     render Views::Searches::Index.new(
       move: @move, query: query, results: results, recent_searches: recent_searches,
+      example_queries: example_queries(query, results, recent_searches),
       pinned_item_ids: pinned_item_ids
     )
   end
 
   private
+
+  # A no-results search keeps a way forward (#922): the user's other recent
+  # searches, or — only when they have none — examples drawn from this Move's
+  # own rooms and items. Queried only on that branch.
+
+  #: (String query, untyped results, untyped recent_searches) -> Array[String]
+  def example_queries(query, results, recent_searches)
+    return [] if query.blank? || results.any?
+    return [] if recent_searches.any? { |recent| !recent.casecmp?(query.strip) }
+
+    Searches::ExampleQueries.new(@move, exclude: query).list
+  end
 
   # Each result card renders its item's source photo; batch the media +
   # attachment + blob loads for the page instead of three queries per card.

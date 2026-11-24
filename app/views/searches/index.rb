@@ -15,12 +15,13 @@ module Views
       # First grid row (lg is 3-col) loads eager, the rest lazy (#673).
       EAGER_THUMBS = 3
 
-      #: (move: untyped, query: untyped, results: untyped, ?recent_searches: untyped, ?pinned_item_ids: untyped) -> void
-      def initialize(move:, query:, results:, recent_searches: [], pinned_item_ids: Set.new)
+      #: (move: untyped, query: untyped, results: untyped, ?recent_searches: untyped, ?example_queries: untyped, ?pinned_item_ids: untyped) -> void
+      def initialize(move:, query:, results:, recent_searches: [], example_queries: [], pinned_item_ids: Set.new)
         @move = move
         @query = query.to_s
         @results = results
         @recent_searches = recent_searches
+        @example_queries = example_queries
         @pinned_item_ids = pinned_item_ids
       end
 
@@ -77,21 +78,39 @@ module Views
         @recent_searches.any? ? recent_searches : examples
       end
 
-      #: () -> untyped
-      def examples
+      #: (?untyped queries) -> untyped
+      def examples(queries = I18n.t("searches.examples"))
         div(class: "mx-auto mt-8 flex max-w-3xl flex-col items-center gap-4") do
           hint_label(Components::Icons::Sparkles, I18n.t("searches.hint"))
-          examples = I18n.t("searches.examples") #: untyped
-          chip_row { examples.each { |example| example_chip(example) } }
+          chip_row { queries.each { |example| example_chip(example) } }
         end
       end
 
-      #: () -> untyped
-      def recent_searches
+      #: (?untyped queries) -> untyped
+      def recent_searches(queries = @recent_searches)
         div(class: "mx-auto mt-8 flex max-w-3xl flex-col items-center gap-4") do
           hint_label(Components::Icons::Clock, I18n.t("searches.recent"))
-          chip_row { @recent_searches.each { |query| example_chip(query) } }
+          chip_row { queries.each { |query| example_chip(query) } }
         end
+      end
+
+      # No-results way forward (#922, ux rules 4 & 5): the same chips as the
+      # landing page, minus the query that just failed. Recent searches win;
+      # otherwise data-derived examples, then the static ones.
+
+      #: () -> untyped
+      def no_results_hints
+        recent = without_query(@recent_searches)
+        return recent_searches(recent) if recent.any?
+
+        static = I18n.t("searches.examples") #: untyped
+        examples(without_query(@example_queries.presence || static))
+      end
+
+      #: (untyped queries) -> Array[String]
+      def without_query(queries)
+        failed = @query.strip
+        queries.reject { |query| query.casecmp?(failed) }
       end
 
       #: (untyped icon, untyped text) -> untyped
@@ -252,6 +271,7 @@ module Views
           title: I18n.t("searches.empty.title", query: @query),
           description: I18n.t("searches.empty.description")
         )
+        no_results_hints
       end
     end
   end
