@@ -149,11 +149,9 @@ module Components
 
       #: () -> untyped
       def edit_link
-        a(
-          href: edit_move_box_path(@move, @box),
-          aria_label: I18n.t("boxes.show.edit"),
-          class: "rounded-full p-2 text-muted transition hover:bg-surface-container-high hover:text-text-warm"
-        ) { render Components::Icons::Pencil.new(css: "h-5 w-5") }
+        render Components::Ui::IconButton.new(href: edit_move_box_path(@move, @box), label: I18n.t("boxes.show.edit")) do
+          render Components::Icons::Pencil.new(css: "h-5 w-5")
+        end
       end
 
       # The single contextual primary action for the box's phase, made prominent —
@@ -284,7 +282,7 @@ module Components
 
       #: () -> untyped
       def box_title
-        I18n.t("boxes.show.title", number: Kernel.format("%03d", @box.number.to_i))
+        I18n.t("boxes.show.title", number: @box.padded_number)
       end
     end
   end

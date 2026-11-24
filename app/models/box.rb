@@ -118,6 +118,33 @@ class Box < ApplicationRecord
          .map { |l, w, h, n| { length_cm: l, width_cm: w, height_cm: h, count: n } }
   end
 
+  # The printed-label width of a box number (#696): "7" → "007". One decision
+  # for every surface that names a box — headers, PDFs, filenames. Takes a raw
+  # number so callers holding only a number (a label-print run's range) share it.
+  PADDED_NUMBER_FORMAT = "%03d"
+
+  # @rbs skip
+  def self.pad_number(number)
+    format(PADDED_NUMBER_FORMAT, number.to_i)
+  end
+
+  # Padded labels keyed by id for an ordered [[id, number], ...] list — except
+  # when string-distinct numbers share a cast ("1"/"01"), where padding would
+  # render indistinguishable duplicates: those keep their raw stored number.
+  # Use this wherever labels must stay unique (a select's options).
+
+  # @rbs skip
+  def self.distinct_padded_labels(pairs)
+    padded = pairs.map { |id, number| [id, number, pad_number(number)] }
+    duplicates = padded.map { |_, _, label| label }.tally
+    padded.to_h { |id, number, label| [id, duplicates.fetch(label) > 1 ? number : label] }
+  end
+
+  #: () -> String
+  def padded_number
+    Box.pad_number(number)
+  end
+
   #: () -> bool
   def packing?
     status == "packing"

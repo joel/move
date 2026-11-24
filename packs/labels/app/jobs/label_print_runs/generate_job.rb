@@ -74,7 +74,7 @@ module LabelPrintRuns
     end
 
     def filename(run)
-      "boxes-#{format("%03d", run.from_number)}-#{format("%03d", run.to_number)}-labels.pdf"
+      "boxes-#{Box.pad_number(run.from_number)}-#{Box.pad_number(run.to_number)}-labels.pdf"
     end
   end
 end

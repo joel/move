@@ -60,7 +60,7 @@ module Components
       def sheet_body
         div(class: "w-12 h-1.5 rounded-full bg-outline-variant/60 mx-auto mb-4")
         h3(class: "text-headline-md text-text-warm mb-4") do
-          I18n.t("boxes.manage.title", number: Kernel.format("%03d", @box.number.to_i))
+          I18n.t("boxes.manage.title", number: @box.padded_number)
         end
         details_block
         div(class: "flex flex-col gap-2") do

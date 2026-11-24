@@ -78,7 +78,7 @@ module Views
 
       #: () -> untyped
       def box_label
-        I18n.t("unpacking.box_title", number: Kernel.format("%03d", @box.number.to_i))
+        I18n.t("unpacking.box_title", number: @box.padded_number)
       end
     end
   end

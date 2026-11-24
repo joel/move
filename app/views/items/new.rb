@@ -46,7 +46,7 @@ module Views
 
       #: () -> String
       def box_context
-        number = Kernel.format("%03d", @box.number.to_i)
+        number = @box.padded_number
         room = @box.room&.name
         room ? "#{I18n.t("items.box", number:)} · #{room}" : I18n.t("items.box", number:)
       end

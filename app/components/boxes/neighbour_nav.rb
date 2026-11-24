@@ -53,76 +53,42 @@ module Components
         @boxes[index + 1]&.first
       end
 
-      # The header-bento icon-button recipe; a disabled end renders a same-size
-      # faded span so the cluster never shifts as arrows come and go along the
-      # walk. The span keeps the aria-label + a link role so the boundary stays
-      # perceivable to assistive tech (aria-disabled needs a role to announce).
+      # Ui::IconButton: a nil box id (a walk boundary) renders its disabled span.
 
       #: (untyped box_id, String key, css: String) -> untyped
       def arrow(box_id, key, css:)
-        if box_id
-          a(
-            href: move_box_path(@move, box_id),
-            aria_label: I18n.t(key),
-            class: "rounded-full p-2 text-muted transition hover:bg-surface-container-high hover:text-text-warm"
-          ) { render Components::Icons::ChevronRight.new(css: css) }
-        else
-          # tabindex keeps the disabled link in the tab order (the APG disabled-
-          # link pattern) so keyboard users encounter the boundary too.
-          span(role: "link", tabindex: "0", aria_disabled: "true", aria_label: I18n.t(key),
-               class: "rounded-full p-2 text-muted/40") do
-            render Components::Icons::ChevronRight.new(css: css)
-          end
+        render Components::Ui::IconButton.new(href: box_id && move_box_path(@move, box_id), label: I18n.t(key)) do
+          render Components::Icons::ChevronRight.new(css: css)
         end
       end
 
-      # The jump select (members-row compact-select recipe): a GET form that
-      # auto-submits to the jump route, which redirects to the chosen box. The
-      # form's action is fixed at render time while the box is chosen at submit
-      # time — hence `?id` on a collection route rather than a member path.
+      # The jump select (Ui::CompactSelect): a GET form that auto-submits to the
+      # jump route, which redirects to the chosen box. The form's action is fixed
+      # at render time while the box is chosen at submit time — hence `?id` on a
+      # collection route rather than a member path.
 
       #: () -> untyped
       def jump_form
         form_with(url: jump_move_boxes_path(@move), method: :get, data: { controller: "auto-submit" }) do
-          div(class: "relative") do
-            jump_select
-            span(
-              class: "pointer-events-none absolute inset-y-0 right-3 flex items-center " \
-                     "text-on-surface-variant"
-            ) { render Components::Icons::ChevronRight.new(css: "h-4 w-4 rotate-90") }
-          end
+          render Components::Ui::CompactSelect.new(
+            name: "id",
+            aria_label: I18n.t("boxes.show.nav.jump"),
+            options: jump_options,
+            selected: @box.id,
+            auto_submit: true
+          )
         end
       end
 
-      #: () -> untyped
-      def jump_select
-        select(
-          name: "id",
-          aria_label: I18n.t("boxes.show.nav.jump"),
-          data: { action: "change->auto-submit#submit" },
-          class: "cursor-pointer appearance-none rounded-full border border-card-border " \
-                 "bg-card py-2 pl-4 pr-9 text-body-md text-text-warm transition " \
-                 "hover:border-accent-sage focus:outline-none focus:ring-2 focus:ring-accent-sage/30"
-        ) do
-          # option_labels preserves the walk's order (built from @boxes).
-          option_labels.each do |id, label|
-            option(value: id, selected: id == @box.id) do
-              I18n.t("boxes.show.nav.option", number: label)
-            end
-          end
+      # Box.distinct_padded_labels keeps "1"/"01" distinguishable (the same tie
+      # the positional neighbour derivation exists to survive) and preserves the
+      # walk's order (built from @boxes).
+
+      #: () -> Array[[String, untyped]]
+      def jump_options
+        Box.distinct_padded_labels(@boxes).map do |id, label|
+          [I18n.t("boxes.show.nav.option", number: label), id]
         end
-      end
-
-      # Padded labels ("001") — except when string-distinct numbers share a cast
-      # ("1"/"01"), where padding would render indistinguishable duplicate
-      # options: those keep their raw stored number. The same tie the positional
-      # neighbour derivation exists to survive.
-
-      #: () -> untyped
-      def option_labels
-        padded = @boxes.map { |id, number| [id, number, Kernel.format("%03d", number.to_i)] }
-        duplicates = padded.map { |_, _, label| label }.tally
-        padded.to_h { |id, number, label| [id, duplicates.fetch(label) > 1 ? number : label] }
       end
     end
   end

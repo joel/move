@@ -126,7 +126,7 @@ class BoxLabelsPdf
     number_height = top * 0.46
     room_height = top * 0.34
     token_top = top - number_height - room_height
-    fit_text(doc, "##{format("%03d", box.number.to_i)}",
+    fit_text(doc, "##{box.padded_number}",
              top: top, height: number_height, size: NUMBER_SIZE, min_size: NUMBER_MIN_SIZE)
     fit_text(doc, box.room&.name.presence || "Unassigned",
              top: top - number_height, height: room_height, size: ROOM_SIZE, min_size: ROOM_MIN_SIZE)

@@ -29,6 +29,6 @@ class LabelsController < MoveScopedController
 
   #: () -> String
   def filename
-    "box-#{format("%03d", @box.number.to_i)}-label.pdf"
+    "box-#{@box.padded_number}-label.pdf"
   end
 end

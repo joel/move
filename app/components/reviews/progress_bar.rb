@@ -47,10 +47,9 @@ module Components
 
       #: () -> untyped
       def exit_link
-        a(
+        render Components::Ui::IconButton.new(
           href: @queue ? move_review_path(@move) : move_box_path(@move, @box),
-          data: { action: "click->pending-add#guardVisit" },
-          class: "flex h-10 w-10 items-center justify-center rounded-full bg-card text-muted hover:text-text-warm"
+          data: { action: "click->pending-add#guardVisit" }, variant: :filled
         ) { render Components::Icons::ChevronRight.new(css: "h-5 w-5 rotate-180") }
       end
 

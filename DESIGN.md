@@ -170,6 +170,26 @@ micro-bar" slot.
 ### `Ui::Field` / `Ui::Select`
 Large 20px-radius container on `card`, sage focus ring, label + I18n error slot.
 
+### `Ui::CompactSelect` — label-less pill select (#696)
+Inline control where a visible label is noise (members-row role, box-detail
+jump-to-box): `rounded-full` on `card`, 1px `card-border` hairline, `py-2 pl-4 pr-9`
+`body-md` `text-warm`, sage hover border + focus ring, and a pointer-events-none
+rotated `ChevronRight` (h-4, `on-surface-variant`) overlaid on the right. No visible
+label, so `aria_label:` is **required**. `options:` = `[label, value]` pairs;
+`selected:` compares by `to_s`. `auto_submit: true` adds
+`change->auto-submit#submit` — the enclosing form must carry
+`data-controller="auto-submit"`.
+
+### `Ui::IconButton` — round icon-only link; disabled = faded span (#696)
+The icon is the block. `href:` → `<a>`; `href: nil` → a same-size faded span
+(`text-muted/40`) with `role="link"` + `tabindex="0"` + `aria-disabled="true"` (APG
+disabled-link) so a walk boundary stays perceivable and the arrow cluster never
+shifts. `label:` is the `aria-label` (icon-only — pass one). `data:` lands on the
+anchor only (e.g. the review walk's `pending-add#guardVisit`). Variants: `ghost`
+(default — `p-2`, `text-muted`, surface-high hover) · `filled` (40px `card`
+circle). Used by the box-to-box and review-walk chevrons, the box header's edit
+pencil and the review walk's exit link.
+
 ### `Ui::RecognitionState` — single source of truth for the AI pipeline badge
 Seven states, each an icon + tint: `queued` (clock, neutral) · `processing`
 (sparkles, pulsing sage glow) · `succeeded` (check, sage) · `failed` (alert,

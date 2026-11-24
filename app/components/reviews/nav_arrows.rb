@@ -14,7 +14,7 @@ module Components
     # chrome. Both anchors carry the pending-add guard (#690) so in-progress
     # item edits are saved before navigating — the pending-add controller scope
     # is widened to the whole screen in Views::Reviews::Photo for exactly this.
-    # (Third copy of the icon-arrow recipe — consolidation tracked in #696.)
+    # The arrows are Ui::IconButton (#696).
     class NavArrows < Components::Base
       # @rbs prev_href: untyped -- nil at the start of the walk
       # @rbs next_href: untyped -- nil at the end of the walk
@@ -38,21 +38,9 @@ module Components
 
       #: (untyped href, String key, css: String) -> untyped
       def arrow(href, key, css:)
-        if href
-          a(
-            href: href,
-            aria_label: I18n.t(key),
-            data: { action: "click->pending-add#guardVisit" },
-            class: "rounded-full p-2 text-muted transition hover:bg-surface-container-high hover:text-text-warm"
-          ) { render Components::Icons::ChevronRight.new(css: css) }
-        else
-          # tabindex keeps the disabled link in the tab order (the APG disabled-
-          # link pattern) so keyboard users encounter the boundary too.
-          span(role: "link", tabindex: "0", aria_disabled: "true", aria_label: I18n.t(key),
-               class: "rounded-full p-2 text-muted/40") do
-            render Components::Icons::ChevronRight.new(css: css)
-          end
-        end
+        render Components::Ui::IconButton.new(
+          href: href, label: I18n.t(key), data: { action: "click->pending-add#guardVisit" }
+        ) { render Components::Icons::ChevronRight.new(css: css) }
       end
     end
   end
