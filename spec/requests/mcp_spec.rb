@@ -200,6 +200,20 @@ RSpec.describe "MCP endpoint" do
       expect(from.reload.status).to eq("unpacked")
       expect(to.reload.status).to eq("unpacking")
     end
+
+    it "refuses an unpacked destination with a tool error and leaves the item (#839)" do
+      from = create(:box, move:, number: 4)
+      create(:box, move:, number: 5, status: "unpacked")
+      item = create(:item, move:, box: from, name: "Mug")
+
+      body = tool_call("move_item", { item_id: item.id, to_box_number: 5 })
+
+      aggregate_failures do
+        expect(body.dig("result", "isError")).to be(true)
+        expect(body.dig("result", "content", 0, "text")).to include("already unpacked")
+        expect(item.reload.box_id).to eq(from.id)
+      end
+    end
   end
 
   describe "mark_unpacked" do

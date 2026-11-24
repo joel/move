@@ -24,6 +24,8 @@ en:
       saved: "Saved"
       save_failed: "Couldn’t save"
       move: "Move"
+      # Move-target picker suffix: an unpacked box is listed but disabled (#839).
+      move_target_unpacked: "%{box} (unpacked)"
       # Unpacking phase (box unpacking/unpacked): physically taking the item out.
       mark_unpacked: "Mark unpacked"
       mark_unpacked_confirm: "Mark this item as unpacked from its box?"
@@ -61,6 +63,7 @@ en:
       same_box: "The item is already in that box."
       invalid: "That box isn't part of this move."
       removed_item: "Restore this item before moving it to another box."
+      box_unpacked: "Box %{number} is already unpacked — reopen it before moving items into it."
       failed: "Could not move the item."
     mark_removed:
       removed: "Item marked as removed."

@@ -4,7 +4,9 @@ module Items
   # Moves an Item to another Box within the same Move (Design Spec C3 "Move").
   # Moving changes only box_id — presence stays `in_box` (Domain §5.5): a moved
   # item is still present, just in a different container. Cross-Move moves are
-  # rejected. Returns the failure reason as a symbol for a precise message.
+  # rejected, and so is a destination that is already `unpacked`
+  # (Failure(:box_unpacked), #839): reopen it first. Returns the failure
+  # reason as a symbol for a precise message.
   #
   # Moving the last in-box item out of an `unpacking` box completes that SOURCE
   # box (#757) — the same lifecycle rule as Items::Unpack, so an emptied box
@@ -18,15 +20,19 @@ module Items
   class Move < BaseAction
     include CurrentBoxLock
 
-    # The source lock is BaseAction::PARENT_ROW_LOCK (CurrentBoxLock's
-    # default), FOR NO KEY UPDATE: the box_id write's FK check takes FOR KEY
-    # SHARE on the TARGET box, so two crossing moves (3→8 and 8→3) can't
-    # deadlock.
+    # Both boxes are locked with BaseAction::PARENT_ROW_LOCK (FOR NO KEY
+    # UPDATE), CurrentBoxLock's default. The source lock serializes with an
+    # unpack or another move of the same item. The destination lock (#839)
+    # keeps the `unpacked` guard true until we commit: a concurrent "mark box
+    # unpacked" on the destination either commits first (we then read
+    # `unpacked` and refuse) or waits for our commit (its cascade then sweeps
+    # the arrived item to removed with the rest). CurrentBoxLock takes the two
+    # locks in id order, so crossing moves (3→8 and 8→3) can't deadlock.
 
     #: (item: untyped, target_box: untyped, mover: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, target_box:, mover:)
       yield ensure_writable(item.move)
-      moved = with_current_box_lock(item) { |box| locked_move(item, box, target_box) }
+      moved = with_current_box_lock(item, also_lock: target_box) { |box| locked_move(item, box, target_box) }
       source, was_unpacking = yield moved
       yield emit_event(item, target_box, mover)
       # Only a box that was being unpacked when the item left it (read under
@@ -40,7 +46,8 @@ module Items
 
     private
 
-    # Runs under the lock of the box the item is in NOW (CurrentBoxLock): that
+    # Runs under the lock of the box the item is in NOW (CurrentBoxLock), and
+    # of the destination box (whose lock reloaded target_box): that
     # serializes the move with a concurrent "mark box unpacked" (whose cascade
     # may have just removed this item), with restores, and with another move of
     # the same item, which may have re-boxed it (#757 Codex R1). Returns the
@@ -63,9 +70,22 @@ module Items
       # removed and absent from every inventory).
       return Failure(:not_found) if item.discarded? # deleted concurrently (reload is unscoped)
       return Failure(:removed) if item.removed?
-      return Failure(:box_missing) if target_box.nil?
+
+      validate_target(item, target_box)
+    end
+
+    # Reads the destination as its lock reloaded it (#839): a box deleted or
+    # unpacked after the caller loaded it is refused.
+
+    #: (untyped item, untyped target_box) -> Dry::Monads::Result[untyped, untyped]
+    def validate_target(item, target_box)
+      return Failure(:box_missing) if target_box.nil? || target_box.discarded?
       return Failure(:same_box) if target_box.id == item.box_id
       return Failure(:cross_move) if target_box.move_id != item.move_id
+      # An in-box item inside a completed box contradicts its celebration and
+      # grid summary (architecture.md §4c), the same rule as
+      # Items::RestoreToBox.
+      return Failure(:box_unpacked) if target_box.unpacked?
 
       Success()
     end

@@ -123,7 +123,7 @@ shared action and emit `mcp.tool_called`; queries are read-only.
 | `get_volume_summary` | — | `Moves::VolumeSummary` | | `{ totals, rooms }` |
 | `add_item_to_box` | `box_number, name` | `Items::CreateManual` | ● | `{ item }` |
 | `add_media_to_box` | `box_number, signed_id` | `Captures::Create` | ● | `{ media_id, recognition }` |
-| `move_item` | `item_id, to_box_number` | `Items::Move` | ● | `{ item, source_box_completed }` — true when moving the last in-box item out of an unpacking box completed it (#757) |
+| `move_item` | `item_id, to_box_number` | `Items::Move` | ● | `{ item, source_box_completed }` — true when moving the last in-box item out of an unpacking box completed it (#757); an already-unpacked destination is a tool error (#839) |
 | `mark_unpacked` | `item_id` | `Items::Unpack` | ● | `{ item, box_completed }` — true when the box is unpacked after the call (#755) |
 | `create_media_upload` | `byte_size?` | — (returns upload URL) | | `{ url, method, instructions }` |
 

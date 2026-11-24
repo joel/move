@@ -140,7 +140,7 @@ class ItemsController < MoveScopedController
     in Dry::Monads::Success({ item:, source_box:, source_completed: })
       moved_response(item, completed_source: source_completed ? source_box : nil)
     in Dry::Monads::Failure(reason)
-      redirect_to move_item_path(@move, @item), alert: move_error(reason)
+      redirect_to move_item_path(@move, @item), alert: move_error(reason, target)
     end
   end
 
@@ -406,9 +406,10 @@ class ItemsController < MoveScopedController
     head :not_found
   end
 
-  #: (untyped reason) -> String
-  def move_error(reason)
+  #: (untyped reason, untyped target) -> String
+  def move_error(reason, target)
     case reason
+    when :box_unpacked then t("items.move.box_unpacked", number: target.number)
     when :removed then t("items.move.removed_item")
     when :same_box then t("items.move.same_box")
     when :cross_move, :box_missing then t("items.move.invalid")

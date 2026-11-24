@@ -630,7 +630,16 @@ per adapter, so no surface can drift:
   one exception is `Boxes::CompleteIfEmpty`, which keeps `FOR UPDATE` so no
   item can be moved or created **into** the box between its emptiness check
   and the unpacked cascade. That can't deadlock: it only proceeds when the
-  box has no `in_box` rows to wait on. The review walk's mis-detection removal
+  box has no `in_box` rows to wait on. `Items::Move` also refuses an
+  `unpacked` **destination** (`Failure(:box_unpacked)`, #839): the item page
+  toasts it and its picker lists unpacked boxes disabled, and the MCP
+  `move_item` tool returns a tool error. The guard is read under the
+  destination's lock, which `CurrentBoxLock`'s `also_lock:` takes in the same
+  transaction as the source lock, both in ascending box id order so crossing
+  moves (3→8 and 8→3) queue on the same first row instead of deadlocking. A
+  concurrent "mark box unpacked" on the destination therefore either commits
+  first (the move refuses) or waits for the move (its cascade sweeps the
+  arrived item to `removed`). The review walk's mis-detection removal
   deliberately does **not** complete (packing-phase cleanup), and reopen never
   re-completes an emptied box.
 - `Boxes::CompleteIfEmpty` re-checks `unpacking? && items.in_box.none?` under

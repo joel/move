@@ -42,6 +42,59 @@ RSpec.describe Items::Move do
     expect(item.presence_state).to eq("removed")
   end
 
+  describe "unpacked destination (#839)" do
+    it "refuses to move an item into an unpacked box and leaves it where it was" do
+      unpacked = create(:box, move:, status: "unpacked")
+      allow(Rails.event).to receive(:notify).and_call_original
+
+      result = described_class.new.call(item:, target_box: unpacked, mover:)
+
+      aggregate_failures do
+        expect(result.failure).to eq(:box_unpacked)
+        expect(item.reload.box).to eq(source)
+        expect(item.presence_state).to eq("in_box")
+        expect(Rails.event).not_to have_received(:notify).with("item.moved", anything)
+      end
+    end
+
+    it "reads the destination's status fresh under its lock, not the caller's stale copy" do
+      stale_target = Box.find(target.id) # loaded while packing
+      Box.where(id: target.id).update_all(status: "unpacked") # rubocop:disable Rails/SkipsModelValidations
+
+      result = described_class.new.call(item:, target_box: stale_target, mover:)
+
+      aggregate_failures do
+        expect(result.failure).to eq(:box_unpacked)
+        expect(item.reload.box).to eq(source)
+      end
+    end
+
+    it "refuses a destination deleted after the caller loaded it" do
+      Box.where(id: target.id).update_all(discarded_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+
+      expect(described_class.new.call(item:, target_box: target, mover:).failure).to eq(:box_missing)
+      expect(item.reload.box).to eq(source)
+    end
+
+    it "still accepts a destination that is being unpacked" do
+      unpacking = create(:box, move:, status: "unpacking")
+
+      expect(described_class.new.call(item:, target_box: unpacking, mover:)).to be_success
+      expect(item.reload.box).to eq(unpacking)
+    end
+
+    it "locks source and destination in id order so crossing moves can't deadlock" do
+      other = create(:item, :manual, move:, box: target)
+      there = box_locks_taken(mode: /FOR NO KEY UPDATE/) { described_class.new.call(item:, target_box: target, mover:) }
+      back = box_locks_taken(mode: /FOR NO KEY UPDATE/) do
+        described_class.new.call(item: other, target_box: source, mover:)
+      end
+
+      expect(there).to eq([source.id, target.id].sort)
+      expect(back).to eq(there) # 3→8 and 8→3 take the same first lock
+    end
+  end
+
   describe "last-item auto-complete (#757)" do
     let(:target) { create(:box, move:, status: "unpacking") }
 
@@ -190,9 +243,9 @@ RSpec.describe Items::Move do
           expect(current.reload.status).to eq("unpacked") # the box the item actually left
           expect(stale.reload.status).to eq("unpacking")
           expect(target.reload.status).to eq("unpacking")
-          # Box-first, retried on the current box; the completion re-locks it after commit.
-          expect(locks.first(2)).to eq([stale.id, current.id])
-          expect(locks).not_to include(target.id)
+          # Box-first, retried on the current box, each attempt with the
+          # destination (#839) in id order; the completion re-locks after commit.
+          expect(locks.first(4)).to eq([stale.id, target.id].sort + [current.id, target.id].sort)
         end
       end
 
