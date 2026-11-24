@@ -50,6 +50,8 @@ module ReviewPhotoMoveResponses
 
   def photo_move_lost_race: () -> untyped
 
+  def photo_move_failed: (untyped reason) -> untyped
+
   def photo_gone_path: () -> String
 
   def move_photo_error: (untyped reason) -> String

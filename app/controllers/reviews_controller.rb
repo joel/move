@@ -177,7 +177,7 @@ class ReviewsController < MoveScopedController
     in Dry::Monads::Failure(:not_found | :box_changed)
       photo_move_lost_race
     in Dry::Monads::Failure(reason)
-      redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query), alert: move_photo_error(reason)
+      photo_move_failed(reason)
     end
   end
 

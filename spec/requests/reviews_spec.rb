@@ -752,6 +752,22 @@ RSpec.describe "Per-photo review" do
         expect(response).to have_http_status(:ok)
       end
 
+      it "lands on the photo's current box when it was re-boxed before an unpacked-target refusal (#947)" do
+        detected(name: "Lamp")
+        elsewhere = create(:box, move:, number: "9")
+        race_before_lock(lambda do
+          Media.where(id: media.id).update_all(box_id: elsewhere.id) # rubocop:disable Rails/SkipsModelValidations
+          Box.where(id: target.id).update_all(status: "unpacked") # rubocop:disable Rails/SkipsModelValidations
+        end)
+
+        patch move_box_review_move_photo_path(move, box, media), params: { target_box_id: target.id }
+
+        # Not the review URL under the old box: the photo isn't there (404).
+        expect(response).to redirect_to(move_box_path(move, elsewhere))
+        expect(flash[:alert]).to eq(I18n.t("reviews.flash.move_photo_errors.moved_elsewhere", number: "9"))
+        expect(media.reload.box_id).to eq(elsewhere.id)
+      end
+
       it "lands on the review queue when a concurrent move wins in queue mode" do
         detected(name: "Lamp")
         elsewhere = create(:box, move:, number: "9")
