@@ -76,21 +76,11 @@ RSpec.describe Discards::CascadeRestore do
   end
 
   # Starts `work` on another connection in a thread and returns it once that
-  # connection is waiting on a row lock or has finished (committed).
-  def start_on_other_connection_until_blocked_or_done
-    pid = Queue.new
-    thread = Thread.new do
-      ActiveRecord::Base.connection_pool.with_connection do |c|
-        pid << c.select_value("SELECT pg_backend_pid()")
-        yield
-      end
-    end
-    backend = pid.pop
-    Timeout.timeout(5) do
-      sleep 0.01 until !thread.alive? || ActiveRecord::Base.connection.select_value(
-        "SELECT wait_event_type = 'Lock' FROM pg_stat_activity WHERE pid = #{Integer(backend)}"
-      )
-    end
+  # connection is queued behind THIS one (the restore's lock, not any other
+  # lock on the server, #926) or has finished (committed).
+  def start_on_other_connection_until_blocked_or_done(&)
+    thread, pid = start_on_other_connection(&)
+    blocked_by?(pid, backend_pid, thread)
     thread
   end
 

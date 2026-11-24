@@ -6,9 +6,9 @@ require "rails_helper"
 # pins the behaviour on a stale copy; this pins that two marks on separate
 # connections really serialize on the item row lock, so only one of them emits
 # item.removed. The second mark is started from inside the first one's
-# critical section and the test waits (bounded, on pg_locks — no sleeps for
-# correctness) until it is queued behind the lock before letting the first
-# commit.
+# critical section and the test waits (bounded, on pg_blocking_pids of the
+# second mark's backend — no sleeps for correctness) until it is queued behind
+# the first one's lock before letting the first commit.
 #
 # Transactional fixtures are off for this file: the second connection cannot
 # see rows the test transaction never committed. Rows are cleaned by
@@ -33,36 +33,16 @@ RSpec.describe Items::MarkRemoved do # item row lock
 
   before { allow(Rails.event).to receive(:notify) }
 
-  # A second mark on its own connection, from a copy loaded while in_box.
-  def concurrent_mark(stale)
-    Thread.new do
-      ActiveRecord::Base.connection_pool.with_connection do
-        described_class.new.call(item: stale, actor:)
-      end
-    end
-  end
-
-  # Bounded wait until some backend is waiting on a row lock.
-  def lock_waiter_queued?
-    100.times do
-      waiting = ActiveRecord::Base.connection.select_value(
-        "SELECT count(*) FROM pg_locks WHERE NOT granted"
-      ).to_i
-      return true if waiting.positive?
-
-      sleep 0.02
-    end
-    false
-  end
-
   it "serializes two concurrent marks so exactly one emits item.removed" do
-    stale = Item.find(item.id)
+    stale = Item.find(item.id) # the second mark's copy, loaded while in_box
     second = nil
     queued = nil
     first = Item.find(item.id)
     allow(first).to receive(:update!).and_wrap_original do |original, *args, **kw|
-      second = concurrent_mark(stale)
-      queued = lock_waiter_queued?
+      second, second_pid = start_on_other_connection { described_class.new.call(item: stale, actor:) }
+      # The second mark is queued behind THIS connection (the first mark's
+      # item lock), not just any waiter on the server (#926).
+      queued = blocked_by?(second_pid, backend_pid, second)
       original.call(*args, **kw)
     end
 
