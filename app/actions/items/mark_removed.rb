@@ -29,13 +29,17 @@ module Items
       yield ensure_writable(item.move)
       yield ensure_unpacking_phase(item.box) unless allow_any_phase
       removed_now = yield persist_unless_removed(item)
-      # Reason: item.removed is emitted after the commit, outside the lock,
+      # Reason: item.removed is emitted after this action's lock is released,
       # because subscribers run synchronously, enqueue on the separate queue
       # DB and broadcast Turbo Streams, and must only ever see committed state.
-      # Accepted gap (#925): a crash between the commit and this emit leaves
-      # the item removed but loses the event, so the activity entry and the
-      # subscriber side effects are gone, and an idempotent retry does not
-      # re-emit. Closing that window would need a transactional outbox.
+      # That holds only when no caller transaction encloses this call:
+      # MarkPhotoRemoved (box.with_lock) and FindLists::MarkFound
+      # (item.with_lock) wrap it, so on those paths the emit still runs before
+      # their outer commit (#965). Accepted gap (#925): on the unwrapped paths
+      # a crash between the commit and this emit leaves the item removed but
+      # loses the event, so the activity entry and the subscriber side effects
+      # are gone, and an idempotent retry does not re-emit. Closing that
+      # window would need a transactional outbox.
       yield emit_event(item, actor) if removed_now
       Success(item)
     end
