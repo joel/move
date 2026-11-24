@@ -33,10 +33,6 @@ module Captures
   # lands first (and the conflict is refused as :superseded) or waits for the
   # decision to commit.
   class Retake < BaseAction
-    # Re-scan failures after the swap has persisted: the retake is still
-    # announced (see #finish).
-    SWAP_KEPT_FAILURES = %i[enqueue_failed replaced_rescan_wrong_phase].freeze
-
     #: (media: untyped, actor: untyped, ?file: untyped, ?rerun_recognition: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, actor:, file: nil, rerun_recognition: false)
       yield ensure_writable(media.move)
@@ -53,30 +49,25 @@ module Captures
 
     private
 
-    # Under the lock the guard re-checks only the box phase, so no items go
-    # into a box sealed since the up-front check. That refusal comes after the
-    # swap, so it has its own code and the caller can say the photo was
-    # replaced. A run that went in flight since the up-front check is NOT a
-    # refusal here: it may be processing the old image, and the re-scan's
-    # newer run is what supersedes it (Process re-checks the latest run under
-    # the photo lock before it materializes).
+    # The guard only takes the locks and always creates the run. Nothing is
+    # re-checked under them on purpose: the swap has already persisted, and a
+    # run that started meanwhile may be scanning the OLD image. The re-scan's
+    # run is then the latest, so Process supersedes the older one (it
+    # re-checks the latest run under the photo lock before it materializes)
+    # instead of letting it put old-image items on the new photo.
 
     #: (untyped media) -> Dry::Monads::Result[untyped, untyped]
     def rescan(media)
-      RecognitionRuns::Enqueue.new.call(
-        media:, rescan: true,
-        guard: ->(locked) { locked.box.capturable? ? Success() : Failure(:replaced_rescan_wrong_phase) }
-      )
+      RecognitionRuns::Enqueue.new.call(media:, rescan: true, guard: ->(_locked) { Success() })
     end
 
-    # The swap has persisted whenever the re-scan fails: a job that could not
-    # be queued (#871: the run is failed and retryable) or a guard that
-    # refused under the lock. So the retake is still announced before that
-    # failure is returned. Any other re-scan failure stops here.
+    # The swap has persisted even when the re-scan job could not be queued
+    # (#871: the run is failed and retryable), so the retake is still announced
+    # before that failure is returned. Any other re-scan failure stops here.
 
     #: (untyped media, untyped actor, Dry::Monads::Result[untyped, untyped] rescan) -> Dry::Monads::Result[untyped, untyped]
     def finish(media, actor, rescan)
-      return rescan if rescan.failure? && SWAP_KEPT_FAILURES.exclude?(rescan.failure)
+      return rescan if rescan.failure? && rescan.failure != :enqueue_failed
 
       emit_event(media, actor)
       rescan.failure? ? rescan : Success(media)

@@ -96,7 +96,6 @@ en:
         image_too_large: "That image is too large. Try a smaller photo."
         unsupported_image: "That file isn't a supported image. Use a JPEG, PNG, or WEBP."
         enqueue_failed: "Photo replaced, but the re-scan couldn't start. Retry recognition from the box's capture screen."
-        replaced_rescan_wrong_phase: "Photo replaced, but the box is no longer packing, so it wasn't re-scanned."
         failed: "Could not replace the photo. Try again."
       move_photo_errors:
         box_missing: "Pick a box to move the photo to."

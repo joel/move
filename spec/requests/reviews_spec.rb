@@ -786,18 +786,6 @@ RSpec.describe "Per-photo review" do
       expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
       expect(flash[:alert]).to eq(I18n.t("reviews.flash.retake_errors.no_file"))
     end
-
-    # #919 — the re-scan guard refused under the lock after the swap persisted:
-    # the alert says the photo was replaced, not that nothing happened.
-    it "says the photo was replaced when the re-scan is refused after the swap" do
-      retake = instance_double(Captures::Retake, call: Dry::Monads::Failure(:replaced_rescan_wrong_phase))
-      allow(Captures::Retake).to receive(:new).and_return(retake)
-
-      post move_box_review_retake_photo_path(move, box, media), params: { file: upload, rerun_recognition: "1" }
-
-      expect(flash[:alert]).to eq(I18n.t("reviews.flash.retake_errors.replaced_rescan_wrong_phase"))
-      expect(flash[:alert]).to start_with("Photo replaced")
-    end
   end
 
   describe "queue mode (?queue=move) — the Move-wide walk (#654)" do
