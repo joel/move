@@ -36,9 +36,10 @@ module Components
       # @rbs unpacking: bool
       # @rbs pinnable: bool
       # @rbs pinned: bool
+      # @rbs highlight: bool
       # @rbs return: void
       def initialize(item:, move:, image_ready: false, generating: false, failed: false, eager: false,
-                     unpacking: false, pinnable: false, pinned: false)
+                     unpacking: false, pinnable: false, pinned: false, highlight: false)
         @item = item
         @move = move
         @image_ready = image_ready
@@ -53,11 +54,14 @@ module Components
         @unpacking = unpacking
         @pinnable = pinnable
         @pinned = pinned
+        # The just-added manual item (#958): the shared `highlight` Stimulus
+        # controller scrolls it into view and flashes a ring once.
+        @highlight = highlight
       end
 
       #: () -> void
       def view_template
-        div(id: self.class.dom_id(@item), class: card_classes) do
+        div(id: self.class.dom_id(@item), class: card_classes, data: highlight_data) do
           a(href: view_context.move_item_path(@move, @item), class: "flex flex-1 flex-col") do
             tile
             caption
@@ -225,6 +229,11 @@ module Components
 
       # `relative` anchors the pin overlay to the card (the tile's corner —
       # the tile is the card's first child, so card-relative == tile-relative).
+
+      #: () -> Hash[Symbol, String]
+      def highlight_data
+        @highlight ? { controller: "highlight" } : {}
+      end
 
       #: () -> String
       def card_classes

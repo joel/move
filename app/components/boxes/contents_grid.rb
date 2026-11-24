@@ -32,10 +32,11 @@ module Components
       # @rbs editable: bool
       # @rbs pinnable: bool
       # @rbs pinned_item_ids: untyped
+      # @rbs highlight_item_id: untyped
       # @rbs return: void
       def initialize(move:, box:, media:, items:, reviewable_media_ids: [],
                      recoverable_media_ids: [], conflict_media_ids: [], unpacked_media_ids: [], editable: false,
-                     pinnable: false, pinned_item_ids: Set.new)
+                     pinnable: false, pinned_item_ids: Set.new, highlight_item_id: nil)
         @move = move
         @box = box
         @media = media # recent_first, blobs preloaded
@@ -54,6 +55,7 @@ module Components
         # machine (closed ∌ unpacking).
         @pinnable = pinnable
         @pinned_item_ids = pinned_item_ids
+        @highlight_item_id = highlight_item_id
         # In-box items grouped by their source photo (only this box's photos are
         # rendered as cards).
         @items_by_media = items.group_by(&:source_media_id)
@@ -79,6 +81,16 @@ module Components
 
       private
 
+      # Whether a card holds the just-added item (#958): a standalone card, or the
+      # photo card a recovery add (settled-orphan source photo) stays bound to.
+
+      #: (Array[untyped]? items) -> bool
+      def highlighted?(items)
+        return false unless @highlight_item_id
+
+        (items || []).any? { |item| item.id == @highlight_item_id }
+      end
+
       #: () -> untyped
       def any_cards?
         @media.any? || @standalone_items.any?
@@ -97,7 +109,8 @@ module Components
               unpacked: @unpacked_media_ids.include?(media.id),
               eager: index < EAGER_TILES,
               unpacking: @unpacking, interactive: @interactive,
-              pinnable: @pinnable, pinned_item_ids: @pinned_item_ids
+              pinnable: @pinnable, pinned_item_ids: @pinned_item_ids,
+              highlight: highlighted?(@items_by_media[media.id])
             )
           end
           # Standalone items most-recent first (items arrive created-ascending).
@@ -109,7 +122,8 @@ module Components
               render Components::Boxes::ItemCard.new(
                 item: item, move: @move, image_ready: @move.image_generation_ready?,
                 eager: index < EAGER_TILES, unpacking: @interactive,
-                pinnable: @pinnable, pinned: @pinned_item_ids.include?(item.id)
+                pinnable: @pinnable, pinned: @pinned_item_ids.include?(item.id),
+                highlight: highlighted?([item])
               )
             end
           end

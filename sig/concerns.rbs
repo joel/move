@@ -70,6 +70,11 @@ module ReviewItemListing
   def review_list_stream: (Array[untyped] items, ?highlight_id: untyped) -> untyped
 end
 
+# ItemsController#create's showcase landing (#958).
+module ManualItemShowcase
+  def redirect_to_box_showcasing: (untyped item) -> untyped
+end
+
 # ReviewsController#dismiss_conflict / #keep_both_conflict responses (#881).
 module ReviewConflictResponses
   def resolve_conflict: (Symbol outcome) -> Dry::Monads::Result[untyped, untyped]

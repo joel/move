@@ -47,7 +47,8 @@ class BoxesController < MoveScopedController
 
   #: () -> untyped
   def show
-    render box_show_view
+    # A just-added manual item's one-time highlight (#958, ItemsController#create).
+    render box_show_view(highlight_item_id: flash[:highlight_item_id])
   end
 
   # GET /moves/:move_id/boxes/jump?id=N — the detail nav's jump select (#694).
@@ -350,8 +351,8 @@ class BoxesController < MoveScopedController
   # the inventory and the gallery badges together; a transition to `unpacked`
   # cascades the in-box items to removed).
 
-  #: () -> untyped
-  def box_show_view
+  #: (?highlight_item_id: untyped) -> untyped
+  def box_show_view(highlight_item_id: nil)
     scope = authorized_scope(@box.items)
     # Removed items ride along ONLY while unpacking — the in-place checklist
     # (#727) renders them as checked chips/cards. Every other status keeps the
@@ -408,7 +409,8 @@ class BoxesController < MoveScopedController
       # retake / rescan / delete stay reachable.
       conflict_media_ids: conflict_media_ids(review_media_ids),
       # Photos whose every sourced item has been unpacked — the gallery badges them.
-      unpacked_media_ids: unpacked_media_ids
+      unpacked_media_ids: unpacked_media_ids,
+      highlight_item_id: highlight_item_id
     )
   end
 
