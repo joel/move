@@ -3,6 +3,7 @@
 en:
   searches:
     placeholder: "Find anything…"
+    input_label: "Search this move"
     hint: "Search by name or meaning — phrasing need not match exactly."
     recent: "Recent searches"
     examples:

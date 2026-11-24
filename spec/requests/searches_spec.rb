@@ -92,6 +92,43 @@ RSpec.describe "Searches" do
       end
     end
 
+    # #915: on a phone, refocusing the input after a search reopens the soft
+    # keyboard over the results the user just asked for (ux rule 5).
+    describe "query input focus and label (#915)" do
+      def query_input
+        Capybara.string(response.body).find_field("q")
+      end
+
+      it "autofocuses the labelled query input on the empty page" do
+        get move_search_path(move)
+
+        aggregate_failures do
+          expect(query_input[:autofocus]).not_to be_nil
+          expect(query_input[:"aria-label"]).to eq(I18n.t("searches.input_label"))
+        end
+      end
+
+      it "does not autofocus the input when showing results, keeping the query" do
+        create(:item, :confirmed, move:, box: create(:box, move:, number: "6"), name: "Desk lamp")
+        index_all
+
+        get move_search_path(move, q: "lamp")
+
+        aggregate_failures do
+          expect(response.body).to include("Desk lamp")
+          expect(query_input[:autofocus]).to be_nil
+          expect(query_input[:value]).to eq("lamp")
+          expect(query_input[:"aria-label"]).to eq(I18n.t("searches.input_label"))
+        end
+      end
+
+      it "does not autofocus the input on the no-results page" do
+        get move_search_path(move, q: "zzzznotathing")
+
+        expect(query_input[:autofocus]).to be_nil
+      end
+    end
+
     it "shows the no-results state for an unmatched query" do
       get move_search_path(move, q: "zzzznotathing")
 
