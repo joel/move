@@ -433,7 +433,7 @@ RSpec.describe "Review pending edits (JS)", :js do
       window.__otherTabRename = (name) => {
         const input = document.querySelector('[data-inline-rename-target="input"]');
         const url = input.closest('[data-controller~="inline-rename"]').dataset.inlineRenameUrlValue;
-        const token = document.querySelector('meta[name="csrf-token"]').content;
+        const token = document.querySelector('meta[name="csrf-token"]')?.content ?? "";
         return of_(url, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Accept: "application/json", "X-CSRF-Token": token },
