@@ -8,7 +8,8 @@ module Searches
   # #922 — Example queries built from the Move's own data, offered under the
   # no-results empty state when the user has no recent searches (ux rules 4 & 5).
   # The Move's busiest room names come first, then its most common item names;
-  # both are counted over searchable items only, so every suggestion can match.
+  # both are counted over searchable items that already have a search document
+  # (Search::Items inner-joins it), so a suggestion can match.
   # Ranked and capped in SQL. The query that just failed is left out.
   class ExampleQueries
     LIMIT = 3
@@ -33,7 +34,7 @@ module Searches
     #: () -> Array[String]
     def room_names
       Room.where(move_id: @move.id)
-          .joins(boxes: :items).merge(Item.searchable)
+          .joins(boxes: { items: :search_document }).merge(Item.searchable)
           .where.not("LOWER(rooms.name) = ?", @exclude)
           .group("rooms.id", "rooms.name")
           .order(Arel.sql("COUNT(items.id) DESC"), "rooms.name")
@@ -43,7 +44,7 @@ module Searches
 
     #: () -> Array[String]
     def item_names
-      @move.items.searchable
+      @move.items.searchable.joins(:search_document)
            .where.not("LOWER(items.name) = ?", @exclude)
            .group(Arel.sql("LOWER(items.name)"))
            .order(Arel.sql("COUNT(*) DESC, MIN(items.name)"))

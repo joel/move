@@ -5,9 +5,13 @@ RSpec.describe Searches::ExampleQueries do
   let(:kitchen) { create(:room, move:, name: "Kitchen") }
   let(:office) { create(:room, move:, name: "Office") }
 
-  def add_items(room, *names, **attrs)
+  # Factory items emit no indexing events, so index them as the job would.
+  def add_items(room, *names, index: true, **attrs)
     box = create(:box, move:, room:)
-    names.each { |name| create(:item, :confirmed, move:, box:, name:, **attrs) }
+    names.each do |name|
+      item = create(:item, :confirmed, move:, box:, name:, **attrs)
+      Search::RefreshDocument.new.call(item:) if index
+    end
   end
 
   it "ranks the busiest rooms first, then the most common item names, capped at three" do
@@ -19,6 +23,12 @@ RSpec.describe Searches::ExampleQueries do
 
   it "counts only searchable items" do
     add_items(office, "Lamp", review_state: "needs_correction")
+
+    expect(described_class.new(move).list).to eq([])
+  end
+
+  it "skips items not yet indexed, which search could not match" do
+    add_items(office, "Lamp", index: false)
 
     expect(described_class.new(move).list).to eq([])
   end
