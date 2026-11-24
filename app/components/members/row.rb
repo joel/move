@@ -101,26 +101,13 @@ module Components
           url: update_role_move_member_path(@move, @membership),
           method: :patch, data: { controller: "auto-submit" }
         ) do
-          div(class: "relative") do
-            select(
-              name: "member[role]",
-              data: { action: "change->auto-submit#submit" },
-              aria_label: I18n.t("members.actions.change_role", name: member_name(@membership.user)),
-              class: "cursor-pointer appearance-none rounded-full border border-card-border " \
-                     "bg-card py-2 pl-4 pr-9 text-body-md text-text-warm transition " \
-                     "hover:border-accent-sage focus:outline-none focus:ring-2 focus:ring-accent-sage/30"
-            ) do
-              MoveMembership::ROLES.each do |role|
-                option(value: role, selected: @membership.role == role) do
-                  I18n.t("members.roles.#{role}")
-                end
-              end
-            end
-            span(
-              class: "pointer-events-none absolute inset-y-0 right-3 flex items-center " \
-                     "text-on-surface-variant"
-            ) { render Components::Icons::ChevronRight.new(css: "h-4 w-4 rotate-90") }
-          end
+          render Components::Ui::CompactSelect.new(
+            name: "member[role]",
+            aria_label: I18n.t("members.actions.change_role", name: member_name(@membership.user)),
+            options: MoveMembership::ROLES.map { |role| [I18n.t("members.roles.#{role}"), role] },
+            selected: @membership.role,
+            auto_submit: true
+          )
         end
       end
 
