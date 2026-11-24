@@ -168,6 +168,63 @@ RSpec.describe "Searches" do
       expect(response.body).to include("kitchen electronics")
     end
 
+    # #922: a search that finds nothing keeps a way forward under the empty state.
+    describe "no-results suggestions (#922)" do
+      def chip_texts
+        Capybara.string(response.body).all("a[href*='/search?q=']").map(&:text)
+      end
+
+      before do
+        kitchen = create(:room, move:, name: "Kitchen")
+        create(:item, :confirmed, move:, box: create(:box, move:, number: "1", room: kitchen),
+                                  name: "Cast iron skillet")
+        index_all
+      end
+
+      it "offers the user's recent searches as chips" do
+        get move_search_path(move, q: "skillet")
+        get move_search_path(move, q: "zzzznotathing")
+
+        aggregate_failures do
+          expect(response.body).to include(I18n.t("searches.empty.description"))
+          expect(response.body).to include(I18n.t("searches.recent"))
+          expect(chip_texts).to eq(["“skillet”"])
+          expect(response.body).to include(move_search_path(move, q: "skillet"))
+        end
+      end
+
+      it "offers examples from the move's own rooms and items when there are no recent searches" do
+        get move_search_path(move, q: "zzzznotathing")
+
+        aggregate_failures do
+          expect(response.body).to include(I18n.t("searches.empty.description"))
+          expect(response.body).not_to include(I18n.t("searches.recent"))
+          expect(chip_texts).to eq(["“Kitchen”", "“Cast iron skillet”"])
+          expect(response.body).not_to include("kitchen electronics")
+        end
+      end
+
+      it "falls back to the static examples for a move with no searchable items" do
+        get move_search_path(create(:move, created_by: user), q: "zzzznotathing")
+
+        expect(response.body).to include("kitchen electronics")
+      end
+
+      it "leaves the failed query out of the suggestions" do
+        get move_search_path(move, q: "skillet")
+        Item.find_by!(name: "Cast iron skillet").update!(review_state: "needs_correction")
+        index_all
+
+        get move_search_path(move, q: "SKILLET")
+
+        aggregate_failures do
+          expect(response.body).to include(I18n.t("searches.empty.title", query: "SKILLET"))
+          expect(chip_texts.map(&:downcase)).not_to include("“skillet”")
+          expect(response.body).not_to include(I18n.t("searches.recent"))
+        end
+      end
+    end
+
     it "links the sidebar Search destination to this move" do
       get move_boxes_path(move)
 
