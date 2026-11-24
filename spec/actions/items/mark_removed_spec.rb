@@ -102,4 +102,17 @@ RSpec.describe Items::MarkRemoved do
 
     expect(depths).to eq([1])
   end
+
+  it "never emits item.removed when an enclosing transaction rolls back (#965)" do
+    item = create(:item, :manual, move:, box: create(:box, move:, status: "unpacking"))
+    allow(Rails.event).to receive(:notify).and_call_original
+
+    ActiveRecord::Base.transaction do
+      expect(described_class.new.call(item:, actor:)).to be_success
+      raise ActiveRecord::Rollback
+    end
+
+    expect(Rails.event).not_to have_received(:notify).with("item.removed", anything)
+    expect(item.reload.presence_state).to eq("in_box")
+  end
 end

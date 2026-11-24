@@ -43,9 +43,7 @@ module Items
     end
 
     # Success(true) when this call flipped the item, Success(false) when the
-    # locked re-read found it already removed. The lock is released (and the
-    # write committed, unless a caller's transaction encloses it) before the
-    # event is emitted.
+    # locked re-read found it already removed.
 
     #: (untyped item) -> Dry::Monads::Result[untyped, untyped]
     def persist_unless_removed(item)
@@ -59,12 +57,20 @@ module Items
       Failure(e.record.errors)
     end
 
+    # The emit waits for the OUTERMOST transaction to commit (#965). Two
+    # callers wrap this call in their own lock (MarkPhotoRemoved under the box
+    # lock, FindLists::MarkFound under the item lock), so persist's with_lock
+    # joins their transaction and releasing it commits nothing. The
+    # subscribers run synchronously, enqueue onto the separate queue DB and
+    # broadcast Turbo Streams, so an in-transaction emit would expose
+    # pre-commit state, or state that later rolls back. With no transaction
+    # open (the direct callers) it emits at once; on rollback it never emits.
+    # The payload is captured now, not at commit.
+
     #: (untyped item, untyped actor) -> Dry::Monads::Success[nil]
     def emit_event(item, actor)
-      Rails.event.notify(
-        "item.removed", item_id: item.id, box_id: item.box_id, move_id: item.move_id,
-                        actor_id: actor&.id
-      )
+      payload = { item_id: item.id, box_id: item.box_id, move_id: item.move_id, actor_id: actor&.id }
+      ActiveRecord.after_all_transactions_commit { Rails.event.notify("item.removed", **payload) }
       Success()
     end
   end
