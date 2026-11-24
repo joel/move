@@ -60,11 +60,14 @@ module Components
         )
       end
 
+      # Retry returns to the range picker pre-filled with the failed run's range
+      # (#959, UX rule 4).
       #: () -> untyped
       def failed
         span(class: "text-body-md text-secondary") { t("failed_title") }
         render Components::Ui::Button.new(
-          label: t("retry"), variant: :secondary, href: move_label_print_path(@run.move)
+          label: t("retry"), variant: :secondary,
+          href: move_label_print_path(@run.move, from: @run.from_number, to: @run.to_number)
         )
       end
 
