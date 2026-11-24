@@ -295,6 +295,87 @@ RSpec.describe "Review pending edits (JS)", :js do
     expect(page).to have_field(with: "Cutting board")
   end
 
+  # #692's leftover ordering: the add's server read happens BEFORE the rename
+  # commits, but the rename SETTLES before the add's (stale) list reaches the
+  # page — so no request is in flight when the replacement row connects. The
+  # add runs on the wire first; the rename PATCH is gated until the add's
+  # response is back, and that response is withheld from Turbo until the
+  # rename has settled. Requests stay strictly serial on the server (see the
+  # shared-connection note above).
+  def stale_add_list_after_rename_settles(fail_rename: false)
+    page.execute_script(<<~JS)
+      let releaseRename; const renameGate = new Promise((r) => { releaseRename = r });
+      let renameDone; const renameSettled = new Promise((r) => { renameDone = r });
+      const of_ = window.fetch;
+      window.fetch = (...args) => {
+        const url = String(args[0] instanceof Request ? args[0].url : args[0]);
+        const method = ((args[0] instanceof Request ? args[0].method : args[1]?.method) || "GET").toLowerCase();
+        if (url.includes("/rename") && method === "patch") {
+          const send = () => (#{fail_rename} ? new Response(null, { status: 422 }) : of_(...args));
+          return renameGate.then(send).then((res) => {
+            setTimeout(renameDone, 300); // let the controller apply the echo first
+            return res;
+          });
+        }
+        if (url.includes("/items") && method === "post" && !window.__heldOnce) {
+          window.__heldOnce = true;
+          return of_(...args).then(async (res) => {
+            releaseRename();
+            await renameSettled;
+            window.__staleListDelivered = true;
+            return res;
+          });
+        }
+        return of_(...args);
+      };
+    JS
+  end
+
+  it "keeps the rename when the add's pre-rename list lands after the rename settled" do
+    move, box, media, _item = seed_review_photo
+
+    login_as(user: user)
+    visit move_box_review_photo_path(move, box, media)
+    stale_add_list_after_rename_settles
+
+    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
+    # Dirty rename with no blur: the add's turbo:submit-start flushes it.
+    page.execute_script(<<~JS)
+      document.querySelector('[data-inline-rename-target="input"]').value = "Espresso machine";
+    JS
+    click_button I18n.t("reviews.photo.add")
+
+    eventually(timeout: 10) { page.evaluate_script("window.__staleListDelivered === true") }
+    expect(page).to have_field(with: "Cutting board")
+    # The replacement row was rendered from the pre-rename snapshot ("Coffee
+    # machine"), but its version is older than the rename's echo, so the row
+    # shows the persisted name — on page, without a reload.
+    expect(page).to have_field(with: "Espresso machine")
+    expect(page).to have_no_field(with: "Coffee machine")
+    expect(page).to have_no_css('input[aria-invalid="true"]')
+  end
+
+  it "keeps a failed rename flagged when the add's list replaces the row afterwards" do
+    move, box, media, _item = seed_review_photo
+
+    login_as(user: user)
+    visit move_box_review_photo_path(move, box, media)
+    stale_add_list_after_rename_settles(fail_rename: true)
+
+    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
+    page.execute_script(<<~JS)
+      document.querySelector('[data-inline-rename-target="input"]').value = "Espresso machine";
+    JS
+    click_button I18n.t("reviews.photo.add")
+
+    eventually(timeout: 10) { page.evaluate_script("window.__staleListDelivered === true") }
+    expect(page).to have_field(with: "Cutting board")
+    # The 422 settled on the OLD row, which the add's stream then replaced: the
+    # fresh row must still read as failed, not as a silent revert.
+    expect(page).to have_field(with: "Coffee machine")
+    expect(page).to have_css('input[aria-invalid="true"]')
+  end
+
   # Holds the mark POST off the wire, delays the first add by 800ms, and fakes
   # a 422 for the rename PATCH 3s after it fires — so the failure lands on the
   # ADOPTED controller, after the add's stream has replaced the item list.

@@ -296,13 +296,45 @@ RSpec.describe "Per-photo review" do
   end
 
   describe "PATCH .../rename" do
-    it "renames the item and answers 204 (no navigation)" do
+    it "renames the item and echoes the canonical name + version (no navigation)" do
       item = detected(name: "Cofee machine")
 
       patch move_box_review_rename_item_path(move, box, media, item), params: { name: "Coffee machine" }
 
-      expect(response).to have_http_status(:no_content)
+      expect(response).to have_http_status(:ok)
       expect(item.reload.name).to eq("Coffee machine")
+      expect(response.parsed_body).to eq(
+        "name" => "Coffee machine", "version" => Components::Reviews::ItemRow.version(item)
+      )
+    end
+
+    # #692: the add's list replacement and a flushed rename race. Whichever lands
+    # last on the client, the versions decide: a list read BEFORE the rename
+    # committed carries an older version than the rename's echo (so the client
+    # keeps the echoed name), and a list read AFTER carries the echo's version
+    # (so the snapshot, which then holds the new name, is equally trusted).
+    it "orders an add's list snapshot against the rename echo by version" do
+      item = detected(name: "Coffee machine")
+
+      post move_box_review_add_item_path(move, box, media), params: { item: { name: "Kettle" } }, as: :turbo_stream
+      before_rename = row_state(item)
+
+      patch move_box_review_rename_item_path(move, box, media, item), params: { name: "Espresso machine" }
+      echo = response.parsed_body
+
+      post move_box_review_add_item_path(move, box, media), params: { item: { name: "Toaster" } }, as: :turbo_stream
+      after_rename = row_state(item)
+
+      expect(before_rename[:name]).to eq("Coffee machine")
+      expect(before_rename[:version]).to be < echo["version"]
+      expect(after_rename).to eq(name: "Espresso machine", version: echo["version"])
+    end
+
+    def row_state(item)
+      # A turbo_stream body has no registered parser, so parsed_body is the raw string.
+      row = Nokogiri::HTML(response.parsed_body.to_s).at_css("##{Components::Reviews::ItemRow.dom_id(item)}")
+      { name: row.at_css("[data-inline-rename-target='input']")["value"],
+        version: Integer(row["data-inline-rename-version-value"]) }
     end
 
     it "answers 422 and keeps the name when the new name is blank (#147)" do
