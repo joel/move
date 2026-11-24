@@ -74,4 +74,63 @@ RSpec.describe Discards::CascadeRestore do
       expect(Media.with_discarded.find(media.id)).to be_discarded
     end
   end
+
+  # Starts `work` on another connection in a thread and returns it once that
+  # connection is waiting on a row lock or has finished (committed).
+  def start_on_other_connection_until_blocked_or_done
+    pid = Queue.new
+    thread = Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection do |c|
+        pid << c.select_value("SELECT pg_backend_pid()")
+        yield
+      end
+    end
+    backend = pid.pop
+    Timeout.timeout(5) do
+      sleep 0.01 until !thread.alive? || ActiveRecord::Base.connection.select_value(
+        "SELECT wait_event_type = 'Lock' FROM pg_stat_activity WHERE pid = #{Integer(backend)}"
+      )
+    end
+    thread
+  end
+
+  # Runs the block right after the restore's second retention check of the
+  # loaded record returned: the re-check under the root's row lock (#907).
+  def after_locked_retention_check(record)
+    calls = 0
+    allow(record).to receive(:retention_expired?).and_wrap_original do |original|
+      result = original.call
+      calls += 1
+      yield if calls == 2
+      result
+    end
+  end
+
+  # #913 — the root's row lock must cover the batch's children. The re-check
+  # under the lock passes, then the cutoff passes and the purge's child-first
+  # Item pass runs. Unserialized, it deletes and commits the child before
+  # restore_children reads it, and the photo comes back without its item. The
+  # purge now waits on the root lock, then finds the child kept and skips it:
+  # the restore is whole. Either way the photo is never restored incomplete.
+  it "never restores the root without a child the purge took after the locked re-check" do
+    travel_to((Discardable::RETENTION - 1.minute).ago) { Photos::Delete.new.call(media:, actor:) }
+
+    loaded = Media.with_discarded.find(media.id)
+    purge = nil
+    after_locked_retention_check(loaded) do
+      travel 2.minutes
+      purge = start_on_other_connection_until_blocked_or_done do
+        Discards::PurgeExpired.new.send(:purge_pass, Item, Discardable::RETENTION.ago)
+      end
+    end
+
+    result = described_class.new.call(record: loaded, actor:)
+    purge.join
+
+    aggregate_failures do
+      expect(result).to be_success
+      expect(Media.find(media.id)).to be_kept
+      expect(Item.exists?(item.id)).to be(true) # restored with its photo, not purged
+    end
+  end
 end

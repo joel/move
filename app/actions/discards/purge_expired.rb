@@ -59,10 +59,12 @@ module Discards
     #: (untyped record, untyped cutoff) -> bool
     def purge_record(record, cutoff)
       ActiveRecord::Base.transaction do
+        root = lock_batch_root(record)
         record.lock!
         # Re-verify under lock: a Restore clicked between the batch fetch and this
         # transaction must win — never destroy a record that is kept again.
         return false unless record.discarded? && record.discarded_at <= cutoff
+        return false unless batch_root_expired?(record, root, cutoff)
 
         detach_inbound_references(record)
         record.destroy!
@@ -74,6 +76,39 @@ module Discards
       Rails.event.notify("discards.purge_failed",
                          record_type: record.class.name, record_id: record.id, error: e.class.name)
       false
+    end
+
+    # A cascade child is purged under its batch root's row lock (#913) — the
+    # lock Discards::CascadeRestore holds while it re-checks the root's
+    # retention and restores the children. Without it the purge could delete a
+    # child after that re-check passed and before restore_children read it, and
+    # the root would come back without it. Parent before child, like every
+    # cascade path. Roots are the child's direct parent: the cascade graph is
+    # one level deep (Box → items, Media → items). Nil when the record has no
+    # parent trace or the parent row is gone.
+
+    #: (untyped record) -> untyped
+    def lock_batch_root(record)
+      klass = PASSES.find { |model| model.name == record.discarded_by_parent_type }
+      return unless klass
+
+      klass.with_discarded.lock(PARENT_ROW_LOCK).find_by(id: record.discarded_by_parent_id)
+    end
+
+    # A batch child is judged by its root's retention, not its own: Cascade
+    # stamps children a moment before their root, so the cutoff can fall between
+    # them — the child would be expired while the root is still restorable.
+    # Purge it only once the root is past the cutoff too. The trace is re-read
+    # under the record lock; if it no longer names the locked root (re-deleted
+    # meanwhile), skip and let a later night decide.
+
+    #: (untyped record, untyped root, untyped cutoff) -> bool
+    def batch_root_expired?(record, root, cutoff)
+      return true if record.discarded_by_parent_id.nil?
+      return false if root && root.id != record.discarded_by_parent_id
+      return true unless root&.discarded? && root.discard_batch_id == record.discard_batch_id
+
+      root.discarded_at <= cutoff
     end
 
     # Nullifies the two inbound RESTRICT FKs no dependent option covers (Postgres
