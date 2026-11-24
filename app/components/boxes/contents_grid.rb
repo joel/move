@@ -81,6 +81,16 @@ module Components
 
       private
 
+      # Whether a card holds the just-added item (#958): a standalone card, or the
+      # photo card a recovery add (settled-orphan source photo) stays bound to.
+
+      #: (Array[untyped]? items) -> bool
+      def highlighted?(items)
+        return false unless @highlight_item_id
+
+        (items || []).any? { |item| item.id == @highlight_item_id }
+      end
+
       #: () -> untyped
       def any_cards?
         @media.any? || @standalone_items.any?
@@ -99,7 +109,8 @@ module Components
               unpacked: @unpacked_media_ids.include?(media.id),
               eager: index < EAGER_TILES,
               unpacking: @unpacking, interactive: @interactive,
-              pinnable: @pinnable, pinned_item_ids: @pinned_item_ids
+              pinnable: @pinnable, pinned_item_ids: @pinned_item_ids,
+              highlight: highlighted?(@items_by_media[media.id])
             )
           end
           # Standalone items most-recent first (items arrive created-ascending).
@@ -112,7 +123,7 @@ module Components
                 item: item, move: @move, image_ready: @move.image_generation_ready?,
                 eager: index < EAGER_TILES, unpacking: @interactive,
                 pinnable: @pinnable, pinned: @pinned_item_ids.include?(item.id),
-                highlight: item.id == @highlight_item_id
+                highlight: highlighted?([item])
               )
             end
           end

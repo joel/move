@@ -57,6 +57,26 @@ RSpec.describe "Items create showcase (#958)" do
     expect(response.parsed_body.css("[data-controller~='highlight']")).to be_empty
   end
 
+  # Codex P2 on #964: a recovery add stays bound to its source photo, so it
+  # renders as a chip inside that PhotoCard, not as a standalone card. The
+  # photo card holding it must take the highlight instead.
+  it "highlights the photo card a recovery add is bound to" do
+    orphan = create(:media, move:, box:, created_at: 1.day.ago) # settled orphan, oldest
+    others = create_list(:media, 4, move:, box:)
+    others.each { |m| create(:item, :confirmed, move:, box:, source_media: m) }
+
+    post move_box_items_path(move, box), params: { item: { name: "Missed mug", source_media_id: orphan.id } }
+    item = box.items.find_by!(name: "Missed mug")
+    expect(item.source_media_id).to eq(orphan.id)
+    follow_redirect!
+
+    doc = response.parsed_body
+    highlighted = doc.css("[data-controller~='highlight']")
+    expect(highlighted.size).to eq(1)
+    expect(highlighted.first["id"]).to eq(Components::Boxes::PhotoCard.dom_id(orphan))
+    expect(highlighted.first.text).to include("Missed mug")
+  end
+
   it "leaves the closed-box refusal unlinked and unhighlighted" do
     sealed = create(:box, move:, status: "sealed")
     post move_box_items_path(move, sealed), params: { item: { name: "Lamp" } }
