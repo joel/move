@@ -54,7 +54,8 @@ RSpec.describe Captures::Retake do
 
     retake(rerun_recognition: true)
 
-    expect(enqueue).to have_received(:call).with(media:, rescan: true) # a re-scan run (#897)
+    # A re-scan run (#897), created through the guarded path (#919).
+    expect(enqueue).to have_received(:call).with(media:, rescan: true, guard: instance_of(Proc))
   end
 
   it "keeps the swap and still emits media.retaken when the re-scan job can't be queued (#871)" do
@@ -109,5 +110,23 @@ RSpec.describe Captures::Retake do
     result = retake
     expect(result).to be_failure
     expect(result.failure).to eq(:recognition_in_flight)
+  end
+
+  # #919 — the guarded enqueue only takes the locks; it re-checks nothing. A
+  # run that went in flight after the up-front check may be scanning the OLD
+  # image. The re-scan still creates its run, which is then the latest, so
+  # Process supersedes the older one instead of letting it put old-image items
+  # on the new photo.
+  it "still re-scans when a run went in flight during the swap, so the newer run supersedes it" do
+    allow(RecognitionRuns::ProcessJob).to receive(:perform_later).and_return(true)
+    concurrent = nil
+    allow(media).to receive(:update!).and_wrap_original do |original, *args, **kw|
+      concurrent = create(:recognition_run, move:, box:, media:, status: "processing")
+      original.call(*args, **kw)
+    end
+
+    expect(retake(rerun_recognition: true)).to be_success
+    expect(RecognitionRun.latest_for?(concurrent)).to be(false)
+    expect(RecognitionRun.latest_for(media.id).pick(:rescan)).to be(true)
   end
 end

@@ -24,6 +24,14 @@ module Captures
   # re-scan a closed box fails rather than smuggling items into it. Refuses while a
   # recognition run is still in flight (a re-scan could race the swap). Caller owns
   # tenant context.
+  #
+  # The re-scan run is created through Enqueue's guarded path (#919), like
+  # Retry (#896): box lock, then photo lock, and the run commits before the
+  # locks are released. Those are the locks
+  # RecognitionSuggestions::ResolveConflict holds from its latest-run check to
+  # its "Keep both" item, so a re-scan cannot commit in between: it either
+  # lands first (and the conflict is refused as :superseded) or waits for the
+  # decision to commit.
   class Retake < BaseAction
     #: (media: untyped, actor: untyped, ?file: untyped, ?rerun_recognition: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, actor:, file: nil, rerun_recognition: false)
@@ -36,11 +44,22 @@ module Captures
       return Failure(:rescan_wrong_phase) if rerun_recognition && !media.box.capturable?
 
       yield swap_image(media, file)
-      rescan = rerun_recognition ? RecognitionRuns::Enqueue.new.call(media: media, rescan: true) : Success()
-      finish(media, actor, rescan)
+      finish(media, actor, rerun_recognition ? rescan(media) : Success())
     end
 
     private
+
+    # The guard only takes the locks and always creates the run. Nothing is
+    # re-checked under them on purpose: the swap has already persisted, and a
+    # run that started meanwhile may be scanning the OLD image. The re-scan's
+    # run is then the latest, so Process supersedes the older one (it
+    # re-checks the latest run under the photo lock before it materializes)
+    # instead of letting it put old-image items on the new photo.
+
+    #: (untyped media) -> Dry::Monads::Result[untyped, untyped]
+    def rescan(media)
+      RecognitionRuns::Enqueue.new.call(media:, rescan: true, guard: ->(_locked) { Success() })
+    end
 
     # The swap has persisted even when the re-scan job could not be queued
     # (#871: the run is failed and retryable), so the retake is still announced
