@@ -8,13 +8,17 @@ module Components
     include Phlex::Rails::Helpers::FormWith
     include Phlex::Rails::Helpers::Pluralize
 
-    #: (move: untyped, box: untyped, rooms: untyped, ?submit_label: untyped, ?dimension_presets: untyped) -> void
-    def initialize(move:, box:, rooms:, submit_label: nil, dimension_presets: [])
+    # `filter_room_id` rides along as a hidden `room_id` (forms drop the page's
+    # query params) so create can return to the room-filtered list (#923).
+
+    #: (move: untyped, box: untyped, rooms: untyped, ?submit_label: untyped, ?dimension_presets: untyped, ?filter_room_id: untyped) -> void
+    def initialize(move:, box:, rooms:, submit_label: nil, dimension_presets: [], filter_room_id: nil)
       @move = move
       @box = box
       @rooms = rooms
       @submit_label = submit_label || I18n.t("boxes.form.submit")
       @dimension_presets = dimension_presets
+      @filter_room_id = filter_room_id
     end
 
     #: () -> void
@@ -23,6 +27,7 @@ module Components
       form_with(model: [@move, @box], class: "flex flex-col gap-5",
                 data: { controller: "dimension-presets" }) do |form|
         render_errors if @box.errors.any?
+        input(type: "hidden", name: "room_id", value: @filter_room_id) if @filter_room_id
 
         field(form, :number, I18n.t("boxes.form.number"), optional: true,
                                                           placeholder: I18n.t("boxes.form.number_placeholder"))

@@ -59,7 +59,8 @@ module Views
         render Components::Ui::Button.new(
           label: I18n.t("boxes.index.add"),
           icon: Components::Icons::Plus,
-          href: new_move_box_path(@move)
+          # Carry the room filter so the new box defaults to it (#923).
+          href: new_move_box_path(@move, room_id: @selected_room_id)
         )
       end
 

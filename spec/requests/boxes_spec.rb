@@ -127,6 +127,20 @@ RSpec.describe "Boxes" do
       expect(response.body).to include("room_id=#{kitchen.id}").and include("sort=weight")
     end
 
+    it "carries the room filter on the Add box link (#923)" do
+      kitchen = create(:room, move:, name: "Kitchen")
+
+      get move_boxes_path(move, room_id: kitchen.id)
+
+      expect(response.body).to include(%(href="#{new_move_box_path(move, room_id: kitchen.id)}"))
+    end
+
+    it "links Add box with no room when unfiltered (#923)" do
+      get move_boxes_path(move)
+
+      expect(response.body).to include(%(href="#{new_move_box_path(move)}"))
+    end
+
     it "keeps the room filter chips when a filtered room has no boxes" do
       create(:room, move:, name: "Kitchen")
       empty_room = create(:room, move:, name: "Attic")
@@ -253,6 +267,55 @@ RSpec.describe "Boxes" do
 
       expect(response.body).not_to include(I18n.t("boxes.form.reuse_dimensions"))
     end
+
+    # #923 — Add box from a room-filtered list remembers the room.
+    describe "room carried from the boxes filter (#923)" do
+      def room_value
+        response.parsed_body.at_css("input[name='box[room_name]']")["value"]
+      end
+
+      def hidden_room_id
+        response.parsed_body.at_css("input[type=hidden][name=room_id]")&.[]("value")
+      end
+
+      it "presets the Move's room and carries the filter" do
+        kitchen = create(:room, move:, name: "Kitchen")
+
+        get new_move_box_path(move, room_id: kitchen.id)
+
+        expect(response).to have_http_status(:ok)
+        expect(room_value).to eq("Kitchen")
+        expect(hidden_room_id).to eq(kitchen.id)
+        expect(response.body).to include(%(href="#{move_boxes_path(move, room_id: kitchen.id)}"))
+      end
+
+      it "ignores a room belonging to another Move" do
+        foreign = create(:room, move: create(:move, created_by: user), name: "Attic")
+
+        get new_move_box_path(move, room_id: foreign.id)
+
+        expect(response).to have_http_status(:ok)
+        expect(room_value).to be_blank
+        expect(hidden_room_id).to be_nil
+      end
+
+      it "ignores an unknown or malformed room_id" do
+        get new_move_box_path(move, room_id: "not-a-uuid")
+
+        expect(response).to have_http_status(:ok)
+        expect(room_value).to be_blank
+        expect(hidden_room_id).to be_nil
+      end
+
+      it "renders a room-less form without a filter" do
+        create(:room, move:, name: "Kitchen")
+
+        get new_move_box_path(move)
+
+        expect(room_value).to be_blank
+        expect(hidden_room_id).to be_nil
+      end
+    end
   end
 
   describe "POST /moves/:move_id/boxes" do
@@ -297,6 +360,49 @@ RSpec.describe "Boxes" do
       end.not_to change(Box, :count)
 
       expect(response).to redirect_to(move_boxes_path(archived))
+    end
+
+    # #923 — back to the room-filtered list, new box visible + highlighted.
+    describe "returning to a room filter (#923)" do
+      let!(:kitchen) { create(:room, move:, name: "Kitchen") }
+
+      it "returns to the same filtered list with the new box highlighted" do
+        post move_boxes_path(move), params: { room_id: kitchen.id, box: { room_name: "Kitchen" } }
+
+        box = move.boxes.order(:created_at).last
+        expect(box.room).to eq(kitchen)
+        expect(response).to redirect_to(move_boxes_path(move, room_id: kitchen.id))
+        follow_redirect!
+        expect(response.body).to include("box-added-highlight").and include(move_box_path(move, box))
+      end
+
+      it "follows the box to its new room when the user changed it" do
+        post move_boxes_path(move), params: { room_id: kitchen.id, box: { room_name: "Garage" } }
+
+        garage = move.rooms.find_by!(name: "Garage")
+        expect(response).to redirect_to(move_boxes_path(move, room_id: garage.id))
+      end
+
+      it "returns to the unfiltered list when the room was cleared" do
+        post move_boxes_path(move), params: { room_id: kitchen.id, box: { room_name: "" } }
+
+        expect(response).to redirect_to(move_boxes_path(move))
+      end
+
+      it "ignores a foreign room_id filter" do
+        foreign = create(:room, move: create(:move, created_by: user), name: "Kitchen")
+
+        post move_boxes_path(move), params: { room_id: foreign.id, box: { room_name: "Kitchen" } }
+
+        expect(response).to redirect_to(move_boxes_path(move))
+      end
+
+      it "keeps the filter on the re-rendered form after a validation error" do
+        post move_boxes_path(move), params: { room_id: kitchen.id, box: { number: "A1", room_name: "Kitchen" } }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include(%(name="room_id" value="#{kitchen.id}"))
+      end
     end
   end
 
