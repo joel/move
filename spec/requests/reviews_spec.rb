@@ -578,6 +578,46 @@ RSpec.describe "Per-photo review" do
       expect(flash[:action_href]).to be_nil
     end
 
+    it "refuses an unpacked target with an alert and leaves the photo in place (#947)" do
+      item = detected(name: "Lamp")
+      target = create(:box, move:, number: "7", status: "unpacked")
+
+      patch move_box_review_move_photo_path(move, box, media), params: { target_box_id: target.id }
+
+      aggregate_failures do
+        expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
+        expect(flash[:alert]).to eq(I18n.t("reviews.flash.move_photo_errors.box_unpacked"))
+        expect(media.reload.box_id).to eq(box.id)
+        expect(item.reload.box_id).to eq(box.id)
+        expect(item.presence_state).to eq("in_box")
+      end
+    end
+
+    it "lists an unpacked box disabled, after the boxes the photo can move to (#947)" do
+      detected(name: "Lamp")
+      open = create(:box, move:, number: "8")
+      unpacked = create(:box, move:, number: "7", status: "unpacked")
+
+      get move_box_review_photo_path(move, box, media)
+
+      options = response.parsed_body.css("select[name=target_box_id] option")
+      aggregate_failures do
+        expect(options.pluck("value")).to eq([open.id, unpacked.id])
+        expect(options.first["disabled"]).to be_nil
+        expect(options.last["disabled"]).not_to be_nil
+        expect(options.last.text).to eq(I18n.t("reviews.photo.move_to_box_unpacked", number: "7"))
+      end
+    end
+
+    it "hides the move control when every other box is unpacked (#947)" do
+      detected(name: "Lamp")
+      create(:box, move:, number: "7", status: "unpacked")
+
+      get move_box_review_photo_path(move, box, media)
+
+      expect(response.body).not_to include(I18n.t("reviews.photo.move_heading"))
+    end
+
     context "when the photo held the last in-box items of an unpacking box (#838)" do
       let(:box) { create(:box, move:, number: "3", status: "unpacking") }
 
@@ -710,6 +750,22 @@ RSpec.describe "Per-photo review" do
         expect(flash[:alert]).to eq(I18n.t("reviews.flash.move_photo_errors.moved_elsewhere", number: "9"))
         follow_redirect!
         expect(response).to have_http_status(:ok)
+      end
+
+      it "lands on the photo's current box when it was re-boxed before an unpacked-target refusal (#947)" do
+        detected(name: "Lamp")
+        elsewhere = create(:box, move:, number: "9")
+        race_before_lock(lambda do
+          Media.where(id: media.id).update_all(box_id: elsewhere.id) # rubocop:disable Rails/SkipsModelValidations
+          Box.where(id: target.id).update_all(status: "unpacked") # rubocop:disable Rails/SkipsModelValidations
+        end)
+
+        patch move_box_review_move_photo_path(move, box, media), params: { target_box_id: target.id }
+
+        # Not the review URL under the old box: the photo isn't there (404).
+        expect(response).to redirect_to(move_box_path(move, elsewhere))
+        expect(flash[:alert]).to eq(I18n.t("reviews.flash.move_photo_errors.moved_elsewhere", number: "9"))
+        expect(media.reload.box_id).to eq(elsewhere.id)
       end
 
       it "lands on the review queue when a concurrent move wins in queue mode" do

@@ -165,7 +165,7 @@ module Views
             header
             list
             add_form if can_add_item?
-            move_photo_control if @editable && @move_boxes.any?
+            move_photo_control if can_move_photo?
             retake_control if @editable
             delete_photo_control if @editable && @box.packing?
             footer
@@ -179,6 +179,14 @@ module Views
       #: () -> bool
       def can_add_item?
         @editable && !@box.unpacked?
+      end
+
+      # Hidden when no other box can take the photo: Photos::Move refuses an
+      # unpacked destination (#947), so a picker of only disabled boxes is noise.
+
+      #: () -> bool
+      def can_move_photo?
+        @editable && @move_boxes.any? { |b| !b.unpacked? }
       end
 
       # pending-add (#690) auto-adds typed-but-unsubmitted text before any
@@ -265,13 +273,25 @@ module Views
               class: "flex-1 rounded-card border border-card-border bg-card p-2 text-body-md " \
                      "text-text-warm focus:border-accent-sage focus:ring-0"
             ) do
-              @move_boxes.each do |box|
-                option(value: box.id) { I18n.t("reviews.photo.move_to_box", number: box.number) }
-              end
+              move_target_options
             end
             render Components::Ui::Button.new(
               label: I18n.t("reviews.photo.move_submit"), type: "submit", variant: :secondary
             )
+          end
+        end
+      end
+
+      # Unpacked boxes stay listed (a picker is a selection surface) but are
+      # disabled and sorted last: Photos::Move refuses them (#839/#947).
+
+      #: () -> void
+      def move_target_options
+        open, unpacked = @move_boxes.partition { |b| !b.unpacked? }
+        open.each { |box| option(value: box.id) { I18n.t("reviews.photo.move_to_box", number: box.number) } }
+        unpacked.each do |box|
+          option(value: box.id, disabled: true) do
+            I18n.t("reviews.photo.move_to_box_unpacked", number: box.number)
           end
         end
       end

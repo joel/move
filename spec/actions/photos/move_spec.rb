@@ -93,6 +93,39 @@ RSpec.describe Photos::Move do
       .to eq(:move_archived)
   end
 
+  describe "unpacked destination (#947)" do
+    it "refuses an unpacked target and moves neither the photo nor its items" do
+      item = create(:item, move:, box: source, source_media: media)
+      unpacked = create(:box, move:, status: "unpacked")
+      allow(Rails.event).to receive(:notify).and_call_original
+
+      result = call(target_box: unpacked)
+
+      aggregate_failures do
+        expect(result.failure).to eq(:box_unpacked)
+        expect(media.reload.box).to eq(source)
+        expect(item.reload.box).to eq(source)
+        expect(item.presence_state).to eq("in_box")
+        expect(Rails.event).not_to have_received(:notify).with("media.moved", anything)
+      end
+    end
+
+    it "reads the target's status fresh under its lock, not the caller's stale copy" do
+      stale_target = Box.find(target.id)
+      Box.where(id: target.id).update_all(status: "unpacked") # rubocop:disable Rails/SkipsModelValidations
+
+      expect(call(target_box: stale_target).failure).to eq(:box_unpacked)
+      expect(media.reload.box).to eq(source)
+    end
+
+    it "refuses a target deleted after the caller loaded it" do
+      Box.where(id: target.id).update_all(discarded_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+
+      expect(call.failure).to eq(:box_missing)
+      expect(media.reload.box).to eq(source)
+    end
+  end
+
   describe "last-item auto-complete of the source box (#838)" do
     let(:source) { create(:box, move:, status: "unpacking") }
     let(:target) { create(:box, move:, status: "unpacking") }
@@ -233,27 +266,30 @@ RSpec.describe Photos::Move do
       locks
     end
 
-    it "locks the source box (FOR NO KEY UPDATE) before the photo and its item rows" do
+    it "locks both boxes (FOR NO KEY UPDATE) before the photo and its item rows" do
       create(:item, move:, box: source, source_media: media)
 
       locks = row_locks { call }
 
       aggregate_failures do
-        expect(locks.first).to eq(["boxes", "FOR NO KEY UPDATE"])
-        # Box, then photo, then its items.
-        expect(locks.index(["media", "FOR NO KEY UPDATE"])).to eq(1)
+        expect(locks.first(2)).to eq([["boxes", "FOR NO KEY UPDATE"]] * 2)
+        # Boxes, then photo, then its items.
+        expect(locks.index(["media", "FOR NO KEY UPDATE"])).to eq(2)
         expect(locks.index(["items", "FOR UPDATE"])).to be > 1
         # The completion re-locks the source AFTER the move commits (FOR UPDATE).
         expect(locks.last).to eq(["boxes", "FOR UPDATE"])
       end
     end
 
-    it "never row-locks the target box (crossing moves can't deadlock)" do
+    it "locks source and target in id order so crossing moves can't deadlock (#947)" do
       create(:item, move:, box: source, source_media: media)
+      back = create(:media, move:, box: target)
 
-      locked = box_locks_taken { call }
+      there = box_locks_taken(mode: /FOR NO KEY UPDATE/) { call }
+      back_locks = box_locks_taken(mode: /FOR NO KEY UPDATE/) { call(photo: back, target_box: source) }
 
-      expect(locked.uniq).to eq([source.id])
+      expect(there).to eq([source.id, target.id].sort)
+      expect(back_locks).to eq(there) # 3→8 and 8→3 take the same first lock
     end
 
     it "re-locks the photo's CURRENT box when a concurrent move re-boxed it, and completes that box" do
@@ -273,7 +309,7 @@ RSpec.describe Photos::Move do
         expect(current.reload.status).to eq("unpacked") # the box the photo actually left
         expect(source.reload.status).to eq("unpacking")
         expect(target.reload.status).to eq("unpacking")
-        expect(locks.first(2)).to eq([source.id, current.id])
+        expect(locks.first(4)).to eq([source.id, target.id].sort + [current.id, target.id].sort)
       end
     end
 

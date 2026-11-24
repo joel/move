@@ -39,8 +39,9 @@ module Components
         # removed (the footer shows Restore instead).
         return if @item.removed?
 
-        targets = @boxes.reject { |b| b.id == @item.box_id }
-        return if targets.empty?
+        open, unpacked = @boxes.reject { |b| b.id == @item.box_id }.partition { |b| !b.unpacked? }
+        # Every other box is unpacked: Items::Move would refuse them all (#839).
+        return if open.empty?
 
         form_with(url: move_move_item_path(@move, @item), method: :patch,
                   class: "flex items-center gap-2") do
@@ -48,7 +49,8 @@ module Components
             name: "target_box_id",
             class: "rounded-card border border-card-border bg-card px-3 py-2 text-text-warm"
           ) do
-            targets.each { |b| option(value: b.id) { box_context(b) } }
+            open.each { |b| option(value: b.id) { box_context(b) } }
+            unpacked_options(unpacked)
           end
           button(type: "submit", class: ghost_button) { I18n.t("items.show.move") }
         end
@@ -120,6 +122,19 @@ module Components
       def danger_button
         "inline-flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm " \
           "font-bold bg-error text-on-error transition hover:opacity-90 active:scale-[0.98]"
+      end
+
+      # Unpacked boxes stay listed (a picker is a selection surface) but are
+      # disabled and sorted last, so the user sees why their box isn't
+      # choosable: Items::Move refuses them (#839). Reopening the box enables it.
+
+      #: (Array[untyped] boxes) -> void
+      def unpacked_options(boxes)
+        boxes.each do |b|
+          option(value: b.id, disabled: true) do
+            I18n.t("items.show.move_target_unpacked", box: box_context(b))
+          end
+        end
       end
 
       #: (untyped box) -> untyped

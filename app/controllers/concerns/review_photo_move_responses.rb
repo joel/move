@@ -52,6 +52,16 @@ module ReviewPhotoMoveResponses
                 alert: t("reviews.flash.move_photo_errors.moved_elsewhere", number: current_box.number)
   end
 
+  # Any other refusal. A post-lock one (:box_unpacked / :box_missing, #947) can
+  # follow a concurrent move that re-boxed the photo while we waited for the
+  # lock: its review URL under @box would then 404, so route it like a lost
+  # race whenever the photo is no longer kept in @box (Codex #948).
+  def photo_move_failed(reason)
+    return photo_move_lost_race unless @move.media.exists?(id: @media.id, box_id: @box.id)
+
+    redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query), alert: move_photo_error(reason)
+  end
+
   # Where to land once the photo or its box is gone: the queue page in queue
   # mode, else the box, or the box list when a concurrent box delete took it.
   def photo_gone_path
@@ -61,7 +71,7 @@ module ReviewPhotoMoveResponses
   end
 
   def move_photo_error(reason)
-    key = %i[box_missing same_box cross_move move_archived photo_deleted box_deleted].include?(reason) ? reason : :failed
+    key = %i[box_missing same_box cross_move box_unpacked move_archived photo_deleted box_deleted].include?(reason) ? reason : :failed
     t("reviews.flash.move_photo_errors.#{key}")
   end
 end

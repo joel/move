@@ -321,6 +321,34 @@ RSpec.describe "Items" do
     end
   end
 
+  describe "GET item page Move picker (#839)" do
+    it "lists an unpacked box disabled, after the boxes it can move to" do
+      open = create(:box, move:, number: "8")
+      unpacked = create(:box, move:, status: "unpacked", number: "9")
+      item = create(:item, :manual, move:, box:)
+
+      get move_item_path(move, item)
+
+      page = response.parsed_body
+      options = page.css("select[name=target_box_id] option")
+      aggregate_failures do
+        expect(options.pluck("value")).to eq([open.id, unpacked.id])
+        expect(options.first["disabled"]).to be_nil
+        expect(options.last["disabled"]).not_to be_nil
+        expect(options.last.text).to include("(unpacked)")
+      end
+    end
+
+    it "hides the Move control when every other box is unpacked" do
+      create(:box, move:, status: "unpacked", number: "9")
+      item = create(:item, :manual, move:, box:)
+
+      get move_item_path(move, item)
+
+      expect(response.body).not_to include('name="target_box_id"')
+    end
+  end
+
   describe "PATCH /moves/:move_id/items/:id/move" do
     it "moves the item to the target box, keeping presence in_box" do
       target = create(:box, move:)
@@ -384,6 +412,24 @@ RSpec.describe "Items" do
         expect(response.body).to include(I18n.t("items.move.moved", number: "8"))
         expect(response.body).not_to include(I18n.t("items.move.view_box"))
       end
+    end
+
+    it "refuses an unpacked destination with a toast and leaves the item in place (#839)" do
+      source = create(:box, move:, status: "unpacking", number: "3")
+      target = create(:box, move:, status: "unpacked", number: "8")
+      item = create(:item, :manual, move:, box: source)
+
+      patch move_move_item_path(move, item), params: { target_box_id: target.id }
+
+      aggregate_failures do
+        expect(response).to redirect_to(move_item_path(move, item))
+        expect(flash[:alert]).to eq(I18n.t("items.move.box_unpacked", number: "8"))
+        expect(item.reload.box).to eq(source)
+        expect(item.presence_state).to eq("in_box")
+        expect(source.reload.status).to eq("unpacking") # the refusal completes nothing
+      end
+      follow_redirect!
+      expect(response.body).to include(I18n.t("items.move.box_unpacked", number: "8"))
     end
 
     it "does not claim a completion when the emptied source box is still packing" do

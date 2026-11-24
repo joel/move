@@ -10,7 +10,8 @@ module MoveMcp
     class MoveItem < Base
       tool_name "move_item"
       description "Move an item to another box in the same move. Moving the last item out of a box " \
-                  "being unpacked also marks that box unpacked (source_box_completed: true)."
+                  "being unpacked also marks that box unpacked (source_box_completed: true). " \
+                  "A destination box that is already unpacked is refused; reopen it first."
       input_schema(
         properties: {
           item_id: { type: "string", description: "The item id (uuid)." },
