@@ -302,7 +302,7 @@ RSpec.describe "Review pending edits (JS)", :js do
   # response is back, and that response is withheld from Turbo until the
   # rename has settled. Requests stay strictly serial on the server (see the
   # shared-connection note above).
-  def stale_add_list_after_rename_settles
+  def stale_add_list_after_rename_settles(fail_rename: false)
     page.execute_script(<<~JS)
       let releaseRename; const renameGate = new Promise((r) => { releaseRename = r });
       let renameDone; const renameSettled = new Promise((r) => { renameDone = r });
@@ -311,7 +311,8 @@ RSpec.describe "Review pending edits (JS)", :js do
         const url = String(args[0] instanceof Request ? args[0].url : args[0]);
         const method = ((args[0] instanceof Request ? args[0].method : args[1]?.method) || "GET").toLowerCase();
         if (url.includes("/rename") && method === "patch") {
-          return renameGate.then(() => of_(...args)).then((res) => {
+          const send = () => (#{fail_rename} ? new Response(null, { status: 422 }) : of_(...args));
+          return renameGate.then(send).then((res) => {
             setTimeout(renameDone, 300); // let the controller apply the echo first
             return res;
           });
@@ -352,6 +353,27 @@ RSpec.describe "Review pending edits (JS)", :js do
     expect(page).to have_field(with: "Espresso machine")
     expect(page).to have_no_field(with: "Coffee machine")
     expect(page).to have_no_css('input[aria-invalid="true"]')
+  end
+
+  it "keeps a failed rename flagged when the add's list replaces the row afterwards" do
+    move, box, media, _item = seed_review_photo
+
+    login_as(user: user)
+    visit move_box_review_photo_path(move, box, media)
+    stale_add_list_after_rename_settles(fail_rename: true)
+
+    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
+    page.execute_script(<<~JS)
+      document.querySelector('[data-inline-rename-target="input"]').value = "Espresso machine";
+    JS
+    click_button I18n.t("reviews.photo.add")
+
+    eventually(timeout: 10) { page.evaluate_script("window.__staleListDelivered === true") }
+    expect(page).to have_field(with: "Cutting board")
+    # The 422 settled on the OLD row, which the add's stream then replaced: the
+    # fresh row must still read as failed, not as a silent revert.
+    expect(page).to have_field(with: "Coffee machine")
+    expect(page).to have_css('input[aria-invalid="true"]')
   end
 
   # Holds the mark POST off the wire, delays the first add by 800ms, and fakes

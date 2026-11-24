@@ -39,6 +39,10 @@ import { Controller } from "@hotwired/stimulus"
 const SETTLED = "inline-rename:settled"
 const confirmed = new Map() // url -> { name, version }
 const sessions = new Map() // url -> { sending: name | null, wanted: name }
+// Items whose last rename failed, until a new edit or a later success supersedes
+// it — or the reviewer returns to the field: a row connecting in a list
+// replacement re-applies the error flag (#147) rather than looking saved.
+const failedRenames = new Set()
 
 // Record a server-confirmed state, keeping only the newest per item.
 function confirm(url, state) {
@@ -55,6 +59,7 @@ function want(url, name) {
   const session = sessions.get(url) ?? { sending: null, wanted: name }
   session.wanted = name
   sessions.set(url, session)
+  failedRenames.delete(url) // a fresh edit supersedes the failure
   pump(url)
 }
 
@@ -75,11 +80,13 @@ function pump(url) {
       // The server may canonicalize: follow its echo unless the user moved on.
       if (session.wanted === name) session.wanted = state.name
       session.sending = null
+      failedRenames.delete(url)
       announce(url, true)
       pump(url)
     })
     .catch(() => {
       sessions.delete(url) // a refused save drops the pending change (#147)
+      failedRenames.add(url) // kept even if no row is on the page to see it now
       announce(url, false)
     })
 }
@@ -108,7 +115,8 @@ export default class extends Controller {
   connect() {
     this.url = this.urlValue // captured so a flush can still fire after teardown
     confirm(this.url, { name: this.inputTarget.value, version: this.versionValue })
-    this.#show(intentFor(this.url))
+    if (failedRenames.has(this.url)) this.#settled(false)
+    else this.#show(intentFor(this.url))
 
     this.flush = () => {
       if (this.hasInputTarget) this.save()
@@ -147,6 +155,7 @@ export default class extends Controller {
 
   // Clear a prior error state when the reviewer returns to edit the field.
   clearError() {
+    failedRenames.delete(this.url)
     this.inputTarget.classList.remove("ring-2", "ring-error")
     this.inputTarget.removeAttribute("aria-invalid")
   }
