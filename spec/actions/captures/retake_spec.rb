@@ -30,6 +30,15 @@ RSpec.describe Captures::Retake do
     expect(Item.kept.exists?(item.id)).to be(true) # items untouched
   end
 
+  it "purges the replaced blob and keeps a single attachment" do
+    old_blob_id = media.image.blob.id
+
+    expect(retake).to be_success
+
+    expect(ActiveStorage::Blob.exists?(old_blob_id)).to be(false)
+    expect(ActiveStorage::Attachment.where(record: media, name: "image").count).to eq(1)
+  end
+
   it "emits media.retaken (re-warms variants, not a fresh capture)" do
     allow(Rails.event).to receive(:notify).and_call_original
 
@@ -159,6 +168,64 @@ RSpec.describe Captures::Retake do
     expect(media).to have_attributes(image_unavailable: true)
     expect(media.image.blob.id).to eq(old_blob_id)
     expect(media.recognition_runs).to be_empty
+  end
+
+  # #956 — create_and_upload! saves the blob row before the storage write.
+  it "leaves no blob row behind when storing the new image fails" do
+    media # stored before the failure is stubbed
+    allow(ActiveStorage::Blob.service).to receive(:upload).and_raise(Errno::ENOSPC)
+
+    allow(ActiveStorage::Blob.service).to receive(:delete).and_call_original
+
+    expect { expect { retake }.to raise_error(Errno::ENOSPC) }.not_to change(ActiveStorage::Blob, :count)
+    expect(media.reload.image).to be_attached
+    # A write that failed after storing the object must not leak it.
+    expect(ActiveStorage::Blob.service).to have_received(:delete).once
+  end
+
+  it "keeps the failed upload's blob row for the abandoned-upload sweep when the storage delete fails too" do
+    media
+    allow(ActiveStorage::Blob.service).to receive(:upload).and_raise(Errno::ENOSPC)
+    allow(ActiveStorage::Blob.service).to receive(:delete).and_raise(Errno::EIO)
+
+    # The upload error propagates, not the delete error.
+    expect { expect { retake }.to raise_error(Errno::ENOSPC) }.to change(ActiveStorage::Blob.unattached, :count).by(1)
+    expect(media.reload.image).to be_attached
+  end
+
+  # #955 — purging the replaced or unused blob is best-effort cleanup: a queue
+  # that refuses every job must not fail or mask the retake.
+  context "when the queue refuses every job" do
+    before do
+      media # created (and its image stored) before the queue goes down
+      allow(Rails.event).to receive(:notify).and_call_original
+      fail_every_enqueue
+    end
+
+    it "still returns the committed retake and emits media.retaken" do
+      old_blob_id = media.image.blob.id
+
+      expect(retake).to be_success
+      expect(media.reload.image.blob.id).not_to eq(old_blob_id)
+      expect(Rails.event).to have_received(:notify).with("media.retaken", hash_including(media_id: media.id))
+    end
+
+    it "still reports a re-scan that couldn't be queued as :enqueue_failed and emits media.retaken" do
+      expect(retake(rerun_recognition: true).failure).to eq(:enqueue_failed)
+      expect(media.recognition_runs.sole).to have_attributes(status: "failed", rescan: true)
+      expect(Rails.event).to have_received(:notify).with("media.retaken", hash_including(media_id: media.id))
+    end
+
+    it "still returns the original refusal when the unused blob can't be purged" do
+      action = described_class.new
+      allow(action).to receive(:upload).and_wrap_original do |original, *args|
+        create(:recognition_run, move:, box:, media:, status: "processing")
+        original.call(*args)
+      end
+
+      expect(action.call(media:, actor: user, file: upload).failure).to eq(:recognition_in_flight)
+      expect(Rails.event).not_to have_received(:notify).with("media.retaken", anything)
+    end
   end
 
   it "refuses a re-scan, without swapping, when the box was sealed after the pre-check" do

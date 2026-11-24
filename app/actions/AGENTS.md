@@ -91,6 +91,16 @@ end
     invisible today (no archive UI; capture surface is gated by
     `require_writable_move!`). A future `Moves::Archive` action should cancel
     in-flight runs during the transition (while still writable).
+- **Best-effort cleanup purges** (#955): purging a replaced, unused or
+  superseded blob after the real work goes through
+  `BestEffortPurge#purge_best_effort`, never a bare `purge_later`. Pass
+  blobs, not attachments: delete attachment rows yourself, in the
+  transaction that removes their records (see `Moves::Destroy`). A queue
+  outage then logs instead of failing the action, skipping its event, or
+  replacing a refusal with an exception. Replacing a `has_one_attached` file
+  inside a transaction also queues a purge from an after-commit callback
+  that raises after the commit; `Captures::Retake#detach_replaced` shows how
+  to take that purge over.
 - **Tests**: actions are plain Ruby — unit-test them directly with `.new.call(...)`
   and assert on `Success`/`Failure`.
 - **Types**: every method gets an inline RBS annotation (`#:` on its own line

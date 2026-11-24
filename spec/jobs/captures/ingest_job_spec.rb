@@ -35,6 +35,20 @@ RSpec.describe Captures::IngestJob do
     expect(media.recognition_runs).to be_any # recognition was enqueued+run (inline test adapter)
   end
 
+  # #955 — purging the reserved raw blob is best-effort cleanup once the
+  # capture is done.
+  it "still finishes the ingest when the reserved blob's purge can't be queued" do
+    media = create(:media, :pending, box:, move:)
+    blob = raw_blob
+    fail_every_enqueue
+
+    expect { described_class.perform_now(media.id, blob.id, captured_by_id: nil, tenant:) }.not_to raise_error
+
+    media.reload
+    expect(media).to be_ready
+    expect(media.image).to be_attached
+  end
+
   it "marks the media failed when the reserved blob is gone (never a stuck placeholder)" do
     blob = raw_blob
     blob_id = blob.id

@@ -33,6 +33,31 @@ RSpec.describe Moves::Destroy do
     expect(Room.unscoped.where(move_id: move_id)).to be_empty
   end
 
+  it "removes the deleted Move's attachments and purges their blobs" do
+    move = create(:move, :sample)
+    media = create(:media, box: create(:box, move: move), move: move)
+    blob_id = media.image.blob.id
+
+    expect(described_class.new.call(move: move)).to be_success
+    expect(ActiveStorage::Attachment.where(blob_id:)).to be_empty
+    expect(ActiveStorage::Blob.exists?(blob_id)).to be(false)
+  end
+
+  # #955 — purging the deleted Move's files is best-effort cleanup.
+  it "still deletes the Move and emits move.destroyed when the purge jobs can't be queued" do
+    move = create(:move, :sample)
+    media = create(:media, box: create(:box, move: move), move: move)
+    blob_id = media.image.blob.id
+    allow(Rails.event).to receive(:notify).and_call_original
+    fail_every_enqueue
+
+    expect(described_class.new.call(move: move)).to be_success
+    expect(Move.unscoped.where(id: move.id)).to be_empty
+    expect(Rails.event).to have_received(:notify).with("move.destroyed", move_id: move.id)
+    # Left unattached, so the abandoned-upload sweep reclaims it.
+    expect(ActiveStorage::Blob.unattached.where(id: blob_id)).to exist
+  end
+
   it "cascades every cluster table (#629 — no DELETE_ORDER entries needed)" do
     move = create(:move, :sample)
     box = create(:box, move: move)
