@@ -103,9 +103,10 @@ module Views
       end
 
       # Room filter (left) + sort control (right), both GET-param driven so the
-      # active room and sort survive each other and stay bookmarkable. Filters show
-      # whenever the Move has rooms — even on an empty filtered result, so the user
-      # can always switch rooms; the sort control only when there are boxes to sort.
+      # active room and sort survive each other and stay bookmarkable. `@rooms` is
+      # only the rooms holding boxes plus the selected one (#914), so filters show
+      # even on an empty filtered result and the user can always switch rooms; the
+      # sort control only when there are boxes to sort.
       # `ml-auto` right-aligns the sort without a spacer element.
 
       #: () -> untyped

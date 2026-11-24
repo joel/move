@@ -134,8 +134,10 @@ RSpec.describe "Boxes" do
 
       get move_boxes_path(move, room_id: empty_room.id)
 
-      # The empty filtered result still offers the room chips to switch rooms.
-      expect(response.body).to include("Kitchen").and include("Attic")
+      # The empty filtered result still offers the room chips to switch rooms:
+      # the selected (empty) room and rooms with boxes, not other empty rooms.
+      expect(response.body).to include("Garage").and include("Attic")
+      expect(response.body).not_to include("Kitchen")
       expect(response.body).to include(I18n.t("boxes.empty.filtered_title"))
     end
 
@@ -216,6 +218,14 @@ RSpec.describe "Boxes" do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(I18n.t("boxes.form.submit"))
+    end
+
+    it "still offers rooms with no boxes — a selection surface (#914)" do
+      create(:room, move:, name: "Attic")
+
+      get new_move_box_path(move)
+
+      expect(response.body).to include("Attic")
     end
 
     it "redirects to the boxes home for an archived (read-only) move" do
