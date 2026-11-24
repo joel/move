@@ -78,6 +78,33 @@ RSpec.describe Box do
     end
   end
 
+  describe "#padded_number" do
+    it "zero-pads the stored number to the printed-label width" do
+      expect(build(:box, number: "7").padded_number).to eq("007")
+      expect(build(:box, number: "042").padded_number).to eq("042")
+      expect(build(:box, number: "1234").padded_number).to eq("1234")
+    end
+  end
+
+  describe ".pad_number" do
+    it "pads a raw number (string or integer)" do
+      expect(described_class.pad_number(5)).to eq("005")
+      expect(described_class.pad_number("12")).to eq("012")
+    end
+  end
+
+  describe ".distinct_padded_labels" do
+    it "pads each number, keyed by id, in the given order" do
+      expect(described_class.distinct_padded_labels([%w[b 2], %w[a 10]]))
+        .to eq("b" => "002", "a" => "010")
+    end
+
+    it "keeps the raw number where padding would collide (1 vs 01)" do
+      labels = described_class.distinct_padded_labels([%w[x 1], %w[y 01], %w[z 2]])
+      expect(labels).to eq("x" => "1", "y" => "01", "z" => "002")
+    end
+  end
+
   describe ".ordered" do
     it "sorts by numeric box number, not lexicographically" do
       move = create(:move)

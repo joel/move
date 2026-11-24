@@ -37,6 +37,10 @@ end
 
 class Box
   def self.dimension_presets: (?min_count: Integer, ?limit: Integer) -> untyped
+
+  def self.pad_number: (untyped number) -> String
+
+  def self.distinct_padded_labels: (Array[[untyped, untyped]] pairs) -> Hash[untyped, untyped]
 end
 
 class User
