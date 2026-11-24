@@ -15,6 +15,16 @@ module Components
         "review-item-#{item.id}"
       end
 
+      # The row's freshness for the inline-rename reconcile (#692): updated_at in
+      # whole microseconds (Postgres precision; < 2^53, so exact as a JS Number).
+      # Stamped on the row AND echoed by the rename response, so the client keeps
+      # whichever name is newer when a list replacement races a rename.
+
+      #: (untyped item) -> Integer
+      def self.version(item)
+        (item.updated_at.to_r * 1_000_000).to_i
+      end
+
       # highlight: the row just streamed in from an add — scroll it into view and
       # flash a ring (UX rule #1) via the shared `highlight` Stimulus controller.
       # queue: the Move-wide walk (#654) — the remove URL carries ?queue=move so
@@ -78,7 +88,10 @@ module Components
         return {} if controllers.empty?
 
         data = { controller: controllers.join(" ") }
-        data[:inline_rename_url_value] = rename_path if @editable
+        if @editable
+          data[:inline_rename_url_value] = rename_path
+          data[:inline_rename_version_value] = self.class.version(@item).to_s
+        end
         data
       end
 
