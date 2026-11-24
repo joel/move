@@ -471,6 +471,9 @@ RSpec.describe "Review pending edits (JS)", :js do
   # afterwards (a newer version); 3. an add lands and its stream replaces the
   # list, so the row reconnects carrying the other tab's newer version.
   def stale_echo_behind_other_tab_edit(here, other)
+    stale_version = page.evaluate_script(
+      %(document.querySelector('[data-controller~="inline-rename"]').dataset.inlineRenameVersionValue)
+    )
     hold_rename_response
     type_rename(here)
     eventually { page.evaluate_script("window.__renameOnServer === true") }
@@ -478,7 +481,20 @@ RSpec.describe "Review pending edits (JS)", :js do
     eventually { page.evaluate_script("window.__otherTabDone === true") }
     fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
     click_button I18n.t("reviews.photo.add")
-    expect(page).to have_field(with: "Cutting board")
+    await_list_replacement(stale_version)
+  end
+
+  # The add's stream has replaced the list and the original row reconnected
+  # carrying the other tab's newer version. Not `have_field(with: "Cutting
+  # board")`: the add form's own input holds that text until submit-end resets
+  # it, so it matches before the stream lands, and a replacement arriving after
+  # the held echo is released makes that echo the newest state this tab knows
+  # (so the controller correctly sends nothing more; #953).
+  def await_list_replacement(stale_version)
+    within("##{Components::Reviews::ItemList::ID}") do
+      expect(page).to have_field(with: "Cutting board")
+      expect(page).to have_no_css("[data-inline-rename-version-value='#{stale_version}']")
+    end
   end
 
   it "does not re-send an older rename over a newer edit a list replacement brought in" do
