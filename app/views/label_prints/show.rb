@@ -54,7 +54,8 @@ module Views
 
       # Large-batch confirmation (#314): the range is valid but would print a lot of
       # labels, so ask before burning thermal paper. "Print anyway" re-POSTs the same
-      # range with confirmed=true; "Back" returns to the range picker.
+      # range with confirmed=true; "Back" returns to the range picker pre-filled with
+      # that range (#959, UX rule 4), so narrowing it doesn't mean retyping it.
 
       #: () -> untyped
       def confirm_card
@@ -79,7 +80,8 @@ module Views
           end
           render Components::Ui::Button.new(
             label: I18n.t("label_print.confirm.cancel"),
-            href: move_label_print_path(@move), variant: :ghost, full_width: true
+            href: move_label_print_path(@move, from: @from, to: @to),
+            variant: :ghost, full_width: true
           )
         end
       end
