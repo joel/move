@@ -92,8 +92,10 @@ end
     `require_writable_move!`). A future `Moves::Archive` action should cancel
     in-flight runs during the transition (while still writable).
 - **Best-effort cleanup purges** (#955): purging a replaced, unused or
-  superseded blob/attachment after the real work goes through
-  `BestEffortPurge#purge_best_effort`, never a bare `purge_later`. A queue
+  superseded blob after the real work goes through
+  `BestEffortPurge#purge_best_effort`, never a bare `purge_later`. Pass
+  blobs, not attachments: delete attachment rows yourself, in the
+  transaction that removes their records (see `Moves::Destroy`). A queue
   outage then logs instead of failing the action, skipping its event, or
   replacing a refusal with an exception. Replacing a `has_one_attached` file
   inside a transaction also queues a purge from an after-commit callback

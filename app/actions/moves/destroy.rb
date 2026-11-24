@@ -52,12 +52,14 @@ module Moves
     def teardown(move)
       # Capture attachment ids before any row is gone (delete_all skips the purge
       # callback, so blobs would otherwise orphan in storage).
-      attachment_ids = attachment_ids_for(move)
+      attachments = ActiveStorage::Attachment.where(id: attachment_ids_for(move))
+      blob_ids = attachments.pluck(:blob_id)
       ActiveRecord::Base.transaction do
         DELETE_ORDER.each { |model| model.unscoped.where(move_id: move.id).delete_all }
         Move.unscoped.where(id: move.id).delete_all
+        attachments.delete_all
       end
-      purge_blobs(attachment_ids)
+      purge_blobs(blob_ids)
       Success()
     rescue ActiveRecord::InvalidForeignKey, ActiveRecord::StatementInvalid => e
       Failure(e.message)
@@ -74,14 +76,17 @@ module Moves
       end
     end
 
-    # After the rows are gone, purge the (now-orphaned) attachments + their
-    # blobs. Best-effort (#955): the Move is already deleted, so a purge that
-    # can't be queued must not fail the action or skip move.destroyed.
+    # The attachment rows go in the delete transaction, with the records they
+    # point at. Their blobs are purged once that has committed, as best-effort
+    # cleanup (#955): the Move is already gone, so a purge that can't be queued
+    # must not fail the action or skip move.destroyed. A blob left behind is
+    # unattached, so PurgeAbandonedUploadsJob reclaims it. A blob still attached
+    # elsewhere is not purged.
 
-    #: (untyped attachment_ids) -> untyped
-    def purge_blobs(attachment_ids)
-      ActiveStorage::Attachment.where(id: attachment_ids).find_each do |attachment|
-        purge_best_effort(attachment, "moves.destroy")
+    #: (untyped blob_ids) -> untyped
+    def purge_blobs(blob_ids)
+      ActiveStorage::Blob.unattached.where(id: blob_ids).find_each do |blob| # steep:ignore NoMethod
+        purge_best_effort(blob, "moves.destroy")
       end
     end
 
