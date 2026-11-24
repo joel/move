@@ -25,7 +25,7 @@ class BoxesController < MoveScopedController
   def index
     # Resolve the filter through the Move's own rooms so an unknown or malformed
     # room_id is treated as a cleared filter, never a stray query.
-    selected_room = @move.rooms.find_by(id: selected_room_id) if selected_room_id
+    selected_room = filter_room
     visible = authorized_scope(@move.boxes)
     scope = visible.includes(:room)
     scope = scope.where(room: selected_room) if selected_room
@@ -61,13 +61,13 @@ class BoxesController < MoveScopedController
   end
 
   # GET /moves/:move_id/boxes/new
+  # Arriving from a room-filtered list (`?room_id=`) presets that room (#923,
+  # ux rule 4) and carries the filter so create can return to it. An unknown
+  # or foreign room_id resolves to nil — a plain, room-less form.
 
   #: () -> untyped
   def new
-    render Views::Boxes::New.new(
-      move: @move, box: @move.boxes.new, rooms: @move.rooms.order(:name),
-      dimension_presets: @move.boxes.dimension_presets
-    )
+    render new_box_view(@move.boxes.new(room_name: filter_room&.name))
   end
 
   # GET /moves/:move_id/boxes/:id/edit
@@ -91,13 +91,12 @@ class BoxesController < MoveScopedController
 
     case result
     in Dry::Monads::Success(box)
-      redirect_to_index_showcasing(box, t(".created", number: box.number))
+      redirect_to_index_showcasing(box, t(".created", number: box.number),
+                                   room_id: (box.room_id if filter_room))
     in Dry::Monads::Failure(errors)
       box = @move.boxes.new(box_params)
       box.errors.merge!(errors) if errors.respond_to?(:each)
-      render Views::Boxes::New.new(move: @move, box: box, rooms: @move.rooms.order(:name),
-                                   dimension_presets: @move.boxes.dimension_presets),
-             status: :unprocessable_content
+      render new_box_view(box), status: :unprocessable_content
     end
   end
 
@@ -328,13 +327,15 @@ class BoxesController < MoveScopedController
   # The #336 "make the new box unmissable" landing, shared by create and
   # duplicate: back on the list (default recency order → the new box is at the
   # top) with a "View" link in the toast + a one-time highlight on its card.
+  # `room_id` keeps a room filter (#923): it is the new box's own room, so the
+  # box is always inside the filtered list even if the user changed the room.
 
-  #: (untyped box, String notice) -> untyped
-  def redirect_to_index_showcasing(box, notice)
+  #: (untyped box, String notice, ?room_id: untyped) -> untyped
+  def redirect_to_index_showcasing(box, notice, room_id: nil)
     flash[:action_href] = move_box_path(@move, box)
     flash[:action_label] = t("boxes.index.view_box")
     flash[:highlight_box_id] = box.id
-    redirect_to move_boxes_path(@move), notice: notice
+    redirect_to move_boxes_path(@move, room_id: room_id), notice: notice
   end
 
   #: () -> untyped
@@ -441,12 +442,21 @@ class BoxesController < MoveScopedController
     end
   end
 
-  # Archived Moves are read-only — no creating, editing or transitioning boxes.
-  # Explicit key (not lazy) since this runs across several actions.
+  # The `?room_id=` filter resolved through the Move's own rooms, so an unknown,
+  # malformed or foreign id is a cleared filter, never a stray query. Shared by
+  # index, new and create (#923). Memoised, including a nil result.
 
   #: () -> untyped
-  def selected_room_id
-    params[:room_id].presence
+  def filter_room
+    return @filter_room if defined?(@filter_room)
+
+    @filter_room = (@move.rooms.find_by(id: params[:room_id]) if params[:room_id].present?)
+  end
+
+  #: (untyped box) -> untyped
+  def new_box_view(box)
+    Views::Boxes::New.new(move: @move, box: box, rooms: @move.rooms.order(:name),
+                          dimension_presets: @move.boxes.dimension_presets, filter_room_id: filter_room&.id)
   end
 
   # Permitted `?sort=` key for the Boxes list; defaults to "recent" (newest
