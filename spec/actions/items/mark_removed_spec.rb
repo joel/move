@@ -87,4 +87,19 @@ RSpec.describe Items::MarkRemoved do
       expect(Rails.event).not_to removed_events
     end
   end
+
+  # #965 control: called on its own, the emit runs after the item lock's
+  # transaction commits — only the fixture wrapper is open (depth 1).
+  it "emits item.removed after its own item-locked write commits (#965)" do
+    item = create(:item, :manual, move:, box: create(:box, move:, status: "unpacking"))
+    depths = [] #: Array[Integer]
+    allow(Rails.event).to receive(:notify).and_wrap_original do |original, name, *args, **kwargs|
+      depths << ActiveRecord::Base.connection.open_transactions if name == "item.removed"
+      original.call(name, *args, **kwargs)
+    end
+
+    described_class.new.call(item:, actor:)
+
+    expect(depths).to eq([1])
+  end
 end
