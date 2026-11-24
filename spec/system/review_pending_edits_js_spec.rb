@@ -448,6 +448,7 @@ RSpec.describe "Review pending edits (JS)", :js do
           return of_(...args).then(async (res) => {
             window.__renameOnServer = true;
             await gate;
+            window.__renamesSettled = (window.__renamesSettled || 0) + 1;
             return res;
           });
         }
@@ -456,15 +457,28 @@ RSpec.describe "Review pending edits (JS)", :js do
     JS
   end
 
-  def rename_here_then_in_other_tab(here, other)
+  # A blur-committed edit, script-driven so no click can blur it early.
+  def type_rename(name)
     page.execute_script(<<~JS)
       const input = document.querySelector('[data-inline-rename-target="input"]');
-      input.value = #{here.to_json};
+      input.value = #{name.to_json};
       input.dispatchEvent(new Event("blur"));
     JS
+  end
+
+  # The #934 interleaving, up to the held echo: 1. this tab renames and the
+  # server commits it, response held; 2. another tab renames the same item
+  # afterwards (a newer version); 3. an add lands and its stream replaces the
+  # list, so the row reconnects carrying the other tab's newer version.
+  def stale_echo_behind_other_tab_edit(here, other)
+    hold_rename_response
+    type_rename(here)
     eventually { page.evaluate_script("window.__renameOnServer === true") }
     page.execute_script("window.__otherTabRename(#{other.to_json})")
     eventually { page.evaluate_script("window.__otherTabDone === true") }
+    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
+    click_button I18n.t("reviews.photo.add")
+    expect(page).to have_field(with: "Cutting board")
   end
 
   it "does not re-send an older rename over a newer edit a list replacement brought in" do
@@ -472,20 +486,10 @@ RSpec.describe "Review pending edits (JS)", :js do
 
     login_as(user: user)
     visit move_box_review_photo_path(move, box, media)
-    hold_rename_response
+    stale_echo_behind_other_tab_edit("Espresso machine", "Coffee grinder")
 
-    # 1. This tab renames; the server commits it, the response is held.
-    # 2. Another tab renames the same item afterwards (a newer version).
-    rename_here_then_in_other_tab("Espresso machine", "Coffee grinder")
-
-    # 3. An add lands: its stream replaces the list, so the row reconnects
-    #    carrying the newer version ("Coffee grinder").
-    fill_in placeholder: I18n.t("reviews.photo.add_placeholder"), with: "Cutting board"
-    click_button I18n.t("reviews.photo.add")
-    expect(page).to have_field(with: "Cutting board")
-
-    # 4. The older echo arrives: the field follows the newer confirmed state,
-    #    and no second PATCH re-sends "Espresso machine".
+    # The older echo arrives: the field follows the newer confirmed state, and
+    # no second PATCH re-sends "Espresso machine".
     page.execute_script("window.__releaseRename()")
     expect(page).to have_field(with: "Coffee grinder")
     expect(page).to have_no_field(with: "Espresso machine")
@@ -493,6 +497,27 @@ RSpec.describe "Review pending edits (JS)", :js do
     sleep 0.5 # a re-send would leave synchronously from the settle handler
     expect(page.evaluate_script("window.__renamePatches")).to eq(1)
     eventually { Apartment::Tenant.switch(slug) { item.reload.name == "Coffee grinder" } }
+  end
+
+  it "still sends a rename the user edited away from and back to while it was held" do
+    move, box, media, item = seed_review_photo
+
+    login_as(user: user)
+    visit move_box_review_photo_path(move, box, media)
+    stale_echo_behind_other_tab_edit("Espresso machine", "Coffee grinder")
+
+    # Edited away and back to the in-flight name: the same value, but a new,
+    # deliberate edit that must win over the other tab's rename.
+    type_rename("Bread knife")
+    type_rename("Espresso machine")
+    page.execute_script("window.__releaseRename()")
+
+    # Wait for the re-send to settle before reading the DB (shared connection).
+    eventually { page.evaluate_script("window.__renamesSettled === 2") }
+    expect(page.evaluate_script("window.__renamePatches")).to eq(2)
+    expect(page).to have_field(with: "Espresso machine")
+    expect(page).to have_no_css('input[aria-invalid="true"]')
+    eventually { Apartment::Tenant.switch(slug) { item.reload.name == "Espresso machine" } }
   end
 
   it "keeps a deliberately re-typed duplicate name typed during an in-flight add" do
