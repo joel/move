@@ -25,73 +25,166 @@ module Captures
   # recognition run is still in flight (a re-scan could race the swap). Caller owns
   # tenant context.
   #
-  # The re-scan run is created through Enqueue's guarded path (#919), like
-  # Retry (#896): box lock, then photo lock, and the run commits before the
-  # locks are released. Those are the locks
-  # RecognitionSuggestions::ResolveConflict holds from its latest-run check to
-  # its "Keep both" item, so a re-scan cannot commit in between: it either
-  # lands first (and the conflict is refused as :superseded) or waits for the
-  # decision to commit.
+  # The in-flight check, the phase check, the swap and (when asked) the
+  # re-scan run all happen in ONE critical section (#929): the box lock, then
+  # the photo lock (PARENT_ROW_LOCK), the same locks Enqueue's guarded path
+  # takes for Retry (#896) and Process takes before it materializes. With a
+  # re-scan, the swap runs as Enqueue's guard (#919), so the run commits with
+  # the swap. Consequences:
+  # - a Retry either commits its run first (the retake sees it in flight and
+  #   refuses before swapping) or waits and then scans the NEW image;
+  # - a concurrent discard either commits first (the retake fails with
+  #   :not_found and swaps nothing) or waits for the retake (#933);
+  # - RecognitionSuggestions::ResolveConflict holds these locks from its
+  #   latest-run check to its "Keep both" item, so a re-scan lands either
+  #   before (the conflict is refused as :superseded) or after the decision.
   class Retake < BaseAction
+    include Items::CurrentBoxLock
+
     #: (media: untyped, actor: untyped, ?file: untyped, ?rerun_recognition: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, actor:, file: nil, rerun_recognition: false)
       yield ensure_writable(media.move)
       return Failure(:no_file) if file.blank?
-      return Failure(:recognition_in_flight) if media.recognition_in_flight?
-      # Re-scan adds items → only into a capturable (packing) box (mirrors
-      # Captures::Create's not_capturable guard). Validated up front so a rejected
-      # re-scan never leaves the image half-swapped.
-      return Failure(:rescan_wrong_phase) if rerun_recognition && !media.box.capturable?
 
-      yield swap_image(media, file)
-      finish(media, actor, rerun_recognition ? rescan(media) : Success())
+      # Cheap early refusal before the upload is transcoded; checked again
+      # under the locks, where it counts.
+      yield ensure_retakeable(media, rerun_recognition)
+      blob = yield upload(file)
+
+      begin
+        rerun_recognition ? swap_and_rescan(media, actor, blob) : swap_only(media, actor, blob)
+      ensure
+        discard_unused(blob)
+      end
     end
 
     private
 
-    # The guard only takes the locks and always creates the run. Nothing is
-    # re-checked under them on purpose: the swap has already persisted, and a
-    # run that started meanwhile may be scanning the OLD image. The re-scan's
-    # run is then the latest, so Process supersedes the older one (it
-    # re-checks the latest run under the photo lock before it materializes)
-    # instead of letting it put old-image items on the new photo.
+    # Re-scan adds items → only into a capturable (packing) box (mirrors
+    # Captures::Create's not_capturable guard). Under the locks, this runs
+    # before the swap, so a rejected retake never leaves the image swapped.
 
-    #: (untyped media) -> Dry::Monads::Result[untyped, untyped]
-    def rescan(media)
-      RecognitionRuns::Enqueue.new.call(media:, rescan: true, guard: ->(_locked) { Success() })
+    #: (untyped media, bool rescan) -> Dry::Monads::Result[untyped, untyped]
+    def ensure_retakeable(media, rescan)
+      return Failure(:recognition_in_flight) if media.recognition_in_flight?
+      return Failure(:rescan_wrong_phase) if rescan && !media.box.capturable?
+
+      Success()
     end
 
-    # The swap has persisted even when the re-scan job could not be queued
-    # (#871: the run is failed and retryable), so the retake is still announced
-    # before that failure is returned. Any other re-scan failure stops here.
+    # Runs under the box and photo locks: re-check, then swap. Returns the
+    # replaced blob.
 
-    #: (untyped media, untyped actor, Dry::Monads::Result[untyped, untyped] rescan) -> Dry::Monads::Result[untyped, untyped]
-    def finish(media, actor, rescan)
-      return rescan if rescan.failure? && rescan.failure != :enqueue_failed
+    #: (untyped media, untyped blob, bool rescan) -> Dry::Monads::Result[untyped, untyped]
+    def checked_swap(media, blob, rescan)
+      yield ensure_retakeable(media, rescan)
+      swap_image(media, blob)
+    end
 
-      emit_event(media, actor)
-      rescan.failure? ? rescan : Success(media)
+    #: (untyped media, untyped actor, untyped blob) -> Dry::Monads::Result[untyped, untyped]
+    def swap_only(media, actor, blob)
+      locked = with_current_box_lock(media) do
+        media.lock!(PARENT_ROW_LOCK)
+        next Failure(:not_found) if media.discarded?
+
+        checked_swap(media, blob, false)
+      end
+      old_blob = yield locked
+      announce(media, actor, old_blob)
+      Success(media)
+    end
+
+    # The guard runs under Enqueue's box and photo locks (lock! reloads the
+    # photo and Enqueue has already refused a discarded one), and the run is
+    # created only when the guard succeeds, in the same transaction as the swap.
+    # `swapped` records that the swap ran: Enqueue's result alone can't tell a
+    # refusal before the swap from a re-scan failure after it.
+
+    #: (untyped media, untyped actor, untyped blob) -> Dry::Monads::Result[untyped, untyped]
+    def swap_and_rescan(media, actor, blob)
+      swapped = nil #: untyped
+      rescan = RecognitionRuns::Enqueue.new.call(
+        media:, rescan: true,
+        guard: lambda { |locked|
+          checked_swap(locked, blob, true).tap { |swap| swapped = swap if swap.success? }
+        }
+      )
+      return rescan unless swapped
+
+      announce(media, actor, swapped.value!)
+      finish(media, rescan)
+    end
+
+    # Reached only once the swap committed (#933): the retake has already
+    # been announced, and the result reports the re-scan on its own. A job
+    # that could not be queued leaves a failed, retryable run (#871); any
+    # other re-scan failure is :rescan_failed, never a failed retake.
+
+    #: (untyped media, Dry::Monads::Result[untyped, untyped] rescan) -> Dry::Monads::Result[untyped, untyped]
+    def finish(media, rescan)
+      return Success(media) if rescan.success?
+
+      rescan.failure == :enqueue_failed ? rescan : Failure(:rescan_failed)
     end
 
     # ImageNormalizer sniffs the real type from the bytes (never the client-declared
     # one), strips EXIF/GPS, caps the size, and transcodes to JPEG — the same
     # authority every capture goes through, so a retake can't smuggle in a raw
     # metadata-bearing or oversized master.
+    #
+    # The blob is stored BEFORE the locks are taken. Attaching an IO would
+    # upload it from an after-commit callback, after the ready flags and the
+    # re-scan run had committed, so a storage failure would leave a "ready"
+    # photo with no file and a queued run with no job. A storage failure here
+    # raises before anything is written.
 
-    #: (untyped media, untyped file) -> Dry::Monads::Result[untyped, untyped]
-    def swap_image(media, file)
-      normalized = ImageNormalizer.call(file)
-      old_blob = media.image.attached? ? media.image.blob : nil
-      media.image.attach(normalized)
-      media.update!(image_unavailable: false, optimized_at: Time.current, status: "ready")
-      purge_replaced(old_blob, media)
-      Success(media)
+    #: (untyped file) -> Dry::Monads::Result[untyped, untyped]
+    def upload(file)
+      Success(ActiveStorage::Blob.create_and_upload!(**blob_params(ImageNormalizer.call(file)))) # steep:ignore InsufficientKeywordArguments
     rescue ImageNormalizer::ImageTooLarge
       Failure(:image_too_large)
     rescue ImageNormalizer::UnsupportedFormat
       Failure(:unsupported_image)
+    end
+
+    # ImageNormalizer returns an {io:, filename:, content_type:, metadata:}
+    # Hash, or the upload itself when it stores a native image unchanged.
+
+    #: (untyped normalized) -> Hash[Symbol, untyped]
+    def blob_params(normalized)
+      return normalized if normalized.is_a?(Hash)
+
+      { io: normalized.open, filename: normalized.original_filename, content_type: normalized.content_type }
+    end
+
+    # A retake refused under the locks (or rolled back) leaves its stored
+    # blob unattached; drop it.
+
+    #: (untyped blob) -> void
+    def discard_unused(blob)
+      return if ActiveStorage::Attachment.exists?(blob_id: blob.id) # steep:ignore NoMethod
+
+      blob.purge_later
+    end
+
+    # One save writes the new attachment and the flags, so a validation
+    # failure writes neither. Returns the replaced blob (nil when there was
+    # none); it is purged once the locks are released.
+
+    #: (untyped media, untyped blob) -> Dry::Monads::Result[untyped, untyped]
+    def swap_image(media, blob)
+      old_blob = media.image.attached? ? media.image.blob : nil
+      media.image = blob
+      media.update!(image_unavailable: false, optimized_at: Time.current, status: "ready")
+      Success(old_blob)
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
+    end
+
+    #: (untyped media, untyped actor, untyped old_blob) -> void
+    def announce(media, actor, old_blob)
+      purge_replaced(old_blob, media)
+      emit_event(media, actor)
     end
 
     # has_one_attached replace usually purges the prior blob, but the corrupt master

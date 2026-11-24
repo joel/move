@@ -13,6 +13,10 @@ class ReviewsController < MoveScopedController
   include ReviewItemListing
   include ReviewConflictResponses
 
+  # Captures::Retake failures with their own flash (retake_error).
+  RETAKE_ERRORS = %i[no_file recognition_in_flight rescan_wrong_phase image_too_large unsupported_image
+                     enqueue_failed rescan_failed].freeze
+
   # ?queue=move flips the photo screen into the Move-wide review-queue walk
   # (#654): Next crosses box boundaries, advancing strictly forward in capture
   # order through photos still holding an unreviewed co-located item, and Finish
@@ -215,6 +219,9 @@ class ReviewsController < MoveScopedController
     in Dry::Monads::Success(_media)
       redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query),
                   notice: t("reviews.flash.photo_retaken")
+    in Dry::Monads::Failure(:not_found)
+      # A concurrent delete won the race (#933): the photo page would 404.
+      redirect_to photo_gone_path, alert: t("reviews.flash.retake_errors.not_found")
     in Dry::Monads::Failure(reason)
       redirect_to move_box_review_photo_path(@move, @box, @media, **queue_query), alert: retake_error(reason)
     end
@@ -340,10 +347,7 @@ class ReviewsController < MoveScopedController
   end
 
   #: (untyped reason) -> String
-  def retake_error(reason)
-    known = %i[no_file recognition_in_flight rescan_wrong_phase image_too_large unsupported_image enqueue_failed]
-    t("reviews.flash.retake_errors.#{known.include?(reason) ? reason : :failed}")
-  end
+  def retake_error(reason) = t("reviews.flash.retake_errors.#{RETAKE_ERRORS.include?(reason) ? reason : :failed}")
 
   # Stream the new item in by replacing the whole list (highlighting the new row)
   # plus a toast. We always replace — never append — because the append target
