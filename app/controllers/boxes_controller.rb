@@ -6,6 +6,7 @@
 # authorize, call the action, pattern-match, render.
 class BoxesController < MoveScopedController
   include FindListPinnable
+  include BoxGridItems
 
   before_action :set_box,
                 only: %i[show jump edit update transition set_fragile seal description_suggestion
@@ -365,12 +366,7 @@ class BoxesController < MoveScopedController
     # nil source (no query), and photo-backed items aren't standalone (never touch
     # it), so eager-loading the whole set would be wasted work Bullet rightly flags.
     foreign = items.select { |i| i.source_media_id && box_media_ids.exclude?(i.source_media_id) }
-    if foreign.any?
-      # The community activerecord sig predates the kwargs Preloader API.
-      ActiveRecord::Associations::Preloader.new(
-        records: foreign, associations: { source_media: { image_attachment: :blob } } # steep:ignore UnexpectedKeywordArgument
-      ).call # steep:ignore NoMethod
-    end
+    preload_item_tiles(foreign)
     # The box's real-capture photos that produced an item — the review walk's
     # membership. not_generated excludes AI-generated item images (#416): they
     # never had a recognition run, so they must not be review-walkable nor flip

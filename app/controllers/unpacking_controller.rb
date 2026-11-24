@@ -7,6 +7,8 @@
 # tenant schema and is scoped to one Move. Thin: authorize, call the action,
 # pattern-match, render.
 class UnpackingController < MoveScopedController
+  include BoxGridItems
+
   before_action :set_box
   before_action :ensure_unpacking_surface, only: :show
   before_action :set_item, only: %i[remove restore]
@@ -376,19 +378,18 @@ class UnpackingController < MoveScopedController
 
   # A photo that left this box (Codex #886): Photos::Move takes only its
   # in-box items, so the ones already unpacked stay here — and with their
-  # photo gone, a full grid render shows them as standalone cards. They take
-  # the photo card's place (a reload re-sorts them after the photos); with
-  # none left behind the card is simply removed.
+  # photo gone, a full grid render shows them as standalone cards. The photo
+  # card is removed and, when items stayed behind, the standalone region is
+  # redrawn in full-render order so they land at their sorted place (#889).
+  # One SafeBuffer, so the callers still get a single stream.
 
   #: (untyped media_id) -> untyped
   def departed_photo_stream(media_id)
-    target = Components::Boxes::PhotoCard.dom_id_for(media_id)
-    # The cards read their (shared) source photo + blob for the tile (#416).
-    left = authorized_scope(@box.items).where(source_media_id: media_id).order(created_at: :desc, id: :desc)
-                                       .includes(source_media: { image_attachment: :blob }).to_a
-    return turbo_stream.remove(target) if left.empty?
+    remove = turbo_stream.remove(Components::Boxes::PhotoCard.dom_id_for(media_id))
+    return remove unless authorized_scope(@box.items).exists?(source_media_id: media_id)
 
-    turbo_stream.replace(target, view_context.safe_join(left.map { |item| view_context.render(item_card(item)) }))
+    cards = view_context.safe_join(standalone_grid_items.map { |item| view_context.render(item_card(item)) })
+    view_context.safe_join([remove, turbo_stream.update(Components::Boxes::ContentsGrid::STANDALONE_ID, cards)])
   end
 
   #: (untyped item) -> untyped
