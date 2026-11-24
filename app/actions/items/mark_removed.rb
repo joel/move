@@ -13,13 +13,23 @@ module Items
   # phase-aware UI is not the only gate. The C2 review walk removes a mis-detected
   # item *during packing*, a different use case, so it opts out via
   # `allow_any_phase: true`.
+  #
+  # Replay-idempotent (#916), like RestoreToBox and MarkFound: a double tap, a
+  # checklist toggle racing another device, or a retried MCP call on an item
+  # that is already removed returns Success(item) without writing or emitting a
+  # second item.removed (which would duplicate the activity entry and re-fire
+  # every subscriber). The presence check runs under a row lock on the item, so
+  # two concurrent marks serialize and the loser re-reads `removed` and no-ops.
+  # Item lock only, no box lock taken here: callers that hold the box lock
+  # (MarkPhotoRemoved) keep the box → item order, and CompleteIfEmpty runs after
+  # this returns, never while the item is locked (#739 R2).
   class MarkRemoved < BaseAction
     #: (item: untyped, actor: untyped, ?allow_any_phase: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:, allow_any_phase: false)
       yield ensure_writable(item.move)
       yield ensure_unpacking_phase(item.box) unless allow_any_phase
-      yield persist(item)
-      yield emit_event(item, actor)
+      removed_now = yield persist_unless_removed(item)
+      yield emit_event(item, actor) if removed_now
       Success(item)
     end
 
@@ -32,10 +42,19 @@ module Items
       Success()
     end
 
+    # Success(true) when this call flipped the item, Success(false) when the
+    # locked re-read found it already removed. The lock is released (and the
+    # write committed, unless a caller's transaction encloses it) before the
+    # event is emitted.
+
     #: (untyped item) -> Dry::Monads::Result[untyped, untyped]
-    def persist(item)
-      item.update!(presence_state: "removed")
-      Success(item)
+    def persist_unless_removed(item)
+      item.with_lock do
+        next Success(false) if item.removed?
+
+        item.update!(presence_state: "removed")
+        Success(true)
+      end
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
     end
