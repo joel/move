@@ -24,31 +24,64 @@ module Captures
   # re-scan a closed box fails rather than smuggling items into it. Refuses while a
   # recognition run is still in flight (a re-scan could race the swap). Caller owns
   # tenant context.
+  #
+  # The re-scan run is created through Enqueue's guarded path (#919), like
+  # Retry (#896): box lock, then photo lock, the checks again under them, and
+  # the run commits before the locks are released. Those are the locks
+  # RecognitionSuggestions::ResolveConflict holds from its latest-run check to
+  # its "Keep both" item, so a re-scan cannot commit in between: it either
+  # lands first (and the conflict is refused as :superseded) or waits for the
+  # decision to commit.
   class Retake < BaseAction
+    # Re-scan refusals after the swap has persisted: the retake is still
+    # announced (see #finish).
+    SWAP_KEPT_FAILURES = %i[enqueue_failed recognition_in_flight rescan_wrong_phase].freeze
+
     #: (media: untyped, actor: untyped, ?file: untyped, ?rerun_recognition: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, actor:, file: nil, rerun_recognition: false)
       yield ensure_writable(media.move)
       return Failure(:no_file) if file.blank?
-      return Failure(:recognition_in_flight) if media.recognition_in_flight?
-      # Re-scan adds items → only into a capturable (packing) box (mirrors
-      # Captures::Create's not_capturable guard). Validated up front so a rejected
-      # re-scan never leaves the image half-swapped.
-      return Failure(:rescan_wrong_phase) if rerun_recognition && !media.box.capturable?
+
+      # Checked before the swap (and again under the lock, see #rescan), so a
+      # refusal on what we already know never leaves the image swapped.
+      yield rescan_allowed(media, rerun_recognition:)
 
       yield swap_image(media, file)
-      rescan = rerun_recognition ? RecognitionRuns::Enqueue.new.call(media: media, rescan: true) : Success()
-      finish(media, actor, rescan)
+      finish(media, actor, rerun_recognition ? rescan(media) : Success())
     end
 
     private
 
-    # The swap has persisted even when the re-scan job could not be queued
-    # (#871: the run is failed and retryable), so the retake is still announced
-    # before that failure is returned. Any other re-scan failure stops here.
+    # Re-scan adds items → only into a capturable (packing) box (mirrors
+    # Captures::Create's not_capturable guard).
+
+    #: (untyped media, rerun_recognition: bool) -> Dry::Monads::Result[untyped, untyped]
+    def rescan_allowed(media, rerun_recognition:)
+      return Failure(:recognition_in_flight) if media.recognition_in_flight?
+      return Failure(:rescan_wrong_phase) if rerun_recognition && !media.box.capturable?
+
+      Success()
+    end
+
+    # The guard re-runs the checks on the locked photo (and its freshly
+    # locked box), so a run or phase change that committed since the
+    # up-front check is seen.
+
+    #: (untyped media) -> Dry::Monads::Result[untyped, untyped]
+    def rescan(media)
+      RecognitionRuns::Enqueue.new.call(
+        media:, rescan: true, guard: ->(locked) { rescan_allowed(locked, rerun_recognition: true) }
+      )
+    end
+
+    # The swap has persisted whenever the re-scan fails: a job that could not
+    # be queued (#871: the run is failed and retryable) or a guard that
+    # refused under the lock. So the retake is still announced before that
+    # failure is returned. Any other re-scan failure stops here.
 
     #: (untyped media, untyped actor, Dry::Monads::Result[untyped, untyped] rescan) -> Dry::Monads::Result[untyped, untyped]
     def finish(media, actor, rescan)
-      return rescan if rescan.failure? && rescan.failure != :enqueue_failed
+      return rescan if rescan.failure? && SWAP_KEPT_FAILURES.exclude?(rescan.failure)
 
       emit_event(media, actor)
       rescan.failure? ? rescan : Success(media)

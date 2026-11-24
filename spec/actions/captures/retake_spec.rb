@@ -54,7 +54,8 @@ RSpec.describe Captures::Retake do
 
     retake(rerun_recognition: true)
 
-    expect(enqueue).to have_received(:call).with(media:, rescan: true) # a re-scan run (#897)
+    # A re-scan run (#897), created through the guarded path (#919).
+    expect(enqueue).to have_received(:call).with(media:, rescan: true, guard: instance_of(Proc))
   end
 
   it "keeps the swap and still emits media.retaken when the re-scan job can't be queued (#871)" do
@@ -109,5 +110,31 @@ RSpec.describe Captures::Retake do
     result = retake
     expect(result).to be_failure
     expect(result.failure).to eq(:recognition_in_flight)
+  end
+
+  # #919 — the checks run again under the box and photo locks the guarded
+  # enqueue takes. A run that went in flight after the up-front check (here,
+  # during the swap) refuses the re-scan; the swap has persisted, so the retake
+  # is still announced.
+  it "re-checks under the lock and creates no run when one went in flight meanwhile" do
+    allow(Rails.event).to receive(:notify).and_call_original
+    allow(media).to receive(:update!).and_wrap_original do |original, *args, **kw|
+      create(:recognition_run, move:, box:, media:, status: "queued")
+      original.call(*args, **kw)
+    end
+
+    expect(retake(rerun_recognition: true).failure).to eq(:recognition_in_flight)
+    expect(media.recognition_runs.count).to eq(1) # only the concurrent one
+    expect(Rails.event).to have_received(:notify).with("media.retaken", hash_including(media_id: media.id))
+  end
+
+  it "re-checks the box phase under the lock" do
+    allow(media).to receive(:update!).and_wrap_original do |original, *args, **kw|
+      Box.where(id: box.id).update_all(status: "sealed") # rubocop:disable Rails/SkipsModelValidations
+      original.call(*args, **kw)
+    end
+
+    expect(retake(rerun_recognition: true).failure).to eq(:rescan_wrong_phase)
+    expect(media.recognition_runs).to be_empty
   end
 end
