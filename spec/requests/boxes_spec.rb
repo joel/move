@@ -139,6 +139,39 @@ RSpec.describe "Boxes" do
       expect(response.body).to include(I18n.t("boxes.empty.filtered_title"))
     end
 
+    describe "room filter chips (#914)" do
+      def chip_room_ids
+        response.body.scan(/room_id=([0-9a-f-]{36})/).flatten.uniq
+      end
+
+      it "shows chips only for rooms holding a live box, busiest first" do
+        kitchen = create(:room, move:, name: "Kitchen")
+        bedroom = create(:room, move:, name: "Bedroom")
+        empty = create(:room, move:, name: "Attic")
+        gone = create(:room, move:, name: "Cellar")
+        create(:box, move:, number: "1", room: kitchen)
+        create(:box, move:, number: "2", room: bedroom)
+        create(:box, move:, number: "3", room: bedroom)
+        create(:box, move:, number: "4", room: gone).discard
+
+        get move_boxes_path(move)
+
+        expect(chip_room_ids).to eq([bedroom.id, kitchen.id])
+        expect(chip_room_ids).not_to include(empty.id, gone.id)
+      end
+
+      it "keeps the selected room's chip even when it has no boxes" do
+        kitchen = create(:room, move:, name: "Kitchen")
+        empty = create(:room, move:, name: "Attic")
+        create(:room, move:, name: "Cellar")
+        create(:box, move:, number: "1", room: kitchen)
+
+        get move_boxes_path(move, room_id: empty.id)
+
+        expect(chip_room_ids).to contain_exactly(kitchen.id, empty.id)
+      end
+    end
+
     it "offers the duplicate control on a dimensioned card to an editor (#658)" do
       box = create(:box, :with_dimensions, move:, number: "1")
 
