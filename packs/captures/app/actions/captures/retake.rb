@@ -33,9 +33,16 @@ module Captures
   # lands first (and the conflict is refused as :superseded) or waits for the
   # decision to commit.
   class Retake < BaseAction
-    # Re-scan refusals after the swap has persisted: the retake is still
+    # The same refusals from the guard, under the lock: the swap has already
+    # persisted, so they get their own codes and the caller can say the photo
+    # was replaced and only the re-scan did not start.
+    LATE_REFUSALS = {
+      recognition_in_flight: :replaced_recognition_in_flight, rescan_wrong_phase: :replaced_rescan_wrong_phase
+    }.freeze
+
+    # Re-scan failures after the swap has persisted: the retake is still
     # announced (see #finish).
-    SWAP_KEPT_FAILURES = %i[enqueue_failed recognition_in_flight rescan_wrong_phase].freeze
+    SWAP_KEPT_FAILURES = [:enqueue_failed, *LATE_REFUSALS.values].freeze
 
     #: (media: untyped, actor: untyped, ?file: untyped, ?rerun_recognition: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, actor:, file: nil, rerun_recognition: false)
@@ -70,8 +77,17 @@ module Captures
     #: (untyped media) -> Dry::Monads::Result[untyped, untyped]
     def rescan(media)
       RecognitionRuns::Enqueue.new.call(
-        media:, rescan: true, guard: ->(locked) { rescan_allowed(locked, rerun_recognition: true) }
+        media:, rescan: true, guard: ->(locked) { recheck(locked) }
       )
+    end
+
+    # A refusal here comes after the swap, so it is reported with its
+    # LATE_REFUSALS code.
+
+    #: (untyped media) -> Dry::Monads::Result[untyped, untyped]
+    def recheck(media)
+      result = rescan_allowed(media, rerun_recognition: true)
+      result.success? ? result : Failure(LATE_REFUSALS.fetch(result.failure))
     end
 
     # The swap has persisted whenever the re-scan fails: a job that could not

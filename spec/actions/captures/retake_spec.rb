@@ -114,8 +114,8 @@ RSpec.describe Captures::Retake do
 
   # #919 — the checks run again under the box and photo locks the guarded
   # enqueue takes. A run that went in flight after the up-front check (here,
-  # during the swap) refuses the re-scan; the swap has persisted, so the retake
-  # is still announced.
+  # during the swap) refuses the re-scan with its own code: the swap has
+  # persisted, so the caller can say so, and the retake is still announced.
   it "re-checks under the lock and creates no run when one went in flight meanwhile" do
     allow(Rails.event).to receive(:notify).and_call_original
     allow(media).to receive(:update!).and_wrap_original do |original, *args, **kw|
@@ -123,7 +123,7 @@ RSpec.describe Captures::Retake do
       original.call(*args, **kw)
     end
 
-    expect(retake(rerun_recognition: true).failure).to eq(:recognition_in_flight)
+    expect(retake(rerun_recognition: true).failure).to eq(:replaced_recognition_in_flight)
     expect(media.recognition_runs.count).to eq(1) # only the concurrent one
     expect(Rails.event).to have_received(:notify).with("media.retaken", hash_including(media_id: media.id))
   end
@@ -134,7 +134,7 @@ RSpec.describe Captures::Retake do
       original.call(*args, **kw)
     end
 
-    expect(retake(rerun_recognition: true).failure).to eq(:rescan_wrong_phase)
+    expect(retake(rerun_recognition: true).failure).to eq(:replaced_rescan_wrong_phase)
     expect(media.recognition_runs).to be_empty
   end
 end
