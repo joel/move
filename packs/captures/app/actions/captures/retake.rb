@@ -150,7 +150,7 @@ module Captures
 
     # Blob.create_and_upload! in two steps (#956): it saves the blob row
     # before the storage write, so a write that raises would leave a row with
-    # no file and nothing pointing at it. The row is deleted again and the
+    # no file and nothing pointing at it. The row is discarded again and the
     # storage error propagates unchanged. `ensure` rather than a rescue: any
     # exception class can come out of a storage service, and none is handled
     # here.
@@ -163,9 +163,26 @@ module Captures
         blob.upload_without_unfurling(params.fetch(:io))
         stored = true
       ensure
-        ActiveStorage::Blob.where(id: blob.id).delete_all unless stored # steep:ignore NoMethod
+        discard_failed_upload(blob) unless stored
       end
       blob
+    end
+
+    # A failed write can still have stored the object (the response was lost
+    # or timed out), and the row holds its only key. So the object is deleted
+    # first (deleting a missing key is a no-op) and the row only after that.
+    # When the storage delete fails too, the row is kept: it is an unattached
+    # blob, which PurgeAbandonedUploadsJob purges a day later. This runs while
+    # the storage error propagates, so nothing raised here may replace it.
+
+    #: (untyped blob) -> void
+    def discard_failed_upload(blob)
+      blob.delete
+      ActiveStorage::Blob.where(id: blob.id).delete_all # steep:ignore NoMethod
+    rescue StandardError => e # rubocop:disable Move/BroadRescue -- runs while the upload error propagates; must not replace it
+      Rails.logger.warn(
+        "[captures.retake] blob #{blob.id} kept for the abandoned-upload sweep: #{e.class}: #{e.message}"
+      )
     end
 
     # ImageNormalizer returns an {io:, filename:, content_type:, metadata:}

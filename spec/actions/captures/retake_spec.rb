@@ -175,7 +175,21 @@ RSpec.describe Captures::Retake do
     media # stored before the failure is stubbed
     allow(ActiveStorage::Blob.service).to receive(:upload).and_raise(Errno::ENOSPC)
 
+    allow(ActiveStorage::Blob.service).to receive(:delete).and_call_original
+
     expect { expect { retake }.to raise_error(Errno::ENOSPC) }.not_to change(ActiveStorage::Blob, :count)
+    expect(media.reload.image).to be_attached
+    # A write that failed after storing the object must not leak it.
+    expect(ActiveStorage::Blob.service).to have_received(:delete).once
+  end
+
+  it "keeps the failed upload's blob row for the abandoned-upload sweep when the storage delete fails too" do
+    media
+    allow(ActiveStorage::Blob.service).to receive(:upload).and_raise(Errno::ENOSPC)
+    allow(ActiveStorage::Blob.service).to receive(:delete).and_raise(Errno::EIO)
+
+    # The upload error propagates, not the delete error.
+    expect { expect { retake }.to raise_error(Errno::ENOSPC) }.to change(ActiveStorage::Blob.unattached, :count).by(1)
     expect(media.reload.image).to be_attached
   end
 
