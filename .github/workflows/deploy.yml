@@ -126,11 +126,13 @@ jobs:
       # Runs before checkout and the SSH agent, pinned by SHA, with no secrets in
       # its env: it only ever sees the two OAuth inputs (#834).
       - name: Join the tailnet
-        uses: tailscale/github-action@6cae46e2d796f265265cfcf628b72a32b4d7cade # v3
+        uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
+          # v4 caches binaries by default; this job stays cache-free.
+          use-cache: 'false'
 
       - name: Checkout code
         uses: actions/checkout@v7

@@ -38,7 +38,8 @@ import { Controller } from "@hotwired/stimulus"
 // shows the item re-syncs from it (and reverts + flags on failure, #147).
 const SETTLED = "inline-rename:settled"
 const confirmed = new Map() // url -> { name, version }
-const sessions = new Map() // url -> { sending: name | null, wanted: name }
+// url -> { sending: name | null, wanted: name, revision: edits counted so far }
+const sessions = new Map()
 // Items whose last rename failed, until a new edit or a later success supersedes
 // it — or the reviewer returns to the field: a row connecting in a list
 // replacement re-applies the error flag (#147) rather than looking saved.
@@ -56,8 +57,9 @@ function intentFor(url) {
 }
 
 function want(url, name) {
-  const session = sessions.get(url) ?? { sending: null, wanted: name }
+  const session = sessions.get(url) ?? { sending: null, wanted: name, revision: 0 }
   session.wanted = name
+  session.revision += 1 // value equality can't tell "no edit" from "edited back"
   sessions.set(url, session)
   failedRenames.delete(url) // a fresh edit supersedes the failure
   pump(url)
@@ -73,12 +75,18 @@ function pump(url) {
     return
   }
   const name = session.wanted
+  const revision = session.revision
   session.sending = name
   patch(url, name)
     .then((state) => {
       confirm(url, state)
-      // The server may canonicalize: follow its echo unless the user moved on.
-      if (session.wanted === name) session.wanted = state.name
+      // The server may canonicalize: follow the confirmed state unless the user
+      // edited meanwhile (even back to this same name). That's the echo, or a
+      // newer row (e.g. an edit from another tab that a list replacement brought
+      // in while this PATCH was in flight). This PATCH didn't win then, and
+      // re-sending the older name would overwrite a save the user never asked
+      // to undo (#934).
+      if (session.revision === revision) session.wanted = confirmed.get(url).name
       session.sending = null
       failedRenames.delete(url)
       announce(url, true)
