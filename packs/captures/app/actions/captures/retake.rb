@@ -49,9 +49,13 @@ module Captures
       # Cheap early refusal before the upload is transcoded; checked again
       # under the locks, where it counts.
       yield ensure_retakeable(media, rerun_recognition)
-      normalized = yield normalize(file)
+      blob = yield upload(file)
 
-      rerun_recognition ? swap_and_rescan(media, actor, normalized) : swap_only(media, actor, normalized)
+      begin
+        rerun_recognition ? swap_and_rescan(media, actor, blob) : swap_only(media, actor, blob)
+      ensure
+        discard_unused(blob)
+      end
     end
 
     private
@@ -71,19 +75,19 @@ module Captures
     # Runs under the box and photo locks: re-check, then swap. Returns the
     # replaced blob.
 
-    #: (untyped media, untyped normalized, bool rescan) -> Dry::Monads::Result[untyped, untyped]
-    def checked_swap(media, normalized, rescan)
+    #: (untyped media, untyped blob, bool rescan) -> Dry::Monads::Result[untyped, untyped]
+    def checked_swap(media, blob, rescan)
       yield ensure_retakeable(media, rescan)
-      swap_image(media, normalized)
+      swap_image(media, blob)
     end
 
-    #: (untyped media, untyped actor, untyped normalized) -> Dry::Monads::Result[untyped, untyped]
-    def swap_only(media, actor, normalized)
+    #: (untyped media, untyped actor, untyped blob) -> Dry::Monads::Result[untyped, untyped]
+    def swap_only(media, actor, blob)
       locked = with_current_box_lock(media) do
         media.lock!(PARENT_ROW_LOCK)
         next Failure(:not_found) if media.discarded?
 
-        checked_swap(media, normalized, false)
+        checked_swap(media, blob, false)
       end
       old_blob = yield locked
       announce(media, actor, old_blob)
@@ -96,13 +100,13 @@ module Captures
     # `swapped` records that the swap ran: Enqueue's result alone can't tell a
     # refusal before the swap from a re-scan failure after it.
 
-    #: (untyped media, untyped actor, untyped normalized) -> Dry::Monads::Result[untyped, untyped]
-    def swap_and_rescan(media, actor, normalized)
+    #: (untyped media, untyped actor, untyped blob) -> Dry::Monads::Result[untyped, untyped]
+    def swap_and_rescan(media, actor, blob)
       swapped = nil #: untyped
       rescan = RecognitionRuns::Enqueue.new.call(
         media:, rescan: true,
         guard: lambda { |locked|
-          checked_swap(locked, normalized, true).tap { |swap| swapped = swap if swap.success? }
+          checked_swap(locked, blob, true).tap { |swap| swapped = swap if swap.success? }
         }
       )
       return rescan unless swapped
@@ -126,25 +130,51 @@ module Captures
     # ImageNormalizer sniffs the real type from the bytes (never the client-declared
     # one), strips EXIF/GPS, caps the size, and transcodes to JPEG — the same
     # authority every capture goes through, so a retake can't smuggle in a raw
-    # metadata-bearing or oversized master. Runs before the locks are taken.
+    # metadata-bearing or oversized master.
+    #
+    # The blob is stored BEFORE the locks are taken. Attaching an IO would
+    # upload it from an after-commit callback, after the ready flags and the
+    # re-scan run had committed, so a storage failure would leave a "ready"
+    # photo with no file and a queued run with no job. A storage failure here
+    # raises before anything is written.
 
     #: (untyped file) -> Dry::Monads::Result[untyped, untyped]
-    def normalize(file)
-      Success(ImageNormalizer.call(file))
+    def upload(file)
+      Success(ActiveStorage::Blob.create_and_upload!(**blob_params(ImageNormalizer.call(file)))) # steep:ignore InsufficientKeywordArguments
     rescue ImageNormalizer::ImageTooLarge
       Failure(:image_too_large)
     rescue ImageNormalizer::UnsupportedFormat
       Failure(:unsupported_image)
     end
 
+    # ImageNormalizer returns an {io:, filename:, content_type:, metadata:}
+    # Hash, or the upload itself when it stores a native image unchanged.
+
+    #: (untyped normalized) -> Hash[Symbol, untyped]
+    def blob_params(normalized)
+      return normalized if normalized.is_a?(Hash)
+
+      { io: normalized.open, filename: normalized.original_filename, content_type: normalized.content_type }
+    end
+
+    # A retake refused under the locks (or rolled back) leaves its stored
+    # blob unattached; drop it.
+
+    #: (untyped blob) -> void
+    def discard_unused(blob)
+      return if ActiveStorage::Attachment.exists?(blob_id: blob.id) # steep:ignore NoMethod
+
+      blob.purge_later
+    end
+
     # One save writes the new attachment and the flags, so a validation
     # failure writes neither. Returns the replaced blob (nil when there was
     # none); it is purged once the locks are released.
 
-    #: (untyped media, untyped normalized) -> Dry::Monads::Result[untyped, untyped]
-    def swap_image(media, normalized)
+    #: (untyped media, untyped blob) -> Dry::Monads::Result[untyped, untyped]
+    def swap_image(media, blob)
       old_blob = media.image.attached? ? media.image.blob : nil
-      media.image = normalized
+      media.image = blob
       media.update!(image_unavailable: false, optimized_at: Time.current, status: "ready")
       Success(old_blob)
     rescue ActiveRecord::RecordInvalid => e

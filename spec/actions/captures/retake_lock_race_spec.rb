@@ -150,9 +150,9 @@ RSpec.describe Captures::Retake do # vs Retry (#929) and Photos::Delete (#933)
     it "fails the retake cleanly, swapping nothing, when the discard commits first" do
       action = described_class.new
       # The discard commits after the cheap pre-check, before the locks.
-      allow(action).to receive(:normalize).and_wrap_original do |normalize, *args|
+      allow(action).to receive(:upload).and_wrap_original do |upload, *args|
         start_on_other_connection { discard }.first.join
-        normalize.call(*args)
+        upload.call(*args)
       end
 
       result = retake(action, rerun_recognition: true)

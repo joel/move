@@ -97,6 +97,7 @@ en:
         unsupported_image: "That file isn't a supported image. Use a JPEG, PNG, or WEBP."
         enqueue_failed: "Photo replaced, but the re-scan couldn't start. Retry recognition from the box's capture screen."
         rescan_failed: "Photo replaced, but the re-scan couldn't start. Retake it again with re-scan to try once more."
+        not_found: "This photo was deleted before it could be replaced."
         failed: "Could not replace the photo. Try again."
       move_photo_errors:
         box_missing: "Pick a box to move the photo to."

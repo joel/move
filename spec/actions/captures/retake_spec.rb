@@ -132,21 +132,39 @@ RSpec.describe Captures::Retake do
   it "refuses, without swapping, a run that went in flight after the pre-check" do
     old_blob_id = media.image.blob.id
     action = described_class.new
-    allow(action).to receive(:normalize).and_wrap_original do |original, *args|
+    allow(action).to receive(:upload).and_wrap_original do |original, *args|
       create(:recognition_run, move:, box:, media:, status: "processing")
       original.call(*args)
     end
 
-    result = action.call(media:, actor: user, file: upload)
+    result = nil
+    # The blob stored for the refused retake is dropped again.
+    expect { result = action.call(media:, actor: user, file: upload) }.not_to change(ActiveStorage::Blob, :count)
 
     expect(result.failure).to eq(:recognition_in_flight)
     expect(media.reload.image.blob.id).to eq(old_blob_id)
   end
 
+  # The new file is stored before anything is written: attaching an IO would
+  # upload it after the ready flags (and a re-scan run) had committed.
+  it "writes nothing when storing the new image fails" do
+    allow(RecognitionRuns::ProcessJob).to receive(:perform_later).and_return(true)
+    media.update!(image_unavailable: true)
+    old_blob_id = media.image.blob.id
+    allow(ActiveStorage::Blob.service).to receive(:upload).and_raise(Errno::ENOSPC)
+
+    expect { retake(rerun_recognition: true) }.to raise_error(Errno::ENOSPC)
+
+    media.reload
+    expect(media).to have_attributes(image_unavailable: true)
+    expect(media.image.blob.id).to eq(old_blob_id)
+    expect(media.recognition_runs).to be_empty
+  end
+
   it "refuses a re-scan, without swapping, when the box was sealed after the pre-check" do
     old_blob_id = media.image.blob.id
     action = described_class.new
-    allow(action).to receive(:normalize).and_wrap_original do |original, *args|
+    allow(action).to receive(:upload).and_wrap_original do |original, *args|
       Box.find(box.id).update!(status: "sealed")
       original.call(*args)
     end
