@@ -76,6 +76,8 @@ module ReviewConflictResponses
 
   def conflict_refused_response: (untyped reason) -> untyped
 
+  def conflict_photo_gone_response: () -> untyped
+
   def conflict_refusal_message: (untyped reason) -> String
 
   def conflict_photo_path: () -> String
