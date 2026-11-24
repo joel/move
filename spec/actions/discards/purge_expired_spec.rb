@@ -210,4 +210,34 @@ RSpec.describe Discards::PurgeExpired do
       expect(Rails.event).not_to have_received(:notify)
     end
   end
+
+  # #913 — Cascade stamps a child a moment before its root, so a cutoff can
+  # fall between them. The child is judged by its batch root: it stays until
+  # the root is expired too, so a still-restorable root never loses it.
+  it "keeps a batch child whose own cutoff passed while its root is still restorable" do
+    media = create(:media, move:, box:)
+    item = create(:item, move:, box:, source_media: media)
+    Discards::Cascade.new.call(record: media, actor:)
+    cutoff = 1.hour.ago
+    # rubocop:disable Rails/SkipsModelValidations
+    Item.with_discarded.where(id: item.id).update_all(discarded_at: cutoff - 1.second)
+    Media.with_discarded.where(id: media.id).update_all(discarded_at: cutoff + 1.second)
+    # rubocop:enable Rails/SkipsModelValidations
+
+    described_class.new.call(cutoff:)
+
+    expect(Item.with_discarded.find(item.id)).to be_discarded
+    expect(Media.with_discarded.find(media.id)).to be_discarded
+  end
+
+  it "purges a batch child once its root is past the cutoff as well" do
+    media = create(:media, move:, box:)
+    item = create(:item, move:, box:, source_media: media)
+    travel_to(expired_time) { Discards::Cascade.new.call(record: media, actor:) }
+
+    described_class.new.call
+
+    expect(Item.with_discarded.exists?(item.id)).to be(false)
+    expect(Media.with_discarded.exists?(media.id)).to be(false)
+  end
 end
