@@ -341,7 +341,8 @@ class ReviewsController < MoveScopedController
 
   #: (untyped reason) -> String
   def retake_error(reason)
-    known = %i[no_file recognition_in_flight rescan_wrong_phase image_too_large unsupported_image enqueue_failed]
+    known = %i[no_file recognition_in_flight rescan_wrong_phase image_too_large unsupported_image enqueue_failed
+               rescan_failed]
     t("reviews.flash.retake_errors.#{known.include?(reason) ? reason : :failed}")
   end
 
