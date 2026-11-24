@@ -26,14 +26,15 @@ class BoxesController < MoveScopedController
     # Resolve the filter through the Move's own rooms so an unknown or malformed
     # room_id is treated as a cleared filter, never a stray query.
     selected_room = @move.rooms.find_by(id: selected_room_id) if selected_room_id
-    scope = authorized_scope(@move.boxes).includes(:room)
+    visible = authorized_scope(@move.boxes)
+    scope = visible.includes(:room)
     scope = scope.where(room: selected_room) if selected_room
 
     render Views::Boxes::Index.new(
       move: @move,
       boxes: scope.sorted_by(sort_key),
       sort_key: sort_key,
-      rooms: @move.rooms.order(:name),
+      rooms: @move.rooms.holding_boxes(visible, keep: selected_room),
       summary: move_summary,
       selected_room_id: selected_room&.id,
       item_counts: @move.items.in_box.group(:box_id).count,

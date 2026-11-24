@@ -465,7 +465,10 @@ class ::Room < ::ApplicationRecord
   end
   include ::Room::GeneratedAssociationMethods
 
+  def self.holding_boxes: (untyped boxes, ?keep: untyped) -> ::Room::ActiveRecord_Relation
+
   module ::Room::GeneratedRelationMethods
+    def holding_boxes: (untyped boxes, ?keep: untyped) -> ::Room::ActiveRecord_Relation
   end
 
   class ::Room::ActiveRecord_Relation < ::ActiveRecord::Relation
