@@ -21,6 +21,8 @@ module Boxes
   #     `where(status:)` SQL filter; iterating those rows to transition each is not
   #     the anti-pattern (we act on each row).
   class BulkTransition < BaseAction
+    include MoveWritable
+
     # The forward edges of Box::TRANSITIONS, ordered as the lifecycle flows. A
     # requested `to` outside this list is rejected (Failure(:invalid_step)).
     STEPS = [

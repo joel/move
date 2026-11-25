@@ -12,6 +12,8 @@ module Boxes
   # box (unpacked -> unpacking) leaves the removed items to be restored
   # individually.
   class TransitionStatus < BaseAction
+    include MoveWritable
+
     # `description` is the optional contents summary captured by the seal modal
     # (B1) — persisted in the same transaction as the seal so the two never
     # diverge. nil leaves any existing description untouched.

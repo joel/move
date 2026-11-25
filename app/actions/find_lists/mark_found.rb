@@ -14,6 +14,8 @@ module FindLists
   # That emit is deferred until the item-locked transaction below commits
   # (#965), so subscribers never see the find before it is durable.
   class MarkFound < BaseAction
+    include MoveWritable
+
     # Returns Success(item:, opened_box:, completed_box:) — opened_box is the
     # Box when this call auto-opened it, completed_box the Box when marking
     # this item found emptied and auto-completed it (#755); the controller

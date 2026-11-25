@@ -13,6 +13,8 @@ module Captures
   # job exist, so the tile renders immediately as a placeholder and fills in over
   # ActionCable.
   class StartIngest < BaseAction
+    include MoveWritable
+
     # Binds a direct-upload signed_id to the Move (mirrors Captures::Create's MCP
     # purpose): CapturesController#direct_upload mints the blob's signed_id with it,
     # and #resolve_direct_upload verifies with it — so a token can only reserve a

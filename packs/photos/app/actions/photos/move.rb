@@ -32,6 +32,7 @@ module Photos
   # call won the completion race (#756 R7). The completion is a secondary
   # mutation, so its failure never fails the move.
   class Move < BaseAction
+    include MoveWritable
     include Items::CurrentBoxLock
 
     #: (media: untyped, target_box: untyped, mover: untyped) -> Dry::Monads::Result[untyped, untyped]

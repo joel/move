@@ -9,6 +9,7 @@ module Items
   # (ConfirmedEdit, shared with Update), and it emits `item.updated` so the search
   # projection follows. Caller owns the tenant context + writable-Move guard.
   class Rename < BaseAction
+    include MoveWritable
     include ConfirmedEdit
 
     #: (item: untyped, name: untyped, editor: untyped) -> Dry::Monads::Result[untyped, untyped]

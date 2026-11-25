@@ -7,6 +7,8 @@ module RecognitionRuns
   # data or bounding boxes are stored. Provider/persistence errors end the run
   # `failed` (never stuck in processing) and return Failure — they never raise up.
   class Process < BaseAction
+    include MoveWritable
+
     # The run's box or photo was deleted while the provider call was in flight
     # (#854). Raised inside the materialize transaction so it rolls back and the
     # broad rescue records a failed run with zero inventory.

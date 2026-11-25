@@ -6,6 +6,8 @@ module Items
   # them) unless the name validation fails. An item is just a name now. The caller
   # owns the tenant context and the writable-Move guard (controller).
   class CreateManual < BaseAction
+    include MoveWritable
+
     #: (box: untyped, params: untyped, creator: untyped, ?source_media: untyped, ?require_open: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, params:, creator:, source_media: nil, require_open: false)
       yield ensure_writable(box.move)

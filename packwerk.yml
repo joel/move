@@ -39,7 +39,7 @@ cache: true
 # `packs/utility`; the root is reclassified as `application` once all domains move.
 #   - application : controllers / orchestration (lives in the unlayered root for now)
 #   - domain      : the per-domain packs (packs/labels, and future boxes/items/…)
-#   - utility     : the shared kernel (BaseAction, ApplicationRecord, Current, …)
+#   - utility     : the shared kernel (ApplicationRecord, Current, …)
 architecture_layers:
   - application
   - domain

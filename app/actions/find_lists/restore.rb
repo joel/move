@@ -14,6 +14,8 @@ module FindLists
   # unlocked: an unpin committing between it and the flip is the accepted
   # fence residual shared by this family of guards (#737).
   class Restore < BaseAction
+    include MoveWritable
+
     #: (move: untyped, user: untyped, item: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, user:, item:)
       yield ensure_writable(move)

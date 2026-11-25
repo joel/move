@@ -14,6 +14,8 @@ module Moves
   # a provider switch (#187). The caller owns authorization (admin) and the
   # archived read-only guard.
   class SetRecognitionProvider < BaseAction
+    include MoveWritable
+
     #: (move: untyped, provider: untyped, ?model: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, provider:, model: nil, actor: nil)
       provider = provider.to_s

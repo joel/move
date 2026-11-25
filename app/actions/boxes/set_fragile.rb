@@ -12,6 +12,8 @@ module Boxes
   # flag is a lightweight box setting, not tracked inventory content (and so stays
   # out of the box Logidze whitelist + the feed's `box.updated` revert path).
   class SetFragile < BaseAction
+    include MoveWritable
+
     #: (box: untyped, fragile: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, fragile:, actor:)
       yield ensure_writable(box.move)

@@ -18,6 +18,7 @@ module Items
   # race (#756 R7). The completion is a secondary mutation, so its failure
   # never fails the move.
   class Move < BaseAction
+    include MoveWritable
     include CurrentBoxLock
 
     # Both boxes are locked with BaseAction::PARENT_ROW_LOCK (FOR NO KEY

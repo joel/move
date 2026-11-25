@@ -79,8 +79,10 @@ end
 - **Guard + transition**: validate the business rule (`yield guard`) before the
   state change.
 - **Archived-Move guard**: a user-facing *mutating* action's first step is
-  `yield ensure_writable(<move>)` (`BaseAction#ensure_writable` → `Failure(:move_archived)`
-  on an archived Move). This is the single source of truth for "an archived Move
+  `yield ensure_writable(<move>)`: the action does `include MoveWritable`
+  (`app/actions/move_writable.rb`; `ensure_writable` → `Failure(:move_archived)`
+  on an archived Move). It is a mixin, not part of `BaseAction`, so the action
+  base stays domain-free (#443). This is the single source of truth for "an archived Move
   is read-only" — every caller (web, MCP, jobs) inherits it; controllers map the
   failure to a friendly redirect, MCP tools to a read-only tool error. Read-only
   actions (and token revoke) are not guarded.

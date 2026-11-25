@@ -13,6 +13,8 @@ module Moves
   # active search provider (or a recognition-only vendor like Anthropic) changes no
   # vectors. The caller owns authorization (admin) and the archived guard.
   class SetProviderKey < BaseAction
+    include MoveWritable
+
     #: (move: untyped, provider: untyped, api_key: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, provider:, api_key:, actor: nil)
       provider = provider.to_s

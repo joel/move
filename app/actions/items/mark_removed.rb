@@ -24,6 +24,8 @@ module Items
   # (MarkPhotoRemoved) keep the box → item order, and CompleteIfEmpty runs after
   # this returns, never while the item is locked (#739 R2).
   class MarkRemoved < BaseAction
+    include MoveWritable
+
     #: (item: untyped, actor: untyped, ?allow_any_phase: bool) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:, allow_any_phase: false)
       yield ensure_writable(item.move)

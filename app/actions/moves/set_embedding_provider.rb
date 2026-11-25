@@ -14,6 +14,8 @@ module Moves
   # (same provider) skips the reindex and the event. The caller (controller) owns
   # authorization (admin) and the archived read-only guard.
   class SetEmbeddingProvider < BaseAction
+    include MoveWritable
+
     #: (move: untyped, provider: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, provider:, actor: nil)
       provider = provider.to_s

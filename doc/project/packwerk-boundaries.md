@@ -46,7 +46,7 @@ The checkers come from core `packwerk` (dependencies) + `packwerk-extensions`
 ```
 application   →  controllers / orchestration (lives in the unlayered root for now)
 domain        →  the per-domain packs (packs/labels, future boxes/items/…)
-utility       →  the shared kernel (BaseAction, ApplicationRecord, Current, …)
+utility       →  the shared kernel (ApplicationRecord, Current, …)
 ```
 
 A `domain` pack may reference `domain` + `utility`, never `application`.
@@ -63,14 +63,24 @@ so per-constant privacy/visibility would be ceremony (a `visible_to` listing eve
 pack). Domain packs keep both strict.
 
 > **Self-contained means *no domain coupling at all* — including method calls
-> Packwerk can't see.** `BaseAction` and `Discards::Cascade`/`CascadeRestore` are
-> deliberately **not** in utility: both call `ensure_writable(move)` →
-> `move.writable?` / `Failure(:move_archived)`, a method-call dependency on the Move
-> domain's archived-invariant. Packwerk only tracks *constants*, so it wouldn't flag
-> it — but a bottom-layer kernel that has to change when Move's writable/archive
-> contract changes isn't a kernel. They stay in the root until `ensure_writable` is
-> factored out of the action base (tracked follow-up), after which they can be
-> promoted to `utility`.
+> Packwerk can't see.** `BaseAction#ensure_writable(move)` used to call
+> `move.writable?` / `Failure(:move_archived)`: a method-call dependency on the Move
+> domain's archived invariant. Packwerk only tracks *constants*, so it wouldn't flag
+> it, but a bottom-layer kernel that has to change when Move's writable/archive
+> contract changes isn't a kernel.
+>
+> **#443 factored it out.** The guard is now the **`MoveWritable`** mixin
+> (`app/actions/move_writable.rb`, in the root with the Move aggregate). Each
+> mutating action does `include MoveWritable`, which turns the hidden method-call
+> dependency into a constant reference Packwerk can see (every pack that includes
+> it already depends on `.`). `BaseAction` is now domain-free (Dry::Monads,
+> `PARENT_ROW_LOCK`, `with_responsible`).
+>
+> **Still in the root:** `BaseAction` itself, until `packs/utility/app/actions`
+> gets a `check` line in the (protected) `Steepfile`. Moving it without one would
+> drop it from type checking. `Discards::Cascade`/`CascadeRestore` include
+> `MoveWritable` (they guard `record.move`), so they stay Move-coupled and belong
+> in the root.
 
 **The unlayered-root escape hatch.** The root package still has **no `layer:`**. The
 architecture checker treats a reference to a layer-less package as always allowed
@@ -141,8 +151,8 @@ packs/labels/
 - **Private**: the progress recorder, the broadcasting mixin, the generation job —
   referenced only inside the pack.
 - `dependencies: ['.', 'packs/utility']` — reaches the shared kernel in
-  `packs/utility` (`BaseAction`, `ApplicationRecord`, `ApplicationJob`) and the
-  domain constants still in root (`Move`, `Box`, `BoxLabelsPdf`).
+  `packs/utility` (`ApplicationRecord`, `ApplicationJob`) and what is still in root:
+  `BaseAction` and the domain constants (`Move`, `Box`, `BoxLabelsPdf`).
 - `visible_to: ['.']` — only the root app references labels today. When
   `accounts`/`moves` become packs, add them here.
 
@@ -179,9 +189,11 @@ they are irreducible and correctly belong in the unlayered root:
   so it stays in the root.
 - **The application layer** — controllers, Phlex `Views::`/`Components::`, presenters,
   policies, mailers, channels, MCP — orchestrates the domains and belongs at the top.
-- **`BaseAction`** and **`Discards::Cascade`/`CascadeRestore`** — the action base and
-  the soft-delete cascade both carry Move-domain coupling (`ensure_writable(move)`),
-  so they stay in the root until decoupled (#443).
+- **`Discards::Cascade`/`CascadeRestore`**: the soft-delete cascade includes
+  `MoveWritable` (it guards `record.move`), so it is Move-coupled and stays in the root.
+- **`BaseAction`**: domain-free since #443 (the archived-Move guard moved to the
+  `MoveWritable` mixin). It is still in the root only because moving it into
+  `packs/utility/app/actions` needs a `check` line in the protected `Steepfile`.
 
 This is a **standard, healthy Packwerk end state**: extract the *periphery* (which
 depends inward on the core), and leave the core aggregate + identity + application in
@@ -254,7 +266,8 @@ graph TD
 **kernel** = the domain-free framework infrastructure (`ApplicationRecord`,
 `ApplicationJob`, `ApplicationMailer`, `Current`, `Discardable`, `Roleable`,
 `ProviderHttp`) — extracted into **`packs/utility`** (the `utility` layer).
-`BaseAction` stays in root for now (its `ensure_writable` couples it to Move).
+`BaseAction` is domain-free since #443 but still in root, until the Steepfile checks
+`packs/utility/app/actions`.
 `Apartment` + `Rails.event` are gem/framework globals, not packaged.
 
 **Known coupling hotspots** (to untangle as domains are extracted):

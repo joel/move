@@ -48,13 +48,6 @@ unwraps a `Success` and passes the value on, or **short-circuits** on the first
 class BaseAction
   include Dry::Monads[:result, :do]
 
-  # Archived-Move invariant in one place: a user-facing *mutating* action's first
-  # step is `yield ensure_writable(move)`. Web, MCP and jobs all inherit it.
-  def ensure_writable(move)
-    return Failure(:move_archived) unless move.writable?
-    Success()
-  end
-
   # Attribute the Logidze version(s) created in the block to `actor` (the activity
   # feed's "who did this" + attributed revert). Non-transactional on purpose.
   def with_responsible(actor, &) = Logidze.with_responsible(actor&.id, transactional: false, &)
@@ -218,6 +211,8 @@ the activity feed (synchronously) and the search index (via an async job).
 
 - **Archived-Move guard.** `yield ensure_writable(move)` is the first step of any
   user-facing mutation — the single source of truth for "archived Move is read-only".
+  The action gets it with `include MoveWritable` (`app/actions/move_writable.rb`);
+  it is a mixin, not part of `BaseAction`, so the action base stays domain-free (#443).
 - **Attribution.** Wrap persistence in `with_responsible(actor) { … }` so Logidze
   records who made the change (powers the activity feed's attributed revert).
 - **Tenancy.** Actions run inside the active Apartment tenant schema; the caller
@@ -234,7 +229,8 @@ the activity feed (synchronously) and the search index (via an async job).
 
 ```
 app/actions/
-├── base_action.rb          # the railway base + ensure_writable + with_responsible
+├── base_action.rb          # the railway base + with_responsible (domain-free)
+├── move_writable.rb        # ensure_writable: the archived-Move guard mixin
 ├── README.md  ·  AGENTS.md  ·  CLAUDE.md  ·  diagrams/  (svg + editable excalidraw)
 ├── boxes/          create · update · delete · restore · transition_status · suggest_description · room_resolution
 ├── captures/       create

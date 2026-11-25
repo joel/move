@@ -9,6 +9,7 @@ module Items
   # (ConfirmedEdit, shared with Rename). Presence state stays an independent axis
   # changed by its own actions. Caller owns tenant context + writable-Move guard.
   class Update < BaseAction
+    include MoveWritable
     include ConfirmedEdit
 
     #: (item: untyped, params: untyped, editor: untyped) -> Dry::Monads::Result[untyped, untyped]

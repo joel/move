@@ -10,6 +10,7 @@ module Vocabularies
   # cascade needed. A rename changes the items' denormalized search_text (box room
   # is part of it), so the affected items are reindexed.
   class Update < BaseAction
+    include MoveWritable
     include Search::Reindexing
 
     #: (record: untyped, vocabulary: untyped, params: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
