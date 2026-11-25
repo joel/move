@@ -853,6 +853,42 @@ RSpec.describe "Per-photo review" do
     end
   end
 
+  describe "the Retake control (#619 — in-app viewfinder)" do
+    before { detected(name: "Lamp") }
+
+    def retake_section
+      get move_box_review_photo_path(move, box, media)
+      response.parsed_body.at_css("[data-controller='camera-capture']")
+    end
+
+    it "opens the in-app viewfinder on demand instead of the native camera" do
+      section = retake_section
+
+      expect(section["data-camera-capture-autostart-value"]).to eq("false")
+      expect(section.at_css("[data-camera-capture-target='viewfinder'] video[data-camera-capture-target='video']"))
+        .to be_present
+      expect(section.at_css("button[data-camera-capture-target='shutter'][disabled]")).to be_present
+      expect(section.at_css("[data-camera-capture-target='start'] button[data-action='camera-capture#start']").text)
+        .to include(I18n.t("reviews.photo.retake_camera"))
+      expect(section.at_css("button[data-camera-capture-target='close']")).to be_present
+    end
+
+    it "keeps the chooser as the fallback, behind the upload lock, without capture=" do
+      section = retake_section
+      form = section.at_css(%(form[action="#{move_box_review_retake_photo_path(move, box, media)}"]))
+      input = form.at_css("[data-camera-capture-target='fallback'] input[type='file'][name='file']")
+
+      expect(input["capture"]).to be_nil
+      expect(input["data-camera-capture-target"]).to eq("input")
+      expect(input["data-action"]).to include("click->camera-capture#guardPick")
+        .and include("change->camera-capture#uploadStarted").and include("change->capture-upload#submit")
+      expect(form["data-action"]).to include("camera-capture:settle->capture-upload#reset")
+      expect(section["data-action"]).to include("turbo:submit-start->camera-capture#uploadInFlight")
+        .and include("turbo:submit-end->camera-capture#uploadSettled")
+      expect(form.at_css('input[name="rerun_recognition"]')).to be_present
+    end
+  end
+
   describe "POST .../review/photo/:media_id/retake (retake photo)" do
     def upload
       Rack::Test::UploadedFile.new(Rails.root.join("spec/fixtures/files/sample_image.png"), "image/png")
@@ -866,6 +902,37 @@ RSpec.describe "Per-photo review" do
       expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
       expect(flash[:notice]).to eq(I18n.t("reviews.flash.photo_retaken"))
       expect(media.reload.image_unavailable?).to be(false)
+    end
+
+    # #619 — the viewfinder's shutter hands its frame to the same form as a
+    # chooser pick (a capture-<ts>.jpg in :file), alongside the re-scan box.
+    def stub_retake
+      instance_double(Captures::Retake, call: Dry::Monads::Success(media)).tap do |retake|
+        allow(Captures::Retake).to receive(:new).and_return(retake)
+      end
+    end
+
+    it "forwards a viewfinder frame and the re-scan choice to Captures::Retake" do
+      retake = stub_retake
+      frame = Rack::Test::UploadedFile.new(Rails.root.join("spec/fixtures/files/sample_image.png"),
+                                           "image/jpeg", original_filename: "capture-1700000000000.jpg")
+
+      post move_box_review_retake_photo_path(move, box, media), params: { file: frame, rerun_recognition: "1" }
+
+      expect(retake).to have_received(:call).with(
+        media:, actor: user, rerun_recognition: true,
+        file: having_attributes(original_filename: "capture-1700000000000.jpg")
+      )
+      expect(response).to redirect_to(move_box_review_photo_path(move, box, media))
+      expect(flash[:notice]).to eq(I18n.t("reviews.flash.photo_retaken"))
+    end
+
+    it "retakes without a re-scan when the box is left unticked" do
+      retake = stub_retake
+
+      post move_box_review_retake_photo_path(move, box, media), params: { file: upload }
+
+      expect(retake).to have_received(:call).with(hash_including(rerun_recognition: be_falsey))
     end
 
     it "surfaces a friendly error when no file is chosen" do

@@ -229,7 +229,10 @@ teardown mid-permission-prompt, track-ended hook). The caller owns layout
 Shutter recipe: `Ui::CameraViewfinder::SHUTTER_CLASSES` — a 64px `bg-text-warm`
 disc in a 4px `accent-sage` ring overlaid bottom-centre, `active:scale-90`,
 `disabled:opacity-50`, sage `focus-visible` outline. Used by B2 capture
-(`max-w-md`, status + flash + shutter overlays) and E2 scan (`max-w-sm`, aim hint
+(`max-w-md`, status + flash + shutter overlays), C2 review Retake (#619 —
+`Reviews::RetakeControl`, `max-w-sm`, same overlays; `camera-capture` with
+`autostart: false` so the camera opens only on "Take a new photo", plus a
+"Cancel" `close` target) and E2 scan (`max-w-sm`, aim hint
 + reticle).
 
 ### `Ui::BlurUpImage` — LQIP blur-up under every photo (#681)

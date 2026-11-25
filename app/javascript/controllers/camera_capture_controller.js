@@ -55,7 +55,13 @@ const INFLIGHT_RECOVERY_MS = 120000
 // and re-acquired on return.
 export default class extends Controller {
   static targets = ["viewfinder", "video", "shutter", "status", "flash",
-    "fallback", "start", "library", "input", "note"]
+    "fallback", "start", "library", "input", "note", "close"]
+
+  // autostart: false on surfaces where capture is a secondary action (the
+  // review screen's Retake, #619) — the camera then starts only from the
+  // "start" button on every pointer type, and the optional "close" target
+  // releases it again.
+  static values = { autostart: { type: Boolean, default: true } }
 
   connect() {
     this.retried = false
@@ -79,7 +85,7 @@ export default class extends Controller {
     this.onVisibility = () => this.#visibilityChanged()
     document.addEventListener("visibilitychange", this.onVisibility)
     this.#setState(this.supported ? "idle" : "unavailable")
-    if (this.supported && window.matchMedia("(pointer: coarse)").matches) this.start()
+    if (this.supported && this.#autostarts()) this.start()
   }
 
   disconnect() {
@@ -94,12 +100,47 @@ export default class extends Controller {
   async start() {
     if (!this.supported) return
     if (this.state !== "idle" && this.state !== "unavailable") return
+    // The start control hides while the camera is requested; a keyboard user
+    // who pressed it must not be left focused on a hidden control.
+    const fromStart = this.startTarget.contains(document.activeElement)
     this.#setState("requesting")
     const outcome = await this.camera.start()
     if (outcome === "stale") return
-    if (outcome !== "live") return this.#setState("unavailable")
+    if (outcome !== "live") {
+      this.#setState("unavailable")
+      if (fromStart) this.#focusStart()
+      return
+    }
     this.retried = false
     this.#setState("streaming")
+    if (fromStart) this.#focusLive()
+  }
+
+  // The shutter, unless an upload in flight keeps it disabled — then Cancel.
+  #focusLive() {
+    const target = this.shutterTarget.disabled && this.hasCloseTarget ? this.closeTarget : this.shutterTarget
+    target.focus()
+  }
+
+  // "Cancel" (the close target, #619): release the camera and fold the
+  // viewfinder away. stop() bumps the generation, so an in-flight start() or
+  // capture() tail goes stale. The upload lock is untouched — closing never
+  // unlocks a busy pipeline. Focus moves to the re-revealed start control
+  // (the Cancel button that held it is now hidden).
+  close() {
+    if (this.state === "idle" || this.state === "unavailable") return
+    this.camera.stop()
+    this.resumeOnVisible = false
+    this.#setState("idle")
+    this.#focusStart()
+  }
+
+  // The start target is the button itself (B2) or a wrapper around a
+  // Ui::Button (review Retake).
+  #focusStart() {
+    const start = this.startTarget
+    const button = start.matches("button") ? start : start.querySelector("button")
+    button?.focus()
   }
 
   // Shutter → grab the visible frame → hand it to the capture-upload pipeline.
@@ -316,15 +357,21 @@ export default class extends Controller {
     this.libraryTarget.classList.toggle("hidden", !streaming || this.uploadPending)
     this.noteTarget.classList.toggle("hidden", state !== "unavailable")
     this.startTarget.classList.toggle("hidden", !this.#offerStart(state))
+    if (this.hasCloseTarget) this.closeTarget.classList.toggle("hidden", !live)
     this.shutterTarget.disabled = state !== "streaming" || this.uploadPending
   }
 
-  // "Use camera" shows on fine-pointer idle (no unprompted webcam) and as the
-  // retry affordance whenever the camera failed but the API exists.
+  // "Use camera" shows on idle whenever the camera doesn't auto-start (fine
+  // pointers — no unprompted webcam — or an autostart: false surface) and as
+  // the retry affordance whenever the camera failed but the API exists.
   #offerStart(state) {
     if (!this.supported) return false
     if (state === "unavailable") return true
-    return state === "idle" && !window.matchMedia("(pointer: coarse)").matches
+    return state === "idle" && !this.#autostarts()
+  }
+
+  #autostarts() {
+    return this.autostartValue && window.matchMedia("(pointer: coarse)").matches
   }
 
   // One failsafe at a time — re-arming without clearing would orphan a timer
