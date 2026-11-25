@@ -293,12 +293,26 @@ export default class extends Controller {
   // the input also makes any zombie submit() bail on its own staleness
   // guards. The event bubbles from the input to the form, where
   // capture-upload listens.
+  //
+  // When the page stays mounted (a failed response rendered in place, or a
+  // recovery), the "Replacing photo…" status hides here; if it held focus,
+  // the keyboard user must not drop to the body (#995).
   #settle() {
+    const stranded = this.hasPendingTarget && this.pendingTarget.contains(document.activeElement)
     this.liveSubmission = null
     this.#clearSettleTimer()
     this.uploadPending = false
     this.inputTarget.dispatchEvent(new CustomEvent("camera-capture:settle", { bubbles: true }))
     this.#setState(this.state)
+    if (stranded) this.#focusAfterSettle()
+  }
+
+  // The next live control: the re-armed shutter while streaming, else the
+  // start control (idle, or the retry after a failure), else the chooser.
+  #focusAfterSettle() {
+    if (this.state === "streaming") return this.shutterTarget.focus()
+    if (this.#offerStart(this.state)) return this.#focusStart()
+    if (!this.fallbackTarget.classList.contains("hidden")) this.inputTarget.focus()
   }
 
   // "Choose from library" — the same input the tile wraps; the existing

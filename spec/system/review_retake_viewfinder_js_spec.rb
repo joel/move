@@ -141,7 +141,10 @@ RSpec.describe "Review retake viewfinder (JS)", :js do
       JS
     end
 
+    # Settle only once the held submit was attempted (the pipeline's downscale
+    # is async), as a real turbo:submit-end would.
     def settle_submission
+      eventually { page.evaluate_script("window.__submits").positive? }
       page.execute_script(<<~JS)
         const form = document.querySelector("form[data-controller~='capture-upload']")
         form.dispatchEvent(new CustomEvent("turbo:submit-end", { bubbles: true, detail: {} }))
@@ -170,13 +173,41 @@ RSpec.describe "Review retake viewfinder (JS)", :js do
     it "brings Cancel back when the upload settles" do
       shoot_with_submission_held
       expect(page).to have_css(pending_status, visible: :visible)
-      eventually { page.evaluate_script("window.__submits").positive? }
 
       settle_submission
 
       expect(page).to have_button(cancel)
       expect(page).to have_css(pending_status, visible: :hidden)
       expect(page).to have_css("#{shutter}:not([disabled])")
+    end
+
+    # #995 — the status that held focus hides on settle; focus must move on
+    # to the next live control, not drop to the body.
+    it "moves focus from the status to the re-armed shutter when the upload settles" do
+      shoot_with_submission_held
+      expect(focused_target).to eq("pending")
+
+      settle_submission
+
+      expect(page).to have_css("#{shutter}:not([disabled])")
+      expect(focused_target).to eq("shutter")
+    end
+
+    it "moves focus from the status to the start control when the camera died meanwhile" do
+      shoot_with_submission_held
+      expect(focused_target).to eq("pending")
+      # The camera dies mid-upload and its one automatic retry is denied.
+      page.execute_script(<<~JS)
+        window.__camera.deny = true
+        window.__camera.streams[0].getVideoTracks()[0].dispatchEvent(new Event("ended"))
+      JS
+      expect(page).to have_text(I18n.t("reviews.photo.retake_unavailable"))
+      expect(focused_target).to eq("pending")
+
+      settle_submission
+
+      expect(page).to have_css(pending_status, visible: :hidden)
+      expect(focused_text).to include(take_photo)
     end
   end
 
