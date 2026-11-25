@@ -285,6 +285,28 @@ RSpec.describe "Unpacking" do
       expect(box.reload.status).to eq("unpacked")
       expect(item.reload.presence_state).to eq("removed")
     end
+
+    it "treats an already-unpacked box as done: a notice, no failure, no second event (#971)" do
+      box = create(:box, :with_room, move:, status: "unpacked")
+      allow(Rails.event).to receive(:notify)
+
+      patch move_box_unpacking_complete_path(move, box)
+
+      expect(response).to redirect_to(move_box_unpacking_path(move, box))
+      expect(flash[:notice]).to eq(I18n.t("unpacking.flash.already_unpacked"))
+      expect(flash[:alert]).to be_nil
+      expect(Rails.event).not_to have_received(:notify).with("box.status_changed", anything)
+      expect(box.reload.status).to eq("unpacked")
+    end
+
+    it "still reports a failure for a box that cannot be unpacked from its state" do
+      box = create(:box, :with_room, move:, status: "sealed")
+
+      patch move_box_unpacking_complete_path(move, box)
+
+      expect(flash[:alert]).to eq(I18n.t("unpacking.flash.failed"))
+      expect(box.reload.status).to eq("sealed")
+    end
   end
 
   describe "PATCH .../unpacking/reopen" do
@@ -323,6 +345,15 @@ RSpec.describe "Unpacking" do
       expect(response).to redirect_to(move_box_unpacking_path(move, box))
       expect(box.reload.status).to eq("unpacking")
       expect(item.reload.presence_state).to eq("in_box")
+    end
+
+    it "does not report an already-unpacked box as done on an archived move" do
+      box = create(:box, :with_room, move:, status: "unpacked")
+
+      patch move_box_unpacking_complete_path(move, box)
+
+      expect(flash[:notice]).to be_nil
+      expect(flash[:alert]).to be_present
     end
   end
 

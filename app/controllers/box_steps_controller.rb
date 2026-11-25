@@ -85,10 +85,13 @@ class BoxStepsController < MoveScopedController
 
   #: (untyped skipped) -> untyped
   def skipped_sentence(skipped)
-    # Every forward step has exactly one skip reason today (:room_required on a
-    # seal); surface it by reason so the copy stays accurate if more are added.
-    reason = t("box_steps.skip_reason.#{skipped.first[:reason]}", default: t("box_steps.skip_reason.default"))
-    t(".skipped", count: skipped.size, reason: reason, numbers: skipped_numbers(skipped))
+    # One sentence per reason: a seal can skip roomless boxes (:room_required)
+    # and, on any step, boxes another member moved on after the bulk loaded
+    # them (:invalid_transition, #970). In-memory grouping of the skip report.
+    skipped.group_by { |entry| entry[:reason] }.map do |reason, boxes|
+      label = t("box_steps.skip_reason.#{reason}", default: t("box_steps.skip_reason.default"))
+      t(".skipped", count: boxes.size, reason: label, numbers: skipped_numbers(boxes))
+    end.join(" ")
   end
 
   #: (untyped skipped) -> untyped
