@@ -23,6 +23,22 @@ RSpec.describe FindLists::MarkFound do
     end
   end
 
+  it "keeps the committed find but leaves a box deleted meanwhile closed (#980)" do
+    box = create(:box, move:, status: "sealed")
+    item = create(:item, move:, box:, name: "Face Cream")
+    create(:find_list_entry, move:, user:, item:)
+    # The action loaded the box, then another member deleted it before the
+    # box lock (the lock's re-read sees the discard).
+    allow(item).to receive(:box).and_return(Box.find(box.id))
+    Box.where(id: box.id).update_all(discarded_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+
+    result = described_class.new.call(move:, user:, item:)
+
+    expect(result).to be_success
+    expect(result.value![:opened_box]).to be_nil
+    expect(Box.unscoped.find(box.id).status).to eq("sealed")
+  end
+
   it "opens an in-transit box for unpacking too" do
     box = create(:box, move:, status: "in_transit")
     item = create(:item, move:, box:, name: "Face Cream")

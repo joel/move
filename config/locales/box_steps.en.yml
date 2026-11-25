@@ -40,6 +40,7 @@ en:
     skip_reason:
       room_required: "need a room first"
       invalid_transition: "already moved on elsewhere"
+      not_found: "deleted meanwhile"
       default: "couldn't be advanced"
     create:
       transitioned:

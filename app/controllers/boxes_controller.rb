@@ -157,6 +157,10 @@ class BoxesController < MoveScopedController
       respond_with_streams(-> { [box_detail_stream] }, redirect: move_box_path(@move, box), toast: true) do
         [:notice, t(".transitioned", status: t("boxes.status.#{box.status}"))]
       end
+    in Dry::Monads::Failure(:not_found)
+      # Another member deleted the box after this request loaded it (#980):
+      # there is no detail left to re-stream, so leave for the boxes home.
+      redirect_to move_boxes_path(@move), alert: t(".deleted"), status: :see_other
     in Dry::Monads::Failure(reason)
       # A refusal usually means the page is stale (another member moved the box
       # on, #971): re-stream the detail from the reloaded row (box_detail_stream

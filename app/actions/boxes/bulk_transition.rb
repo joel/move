@@ -60,12 +60,15 @@ module Boxes
 
     # SQL-scoped to the source state, ordered by numeric label (so a skipped-box
     # report reads in print order). Each row is transitioned through the existing
-    # per-box action — every guard, cascade and event preserved.
+    # per-box action — every guard, cascade and event preserved. `from:` makes
+    # it re-check the source state on the locked row (#979): a box that left
+    # that state after this load is skipped, not advanced.
 
     #: (untyped move, untyped to, untyped actor) -> untyped
     def transition_each(move, to, actor)
-      move.boxes.where(status: SOURCE_FOR.fetch(to)).ordered.map do |box|
-        [box, Boxes::TransitionStatus.new.call(box: box, to: to, actor: actor)]
+      from = SOURCE_FOR.fetch(to)
+      move.boxes.where(status: from).ordered.map do |box|
+        [box, Boxes::TransitionStatus.new.call(box: box, to: to, actor: actor, from: from)]
       end
     end
   end

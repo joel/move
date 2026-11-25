@@ -1235,6 +1235,22 @@ RSpec.describe "Boxes" do
           .and include(I18n.t("boxes.actions.seal")) # the packing action set, not sealed's
         expect(response.body).not_to include(I18n.t("boxes.actions.unseal"))
       end
+
+      it "sends the user to the boxes home when the box was deleted meanwhile (#980)" do
+        box = create(:box, :with_room, move:, number: "1", status: "packing")
+        # Another member deletes the box after this request loaded it.
+        allow(Boxes::TransitionStatus).to receive(:new).and_wrap_original do |original|
+          Boxes::Delete.new.call(box: Box.find(box.id), actor: user)
+          original.call
+        end
+
+        patch transition_move_box_path(move, box), params: { to: "sealed" }, as: :turbo_stream
+
+        expect(response).to redirect_to(move_boxes_path(move))
+        expect(response).to have_http_status(:see_other)
+        expect(flash[:alert]).to eq(I18n.t("boxes.transition.deleted"))
+        expect(Box.unscoped.find(box.id).status).to eq("packing")
+      end
     end
 
     it "rejects an illegal transition" do

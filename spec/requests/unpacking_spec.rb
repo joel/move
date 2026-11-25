@@ -307,6 +307,25 @@ RSpec.describe "Unpacking" do
       expect(flash[:alert]).to eq(I18n.t("unpacking.flash.failed"))
       expect(box.reload.status).to eq("sealed")
     end
+
+    it "sends the user to the boxes home when the box was deleted meanwhile (#980)" do
+      box = create(:box, :with_room, move:, status: "unpacking")
+      delete_box_before_transition(box)
+
+      patch move_box_unpacking_complete_path(move, box)
+
+      expect(response).to redirect_to(move_boxes_path(move))
+      expect(flash[:alert]).to eq(I18n.t("unpacking.flash.box_deleted"))
+      expect(Box.unscoped.find(box.id).status).to eq("unpacking")
+    end
+  end
+
+  # Another member deletes the box after this request loaded it (#980).
+  def delete_box_before_transition(box)
+    allow(Boxes::TransitionStatus).to receive(:new).and_wrap_original do |original|
+      Boxes::Delete.new.call(box: Box.find(box.id), actor: user)
+      original.call
+    end
   end
 
   describe "PATCH .../unpacking/reopen" do
@@ -319,6 +338,17 @@ RSpec.describe "Unpacking" do
       expect(response).to redirect_to(move_box_unpacking_path(move, box))
       expect(box.reload.status).to eq("unpacking")
       expect(item.reload.presence_state).to eq("removed")
+    end
+
+    it "sends the user to the boxes home when the box was deleted meanwhile (#980)" do
+      box = create(:box, :with_room, move:, status: "unpacked")
+      delete_box_before_transition(box)
+
+      patch move_box_unpacking_reopen_path(move, box)
+
+      expect(response).to redirect_to(move_boxes_path(move))
+      expect(flash[:alert]).to eq(I18n.t("unpacking.flash.box_deleted"))
+      expect(Box.unscoped.find(box.id).status).to eq("unpacked")
     end
   end
 

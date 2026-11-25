@@ -140,4 +140,46 @@ RSpec.describe Boxes::TransitionStatus do
       expect(item.reload.presence_state).to eq("removed")
     end
   end
+
+  describe "a box deleted after it was loaded (#980)" do
+    it "is refused as not found, leaving status and events untouched" do
+      box = create(:box, :with_room, move:, status: "packing")
+      stale = Box.find(box.id)
+      Boxes::Delete.new.call(box:, actor:)
+      allow(Rails.event).to receive(:notify)
+
+      expect(transition(stale, "sealed")).to eq(Dry::Monads::Failure(:not_found))
+      expect(Box.unscoped.find(box.id).status).to eq("packing")
+      expect(Rails.event).not_to have_received(:notify).with("box.status_changed", anything)
+    end
+  end
+
+  describe "the expected source state (from:, #979)" do
+    it "transitions when the locked row is still in the expected state" do
+      box = create(:box, :with_room, move:, status: "in_transit")
+
+      expect(described_class.new.call(box:, to: "unpacking", actor:, from: "in_transit")).to be_success
+      expect(box.reload.status).to eq("unpacking")
+    end
+
+    it "refuses a box that left the expected state, even when its new state reaches the target" do
+      box = create(:box, :with_room, move:, status: "in_transit")
+      stale = Box.find(box.id)
+      Box.where(id: box.id).update_all(status: "unpacked") # rubocop:disable Rails/SkipsModelValidations
+      allow(Rails.event).to receive(:notify)
+
+      result = described_class.new.call(box: stale, to: "unpacking", actor:, from: :in_transit)
+
+      expect(result).to eq(Dry::Monads::Failure(:invalid_transition))
+      expect(box.reload.status).to eq("unpacked")
+      expect(Rails.event).not_to have_received(:notify).with("box.status_changed", anything)
+    end
+
+    it "keeps validating the edge alone when from: is omitted" do
+      box = create(:box, :with_room, move:, status: "unpacked")
+
+      expect(transition(box, "unpacking")).to be_success
+      expect(box.reload.status).to eq("unpacking")
+    end
+  end
 end

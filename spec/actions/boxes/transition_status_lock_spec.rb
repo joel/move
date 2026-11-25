@@ -39,6 +39,15 @@ RSpec.describe Boxes::TransitionStatus do # box lock shared with every box write
     end.value
   end
 
+  # Soft-deletes the box on another connection (another member's Delete).
+  def delete_elsewhere(box_id)
+    Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection do
+        Boxes::Delete.new.call(box: Box.find(box_id), actor:)
+      end
+    end.value
+  end
+
   # Tries to lock the box row on another connection; :blocked when the lock
   # TransitionStatus holds keeps it out.
   def concurrent_box_lock(box_id)
@@ -76,6 +85,61 @@ RSpec.describe Boxes::TransitionStatus do # box lock shared with every box write
     expect(described_class.new.call(box: stale, to: "unpacked", actor:))
       .to eq(Dry::Monads::Failure(:invalid_transition))
     expect(item.reload.presence_state).to eq("in_box")
+  end
+
+  it "refuses a box soft-deleted on another connection after it was loaded (#980)" do
+    box = create(:box, :with_room, move:, status: "packing")
+    stale = Box.find(box.id) # loaded while kept
+    delete_elsewhere(box.id)
+    versions = Box.unscoped.find(box.id).log_data&.version
+
+    expect(described_class.new.call(box: stale, to: "sealed", actor:))
+      .to eq(Dry::Monads::Failure(:not_found))
+    deleted = Box.unscoped.find(box.id)
+    expect(deleted).to have_attributes(status: "packing", discarded?: true)
+    expect(deleted.log_data&.version).to eq(versions) # no intervening history
+    expect(Rails.event).not_to have_received(:notify).with("box.status_changed", anything)
+  end
+
+  it "has BulkTransition skip a box deleted on another connection after the bulk loaded it (#980)" do
+    kept = create(:box, :with_room, move:, number: "1", status: "packing")
+    deleted = create(:box, :with_room, move:, number: "2", status: "packing")
+    calls = 0
+    allow(described_class).to receive(:new).and_wrap_original do |original|
+      delete_elsewhere(deleted.id) if (calls += 1) == 1
+      original.call
+    end
+
+    result = Boxes::BulkTransition.new.call(move:, to: "sealed", actor:)
+
+    expect(result.value!).to have_attributes(
+      transitioned: 1, skipped: [{ number: "2", reason: :not_found }]
+    )
+    expect(kept.reload.status).to eq("sealed")
+    expect(Box.unscoped.find(deleted.id).status).to eq("packing")
+  end
+
+  it "has BulkTransition skip a box completed elsewhere instead of reopening it (#979)" do
+    box = create(:box, :with_room, move:, number: "4", status: "in_transit")
+    calls = 0
+    allow(described_class).to receive(:new).and_wrap_original do |original|
+      # The bulk loaded box 4 as in_transit; another member starts unpacking
+      # it and completes it before the bulk's transition runs. unpacked ->
+      # unpacking is a legal edge, so only the from: check refuses it.
+      if (calls += 1) == 1
+        commit_elsewhere(box.id, "unpacking")
+        commit_elsewhere(box.id, "unpacked")
+      end
+      original.call
+    end
+
+    result = Boxes::BulkTransition.new.call(move:, to: "unpacking", actor:)
+
+    expect(result.value!).to have_attributes(
+      transitioned: 0, skipped: [{ number: "4", reason: :invalid_transition }]
+    )
+    expect(box.reload.status).to eq("unpacked")
+    expect(Rails.event).not_to have_received(:notify).with("box.status_changed", anything)
   end
 
   it "holds the box row lock while it writes the transition" do
