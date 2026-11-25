@@ -164,4 +164,24 @@ RSpec.describe Items::MarkPhotoRemoved do
     expect(Rails.event).to have_received(:notify)
       .with("item.removed", hash_including(box_id: box.id)).twice
   end
+
+  # #965: item.removed subscribers enqueue onto the separate queue DB and
+  # broadcast Turbo Streams synchronously, so the emit must run after the
+  # outermost app transaction commits. Under transactional fixtures only the
+  # (non-joinable) fixture wrapper is open then: depth 1. An emit inside the
+  # per-item box lock runs at depth 2 — before that lock's commit.
+  it "emits item.removed only after the box-locked removal commits (#965)" do
+    photo = create(:media, move:, box:)
+    create(:item, :confirmed, move:, box:, source_media: photo, name: "Plates")
+    create(:item, :confirmed, move:, box:, source_media: photo, name: "Mugs")
+    depths = [] #: Array[Integer]
+    allow(Rails.event).to receive(:notify).and_wrap_original do |original, name, *args, **kwargs|
+      depths << ActiveRecord::Base.connection.open_transactions if name == "item.removed"
+      original.call(name, *args, **kwargs)
+    end
+
+    described_class.new.call(box:, media: photo, actor:)
+
+    expect(depths).to eq([1, 1])
+  end
 end

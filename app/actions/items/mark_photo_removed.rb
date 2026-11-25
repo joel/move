@@ -33,10 +33,9 @@ module Items
   #
   # No wrapping transaction: each item runs in its own short box-locked
   # transaction and commits before the next, so every success is durable,
-  # per the bulk best-effort convention. MarkRemoved emits only after its
-  # write succeeds, so no event can outlive a rollback; the in-lock event's
-  # side effects are commit-safe (activity row in the same transaction,
-  # search enqueue deferred to commit #648, cluster refresh a debounced job).
+  # per the bulk best-effort convention. MarkRemoved defers its item.removed
+  # emit until this box-locked transaction commits (#965), so subscribers see
+  # the committed removal and no event outlives a rollback.
   class MarkPhotoRemoved < BaseAction
     #: (box: untyped, media: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, media:, actor:)

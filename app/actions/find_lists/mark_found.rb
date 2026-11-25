@@ -11,6 +11,8 @@ module FindLists
   # the delegated Items::MarkRemoved re-checks it against item.move and emits
   # item.removed — no find_list.* event on top (the delegated item event is
   # the domain fact; the MarkPhotoRemoved "no new event type" precedent).
+  # That emit is deferred until the item-locked transaction below commits
+  # (#965), so subscribers never see the find before it is durable.
   class MarkFound < BaseAction
     # Returns Success(item:, opened_box:, completed_box:) — opened_box is the
     # Box when this call auto-opened it, completed_box the Box when marking

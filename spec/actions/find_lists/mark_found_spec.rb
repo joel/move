@@ -156,4 +156,22 @@ RSpec.describe FindLists::MarkFound do
     expect(result).to eq(Dry::Monads::Failure(:move_archived))
     expect(item.reload.presence_state).to eq("in_box")
   end
+
+  # #965: see the MarkPhotoRemoved counterpart — the emit must run after the
+  # item-locked transaction commits (depth 1 = only the fixture wrapper open).
+  it "emits item.removed only after the item-locked find commits (#965)" do
+    box = create(:box, move:, status: "unpacking")
+    item = create(:item, move:, box:, name: "Face Cream")
+    create(:item, move:, box:, name: "Towels")
+    create(:find_list_entry, move:, user:, item:)
+    depths = [] #: Array[Integer]
+    allow(Rails.event).to receive(:notify).and_wrap_original do |original, name, *args, **kwargs|
+      depths << ActiveRecord::Base.connection.open_transactions if name == "item.removed"
+      original.call(name, *args, **kwargs)
+    end
+
+    described_class.new.call(move:, user:, item:)
+
+    expect(depths).to eq([1])
+  end
 end

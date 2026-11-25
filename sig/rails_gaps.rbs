@@ -15,6 +15,14 @@ module Rails
   def self.error: () -> untyped
 end
 
+# Rails 7.2+ `ActiveRecord.after_all_transactions_commit` — runs the block
+# once every open transaction commits (at once when none is open, never on
+# rollback). Defers Items::MarkRemoved's item.removed emit past a caller's
+# enclosing lock (#965).
+module ActiveRecord
+  def self.after_all_transactions_commit: () { () -> void } -> void
+end
+
 # action_policy has no community RBS. The mixin the controllers include; its
 # method surface is declared as checked call sites demand.
 module ActionPolicy
