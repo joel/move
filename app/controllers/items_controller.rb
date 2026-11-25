@@ -16,10 +16,12 @@ class ItemsController < MoveScopedController
 
   #: () -> untyped
   def show
+    # `origin` is the raw page-of-origin params (#960); Items::BackLink
+    # allow-lists them and builds the back href from route helpers only.
     render Views::Items::Show.new(
       move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
       editable: editable_move?, photo_siblings: photo_siblings(@item),
-      find_list_pinned: find_list_pinned?
+      find_list_pinned: find_list_pinned?, origin: { from: params[:from].to_s, query: params[:q].to_s }
     )
   end
 
