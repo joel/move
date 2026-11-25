@@ -19,8 +19,6 @@ module LabelPrintRuns
   # database is down for the last attempt), LabelPrintRuns::FailStale fails the
   # run on a later sweep (#985).
   class GenerateJob < ApplicationJob
-    include BestEffortPurge
-
     queue_as :default
 
     # Errors worth another attempt. Prawn itself renders deterministically, so
@@ -103,10 +101,9 @@ module LabelPrintRuns
       end
     rescue Apartment::TenantNotFound
       # The tenant schema was dropped (account deletion): the run row went with
-      # it, so purge the attachment this job may have written to public. A
-      # retry that met the dropped schema at its first switch never loaded
-      # the run, so it purges by run id what an earlier attempt left (#986).
-      @run ? @run.document.purge : purge_orphaned_documents(arguments.first)
+      # it, so purge by run id the attachment this attempt or an earlier one
+      # wrote to public (#986). Best-effort, so it never masks the job's error.
+      purge_after_tenant_drop(arguments.first)
     rescue ActiveRecord::ActiveRecordError => e
       # The database is unreachable even for the tenant switch. Let ActiveJob
       # re-raise the job's own error (not this one) so Solid Queue records the
@@ -150,25 +147,34 @@ module LabelPrintRuns
       run.document.purge
     end
 
-    # A retry that finds its run (or its whole tenant schema) gone purges
-    # what an earlier attempt left (#986). Active Storage commits the attachment and blob rows before it
-    # uploads (in after_commit), so an upload that fails with a retryable
-    # error leaves committed rows behind. A Move/tenant deletion that captured
-    # the run's attachment ids before those rows committed won't purge them,
-    # and the run row is gone, so nothing else ever would. Run ids are uuids,
-    # so the lookup in the shared public tables can't reach another tenant's
-    # run. The rows are deleted here; each blob (row and stored object) is
-    # purged by a queued job, best-effort. A blob whose purge can't be queued
-    # stays unattached, and PurgeAbandonedUploadsJob reclaims it.
+    # A retry that finds its run gone purges what an earlier attempt left
+    # (#986). See PurgeDocumentsJob. Errors propagate, so retry_on handles a
+    # transient one.
+    #: (String run_id) -> void
     def purge_orphaned_documents(run_id)
-      attachments = ActiveStorage::Attachment.where(
-        record_type: "LabelPrintRun", record_id: run_id, name: "document"
-      )
-      blobs = ActiveStorage::Blob.where(id: attachments.select(:blob_id)).to_a
-      return if blobs.empty?
+      PurgeDocumentsJob.new.perform(run_id)
+    end
 
-      attachments.delete_all
-      blobs.each { |blob| purge_best_effort(blob, "label_print") }
+    # Runs inside after_discard, where ActiveJob re-raises the last callback
+    # error in place of the job's own (#1001). A database error during the
+    # cleanup is therefore logged, and the purge is queued so its retries
+    # finish it. If even the enqueue fails, the attachment row survives:
+    # nothing in the failure path can do better without the database.
+    #: (String run_id) -> void
+    def purge_after_tenant_drop(run_id)
+      purge_orphaned_documents(run_id)
+    rescue ActiveRecord::ActiveRecordError => e
+      Rails.logger.warn("[label_print] cleanup failed for run=#{run_id}: #{e.class}: #{e.message}")
+      queue_document_purge(run_id)
+    end
+
+    #: (String run_id) -> void
+    def queue_document_purge(run_id)
+      return unless PurgeDocumentsJob.perform_later(run_id) == false
+
+      Rails.logger.warn("[label_print] cleanup for run=#{run_id} was not queued")
+    rescue ActiveJob::EnqueueError, SolidQueue::Job::EnqueueError, ActiveRecord::ActiveRecordError => e
+      Rails.logger.warn("[label_print] cleanup for run=#{run_id} could not be queued: #{e.class}: #{e.message}")
     end
 
     def scan_url(move, box, host, protocol)
