@@ -110,6 +110,7 @@ RSpec.describe AppCLI::Services::WorktreeServe do
       expect(server).not_to include("--publish")
       expect(route).to have_received(:write!)
       expect(shell).to have_received(:say).with("Serving #{worktree} at https://move.w1.wt.move-easy.docker")
+      expect(shell).to have_received(:say).with(%r{Stop it with `bin/cli app stop --name w1`})
     end
 
     it "never names main's database or container" do

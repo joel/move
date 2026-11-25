@@ -175,7 +175,8 @@ module AppCLI
 
       def announce_urls
         shell.say("Serving #{checkout.path} at #{app.url}")
-        shell.say("Org hosts: https://<slug>.#{app.zone}. Stop it with `bin/cli app stop --repo #{checkout.path}`.")
+        # --name targets the app actually started, whatever --name serve got.
+        shell.say("Org hosts: https://<slug>.#{app.zone}. Stop it with `bin/cli app stop --name #{app.label}`.")
       end
 
       def serving_this_checkout?

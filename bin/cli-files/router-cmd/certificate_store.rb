@@ -34,10 +34,14 @@ module AppCLI
       def key_path = File.join(leaf_dir, "#{DOMAIN}-key.pem")
 
       # Idempotent. Returns :generated_all, :renewed_leaf or :present.
+      # A new CA (first run, rotation, or a lost/mismatched CA key) also
+      # re-issues every served worktree's zone leaf: signed by the old CA,
+      # they would fail TLS against the new one.
       def ensure!
         unless ca_usable?
           generate_ca
           generate_leaf
+          served_zones.each { |zone| ensure_zone_leaf!(zone) }
           return :generated_all
         end
         return :present if leaf_state == :ok
@@ -46,15 +50,9 @@ module AppCLI
         :renewed_leaf
       end
 
-      # Served worktrees' zone leaves are re-issued too: signed by the old CA,
-      # they would fail TLS once the new one is trusted.
       def rotate!
-        zones = served_zones
         [ca_cert_path, ca_key_path, cert_path, key_path].each { |path| FileUtils.rm_f(path) }
-        zones.each { |zone| remove_zone_leaf(zone) }
-        result = ensure!
-        zones.each { |zone| ensure_zone_leaf!(zone) }
-        result
+        ensure!
       end
 
       # The zones with a leaf in leaf_dir (`wt-<zone>.pem`).

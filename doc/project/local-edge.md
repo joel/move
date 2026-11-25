@@ -384,8 +384,9 @@ host, and the reverse.
   served worktree gets its own leaf for `*.<zone>`, signed by the same CA
   (`CertificateStore#ensure_zone_leaf!`, renewed like the main leaf), written
   to the mounted `leaf/` directory and listed in its router file under
-  `tls.certificates`. Traefik picks it by SNI. `stop` removes it, and
-  `router certs --rotate` re-issues every zone leaf under the new CA.
+  `tls.certificates`. Traefik picks it by SNI. `stop` removes it. Whenever
+  the CA is replaced (`router certs --rotate`, or `router start` recovering a
+  lost or mismatched CA key), every zone leaf is re-issued under the new CA.
 
 **Auth.** Cookies are host-only (#280), so every worktree host holds its own
 `_move_session_v2`, and a main session never reaches a worktree host (or the

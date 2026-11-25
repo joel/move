@@ -72,6 +72,14 @@ RSpec.describe AppCLI::Services::CertificateStore do
       expect(zone_leaf.verify(store.ca.public_key)).to be(true)
     end
 
+    it "is re-issued when ensure! replaces a CA whose key was lost" do
+      store.ensure!
+      store.ensure_zone_leaf!(zone)
+      File.delete(store.ca_key_path)
+      expect(store.ensure!).to eq(:generated_all)
+      expect(zone_leaf.verify(store.ca.public_key)).to be(true)
+    end
+
     it "is removed without touching the main leaf" do
       store.ensure!
       store.ensure_zone_leaf!(zone)
