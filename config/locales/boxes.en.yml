@@ -158,6 +158,7 @@ en:
       transitioned: "Box marked %{status}."
       room_required: "Assign a room before sealing this box."
       invalid: "That status change isn't allowed."
+      deleted: "That box was deleted, so its status can't change."
       failed: "Could not update the box status."
     seal:
       title: "Describe before sealing"

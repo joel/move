@@ -116,6 +116,7 @@ class UnpackingController < MoveScopedController
     flash_key, message =
       case Boxes::TransitionStatus.new.call(box: @box, to: "unpacked", actor: current_user)
       in Dry::Monads::Success(_) then %i[notice completed]
+      in Dry::Monads::Failure(:not_found) then return redirect_to_deleted_box
       # Already unpacked (last item unpacked on another device, a find-list
       # Found, a double tap — #971): the outcome the user asked for is in
       # place, so it is a notice, not a failure. No second event fires.
@@ -131,11 +132,17 @@ class UnpackingController < MoveScopedController
 
   #: () -> untyped
   def reopen
-    Boxes::TransitionStatus.new.call(box: @box, to: "unpacking", actor: current_user)
-    redirect_to move_box_unpacking_path(@move, @box)
+    result = Boxes::TransitionStatus.new.call(box: @box, to: "unpacking", actor: current_user)
+    result.failure? && result.failure == :not_found ? redirect_to_deleted_box : redirect_to(move_box_unpacking_path(@move, @box))
   end
 
   private
+
+  # The box was deleted by another member after this request loaded it
+  # (#980): its checklist is gone, so land on the boxes home instead.
+
+  #: () -> untyped
+  def redirect_to_deleted_box = redirect_to(move_boxes_path(@move), alert: t("unpacking.flash.box_deleted"), status: :see_other)
 
   #: () -> untyped
   def respond_to_removed
