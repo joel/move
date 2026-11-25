@@ -20,6 +20,7 @@ RSpec.describe "Manual item showcase (JS)", :js do
       })(arguments[0])
     JS
   end
+  let(:card_selector) { "[id^='box_item_'][id$='_card']" }
 
   around do |example|
     original_zone = Rails.application.config.x.tenant_zone
@@ -42,6 +43,36 @@ RSpec.describe "Manual item showcase (JS)", :js do
   end
 
   it "scrolls the new item's card into view below the photo cards" do
+    add_desk_lamp
+
+    expect(page).to have_link(I18n.t("items.create.view_item"))
+    card = find("[data-controller~='highlight']", text: "Desk lamp")
+    expect(scrolled_into_view?(card)).to be(true)
+  end
+
+  # #968 — the highlight is one-shot. Going Back to the box page restores Turbo's
+  # cached snapshot; it must keep the user's restored scroll position and must
+  # not flash the card again.
+  it "does not replay the highlight or override the scroll on a Back visit" do
+    move, box = add_desk_lamp
+    card_id = find(card_selector, text: "Desk lamp")[:id]
+    expect(page).to have_no_css(".ring-accent-sage", wait: 5) # first flash cleared
+
+    page.execute_script("window.scrollTo(0, 0)")
+    sleep 0.5 # let Turbo record the scroll position for restoration
+    click_on I18n.t("items.create.view_item")
+    expect(page).to have_no_current_path(move_box_path(move, box))
+
+    page.go_back
+    expect(page).to have_css("##{card_id}", text: "Desk lamp")
+    expect(page).to have_no_css(".ring-accent-sage", wait: 0) # no second flash
+    sleep 1 # past the restore scroll and any smooth re-scroll
+    expect(page.evaluate_script("window.scrollY")).to eq(0)
+  end
+
+  # Signs in, adds "Desk lamp" manually to a box whose photo cards push the new
+  # card below the fold, and returns [move, box].
+  def add_desk_lamp
     move, box = Apartment::Tenant.switch(slug) do
       m = create(:move, created_by: user)
       b = create(:box, move: m, number: "1")
@@ -54,10 +85,7 @@ RSpec.describe "Manual item showcase (JS)", :js do
     visit new_move_box_item_path(move, box)
     fill_in "item[name]", with: "Desk lamp"
     click_on I18n.t("items.new.submit")
-
-    expect(page).to have_link(I18n.t("items.create.view_item"))
-    card = find("[data-controller~='highlight']", text: "Desk lamp")
-    expect(scrolled_into_view?(card)).to be(true)
+    [move, box]
   end
 
   # Polls past the smooth scroll: true once the card sits inside the viewport.
