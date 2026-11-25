@@ -19,6 +19,8 @@ module LabelPrintRuns
   # database is down for the last attempt), LabelPrintRuns::FailStale fails the
   # run on a later sweep (#985).
   class GenerateJob < ApplicationJob
+    include BestEffortPurge
+
     queue_as :default
 
     # Errors worth another attempt. Prawn itself renders deterministically, so
@@ -55,7 +57,8 @@ module LabelPrintRuns
       Apartment::Tenant.switch(tenant) do
         Current.tenant = tenant
         run = LabelPrintRun.find_by(id: run_id)
-        return unless run&.in_progress? # gone, or a retry after it already finished/failed
+        return purge_orphaned_documents(run_id) unless run
+        return unless run.in_progress? # a retry after it already finished/failed
 
         @run = run
         generate(run, host, protocol, box_ids, copies)
@@ -100,8 +103,10 @@ module LabelPrintRuns
       end
     rescue Apartment::TenantNotFound
       # The tenant schema was dropped (account deletion): the run row went with
-      # it, so purge the attachment this job may have written to public.
-      @run&.document&.purge
+      # it, so purge the attachment this job may have written to public. A
+      # retry that met the dropped schema at its first switch never loaded
+      # the run, so it purges by run id what an earlier attempt left (#986).
+      @run ? @run.document.purge : purge_orphaned_documents(arguments.first)
     rescue ActiveRecord::ActiveRecordError => e
       # The database is unreachable even for the tenant switch. Let ActiveJob
       # re-raise the job's own error (not this one) so Solid Queue records the
@@ -143,6 +148,27 @@ module LabelPrintRuns
       # Tenant schema dropped mid-job (account deletion) — the run row is gone
       # with its schema; purge the attachment just written to public.
       run.document.purge
+    end
+
+    # A retry that finds its run (or its whole tenant schema) gone purges
+    # what an earlier attempt left (#986). Active Storage commits the attachment and blob rows before it
+    # uploads (in after_commit), so an upload that fails with a retryable
+    # error leaves committed rows behind. A Move/tenant deletion that captured
+    # the run's attachment ids before those rows committed won't purge them,
+    # and the run row is gone, so nothing else ever would. Run ids are uuids,
+    # so the lookup in the shared public tables can't reach another tenant's
+    # run. The rows are deleted here; each blob (row and stored object) is
+    # purged by a queued job, best-effort. A blob whose purge can't be queued
+    # stays unattached, and PurgeAbandonedUploadsJob reclaims it.
+    def purge_orphaned_documents(run_id)
+      attachments = ActiveStorage::Attachment.where(
+        record_type: "LabelPrintRun", record_id: run_id, name: "document"
+      )
+      blobs = ActiveStorage::Blob.where(id: attachments.select(:blob_id)).to_a
+      return if blobs.empty?
+
+      attachments.delete_all
+      blobs.each { |blob| purge_best_effort(blob, "label_print") }
     end
 
     def scan_url(move, box, host, protocol)
