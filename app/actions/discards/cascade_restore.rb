@@ -15,6 +15,8 @@ module Discards
   # discarded → Failure(:not_found); discarded under another batch →
   # Failure(:stale). The batch the children are matched on is the re-read one.
   class CascadeRestore < BaseAction
+    include MoveWritable
+
     #: (record: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(record:, actor:, source: :web) # rubocop:disable Lint/UnusedMethodArgument
       yield ensure_writable(record.move)

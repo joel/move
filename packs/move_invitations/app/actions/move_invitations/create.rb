@@ -14,6 +14,8 @@ module MoveInvitations
   # discloses nothing new. Whether the address has a User account elsewhere is
   # never revealed.
   class Create < BaseAction
+    include MoveWritable
+
     #: (move: untyped, email: untyped, role: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, email:, role:, actor:)
       # An archived Move is read-only: Accept refuses it, so an invite here would

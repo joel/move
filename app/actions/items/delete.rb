@@ -12,6 +12,7 @@ module Items
   # discard commits as a secondary mutation (its failure never masks the
   # deletion; Success(item) either way).
   class Delete < BaseAction
+    include MoveWritable
     include CurrentBoxLock
 
     #: (item: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]

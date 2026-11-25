@@ -6,6 +6,7 @@ module Boxes
   # A blank room name leaves the existing room untouched (use D7 room management
   # to remove a room); a present name is resolved/created from the vocabulary.
   class Update < BaseAction
+    include MoveWritable
     include Boxes::RoomResolution
     include Search::Reindexing
 

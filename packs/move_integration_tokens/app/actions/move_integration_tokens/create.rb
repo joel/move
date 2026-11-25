@@ -14,6 +14,8 @@ module MoveIntegrationTokens
   # (MovePolicy#manage_integration_tokens?). organization_id is denormalized from
   # the current Apartment tenant for audit/scoping, mirroring MoveMemberships::Add.
   class Create < BaseAction
+    include MoveWritable
+
     # Returned on success: the persisted record plus the one-time raw token.
     Result = Data.define(:token, :raw_token)
 

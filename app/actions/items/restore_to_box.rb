@@ -9,6 +9,8 @@ module Items
   # one serialization point. NEVER call this while holding an item lock — the
   # box lock is taken first (see below).
   class RestoreToBox < BaseAction
+    include MoveWritable
+
     # Box-locked guard + flip, box-first — the same lock order as
     # TransitionStatus's completion cascade (box transaction → item rows), so
     # no cycle (#756 Codex R2). The lock re-reads the box and the item, so a

@@ -6,6 +6,7 @@ module Boxes
   # attaching a room (resolved by name from the minimal D2 vocabulary). The
   # caller owns the tenant context and the writable-Move guard (controller).
   class Create < BaseAction
+    include MoveWritable
     include Boxes::RoomResolution
 
     #: (move: untyped, params: untyped, creator: untyped) -> Dry::Monads::Result[untyped, untyped]

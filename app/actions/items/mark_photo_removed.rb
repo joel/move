@@ -37,6 +37,8 @@ module Items
   # emit until this box-locked transaction commits (#965), so subscribers see
   # the committed removal and no event outlives a rollback.
   class MarkPhotoRemoved < BaseAction
+    include MoveWritable
+
     #: (box: untyped, media: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(box:, media:, actor:)
       yield ensure_writable(box.move)

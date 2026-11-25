@@ -46,7 +46,7 @@ The checkers come from core `packwerk` (dependencies) + `packwerk-extensions`
 ```
 application   →  controllers / orchestration (lives in the unlayered root for now)
 domain        →  the per-domain packs (packs/labels, future boxes/items/…)
-utility       →  the shared kernel (BaseAction, ApplicationRecord, Current, …)
+utility       →  the shared kernel (ApplicationRecord, Current, …)
 ```
 
 A `domain` pack may reference `domain` + `utility`, never `application`.
@@ -63,14 +63,24 @@ so per-constant privacy/visibility would be ceremony (a `visible_to` listing eve
 pack). Domain packs keep both strict.
 
 > **Self-contained means *no domain coupling at all* — including method calls
-> Packwerk can't see.** `BaseAction` and `Discards::Cascade`/`CascadeRestore` are
-> deliberately **not** in utility: both call `ensure_writable(move)` →
-> `move.writable?` / `Failure(:move_archived)`, a method-call dependency on the Move
-> domain's archived-invariant. Packwerk only tracks *constants*, so it wouldn't flag
-> it — but a bottom-layer kernel that has to change when Move's writable/archive
-> contract changes isn't a kernel. They stay in the root until `ensure_writable` is
-> factored out of the action base (tracked follow-up), after which they can be
-> promoted to `utility`.
+> Packwerk can't see.** `BaseAction#ensure_writable(move)` used to call
+> `move.writable?` / `Failure(:move_archived)`: a method-call dependency on the Move
+> domain's archived invariant. Packwerk only tracks *constants*, so it wouldn't flag
+> it, but a bottom-layer kernel that has to change when Move's writable/archive
+> contract changes isn't a kernel.
+>
+> **#443 factored it out.** The guard is now the **`MoveWritable`** mixin
+> (`app/actions/move_writable.rb`, in the root with the Move aggregate). Each
+> mutating action does `include MoveWritable`, which turns the hidden method-call
+> dependency into a constant reference Packwerk can see (every pack that includes
+> it already depends on `.`). `BaseAction` is now domain-free (Dry::Monads,
+> `PARENT_ROW_LOCK`, `with_responsible`).
+>
+> **Still in the root:** `BaseAction` itself, until `packs/utility/app/actions`
+> gets a `check` line in the (protected) `Steepfile`. Moving it without one would
+> drop it from type checking. `Discards::Cascade`/`CascadeRestore` include
+> `MoveWritable` (they guard `record.move`), so they stay Move-coupled and belong
+> in the root.
 
 **The unlayered-root escape hatch.** The root package still has **no `layer:`**. The
 architecture checker treats a reference to a layer-less package as always allowed
@@ -111,7 +121,8 @@ A pack exposes the **minimum** surface. Two complementary mechanisms:
 > List a pack's public surface with `grep -rl "pack_public: true" packs/<pack>` plus
 > `ls packs/<pack>/app/public`.
 
-**Specs are excluded** from Packwerk (`exclude: spec/**/*` in `packwerk.yml`): a test
+**Specs are excluded** from Packwerk (`exclude: spec/**/*` and `packs/*/spec/**/*`
+in `packwerk.yml`): a test
 may reference any constant — including another pack's private internals — without it
 counting as a boundary violation.
 
@@ -141,8 +152,8 @@ packs/labels/
 - **Private**: the progress recorder, the broadcasting mixin, the generation job —
   referenced only inside the pack.
 - `dependencies: ['.', 'packs/utility']` — reaches the shared kernel in
-  `packs/utility` (`BaseAction`, `ApplicationRecord`, `ApplicationJob`) and the
-  domain constants still in root (`Move`, `Box`, `BoxLabelsPdf`).
+  `packs/utility` (`ApplicationRecord`, `ApplicationJob`) and what is still in root:
+  `BaseAction` and the domain constants (`Move`, `Box`, `BoxLabelsPdf`).
 - `visible_to: ['.']` — only the root app references labels today. When
   `accounts`/`moves` become packs, add them here.
 
@@ -179,9 +190,11 @@ they are irreducible and correctly belong in the unlayered root:
   so it stays in the root.
 - **The application layer** — controllers, Phlex `Views::`/`Components::`, presenters,
   policies, mailers, channels, MCP — orchestrates the domains and belongs at the top.
-- **`BaseAction`** and **`Discards::Cascade`/`CascadeRestore`** — the action base and
-  the soft-delete cascade both carry Move-domain coupling (`ensure_writable(move)`),
-  so they stay in the root until decoupled (#443).
+- **`Discards::Cascade`/`CascadeRestore`**: the soft-delete cascade includes
+  `MoveWritable` (it guards `record.move`), so it is Move-coupled and stays in the root.
+- **`BaseAction`**: domain-free since #443 (the archived-Move guard moved to the
+  `MoveWritable` mixin). It is still in the root only because moving it into
+  `packs/utility/app/actions` needs a `check` line in the protected `Steepfile`.
 
 This is a **standard, healthy Packwerk end state**: extract the *periphery* (which
 depends inward on the core), and leave the core aggregate + identity + application in
@@ -254,7 +267,8 @@ graph TD
 **kernel** = the domain-free framework infrastructure (`ApplicationRecord`,
 `ApplicationJob`, `ApplicationMailer`, `Current`, `Discardable`, `Roleable`,
 `ProviderHttp`) — extracted into **`packs/utility`** (the `utility` layer).
-`BaseAction` stays in root for now (its `ensure_writable` couples it to Move).
+`BaseAction` is domain-free since #443 but still in root, until the Steepfile checks
+`packs/utility/app/actions`.
 `Apartment` + `Rails.event` are gem/framework globals, not packaged.
 
 **Known coupling hotspots** (to untangle as domains are extracted):
@@ -308,13 +322,37 @@ dependency changes (Step 8b / §7 — the `/code-review` and Codex passes flag d
 8. Extend `spec/architecture/conventions_spec.rb` globs if the pack introduces a new
    layer directory shape.
 
-> **Where do a pack's specs go?** For now, **keep them in the root `spec/` tree**
-> (mirroring the code path, e.g. `spec/actions/label_print_runs/…`). The test runner
-> (`.rspec` + the `rspec spec …` commands in CI/Rakefile) only discovers `spec/`, so
-> a spec placed under `packs/<pack>/spec/` would be **silently skipped**. Wiring
-> pack-local specs to run (the packs-rails RSpec integration) is tracked in #439;
-> until then, `packs/*/spec` is excluded from Packwerk only as a safety net, not as a
-> blessed location.
+### Where a pack's specs go
+
+A pack's unit specs live **next to its code**, in `packs/<pack>/spec/`, mirroring
+the `app/` path (`packs/labels/spec/actions/label_print_runs/start_spec.rb`).
+Factories for the pack's records go in `packs/<pack>/spec/factories/`. Each spec
+starts with `require "rails_helper"`, like a root spec. RSpec puts the root `spec/`
+on the load path, so that resolves to `spec/rails_helper.rb`, and the root
+`spec/support/` helpers apply to pack specs unchanged.
+
+How they run (#439): `spec/spec_helper.rb` requires packs-rails' RSpec integration
+(`require "packs/rails/rspec"`). It changes the list of paths RSpec was given before
+RSpec expands it into files:
+
+| Command | What runs |
+|---|---|
+| `bundle exec rspec` or `bundle exec rspec spec …` (the CI, Rakefile `project:tests` and `bin/cli app test` unit command) | root `spec/` **plus every `packs/*/spec/`** |
+| `bundle exec rake spec` (the RakeTask uses RSpec's default `**{,/*/**}/*_spec.rb` pattern so pack paths match) | every spec, root and packs, system included |
+| `bundle exec rspec packs/labels` | `packs/labels/spec/` only |
+| `bundle exec rspec spec/models` or a single file | exactly that path, no pack specs |
+
+So the unit command needs no pack-specific flags, and its
+`--exclude-pattern "spec/system/**/*_spec.rb"` still keeps root system specs out
+of the unit run. **System specs stay in the root `spec/system/`.** The exclude
+pattern only matches the root tree, and the system job runs `rspec spec/system`,
+so a pack system spec would run in the wrong job. `spec/architecture/conventions_spec.rb`
+fails if a `packs/*/spec/system/` spec appears.
+
+`packs/labels` is the first pack with co-located specs (its action, job and model
+specs plus the `label_print_run` factory). Request, component and system specs that
+cover root controllers and views stay in the root `spec/` tree. Specs are excluded
+from Packwerk in both places (`spec/**/*` and `packs/*/spec/**/*` in `packwerk.yml`).
 
 ---
 

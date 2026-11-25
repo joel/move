@@ -39,6 +39,7 @@ module Captures
   #   latest-run check to its "Keep both" item, so a re-scan lands either
   #   before (the conflict is refused as :superseded) or after the decision.
   class Retake < BaseAction
+    include MoveWritable
     include Items::CurrentBoxLock
     include BestEffortPurge
 

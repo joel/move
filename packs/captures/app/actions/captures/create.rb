@@ -18,6 +18,7 @@ module Captures
   #                    a non-native format, transcoded to JPEG (parity with the
   #                    web path); the original blob is then purged.
   class Create < BaseAction
+    include MoveWritable
     include BestEffortPurge
 
     # Active Storage signed_ids are signed with the global secret and ActiveStorage::Blob

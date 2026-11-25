@@ -8,6 +8,8 @@ module Discards
   # and is therefore left out of this cascade's eventual restore. The whole tree is
   # discarded in a single transaction. Returns the batch id on success.
   class Cascade < BaseAction
+    include MoveWritable
+
     #: (record: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(record:, actor:, source: :web) # rubocop:disable Lint/UnusedMethodArgument
       yield ensure_writable(record.move)

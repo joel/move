@@ -10,6 +10,7 @@ module Vocabularies
   # never half-detached. The in-use *confirmation* is the caller's responsibility
   # (UI turbo-confirm); this action assumes it has already been granted.
   class Remove < BaseAction
+    include MoveWritable
     include Search::Reindexing
 
     #: (record: untyped, vocabulary: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]

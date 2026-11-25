@@ -8,6 +8,8 @@ module Moves
   # move.auto_confirm_threshold_changed event for the audit trail. The caller
   # (controller) owns authorization and the archived read-only guard.
   class SetAutoConfirmThreshold < BaseAction
+    include MoveWritable
+
     #: (move: untyped, threshold: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, threshold:, actor: nil)
       yield ensure_writable(move)

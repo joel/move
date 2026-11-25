@@ -10,6 +10,8 @@ module Items
   # turns a Failure into an `item.image_generation_failed` event so the card
   # reverts — generation must never corrupt the item.
   class GenerateImage < BaseAction
+    include MoveWritable
+
     #: (item: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor: nil)
       yield ensure_writable(item.move)

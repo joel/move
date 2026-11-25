@@ -21,11 +21,8 @@ include:
 exclude:
   - "{bin,node_modules,script,tmp,vendor,storage,log,public,coverage,db}/**/*"
   - "spec/**/*"
-  # Defensive: a pack's specs are kept in the ROOT spec/ tree for now (the test
-  # runner only targets spec/ — pack-local packs/*/spec is not yet wired into CI,
-  # see the follow-up). This exclude is a safety net so that IF someone adds a
-  # packs/*/spec referencing the pack's private internals, packwerk won't flag it
-  # (the `spec/**` glob above only matches the root spec/ tree).
+  # Pack-local specs (packs/<pack>/spec, run by the unit suite since #439) — the
+  # `spec/**` glob above only matches the root spec/ tree.
   - "packs/*/spec/**/*"
 
 # Cache the constant-resolution + reference scan (tmp/cache/packwerk) for fast reruns.
@@ -39,7 +36,7 @@ cache: true
 # `packs/utility`; the root is reclassified as `application` once all domains move.
 #   - application : controllers / orchestration (lives in the unlayered root for now)
 #   - domain      : the per-domain packs (packs/labels, and future boxes/items/…)
-#   - utility     : the shared kernel (BaseAction, ApplicationRecord, Current, …)
+#   - utility     : the shared kernel (ApplicationRecord, Current, …)
 architecture_layers:
   - application
   - domain

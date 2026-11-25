@@ -9,6 +9,8 @@ module RecognitionRuns
   # re-enqueuing (Domain §4.10). The original run is left as-is for the record.
   # The new run inherits the failed run's `rescan` flag (#897).
   class Retry < BaseAction
+    include MoveWritable
+
     # Only a failed run is retryable — guards against double-submits / replayed
     # POSTs queuing a duplicate run (and duplicate items) for the same media.
     # A failed run whose photo was already materialized is NOT retryable

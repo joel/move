@@ -13,6 +13,8 @@ module Items
   # (the find-list counts, the box grid) assumes cannot happen. The user
   # restores the box first, then the item.
   class Restore < BaseAction
+    include MoveWritable
+
     #: (item: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(item:, actor:, source: :web)
       yield ensure_writable(item.move) # first step: no lock taken on a read-only Move

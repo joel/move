@@ -151,6 +151,32 @@ sequenceDiagram
 New tenants created later via `Apartment::Tenant.create` clone the current full
 `public`, so they start correct; this path keeps **pre-existing** tenants current.
 
+### Cross-tenant sweeps: `TenantSweep.in_each_tenant` (#584)
+
+Recurring maintenance jobs (`PurgeExpiredDiscardsJob`, `FailStaleRecognitionRunsJob`,
+the label-print and insurance-dossier purges) and the backfill rake tasks
+(`images:*`, `storage:backfill_to_r2`, `search:reindex`) all run the same body once per
+tenant. They go through one helper, `TenantSweep.in_each_tenant { |slug| … }`
+(`packs/organizations/app/public/tenant_sweep.rb`), never a hand-written
+`Organization.pluck(:slug).each { Apartment::Tenant.switch … }` loop.
+
+```mermaid
+flowchart LR
+  S["TenantSweep.in_each_tenant"] --> P["Organization.pluck(:slug)"]
+  P --> L{"for each slug:<br/>Apartment::Tenant.switch"}
+  L -->|schema present| B["yield slug"]
+  L -->|Apartment::TenantNotFound| W["log warn, skip"]
+  B --> L
+  W --> L
+```
+
+A slug with no schema is logged and skipped. That happens in the account-deletion
+race, because `Accounts::Delete` drops the schema before it deletes the Organization
+row, and aborting there would starve every later tenant. Any other error propagates,
+so a real bug in the block is never masked. That includes a `TenantNotFound` raised
+*inside* the block (a nested switch): only a failure to enter the swept slug's own
+schema counts as a ghost tenant.
+
 ### Tenant teardown: deleting an account drops its solo-org schemas (#365)
 
 Account deletion is the inverse of tenant creation and the only place a tenant
@@ -574,9 +600,27 @@ sequenceDiagram
   C-->>B: 200 application/pdf (attachment)
 ```
 
-A `GenerateJob` failure marks the run `failed` and broadcasts that state (a "Try
-again" link), then re-raises; a retry no-ops because the run is no longer in
-progress. `PurgeStaleLabelPrintRunsJob` reaps day-old run PDFs per tenant.
+A transient `GenerateJob` error (a database interruption while the render loop
+records progress, an Active Storage integrity error, or a storage-client timeout
+or network error) is retried with `retry_on`, up to 3 attempts (#306). The run
+stays `processing` meanwhile, so the page keeps showing the bar, and each
+attempt renders from the first box again. The job marks the run `failed` and
+broadcasts that state (a "Try again" link) in `after_discard`, which runs once
+the retries are used up, or at once for any other error. ActiveJob then
+re-raises, and a later run of the job no-ops because the run is no longer in
+progress.
+
+```mermaid
+stateDiagram-v2
+  [*] --> processing: Start enqueues GenerateJob
+  processing --> processing: transient error, attempts left (retry_on)
+  processing --> completed: PDF attached
+  processing --> failed: transient error, attempts used up (after_discard)
+  processing --> failed: any other error (after_discard)
+  failed --> [*]: "Try again" starts a new run
+```
+
+`PurgeStaleLabelPrintRunsJob` reaps day-old run PDFs per tenant.
 
 ### 4b. Bulk box lifecycle steps (Phase 44)
 

@@ -31,19 +31,9 @@ class BaseAction
 
   private
 
-  # The archived-Move invariant lives here, in one place, instead of being
-  # re-checked by every controller and MCP tool: a user-facing mutating action
-  # calls `yield ensure_writable(move)` as its first step. An archived Move is
-  # read-only (Move#writable?). Returns Failure(:move_archived) — controllers map
-  # it to the friendly read-only redirect, MCP tools to a read-only tool error.
-  # Reads and token revocation are not guarded (they stay allowed when archived).
-
-  #: (untyped move) -> (Dry::Monads::Failure[Symbol] | Dry::Monads::Success[nil])
-  def ensure_writable(move)
-    return Failure(:move_archived) unless move.writable?
-
-    Success()
-  end
+  # BaseAction is domain-free on purpose (#443): the archived-Move guard
+  # (`ensure_writable`) is the MoveWritable mixin, included by the actions that
+  # mutate a Move's contents.
 
   # Attributes the Logidze version(s) created while `block` runs to `actor`
   # (Technical Foundation §7.4) — stored in the version meta as `_r`, so the

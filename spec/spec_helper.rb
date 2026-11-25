@@ -13,6 +13,15 @@
 # it.
 #
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
+
+# Pack-local specs (#439): packs-rails' RSpec integration rewrites the run list
+# so `packs/<pack>/spec/` is discovered. A bare `rspec` / `rspec spec …` (the CI,
+# Rakefile and `bin/cli app test` unit invocation) also runs every pack's spec/;
+# `rspec packs/labels` runs that pack's spec/. It must load from here (via
+# `.rspec --require spec_helper`): RSpec has already parsed the paths but not yet
+# expanded them into files. See doc/project/packwerk-boundaries.md.
+require "packs/rails/rspec"
+
 RSpec.configure do |config|
   # rspec-expectations config goes here. You can use an alternate
   # assertion/expectation library such as wrong or the stdlib/minitest
