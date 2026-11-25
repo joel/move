@@ -40,6 +40,15 @@ RSpec.describe Components::Ui::CameraViewfinder do
     expect(html).to match(%r{</video><div class="absolute inset-0">OVERLAY</div></div>\z})
   end
 
+  it "builds the Turbo-cache teardown/resume actions for a consumer controller (#987)" do
+    expect(described_class.cache_actions("qr-scanner")).to eq(
+      "turbo:before-cache@document->qr-scanner#teardown " \
+      "turbo:load@document->qr-scanner#resume " \
+      "turbo:render@document->qr-scanner#resume " \
+      "popstate@window->qr-scanner#resume"
+    )
+  end
+
   it "exposes the shutter recipe with disabled and focus-visible states" do
     expect(described_class::SHUTTER_CLASSES).to include(
       "disabled:opacity-50", "focus-visible:outline-accent-sage", "active:scale-90"

@@ -32,6 +32,25 @@ module Components
                         "active:scale-90 disabled:opacity-50 focus-visible:outline-2 " \
                         "focus-visible:outline-offset-2 focus-visible:outline-accent-sage"
 
+      # The Turbo-cache lifecycle every consumer's controller wires on its
+      # root (#987): `teardown` releases the camera before Turbo snapshots the
+      # page; `resume` restarts it when the page outlives the cache (Turbo can
+      # cache without replacing the body — a non-Turbo history entry, a
+      # morphing refresh). popstate is in the list because Turbo's empty-state
+      # history pop fires neither turbo:load nor turbo:render.
+      CACHE_EVENTS = {
+        "turbo:before-cache@document" => "teardown",
+        "turbo:load@document" => "resume",
+        "turbo:render@document" => "resume",
+        "popstate@window" => "resume"
+      }.freeze
+
+      # The `data-action` descriptors for CACHE_EVENTS on `controller`.
+      #: (String controller) -> String
+      def self.cache_actions(controller)
+        CACHE_EVENTS.map { |event, method| "#{event}->#{controller}##{method}" }.join(" ")
+      end
+
       #: (controller: String, ?css: String?, ?data: Hash[untyped, untyped]) -> void
       def initialize(controller:, css: nil, data: {})
         @controller = controller

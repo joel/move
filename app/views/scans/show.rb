@@ -18,8 +18,9 @@ module Views
           class: "flex flex-col items-center gap-6",
           data: { controller: "qr-scanner", qr_scanner_resolve_url_value: move_scan_path(@move),
                   # Release the camera the moment a navigation starts, and keep
-                  # the Turbo snapshot pristine (#618).
-                  action: "turbo:before-cache@document->qr-scanner#teardown" }
+                  # the Turbo snapshot pristine (#618); restart it if the page
+                  # outlives the cache (#987).
+                  action: Components::Ui::CameraViewfinder.cache_actions("qr-scanner") }
         ) do
           viewfinder
           p(class: "max-w-sm text-center text-sm text-muted") { I18n.t("scans.show.hint") }
