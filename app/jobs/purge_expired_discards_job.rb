@@ -9,13 +9,8 @@
 class PurgeExpiredDiscardsJob < ApplicationJob
   #: () -> void
   def perform
-    Organization.pluck(:slug).each do |slug|
-      Apartment::Tenant.switch(slug) { Discards::PurgeExpired.new.call }
-    rescue Apartment::TenantNotFound
-      # Account-deletion race: Accounts::Delete drops the tenant schema before it
-      # deletes the Organization row, so a listed slug can have no schema. Skip —
-      # aborting here would silently starve every tenant later in the list.
-      next
-    end
+    # TenantSweep skips a slug whose schema is already dropped (the
+    # account-deletion race) so one ghost tenant can't starve the rest.
+    TenantSweep.in_each_tenant { Discards::PurgeExpired.new.call }
   end
 end

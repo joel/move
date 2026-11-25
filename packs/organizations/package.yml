@@ -1,7 +1,8 @@
 # packs/organizations — the tenancy registry: Organization + OrganizationMembership
 # (public-schema, Apartment-excluded) and the tenant-provisioning action.
 #   PUBLIC (app/public): Organization, OrganizationMembership (referenced by
-#     accounts/captures/demo_data/move_integration_tokens/move_memberships/session_handoffs).
+#     accounts/captures/demo_data/move_integration_tokens/move_memberships/session_handoffs),
+#     TenantSweep (the per-tenant sweep loop used by root jobs + rake tasks, #584).
 #   PUBLIC (sigil): Organizations::Create.
 # dependencies: ['.', 'packs/utility'] (references User/Move in root + kernel).
 # visible_to: root + the consumer packs (added below).
