@@ -15,6 +15,8 @@
 #   LabelPrintRun           — the run record (referenced by Accounts::Delete,
 #                             Moves::Destroy, PurgeStaleLabelPrintRunsJob).
 #   LabelPrintRuns::Start   — the entry-point action (referenced by the controller).
+#   LabelPrintRuns::FailStale — the stranded-run sweep (referenced by
+#                             FailStaleLabelPrintRunsJob, #985).
 # PRIVATE (app/actions, app/jobs):
 #   LabelPrintRuns::{RecordProgress, Broadcasting, GenerateJob}.
 #
