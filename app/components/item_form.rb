@@ -9,9 +9,16 @@ module Components
   class ItemForm < Components::Base
     include Phlex::Rails::Helpers::FormWith
 
-    #: (models: untyped, item: untyped, ?submit_label: untyped, ?cancel_href: untyped, ?autosave: untyped, ?source_media_id: untyped) -> void
+    # @rbs models: untyped
+    # @rbs item: untyped
+    # @rbs submit_label: untyped
+    # @rbs cancel_href: untyped
+    # @rbs autosave: untyped
+    # @rbs source_media_id: untyped
+    # @rbs url: String?
+    # @rbs return: void
     def initialize(models:, item:, submit_label: nil, cancel_href: nil,
-                   autosave: false, source_media_id: nil)
+                   autosave: false, source_media_id: nil, url: nil)
       @models = models
       @item = item
       @submit_label = submit_label
@@ -23,11 +30,14 @@ module Components
       # `change->auto-submit#submit` action), so there is no submit button. B3
       # (manual add) keeps the button — a not-yet-created record can't auto-save.
       @autosave = autosave
+      # Overrides the model-derived action, e.g. to carry C3's allow-listed
+      # back-link origin through the update (#960). nil keeps the default.
+      @url = url
     end
 
     #: () -> void
     def view_template
-      form_with(model: @models, class: "flex flex-col gap-6", **form_attrs) do |form|
+      form_with(model: @models, url: @url, class: "flex flex-col gap-6", **form_attrs) do |form|
         input(type: "hidden", name: "item[source_media_id]", value: @source_media_id) if @source_media_id
         render_errors if @item.errors.any?
         name_field

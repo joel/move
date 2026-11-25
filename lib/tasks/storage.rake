@@ -23,18 +23,16 @@ namespace :storage do
     # default scope, but its blob row is still swept below — so a discarded lost
     # photo must stay on the allowlist, or its unreadable source would abort the run.
     expected_lost = Set.new
-    Organization.pluck(:slug).each do |slug|
-      Apartment::Tenant.switch(slug) do
-        Media.with_discarded.where(image_unavailable: true).with_attached_image.find_each do |m|
-          master = m.image.blob
-          expected_lost << master.key
-          # A lost master's derived variants (:thumb/:detail) live in the same
-          # corrupt volume, so a missing/corrupt variant object of a known-lost
-          # photo would also fail to download and abort the sweep — allowlist
-          # those keys too.
-          ActiveStorage::VariantRecord.where(blob_id: master.id).includes(image_attachment: :blob).find_each do |vr|
-            expected_lost << vr.image.blob.key if vr.image.attached?
-          end
+    TenantSweep.in_each_tenant do
+      Media.with_discarded.where(image_unavailable: true).with_attached_image.find_each do |m|
+        master = m.image.blob
+        expected_lost << master.key
+        # A lost master's derived variants (:thumb/:detail) live in the same
+        # corrupt volume, so a missing/corrupt variant object of a known-lost
+        # photo would also fail to download and abort the sweep — allowlist
+        # those keys too.
+        ActiveStorage::VariantRecord.where(blob_id: master.id).includes(image_attachment: :blob).find_each do |vr|
+          expected_lost << vr.image.blob.key if vr.image.attached?
         end
       end
     end

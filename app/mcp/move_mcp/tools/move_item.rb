@@ -28,12 +28,36 @@ module MoveMcp
         return error_response("No box ##{to_box_number} in this move.") if target.nil?
 
         result = ::Items::Move.new.call(item: item, target_box: target, mover: actor(server_context))
-        return failure_response(result.failure) if result.failure?
+        return move_failure_response(result.failure, target) if result.failure?
 
         audit(server_context, item_id: item.id, box_number: target.number.to_i)
         # Items::Move reports the box the item actually left and its post-action
         # REALITY (#756 R5 rule), not a pre-call snapshot.
         data_response(item: item_json(item.reload), source_box_completed: result.value![:source_completed])
+      end
+
+      # Items::Move's refusals, worded as the web UI words them
+      # (ItemsController#move_error, items.move.*) so the assistant gets the
+      # same guidance as a person (#972). The concurrency-only refusals have no
+      # web copy (the web redirects) and get their own. :move_archived keeps the
+      # shared Base wording; anything else (e.g. validation errors) falls back
+      # to the web's generic copy rather than echoing a raw symbol.
+      def self.move_failure_response(failure, target)
+        return failure_response(failure) if failure == :move_archived
+
+        error_response(move_failure_message(failure, target))
+      end
+
+      def self.move_failure_message(failure, target)
+        case failure
+        when :same_box then I18n.t("items.move.same_box")
+        when :removed then I18n.t("items.move.removed_item")
+        when :box_unpacked then I18n.t("items.move.box_unpacked", number: target.number)
+        when :cross_move, :box_missing then I18n.t("items.move.invalid")
+        when :not_found then "That item no longer exists in this move."
+        when :box_changed then "The item was moved by someone else at the same time — try again."
+        else I18n.t("items.move.failed")
+        end
       end
     end
   end

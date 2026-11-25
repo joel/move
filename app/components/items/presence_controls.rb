@@ -13,12 +13,15 @@ module Components
 
       ID = "item-presence-controls"
 
-      #: (move: untyped, item: untyped, boxes: untyped, editable: untyped) -> void
-      def initialize(move:, item:, boxes:, editable:)
+      #: (move: untyped, item: untyped, boxes: untyped, editable: untyped, ?origin: Hash[Symbol, String]) -> void
+      def initialize(move:, item:, boxes:, editable:, origin: {})
         @move = move
         @item = item
         @boxes = boxes
         @editable = editable
+        # The allow-listed back-link origin (#960), carried on each form's URL
+        # so the redirect back to the item keeps it.
+        @origin = origin
       end
 
       #: () -> void
@@ -43,7 +46,7 @@ module Components
         # Every other box is unpacked: Items::Move would refuse them all (#839).
         return if open.empty?
 
-        form_with(url: move_move_item_path(@move, @item), method: :patch,
+        form_with(url: move_move_item_path(@move, @item, **@origin), method: :patch,
                   class: "flex items-center gap-2") do
           select(
             name: "target_box_id",
@@ -80,7 +83,7 @@ module Components
       #: () -> untyped
       def restore_to_box_control
         button_to(
-          I18n.t("items.show.restore"), restore_move_item_path(@move, @item),
+          I18n.t("items.show.restore"), restore_move_item_path(@move, @item, **@origin),
           method: :patch, class: ghost_button
         )
       end
@@ -95,7 +98,7 @@ module Components
       #: () -> untyped
       def mark_unpacked_control
         button_to(
-          I18n.t("items.show.mark_unpacked"), mark_removed_move_item_path(@move, @item),
+          I18n.t("items.show.mark_unpacked"), mark_removed_move_item_path(@move, @item, **@origin),
           method: :patch, class: danger_button,
           data: { turbo_confirm: I18n.t("items.show.mark_unpacked_confirm") }
         )
@@ -104,7 +107,7 @@ module Components
       #: () -> untyped
       def delete_control
         button_to(
-          I18n.t("items.show.delete"), move_item_path(@move, @item),
+          I18n.t("items.show.delete"), move_item_path(@move, @item, **@origin),
           method: :delete, class: danger_button,
           data: { turbo_confirm: I18n.t("items.show.delete_confirm") }
         )
