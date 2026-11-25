@@ -14,6 +14,10 @@ begin
 
   desc "Run all examples"
   RSpec::Core::RakeTask.new(:spec) do |t|
+    # Reason: RSpec's own default pattern (relative to each run path), not the
+    # RakeTask's `spec/**…` one. packs-rails adds packs/*/spec to the run (#439), and
+    # a `spec/`-prefixed pattern joined onto those paths would match nothing.
+    t.pattern = "**{,/*/**}/*_spec.rb"
     t.ruby_opts = [
       "-w", # turn warnings on for your script
       "--yjit" # enable in-process JIT compiler
