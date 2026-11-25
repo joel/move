@@ -53,6 +53,11 @@ RSpec.describe AppCLI::Services::WorktreeRoute do
     expect(Dir.children(certs.leaf_dir)).to contain_exactly("move-easy.docker.pem", "move-easy.docker-key.pem")
   end
 
+  it "returns :generated_all when it had to create the CA, :present after" do
+    expect(route.write!).to eq(:generated_all)
+    expect(route.write!).to eq(:present)
+  end
+
   it "is a no-op to remove twice" do
     expect { 2.times { route.remove! } }.not_to raise_error
   end

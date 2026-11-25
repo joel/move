@@ -30,13 +30,16 @@ module AppCLI
 
       def path = File.join(dir, "dynamic", "wt-#{app.label}.yml")
 
+      # @return [Symbol] CertificateStore#ensure!'s result; :generated_all
+      #   means a new root CA the browser doesn't trust yet
       def write!
-        certs.ensure!
+        ca_result = certs.ensure!
         certs.ensure_zone_leaf!(app.zone)
         FileUtils.mkdir_p(File.dirname(path))
         tmp = "#{path}.tmp"
         File.write(tmp, RouterConfig::HEADER + YAML.dump(config))
         File.rename(tmp, path)
+        ca_result
       end
 
       def remove!

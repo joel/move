@@ -156,6 +156,12 @@ RSpec.describe AppCLI::Services::WorktreeServe do
       expect(db).not_to have_received(:start)
     end
 
+    it "says to trust the CA again when writing the route generated a new one" do
+      allow(route).to receive(:write!).and_return(:generated_all)
+      serve.serve
+      expect(shell).to have_received(:say).with(%r{bin/cli router trust.*bin/cli router restart}, :yellow)
+    end
+
     it "does not count stopped leftovers toward the cap" do
       %w[a b c].each { |l| runner.containers["move-app-wt-#{l}"] = { status: "exited", mount: "/#{l}" } }
       serve.serve

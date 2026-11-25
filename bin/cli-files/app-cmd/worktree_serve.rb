@@ -131,8 +131,17 @@ module AppCLI
         prepare_database!
         runner.run(["docker run --detach", "--name #{app.container}", *container_args(SERVER)])
         await_ready!
-        route.write!
+        write_route
         announce_urls
+      end
+
+      # A new root CA (its key was lost or replaced) re-issues every leaf, so
+      # the browser must trust it again and the router reload its main leaf.
+      def write_route
+        return unless route.write! == :generated_all
+
+        shell.say("A new root CA was generated, so no browser trusts it yet: run `bin/cli router trust` " \
+                  "(then restart the browser) and `bin/cli router restart` before opening #{app.url}.", :yellow)
       end
 
       # SKIP_TEST_DATABASE: in development, db:create and db:prepare also act
@@ -168,7 +177,7 @@ module AppCLI
       end
 
       def already_serving
-        route.write!
+        write_route
         shell.say("#{app.container} already serves #{checkout.path}.")
         announce_urls
       end
