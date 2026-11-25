@@ -19,17 +19,11 @@ class PurgeStaleLabelPrintRunsJob < ApplicationJob
   RETENTION = 1.day
 
   def perform
-    Organization.pluck(:slug).each do |slug|
-      Apartment::Tenant.switch(slug) do
-        LabelPrintRun.where(status: LabelPrintRun::TERMINAL, finished_at: ..RETENTION.ago)
-                     .find_each(&:destroy)
-      end
-    rescue Apartment::TenantNotFound
-      # Account-deletion race (the PurgeExpiredDiscardsJob precedent): the tenant
-      # schema is dropped before the Organization row is deleted, so a listed
-      # slug can have no schema. Skip — aborting would starve every tenant later
-      # in the list of its sweep (#702 found this copied gap).
-      next
+    # TenantSweep skips a slug whose schema is already dropped (the
+    # account-deletion race) so one ghost tenant can't starve the rest.
+    TenantSweep.in_each_tenant do
+      LabelPrintRun.where(status: LabelPrintRun::TERMINAL, finished_at: ..RETENTION.ago)
+                   .find_each(&:destroy)
     end
   end
 end

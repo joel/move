@@ -60,7 +60,9 @@ module Components
 
       #: () -> untyped
       def item_link
-        a(href: view_context.move_item_path(@move, @item),
+        # Tagged so the item's back link returns here, onto this row (#960).
+        a(href: view_context.move_item_path(@move, @item, from: Components::Items::BackLink::FIND_LIST),
+          id: Components::Items::BackLink.find_list_anchor(@item),
           class: "flex min-w-0 flex-1 items-center gap-3 transition hover:text-accent-sage") do
           thumb
           span(class: "min-w-0 flex-1 truncate text-body-md " \

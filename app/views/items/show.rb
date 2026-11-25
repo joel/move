@@ -6,9 +6,13 @@ module Views
     # never cropped) on the left; the edit form plus Move and Remove/Restore
     # controls on the right. Review and presence are shown as independent axes.
     class Show < Views::Base
-      #: (move: untyped, item: untyped, boxes: untyped, ?editable: untyped, ?photo_siblings: untyped, ?find_list_pinned: bool) -> void
-      def initialize(move:, item:, boxes:, editable: false, photo_siblings: 0, find_list_pinned: false)
+      #: (move: untyped, item: untyped, boxes: untyped, ?editable: untyped, ?photo_siblings: untyped, ?find_list_pinned: bool, ?origin: untyped) -> void
+      def initialize(move:, item:, boxes:, editable: false, photo_siblings: 0, find_list_pinned: false,
+                     origin: {})
         @move = move
+        # The page the item was opened from (#960), as allow-listed params from
+        # Components::Items::BackLink.origin_params; the forms carry it on.
+        @origin = origin
         @item = item
         @boxes = boxes
         @editable = editable
@@ -35,15 +39,7 @@ module Views
 
       #: () -> untyped
       def back_link
-        href = move_box_path(@move, @item.box)
-        label = I18n.t("items.show.back")
-        a(
-          href: href,
-          class: "inline-flex items-center gap-2 text-label-caps uppercase text-muted hover:text-text-warm"
-        ) do
-          render Components::Icons::ChevronRight.new(css: "h-4 w-4 rotate-180")
-          plain label
-        end
+        render Components::Items::BackLink.new(move: @move, item: @item, origin: @origin)
       end
 
       #: () -> untyped
@@ -160,9 +156,11 @@ module Views
 
       #: () -> untyped
       def editable_body
-        render Components::ItemForm.new(models: [@move, @item], item: @item, autosave: true)
+        render Components::ItemForm.new(
+          models: [@move, @item], item: @item, autosave: true, url: move_item_path(@move, @item, **@origin)
+        )
         render Components::Items::PresenceControls.new(
-          move: @move, item: @item, boxes: @boxes, editable: @editable
+          move: @move, item: @item, boxes: @boxes, editable: @editable, origin: @origin
         )
       end
 

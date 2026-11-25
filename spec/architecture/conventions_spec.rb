@@ -130,4 +130,17 @@ RSpec.describe "Architecture conventions" do
       expect(Discards::PurgeExpired::PASSES).to match_array(discardable)
     end
   end
+
+  describe "pack-local specs run in the right job (#439)" do
+    # The unit run picks up packs/*/spec via packs-rails, but its
+    # `--exclude-pattern "spec/system/**"` only matches the root tree and the
+    # system job runs `rspec spec/system`. A pack system spec would therefore run
+    # in the unit job with the wrong driver setup, so system specs stay in spec/system.
+    it "keeps system specs out of packs/*/spec" do
+      misplaced = relative_paths("packs/*/spec/system/**/*_spec.rb", [])
+
+      expect(misplaced).to be_empty,
+                           "Move pack system specs to spec/system/: #{misplaced.join(", ")}"
+    end
+  end
 end

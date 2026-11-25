@@ -17,16 +17,11 @@ class PurgeStaleInsuranceDossierRunsJob < ApplicationJob
   RETENTION = 1.day
 
   def perform
-    Organization.pluck(:slug).each do |slug|
-      Apartment::Tenant.switch(slug) do
-        InsuranceDossierRun.where(status: InsuranceDossierRun::TERMINAL, finished_at: ..RETENTION.ago)
-                           .find_each(&:destroy)
-      end
-    rescue Apartment::TenantNotFound
-      # Account-deletion race: Accounts::Delete drops the tenant schema before it
-      # deletes the Organization row, so a listed slug can have no schema. Skip —
-      # aborting here would silently starve every tenant later in the list.
-      next
+    # TenantSweep skips a slug whose schema is already dropped (the
+    # account-deletion race) so one ghost tenant can't starve the rest.
+    TenantSweep.in_each_tenant do
+      InsuranceDossierRun.where(status: InsuranceDossierRun::TERMINAL, finished_at: ..RETENTION.ago)
+                         .find_each(&:destroy)
     end
   end
 end
