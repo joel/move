@@ -20,13 +20,32 @@ module Boxes
     def call(box:, to:, actor:, description: nil)
       yield ensure_writable(box.move)
       to = to.to_s
-      yield validate(box, to)
-      yield persist(box, to, description)
+      yield transition_locked(box, to, description)
       yield emit_event(box, to, actor)
       Success(box)
     end
 
     private
+
+    # Validate + persist (+ cascade) run under the box row lock against the
+    # row re-read by `with_lock` (#970): the caller's box may have been loaded
+    # before another member's transition committed (BulkTransition loads every
+    # source-state box up front), so the lifecycle edge must be checked on the
+    # fresh row, not the in-memory one. PARENT_ROW_LOCK nests harmlessly inside
+    # callers that already hold the box lock (MarkFound's NO KEY UPDATE,
+    # CompleteIfEmpty's stronger FOR UPDATE) and keeps the box-before-items
+    # order of #757/#840 — the unpacked cascade writes items only after the box
+    # is locked. The emit stays after the write, outside the lock block.
+
+    #: (untyped box, untyped to, untyped description) -> Dry::Monads::Result[untyped, untyped]
+    def transition_locked(box, to, description)
+      box.with_lock(PARENT_ROW_LOCK) do
+        check = validate(box, to)
+        check.success? ? persist(box, to, description) : check
+      end
+    rescue ActiveRecord::RecordInvalid => e
+      Failure(e.record.errors)
+    end
 
     #: (untyped box, untyped to) -> Dry::Monads::Result[untyped, untyped]
     def validate(box, to)
@@ -36,18 +55,17 @@ module Boxes
       Success()
     end
 
+    # Runs inside transition_locked's transaction; a RecordInvalid propagates
+    # out of the lock block so the whole transition rolls back.
+
     #: (untyped box, untyped to, untyped description) -> Dry::Monads::Result[untyped, untyped]
     def persist(box, to, description)
-      ActiveRecord::Base.transaction do
-        # `.presence` so a cleared field (blank) is stored as NULL, not "" — and so
-        # a no-op seal doesn't register a spurious description change below.
-        box.description = description.presence unless description.nil?
-        box.update!(status: to)
-        cascade_unpacked(box) if to == "unpacked"
-      end
+      # `.presence` so a cleared field (blank) is stored as NULL, not "" — and so
+      # a no-op seal doesn't register a spurious description change below.
+      box.description = description.presence unless description.nil?
+      box.update!(status: to)
+      cascade_unpacked(box) if to == "unpacked"
       Success(box)
-    rescue ActiveRecord::RecordInvalid => e
-      Failure(e.record.errors)
     end
 
     # Mark every in-box item removed atomically with the status change. update_all

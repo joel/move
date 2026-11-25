@@ -97,6 +97,25 @@ RSpec.describe "Bulk box steps" do
       )
     end
 
+    it "names each skip reason separately when boxes are skipped for different reasons (#970)" do
+      create(:box, move:, status: "packing", room: nil, number: "1")
+      moved_on = create(:box, :with_room, move:, status: "packing", number: "2")
+      # Box 2 is sealed elsewhere after the bulk loaded it as packing.
+      allow(Boxes::TransitionStatus).to receive(:new).and_wrap_original do |original|
+        Box.where(id: moved_on.id).update_all(status: "sealed") # rubocop:disable Rails/SkipsModelValidations
+        original.call
+      end
+
+      post move_box_steps_path(move), params: { to: "sealed" }
+
+      reason = ->(key) { I18n.t("box_steps.skip_reason.#{key}") }
+      expect(flash[:notice]).to eq(
+        [I18n.t("box_steps.create.skipped", count: 1, reason: reason.call(:room_required), numbers: "1"),
+         I18n.t("box_steps.create.skipped", count: 1, reason: reason.call(:invalid_transition), numbers: "2")]
+          .join(" ")
+      )
+    end
+
     it "caps the skipped box-number list so a large batch can't overflow the cookie" do
       26.times { |i| create(:box, move:, status: "packing", room: nil, number: (i + 1).to_s) }
 
