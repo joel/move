@@ -20,15 +20,26 @@ class RodauthMain < Rodauth::Rails::Auth
       # lookup runs: the orphaned-session guard (RodauthApp), the Current.user
       # before_action (rails_account — rodauth-rails runs controller callbacks
       # inside the route), and remember-me's load_memory (deadline extension;
-      # auto-login from the cookie). We leave `already_logged_in` unset, so a
-      # signed-in user can still request or consume a sign-in link, and the
-      # route then re-loads by login or key — a 500 without this (#820).
+      # auto-login from the cookie). `already_logged_in` (below) lets a signed-in
+      # user still request or consume a sign-in link, and the route then
+      # re-loads by login or key — a 500 without this (#820).
       # Allow exactly that: a session-loaded account re-resolved by the route
       # (the pre-2.47 behaviour). Any other reload keeps Rodauth's default
       # (warn on same type, raise otherwise).
       account_reload do |current_type, new_type|
         super(current_type, new_type) unless current_type == :session
       end
+
+      # A signed-in user may deliberately use the logged-out routes (login,
+      # email-auth request/consume, create/verify account, passkey login), so
+      # this is a conscious no-op — the pre-2.47 default, now explicit (#822).
+      # Rodauth 2.47+ warns at boot while it is unset and Rodauth 3 will refuse
+      # to boot. Do NOT halt or redirect here without reworking what depends on
+      # it: the D14 invite carry (/invitations?token=… sends a signed-in user
+      # through a sign-in link), the invited-signup self-heal in after_login
+      # (ensure_personal_organization), and the apex broker (login_redirect →
+      # tenant_handoff_url mints a handoff and clears the apex session).
+      already_logged_in { nil }
 
       # Schema-qualify every Rodauth table to `public`. Rodauth shares the
       # ActiveRecord connection (sequel-activerecord_connection), whose

@@ -152,8 +152,11 @@ module Views
       #: (untyped result, eager: bool) -> untyped
       def result_card(result, eager:)
         div(class: "relative h-full") do
+          # Carries the query so the item's back link returns here, onto this
+          # card (#960).
           a(
-            href: move_item_path(@move, result.item),
+            href: move_item_path(@move, result.item, from: Components::Items::BackLink::SEARCH, q: @query),
+            id: Components::Items::BackLink.search_anchor(result.item),
             class: "group flex h-full flex-col overflow-hidden rounded-card border border-card-border " \
                    "bg-card transition hover:-translate-y-0.5 hover:border-accent-sage"
           ) do

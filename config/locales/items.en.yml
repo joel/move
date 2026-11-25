@@ -20,6 +20,8 @@ en:
     show:
       title: "Item Details"
       back: "Back to box"
+      back_to_results: "Back to results"
+      back_to_find_list: "Back to find list"
       save: "Save Changes"
       saved: "Saved"
       save_failed: "Couldn’t save"
