@@ -145,9 +145,14 @@ def failure_response(failure)
     not_capturable:    "That box is sealed — unseal it before adding media.",
     unsupported_image: "That file isn't a supported image (use JPEG, PNG, WEBP, HEIC, or TIFF)."
   }[failure]
-  error_response(message || "Action failed: #{failure}")
+  error_response(message || "That action could not be completed.") # never the raw symbol (#972)
 end
 ```
+
+A tool whose action has its own refusals maps them itself, reusing the web UI's
+locale copy: `MoveItem.move_failure_response` words every `Items::Move` failure
+(`same_box`, `removed`, `box_unpacked`, `box_missing`, `cross_move`, …) as
+`items.move.*` does, falling back to `items.move.failed` (#972).
 
 Records are always loaded through `move(context).boxes / .items`, so a token can
 **never** reach another Move or Organization — Apartment schema isolation is the

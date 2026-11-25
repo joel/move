@@ -52,7 +52,9 @@ module MoveMcp
             image_too_large: "Image is too large (max #{Media::MAX_IMAGE_BYTES_LABEL}).",
             unsupported_image: "That file isn't a supported image (use JPEG, PNG, WEBP, HEIC, or TIFF)."
           }[failure]
-          error_response(message || "Action failed: #{failure}")
+          # An unmapped failure (a new symbol, validation errors) gets generic
+          # copy, never its raw name (#972).
+          error_response(message || "That action could not be completed.")
         end
 
         # --- lookups (Move-scoped; nil → caller returns error_response) ---
