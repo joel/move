@@ -8,6 +8,8 @@ module Moves
   # with the other Move-setting actions. The caller (controller) owns authorization
   # and the archived read-only guard; ensure_writable is the invariant backstop.
   class SetLabelsPerBox < BaseAction
+    include MoveWritable
+
     #: (move: untyped, labels_per_box: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, labels_per_box:, actor: nil)
       yield ensure_writable(move)

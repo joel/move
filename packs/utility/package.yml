@@ -8,12 +8,12 @@
 #     Discardable / Roleable                  shared model concerns (no domain coupling)
 #     ProviderHttp                            shared HTTP client for AI adapters
 #
-# NOT here — these carry an INVISIBLE (method-call) dependency on the Move domain
-# that Packwerk can't see, so a "self-contained" kernel can't hold them; they stay
-# in the root until their Move coupling is factored out:
-#     BaseAction                  #ensure_writable(move) → move.writable? / :move_archived
-#     Discards::Cascade/Restore   ensure_writable(record.move)
-# Decoupling them (so they can be promoted here) is a tracked follow-up.
+# NOT here (yet):
+#     BaseAction                  domain-free since #443 (the archived-Move guard is
+#                                 the root MoveWritable mixin), but promoting it needs
+#                                 a `check "packs/utility/app/actions"` Steepfile line.
+#     Discards::Cascade/Restore   include MoveWritable (guard record.move), so they
+#                                 are Move-coupled and belong in the root.
 #
 # Enforcement — only the two axes that give a real guarantee here:
 #   enforce_dependencies + dependencies: []   the kernel is SELF-CONTAINED; it may

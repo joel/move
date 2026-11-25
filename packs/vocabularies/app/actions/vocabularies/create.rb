@@ -9,6 +9,8 @@ module Vocabularies
   # all three. The caller owns the tenant context and the admin / writable-Move
   # guard (controller + VocabularyPolicy).
   class Create < BaseAction
+    include MoveWritable
+
     #: (move: untyped, vocabulary: untyped, params: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, vocabulary:, params:, actor:)
       yield ensure_writable(move)

@@ -12,6 +12,8 @@ module Reviews
   # auto-confirmed items are untouched. Caller owns the tenant context + the
   # writable-Move guard (controller).
   class MarkPhotoReviewed < BaseAction
+    include MoveWritable
+
     #: (media: untyped, actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, actor:)
       yield ensure_writable(media.move)

@@ -34,6 +34,8 @@ module RecognitionSuggestions
   #    discards the kept item with the photo).
   # Events are emitted after the commit.
   class ResolveConflict < BaseAction
+    include MoveWritable
+
     OUTCOMES = %i[same second].freeze
 
     #: (suggestion: untyped, actor: untyped, outcome: Symbol) -> Dry::Monads::Result[untyped, untyped]

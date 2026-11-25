@@ -12,6 +12,8 @@ module Moves
   # vectors. Emits move.provider_key_removed (provider only, never a key value).
   # The caller owns authorization (admin) and the archived guard.
   class RemoveProviderKey < BaseAction
+    include MoveWritable
+
     #: (move: untyped, provider: untyped, ?actor: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:, provider:, actor: nil)
       provider = provider.to_s

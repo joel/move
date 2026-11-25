@@ -16,6 +16,8 @@ module Photos
   # (Media `discard_cascade_to :co_located_sourced_items`), so the photo's box
   # is the only parent to check.
   class Restore < BaseAction
+    include MoveWritable
+
     #: (media: untyped, actor: untyped, ?source: Symbol) -> Dry::Monads::Result[untyped, untyped]
     def call(media:, actor:, source: :web)
       yield ensure_writable(media.move) # first step: no lock taken on a read-only Move

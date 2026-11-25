@@ -33,7 +33,7 @@ class MoveScopedController < TenantController
   # Shared before_action guard for mutating controller actions: enforce the
   # editing role (403 for viewers), then redirect with a friendly read-only alert
   # on an archived Move. The writable *invariant* lives in the actions
-  # (BaseAction#ensure_writable → Failure(:move_archived)); this is the controller's
+  # (MoveWritable#ensure_writable → Failure(:move_archived)); this is the controller's
   # presentation of it, in one place instead of copy-pasted per controller. Each
   # subclass declares only its redirect target via read_only_redirect_path.
 
