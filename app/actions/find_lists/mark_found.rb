@@ -48,12 +48,17 @@ module FindLists
       # found with the box closed, and the next submit repairs it (the
       # already-`unpacking` no-op keeps genuine replays event-free). True
       # cross-mutation atomicity needs the #737 cross-flow lock ordering.
-      opened_box = yield open_box_for_unpacking(item.box, user)
+      #
+      # with_lock reloaded the item, so this is the box's first load, and Box's
+      # default_scope hides a box deleted since the item commit: nil then means
+      # nothing to open or complete, never a failed find (#1000).
+      box = item.box
+      opened_box = yield open_box_for_unpacking(box, user)
       # Sequential box-locked steps, never overlapping with an item lock (#739
       # R2 ordering) — CompleteIfEmpty re-checks state under its own lock, and
       # its secondary-mutation form never fails the committed find (#756 R4).
-      Success(item: item, opened_box: opened_box,
-              completed_box: Boxes::CompleteIfEmpty.completed_box(box: item.box, actor: user))
+      completed_box = box && Boxes::CompleteIfEmpty.completed_box(box: box, actor: user)
+      Success(item: item, opened_box: opened_box, completed_box: completed_box)
     end
 
     private
@@ -71,10 +76,12 @@ module FindLists
     # the same box marked found concurrently serialize here — the loser
     # re-reads `unpacking` and no-ops, so box.status_changed emits exactly
     # once (the item locks alone cannot serialize a shared-box write).
-    # Returns the box when it transitioned, else nil.
+    # Returns the box when it transitioned, else nil (also for a nil box).
 
     #: (untyped box, untyped user) -> Dry::Monads::Result[untyped, untyped]
     def open_box_for_unpacking(box, user)
+      return Success(nil) unless box
+
       box.with_lock(PARENT_ROW_LOCK) do
         # The lock's re-read is unscoped: a box deleted meanwhile is not
         # opened, and the committed find is not turned into a failure (#980).
