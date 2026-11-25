@@ -73,6 +73,84 @@ RSpec.describe LabelPrintRuns::GenerateJob do
     expect(run.reload.document.download).to include("/Count 6") # 3 boxes × 2 default copies
   end
 
+  describe "retrying transient failures (#306)" do
+    include ActiveJob::TestHelper
+
+    # The test env runs jobs inline, and the inline adapter cannot schedule the
+    # delayed re-enqueue a retry needs. The test adapter can.
+    def queue_adapter_for_test
+      ActiveJob::QueueAdapters::TestAdapter.new
+    end
+
+    let(:pdf) { instance_double(BoxLabelsPdf) }
+    let(:statuses_seen) { [] }
+
+    before do
+      allow(BoxLabelsPdf).to receive(:new).and_return(pdf)
+      allow(LabelPrintRuns::Broadcasting).to receive(:broadcast_status).and_call_original
+    end
+
+    # Performs the job and every retry it schedules. The block form of
+    # perform_enqueued_jobs would wrap the final error in a Minitest assertion.
+    def enqueue_and_drain(run)
+      described_class.perform_later(run.id, tenant:, host: "h", protocol: "https", box_ids: ids_in(1, 3))
+      perform_enqueued_jobs while enqueued_jobs.any?
+    end
+
+    # Each render records the run's persisted status before acting, so a spec
+    # can show the run stayed active between attempts.
+    def render_with(run, outcomes)
+      allow(pdf).to receive(:render) do
+        statuses_seen << LabelPrintRun.find(run.id).status
+        outcome = outcomes.shift
+        raise outcome if outcome.is_a?(Exception)
+
+        outcome
+      end
+    end
+
+    it "retries a transient error, keeps the run processing, and then completes" do
+      run = run_for(1, 3)
+      render_with(run, [Errno::ECONNRESET.new("storage reset"), "%PDF-1.4 fake"])
+
+      enqueue_and_drain(run)
+
+      expect(pdf).to have_received(:render).twice
+      expect(statuses_seen).to eq(%w[processing processing])
+      expect(run.reload.status).to eq("completed")
+      expect(run.document).to be_attached
+      expect(LabelPrintRuns::Broadcasting).not_to have_received(:broadcast_status)
+        .with(having_attributes(status: "failed"))
+    end
+
+    it "fails the run only once its transient retries are exhausted" do
+      run = run_for(1, 3)
+      errors = Array.new(described_class::ATTEMPTS) { ActiveStorage::IntegrityError.new("checksum") }
+      render_with(run, errors)
+
+      expect { enqueue_and_drain(run) }.to raise_error(ActiveStorage::IntegrityError)
+
+      expect(pdf).to have_received(:render).exactly(described_class::ATTEMPTS).times
+      expect(statuses_seen).to all(eq("processing"))
+      expect(run.reload.status).to eq("failed")
+      expect(run.finished_at).to be_present
+      expect(LabelPrintRuns::Broadcasting).to have_received(:broadcast_status)
+        .with(having_attributes(status: "failed")).once
+    end
+
+    it "fails the run at once on a non-transient error, without retrying" do
+      run = run_for(1, 3)
+      render_with(run, [ArgumentError.new("bad layout")])
+
+      expect { enqueue_and_drain(run) }.to raise_error(ArgumentError, "bad layout")
+
+      expect(pdf).to have_received(:render).once
+      expect(run.reload.status).to eq("failed")
+      expect(LabelPrintRuns::Broadcasting).to have_received(:broadcast_status)
+        .with(having_attributes(status: "failed")).once
+    end
+  end
+
   it "marks the run failed (and re-raises) when rendering blows up" do
     run = run_for(1, 3)
     pdf = instance_double(BoxLabelsPdf)
@@ -83,6 +161,24 @@ RSpec.describe LabelPrintRuns::GenerateJob do
       described_class.perform_now(run.id, tenant:, host: "h", protocol: "https", box_ids: ids_in(1, 3))
     end.to raise_error(StandardError)
     expect(run.reload.status).to eq("failed")
+  end
+
+  it "reaps its own attachment when the run is deleted and the job then fails (#703)" do
+    run = run_for(1, 1)
+    run.document.attach(io: StringIO.new("%PDF-1.4 partial"), filename: "x.pdf", content_type: "application/pdf")
+    pdf = instance_double(BoxLabelsPdf)
+    allow(BoxLabelsPdf).to receive(:new).and_return(pdf)
+    allow(pdf).to receive(:render) do
+      LabelPrintRun.where(id: run.id).delete_all
+      raise ArgumentError, "boom"
+    end
+
+    expect do
+      described_class.perform_now(run.id, tenant:, host: "h", protocol: "https", box_ids: ids_in(1, 1))
+    end.to raise_error(ArgumentError)
+    expect(
+      ActiveStorage::Attachment.where(record_type: "LabelPrintRun", record_id: run.id)
+    ).to be_empty
   end
 
   it "no-ops on a run that is no longer in progress (a retry after completion)" do

@@ -9,17 +9,53 @@ module LabelPrintRuns
   # (throttled to ~20 broadcasts) — then attaches the finished PDF to the run and
   # finalizes it. The QR scan URLs are built from the request `host`/`protocol`
   # passed in at enqueue, since a job has no request of its own.
+  #
+  # Failure handling (#306). Errors that a second attempt can clear are retried
+  # by ActiveJob, and the run stays `processing` meanwhile, so the live status
+  # page keeps showing progress. Rendering restarts from the first box. The run
+  # turns `failed` (and the "Try again" button shows) in one place, after_discard,
+  # which ActiveJob calls when a transient error has used up its attempts and
+  # immediately for any other error.
   class GenerateJob < ApplicationJob
     queue_as :default
+
+    # Errors worth another attempt. Prawn itself renders deterministically, so
+    # "render hiccups" are the database interruptions the render loop can meet
+    # while it records progress. The rest are storage-client and network
+    # failures from the Active Storage upload. Net::OpenTimeout, ReadTimeout and
+    # WriteTimeout are Timeout::Error subclasses. The Aws names are strings
+    # because aws-sdk-s3 loads only with the S3 service (`require: false`);
+    # rescue_from resolves them when an error is raised and skips any name that
+    # is not defined.
+    TRANSIENT_ERRORS = [
+      ActiveRecord::Deadlocked, ActiveRecord::LockWaitTimeout, ActiveRecord::QueryCanceled,
+      ActiveRecord::ConnectionNotEstablished,
+      ActiveStorage::IntegrityError,
+      Timeout::Error, Errno::ECONNRESET, Errno::ECONNREFUSED, Errno::ETIMEDOUT,
+      Errno::EHOSTUNREACH, Errno::EPIPE, SocketError,
+      "Seahorse::Client::NetworkingError",
+      "Aws::S3::Errors::InternalError", "Aws::S3::Errors::ServiceUnavailable",
+      "Aws::S3::Errors::SlowDown", "Aws::S3::Errors::RequestTimeout"
+    ].freeze
+    ATTEMPTS = 3
+
+    # Without a block, retry_on runs after_discard and re-raises once the
+    # attempts are used up, so Solid Queue still records the final error.
+    retry_on(*TRANSIENT_ERRORS, wait: :polynomially_longer, attempts: ATTEMPTS)
+
+    # Runs on the job instance (instance_exec), so it reads @run and @tenant.
+    after_discard { |_job, _error| finalize_failed }
 
     # copies defaults to DEFAULT_COPIES so a job enqueued before Phase 45 deployed
     # (without the arg) still renders the prior fixed 2 pages per box.
     def perform(run_id, tenant:, host:, protocol:, box_ids:, copies: BoxLabelsPdf::DEFAULT_COPIES)
+      @tenant = tenant
       Apartment::Tenant.switch(tenant) do
         Current.tenant = tenant
         run = LabelPrintRun.find_by(id: run_id)
         return unless run&.in_progress? # gone, or a retry after it already finished/failed
 
+        @run = run
         generate(run, host, protocol, box_ids, copies)
       end
     end
@@ -40,16 +76,32 @@ module LabelPrintRuns
       run.update!(status: "completed", completed_count: run.total_count, finished_at: Time.current)
       Broadcasting.broadcast_status(run)
       reap_if_deleted(run)
-    rescue StandardError # rubocop:disable Move/BroadRescue -- mark failed + broadcast, then re-raise (no swallow)
-      begin
-        run.update!(status: "failed", finished_at: Time.current)
-        Broadcasting.broadcast_status(run)
-      rescue ActiveRecord::ActiveRecordError
-        # The run row (or its whole tenant schema) vanished mid-job — nothing
-        # to finalize; fall through to the reap so an attached PDF can't orphan.
+    end
+
+    # Marks the run failed and pushes the failed state (with "Try again") to the
+    # status page. ActiveJob re-raises the error afterwards, so Solid Queue
+    # records it, and a later run of this job no-ops because the run is no
+    # longer in progress. Nothing to do if the job died before it loaded an
+    # active run.
+    def finalize_failed
+      return unless @run
+
+      Apartment::Tenant.switch(@tenant) do
+        mark_failed(@run)
+        reap_if_deleted(@run)
       end
-      reap_if_deleted(run)
-      raise # Solid Queue records it; a retry no-ops (run no longer in_progress)
+    rescue Apartment::TenantNotFound
+      # The tenant schema was dropped (account deletion): the run row went with
+      # it, so purge the attachment this job may have written to public.
+      @run.document.purge
+    end
+
+    def mark_failed(run)
+      run.update!(status: "failed", finished_at: Time.current)
+      Broadcasting.broadcast_status(run)
+    rescue ActiveRecord::ActiveRecordError
+      # The run row (or its whole tenant schema) vanished mid-job: nothing to
+      # finalize. The caller still reaps, so an attached PDF can't orphan.
     end
 
     # Move/tenant deletion can race this job (#703 found the class): the
