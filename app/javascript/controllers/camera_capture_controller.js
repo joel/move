@@ -100,23 +100,47 @@ export default class extends Controller {
   async start() {
     if (!this.supported) return
     if (this.state !== "idle" && this.state !== "unavailable") return
+    // The start control hides while the camera is requested; a keyboard user
+    // who pressed it must not be left focused on a hidden control.
+    const fromStart = this.startTarget.contains(document.activeElement)
     this.#setState("requesting")
     const outcome = await this.camera.start()
     if (outcome === "stale") return
-    if (outcome !== "live") return this.#setState("unavailable")
+    if (outcome !== "live") {
+      this.#setState("unavailable")
+      if (fromStart) this.#focusStart()
+      return
+    }
     this.retried = false
     this.#setState("streaming")
+    if (fromStart) this.#focusLive()
+  }
+
+  // The shutter, unless an upload in flight keeps it disabled — then Cancel.
+  #focusLive() {
+    const target = this.shutterTarget.disabled && this.hasCloseTarget ? this.closeTarget : this.shutterTarget
+    target.focus()
   }
 
   // "Cancel" (the close target, #619): release the camera and fold the
   // viewfinder away. stop() bumps the generation, so an in-flight start() or
   // capture() tail goes stale. The upload lock is untouched — closing never
-  // unlocks a busy pipeline.
+  // unlocks a busy pipeline. Focus moves to the re-revealed start control
+  // (the Cancel button that held it is now hidden).
   close() {
     if (this.state === "idle" || this.state === "unavailable") return
     this.camera.stop()
     this.resumeOnVisible = false
     this.#setState("idle")
+    this.#focusStart()
+  }
+
+  // The start target is the button itself (B2) or a wrapper around a
+  // Ui::Button (review Retake).
+  #focusStart() {
+    const start = this.startTarget
+    const button = start.matches("button") ? start : start.querySelector("button")
+    button?.focus()
   }
 
   // Shutter → grab the visible frame → hand it to the capture-upload pipeline.

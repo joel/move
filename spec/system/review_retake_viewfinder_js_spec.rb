@@ -99,6 +99,8 @@ RSpec.describe "Review retake viewfinder (JS)", :js do
   def shutter = "button[data-camera-capture-target='shutter']"
   def take_photo = I18n.t("reviews.photo.retake_camera")
   def camera(expr) = page.evaluate_script("window.__camera.#{expr}")
+  def focused_target = page.evaluate_script("document.activeElement?.dataset.cameraCaptureTarget")
+  def focused_text = page.evaluate_script("document.activeElement?.textContent").to_s
 
   # Retry a cross-thread read (see review_pending_edits_js_spec.rb).
   def eventually(timeout: 10)
@@ -121,6 +123,8 @@ RSpec.describe "Review retake viewfinder (JS)", :js do
     click_button take_photo
     expect(page).to have_css(viewfinder, visible: :visible)
     expect(page).to have_css("#{shutter}:not([disabled])")
+    # The start button hid under the user's focus; focus follows to the shutter.
+    expect(focused_target).to eq("shutter")
   end
 
   it "never starts the camera on its own" do
@@ -158,6 +162,8 @@ RSpec.describe "Review retake viewfinder (JS)", :js do
 
     expect(page).to have_css(viewfinder, visible: :hidden)
     expect(page).to have_button(take_photo)
+    # Cancel hid itself; focus returns to the re-revealed start button.
+    expect(focused_text).to include(take_photo)
     expect(camera("streams[0].getVideoTracks()[0].readyState")).to eq("ended")
   end
 
