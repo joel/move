@@ -38,11 +38,16 @@ class FakeServeRunner
     @commands << command
     case command
     when /RUBY_VERSION/ then AppCLI::Services::EnvConfig.new("development").ruby_version
-    when /docker ps --all/ then containers.keys.join("\n")
+    when /docker ps/ then names_listed(all: command.include?("--all"))
     when /docker inspect --format/ then containers.dig(command.split.last, :mount).to_s
     when /curl/ then answers_up ? "200" : "000"
     else ""
     end
+  end
+
+  # `docker ps` lists running containers; `--all` adds stopped ones.
+  def names_listed(all:)
+    containers.select { |_, c| all || c[:status] == "running" }.keys.join("\n")
   end
 
   def image_exists?(_image) = true
@@ -148,6 +153,19 @@ RSpec.describe AppCLI::Services::WorktreeServe do
       %w[a b c].each { |l| runner.containers["move-app-wt-#{l}"] = { status: "running", mount: "/#{l}" } }
       expect { serve.serve }.to raise_error(Thor::Error, /3 worktree apps already run \(move-app-wt-a, .*cap is 3/)
       expect(db).not_to have_received(:start)
+    end
+
+    it "does not count stopped leftovers toward the cap" do
+      %w[a b c].each { |l| runner.containers["move-app-wt-#{l}"] = { status: "exited", mount: "/#{l}" } }
+      serve.serve
+      expect(docker_runs.last).to start_with("docker run --detach --name move-app-wt-w1")
+    end
+
+    it "refuses when move-router is down even if this checkout is already served" do
+      runner.containers["move-app-wt-w1"] = { status: "running", mount: worktree }
+      runner.router_running = false
+      expect { serve.serve }.to raise_error(Thor::Error, %r{bin/cli router start})
+      expect(route).not_to have_received(:write!)
     end
 
     it "refuses a name another checkout's app already uses (it would share the database)" do

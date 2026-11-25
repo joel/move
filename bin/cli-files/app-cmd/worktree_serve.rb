@@ -56,11 +56,12 @@ module AppCLI
         announce
         preflight
         with_lock do
+          # First, so a re-serve never reports a URL nothing routes to.
+          refuse_router_down!
           next already_serving if serving_this_checkout?
 
           refuse_other_checkout!
           refuse_over_cap!
-          refuse_router_down!
           start
         end
       end
@@ -206,8 +207,10 @@ module AppCLI
                            "Start it with `bin/cli router start`."
       end
 
+      # Running ones only: a crashed app's leftover container doesn't serve,
+      # and `serve` replaces it when it is this app's.
       def served_apps
-        output = runner.capture("docker ps --all --filter name=^#{WorktreeApp::CONTAINER_PREFIX} " \
+        output = runner.capture("docker ps --filter name=^#{WorktreeApp::CONTAINER_PREFIX} " \
                                 "--format '{{.Names}}'", quiet: true)
         output.to_s.split.grep(/\A#{Regexp.escape(WorktreeApp::CONTAINER_PREFIX)}/o).sort
       end

@@ -384,7 +384,8 @@ host, and the reverse.
   served worktree gets its own leaf for `*.<zone>`, signed by the same CA
   (`CertificateStore#ensure_zone_leaf!`, renewed like the main leaf), written
   to the mounted `leaf/` directory and listed in its router file under
-  `tls.certificates`. Traefik picks it by SNI. `stop` removes it.
+  `tls.certificates`. Traefik picks it by SNI. `stop` removes it, and
+  `router certs --rotate` re-issues every zone leaf under the new CA.
 
 **Auth.** Cookies are host-only (#280), so every worktree host holds its own
 `_move_session_v2`, and a main session never reaches a worktree host (or the
@@ -396,8 +397,10 @@ callbacks are registered for main's hosts only).
 
 - `serve` refuses the main checkout (that is `move-app-dev`'s job), a label
   another checkout's app already uses (they would share the database; pick
-  `--name`), a **fourth** worktree app (cap 3, counted by container name;
-  the running ones are listed), and a stopped `move-router`. It runs the
+  `--name`), a **fourth** worktree app (cap 3, counted over running
+  `move-app-wt-*` containers, which are listed; a crashed app's leftover
+  doesn't count), and a stopped `move-router` (checked first, so re-serving
+  a running app never prints a URL nothing routes to). It runs the
   same `AppPreflight` as `app restart` (key, `.env`, image, Ruby,
   `bundle check` of the worktree's lock), and the same `/up` readiness check
   (`MOVE_APP_READY_TIMEOUT`). A container that doesn't answer is removed with

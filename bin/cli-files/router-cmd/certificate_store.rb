@@ -46,9 +46,22 @@ module AppCLI
         :renewed_leaf
       end
 
+      # Served worktrees' zone leaves are re-issued too: signed by the old CA,
+      # they would fail TLS once the new one is trusted.
       def rotate!
+        zones = served_zones
         [ca_cert_path, ca_key_path, cert_path, key_path].each { |path| FileUtils.rm_f(path) }
-        ensure!
+        zones.each { |zone| remove_zone_leaf(zone) }
+        result = ensure!
+        zones.each { |zone| ensure_zone_leaf!(zone) }
+        result
+      end
+
+      # The zones with a leaf in leaf_dir (`wt-<zone>.pem`).
+      def served_zones
+        Dir.glob(File.join(leaf_dir, "wt-*.pem")).grep_v(/-key\.pem\z/)
+           .map { |path| File.basename(path, ".pem").delete_prefix("wt-") }
+           .select { |zone| zone.end_with?(".#{DOMAIN}") }.sort
       end
 
       # :missing, :foreign (not signed by our CA), :key_mismatch, :names_changed,

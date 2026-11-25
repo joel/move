@@ -64,6 +64,14 @@ RSpec.describe AppCLI::Services::CertificateStore do
       expect { store.ensure_zone_leaf!("evil.example") }.to raise_error(ArgumentError)
     end
 
+    it "is re-issued under the new CA on rotate!" do
+      store.ensure!
+      store.ensure_zone_leaf!(zone)
+      store.rotate!
+      expect(store.served_zones).to eq([zone])
+      expect(zone_leaf.verify(store.ca.public_key)).to be(true)
+    end
+
     it "is removed without touching the main leaf" do
       store.ensure!
       store.ensure_zone_leaf!(zone)
