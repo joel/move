@@ -35,6 +35,14 @@ RSpec.describe "Review retake viewfinder (JS)", :js do
         if (!navigator.mediaDevices) {
           Object.defineProperty(navigator, "mediaDevices", { value: {}, configurable: true })
         }
+        // The insecure origin answers the camera permission query "denied",
+        // which CameraStream treats as sticky — report a fresh "prompt" so
+        // every start() reaches getUserMedia (and the deny flag decides).
+        if (navigator.permissions) {
+          const query = navigator.permissions.query.bind(navigator.permissions)
+          navigator.permissions.query = (descriptor) =>
+            descriptor?.name === "camera" ? Promise.resolve({ state: "prompt" }) : query(descriptor)
+        }
         navigator.mediaDevices.getUserMedia = async () => {
           camera.calls++
           if (camera.deny) throw new DOMException("Permission denied", "NotAllowedError")
@@ -160,6 +168,8 @@ RSpec.describe "Review retake viewfinder (JS)", :js do
     click_button take_photo
 
     expect(page).to have_text(I18n.t("reviews.photo.retake_unavailable"))
+    # The denial came from getUserMedia itself, not a pre-denied permission.
+    expect(camera("calls")).to eq(1)
     expect(page).to have_css(viewfinder, visible: :hidden)
     expect(page).to have_text(I18n.t("reviews.photo.retake_choose"))
     # The start button stays as the retry affordance.
