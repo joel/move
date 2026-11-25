@@ -158,11 +158,13 @@ export default class extends Controller {
     if (refocus) this.#focusLive()
   }
 
-  // Focus is still where the hidden start control left it: on the control
-  // itself, or dropped to the body when it hid.
+  // Focus is still where a hidden control left it: on the start control or
+  // the settled pending status (#995) — Chrome can keep a just-hidden element
+  // active until its next focus fixup — or dropped to the body.
   #focusLeftWithStart() {
     const active = document.activeElement
-    return !active || active === document.body || this.startTarget.contains(active)
+    return !active || active === document.body || this.startTarget.contains(active) ||
+      (this.hasPendingTarget && this.pendingTarget.contains(active))
   }
 
   // The shutter, unless an upload in flight keeps it disabled — then the
