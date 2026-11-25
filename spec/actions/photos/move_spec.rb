@@ -276,8 +276,9 @@ RSpec.describe Photos::Move do
         # Boxes, then photo, then its items.
         expect(locks.index(["media", "FOR NO KEY UPDATE"])).to eq(2)
         expect(locks.index(["items", "FOR UPDATE"])).to be > 1
-        # The completion re-locks the source AFTER the move commits (FOR UPDATE).
-        expect(locks.last).to eq(["boxes", "FOR UPDATE"])
+        # The completion re-locks the source AFTER the move commits (FOR UPDATE);
+        # TransitionStatus's own box lock then nests inside it (#970).
+        expect(locks.last(2)).to eq([["boxes", "FOR UPDATE"], ["boxes", "FOR NO KEY UPDATE"]])
       end
     end
 
@@ -288,8 +289,10 @@ RSpec.describe Photos::Move do
       there = box_locks_taken(mode: /FOR NO KEY UPDATE/) { call }
       back_locks = box_locks_taken(mode: /FOR NO KEY UPDATE/) { call(photo: back, target_box: source) }
 
-      expect(there).to eq([source.id, target.id].sort)
-      expect(back_locks).to eq(there) # 3→8 and 8→3 take the same first lock
+      # first(2): the move's pair; a completing move then re-locks the emptied
+      # source inside CompleteIfEmpty (TransitionStatus's nested lock, #970).
+      expect(there.first(2)).to eq([source.id, target.id].sort)
+      expect(back_locks.first(2)).to eq(there.first(2)) # 3→8 and 8→3 take the same first lock
     end
 
     it "re-locks the photo's CURRENT box when a concurrent move re-boxed it, and completes that box" do

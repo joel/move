@@ -113,14 +113,16 @@ class UnpackingController < MoveScopedController
 
   #: () -> untyped
   def complete
-    result = Boxes::TransitionStatus.new.call(box: @box, to: "unpacked", actor: current_user)
-
-    case result
-    in Dry::Monads::Success(box)
-      redirect_to move_box_unpacking_path(@move, box), notice: t("unpacking.flash.completed")
-    in Dry::Monads::Failure(_reason)
-      redirect_to move_box_unpacking_path(@move, @box), alert: t("unpacking.flash.failed")
-    end
+    flash_key, message =
+      case Boxes::TransitionStatus.new.call(box: @box, to: "unpacked", actor: current_user)
+      in Dry::Monads::Success(_) then %i[notice completed]
+      # Already unpacked (last item unpacked on another device, a find-list
+      # Found, a double tap — #971): the outcome the user asked for is in
+      # place, so it is a notice, not a failure. No second event fires.
+      in Dry::Monads::Failure(:invalid_transition) if @box.reload.unpacked? then %i[notice already_unpacked]
+      in Dry::Monads::Failure(_) then %i[alert failed]
+      end
+    redirect_to move_box_unpacking_path(@move, @box), flash: { flash_key => t("unpacking.flash.#{message}") }
   end
 
   # PATCH /moves/:move_id/boxes/:box_id/unpacking/reopen — celebration "Undo".
