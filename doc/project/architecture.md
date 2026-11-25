@@ -600,9 +600,27 @@ sequenceDiagram
   C-->>B: 200 application/pdf (attachment)
 ```
 
-A `GenerateJob` failure marks the run `failed` and broadcasts that state (a "Try
-again" link), then re-raises; a retry no-ops because the run is no longer in
-progress. `PurgeStaleLabelPrintRunsJob` reaps day-old run PDFs per tenant.
+A transient `GenerateJob` error (a database interruption while the render loop
+records progress, an Active Storage integrity error, or a storage-client timeout
+or network error) is retried with `retry_on`, up to 3 attempts (#306). The run
+stays `processing` meanwhile, so the page keeps showing the bar, and each
+attempt renders from the first box again. The job marks the run `failed` and
+broadcasts that state (a "Try again" link) in `after_discard`, which runs once
+the retries are used up, or at once for any other error. ActiveJob then
+re-raises, and a later run of the job no-ops because the run is no longer in
+progress.
+
+```mermaid
+stateDiagram-v2
+  [*] --> processing: Start enqueues GenerateJob
+  processing --> processing: transient error, attempts left (retry_on)
+  processing --> completed: PDF attached
+  processing --> failed: transient error, attempts used up (after_discard)
+  processing --> failed: any other error (after_discard)
+  failed --> [*]: "Try again" starts a new run
+```
+
+`PurgeStaleLabelPrintRunsJob` reaps day-old run PDFs per tenant.
 
 ### 4b. Bulk box lifecycle steps (Phase 44)
 
