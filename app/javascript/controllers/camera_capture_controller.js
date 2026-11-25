@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import CameraStream from "camera/stream"
 
 // Match the capture-upload pipeline's maxEdge so its own downscale is a no-op
 // for viewfinder frames (one encode per shot, here).
@@ -33,7 +34,8 @@ const INFLIGHT_RECOVERY_MS = 120000
 //      mid-stream) is repaired by connect() simply applying "idle".
 //   2. Every await tail re-checks its generation token, and every terminal path
 //      releases the stream — an abandoned getUserMedia can never leave the
-//      camera indicator lit.
+//      camera indicator lit. The stream side of this lives in the shared
+//      camera/stream module (#618); capture() re-checks the same token.
 //
 // The shutter grabs exactly the frame region the object-cover viewfinder shows
 // (what you frame out must not reach recognition) and hands the JPEG to the
@@ -56,11 +58,16 @@ export default class extends Controller {
     "fallback", "start", "library", "input", "note"]
 
   connect() {
-    this.generation = 0
     this.retried = false
     this.resumeOnVisible = false
     this.settleTimer = null
-    this.stream = null
+    // The getUserMedia lifecycle (generation guard, track-ended hook, release)
+    // is the shared camera/stream module (#618); this controller owns only
+    // the capture state machine around it.
+    this.camera = new CameraStream(this.videoTarget, {
+      constraints: { facingMode: "environment", width: { ideal: MAX_EDGE }, height: { ideal: MAX_EDGE } },
+      onEnded: () => this.#trackEnded()
+    })
     // The upload lock is deliberately SEPARATE from the camera state machine:
     // a camera interruption (track death, hide/show) must never unlock a busy
     // pipeline — the input is single-slot, and a second submission while one
@@ -68,7 +75,7 @@ export default class extends Controller {
     this.uploadPending = false
     this.liveSubmission = null
     this.abandonedSubmissions = new Set()
-    this.supported = !!navigator.mediaDevices?.getUserMedia
+    this.supported = CameraStream.supported
     this.onVisibility = () => this.#visibilityChanged()
     document.addEventListener("visibilitychange", this.onVisibility)
     this.#setState(this.supported ? "idle" : "unavailable")
@@ -77,52 +84,20 @@ export default class extends Controller {
 
   disconnect() {
     document.removeEventListener("visibilitychange", this.onVisibility)
-    this.generation++
     this.#clearSettleTimer()
-    this.#releaseStream()
+    this.camera.stop()
   }
 
-  // Auto-start (coarse pointer), the "Use camera" button, or a retry.
+  // Auto-start (coarse pointer), the "Use camera" button, or a retry. The
+  // stream module re-checks its generation after every await, so a teardown
+  // mid-prompt resolves "stale" and leaves the state to whoever tore down.
   async start() {
     if (!this.supported) return
     if (this.state !== "idle" && this.state !== "unavailable") return
-    const generation = ++this.generation
     this.#setState("requesting")
-    // A sticky denial shouldn't re-prompt on every visit; browsers without the
-    // camera permission query (Safari) fall through to getUserMedia itself.
-    const denied = await this.#cameraDenied()
-    if (generation !== this.generation) return
-    if (denied) return this.#setState("unavailable")
-    let stream
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: MAX_EDGE }, height: { ideal: MAX_EDGE } }
-      })
-    } catch (_error) {
-      if (generation === this.generation) this.#setState("unavailable")
-      return
-    }
-    // Torn down (or superseded) while the permission prompt was open — the
-    // fresh stream must not outlive its request.
-    if (generation !== this.generation) return this.#stopTracks(stream)
-    this.stream = stream
-    const track = stream.getVideoTracks()[0]
-    // Listen before play(): a track can die in the play() window, and an
-    // 'ended' fired before attachment would strand us "streaming" on a corpse.
-    if (!track || track.readyState !== "live") return this.#fail()
-    stream.getVideoTracks().forEach((t) =>
-      t.addEventListener("ended", () => this.#trackEnded(generation))
-    )
-    this.videoTarget.srcObject = stream
-    try {
-      await this.videoTarget.play()
-    } catch (_error) {
-      // Autoplay refused even with muted/playsinline — a viewfinder that never
-      // renders frames must not present an armed shutter.
-      if (generation === this.generation) this.#fail()
-      return
-    }
-    if (generation !== this.generation) return
+    const outcome = await this.camera.start()
+    if (outcome === "stale") return
+    if (outcome !== "live") return this.#setState("unavailable")
     this.retried = false
     this.#setState("streaming")
   }
@@ -132,7 +107,7 @@ export default class extends Controller {
   // upload lock, which keeps the shutter down after we return to "streaming".
   async capture() {
     if (this.state !== "streaming" || this.uploadPending) return
-    const generation = this.generation
+    const generation = this.camera.generation
     this.#setState("capturing")
     let blob = null
     try {
@@ -140,7 +115,7 @@ export default class extends Controller {
     } catch (_error) {
       // Fall through: no frame, no flash — the shutter re-arms below.
     }
-    if (generation !== this.generation || this.state !== "capturing") return
+    if (!this.camera.isCurrent(generation) || this.state !== "capturing") return
     if (blob) {
       // Feedback only when a frame actually enters the pipeline — a flash on a
       // failed grab would tell the user a photo exists that never will.
@@ -248,11 +223,10 @@ export default class extends Controller {
   // return; visible → one automatic re-acquire per incident, then give up to
   // the tile (with "Use camera" as the manual retry). The upload lock is
   // untouched: an in-flight photo keeps the shutter down across the recovery.
-  #trackEnded(generation) {
-    if (generation !== this.generation) return
+  // (The stream module only calls this for the current stream's tracks.)
+  #trackEnded() {
     if (this.state === "idle" || this.state === "unavailable") return
-    this.generation++ // invalidate any in-flight start()/capture() tail on this stream
-    this.#releaseStream()
+    this.camera.stop() // invalidates any in-flight start()/capture() tail on this stream
     if (document.hidden) {
       this.resumeOnVisible = true
       return this.#setState("idle")
@@ -268,8 +242,7 @@ export default class extends Controller {
   #visibilityChanged() {
     if (document.hidden) {
       if (this.state === "requesting" || this.state === "streaming" || this.state === "capturing") {
-        this.generation++
-        this.#releaseStream()
+        this.camera.stop()
         this.resumeOnVisible = true
         this.#setState("idle")
       }
@@ -325,20 +298,6 @@ export default class extends Controller {
     setTimeout(() => flash.classList.add("opacity-0"), 150)
   }
 
-  async #cameraDenied() {
-    try {
-      const status = await navigator.permissions.query({ name: "camera" })
-      return status.state === "denied"
-    } catch (_error) {
-      return false
-    }
-  }
-
-  #fail() {
-    this.#releaseStream()
-    this.#setState("unavailable")
-  }
-
   // The single writer of state-dependent DOM. Everything each state shows is
   // derived here, in one table (which also reads the orthogonal upload lock) —
   // never toggle these classes anywhere else.
@@ -366,15 +325,6 @@ export default class extends Controller {
     if (!this.supported) return false
     if (state === "unavailable") return true
     return state === "idle" && !window.matchMedia("(pointer: coarse)").matches
-  }
-
-  #releaseStream() {
-    this.#stopTracks(this.stream)
-    this.stream = null
-  }
-
-  #stopTracks(stream) {
-    stream?.getTracks().forEach((track) => track.stop())
   }
 
   // One failsafe at a time — re-arming without clearing would orphan a timer

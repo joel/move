@@ -18,6 +18,11 @@ pin_all_from "app/javascript/controllers", under: "controllers"
 # which would modulepreload BOTH strategies (and their libraries) on every page
 # and defeat the split. The dispatcher fetches the right one on demand.
 pin_all_from "app/javascript/lightbox", under: "lightbox", preload: false
+# Shared getUserMedia/stream lifecycle (#618) — camera/stream.js, imported
+# statically by the camera-capture and qr-scanner controllers (which are eager-
+# loaded, so it preloads like they do). New pins are invisible in dev until
+# `bin/rails assets:precompile` + app restart.
+pin_all_from "app/javascript/camera", under: "camera"
 
 # D9 — QR decode for the in-app scanner (E2). Vendored ESM build of jsQR
 # (vendor/javascript/jsqr.js); driven by controllers/qr_scanner_controller.js.

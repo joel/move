@@ -217,6 +217,21 @@ the same wrapper. One row open per page; closes on tap-away, tap of the row, or
 focus moving on; `turbo:before-cache` resets. First use: C2 review item rows
 (#602).
 
+### `Ui::CameraViewfinder` — in-app camera surface (#618)
+Portrait `aspect-3/4`, `rounded-card`, `bg-black`, `relative overflow-hidden`
+frame (no hairline) holding a muted, `playsinline`, autoplaying `object-cover`
+`<video>`; the block is the overlay slot (caller-positioned `absolute inset-0 …`
+children clip to the radius). `controller:` names the Stimulus controller whose
+`video` target the `<video>` becomes — the stream is driven by the shared
+`camera/stream` JS module (acquire/attach/release, generation guard against a
+teardown mid-permission-prompt, track-ended hook). The caller owns layout
+(`css:` — width cap, centring, `hidden` until streaming) and wrapper `data:`.
+Shutter recipe: `Ui::CameraViewfinder::SHUTTER_CLASSES` — a 64px `bg-text-warm`
+disc in a 4px `accent-sage` ring overlaid bottom-centre, `active:scale-90`,
+`disabled:opacity-50`, sage `focus-visible` outline. Used by B2 capture
+(`max-w-md`, status + flash + shutter overlays) and E2 scan (`max-w-sm`, aim hint
++ reticle).
+
 ### `Ui::BlurUpImage` — LQIP blur-up under every photo (#681)
 Zero-JS loading placeholder: a ~24px stripped-JPEG preview (base64 in
 `blob.metadata["lqip"]`, stamped at ingest by `ImageNormalizer`; `images:lqip`

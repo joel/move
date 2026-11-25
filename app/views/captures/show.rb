@@ -93,17 +93,16 @@ module Views
         end
       end
 
-      # Live viewfinder — hidden until the camera-capture controller streams.
-      # The shutter overlays the video bottom-center (native-camera convention);
-      # the flash layer pulses as capture feedback.
+      # Live viewfinder (Ui::CameraViewfinder) — hidden until the camera-capture
+      # controller streams. The shutter overlays the video bottom-center
+      # (native-camera convention); the flash layer pulses as capture feedback.
 
       #: () -> untyped
       def viewfinder
-        div(class: "relative mx-auto hidden aspect-3/4 w-full max-w-md overflow-hidden " \
-                   "rounded-card bg-black",
-            data: { "camera-capture-target": "viewfinder" }) do
-          video(class: "h-full w-full object-cover", playsinline: true, muted: true, autoplay: true,
-                data: { "camera-capture-target": "video" })
+        render Components::Ui::CameraViewfinder.new(
+          controller: "camera-capture", css: "mx-auto hidden max-w-md",
+          data: { "camera-capture-target": "viewfinder" }
+        ) do
           div(class: "absolute inset-0 flex flex-col items-center justify-center gap-3 " \
                      "bg-surface-container-high text-muted",
               data: { "camera-capture-target": "status" }) do
@@ -114,10 +113,7 @@ module Views
                      "transition-opacity duration-150",
               data: { "camera-capture-target": "flash" })
           button(type: "button", disabled: true,
-                 class: "absolute bottom-4 left-1/2 h-16 w-16 -translate-x-1/2 rounded-full " \
-                        "border-4 border-accent-sage bg-text-warm shadow-lg transition " \
-                        "active:scale-90 disabled:opacity-50 focus-visible:outline-2 " \
-                        "focus-visible:outline-offset-2 focus-visible:outline-accent-sage",
+                 class: Components::Ui::CameraViewfinder::SHUTTER_CLASSES,
                  aria: { label: I18n.t("captures.viewfinder.shutter") },
                  data: { "camera-capture-target": "shutter", action: "camera-capture#capture" })
         end
