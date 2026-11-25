@@ -103,8 +103,10 @@ module LabelPrintRuns
       end
     rescue Apartment::TenantNotFound
       # The tenant schema was dropped (account deletion): the run row went with
-      # it, so purge the attachment this job may have written to public.
-      @run&.document&.purge
+      # it, so purge the attachment this job may have written to public. A
+      # retry that met the dropped schema at its first switch never loaded
+      # the run, so it purges by run id what an earlier attempt left (#986).
+      @run ? @run.document.purge : purge_orphaned_documents(arguments.first)
     rescue ActiveRecord::ActiveRecordError => e
       # The database is unreachable even for the tenant switch. Let ActiveJob
       # re-raise the job's own error (not this one) so Solid Queue records the
@@ -148,8 +150,8 @@ module LabelPrintRuns
       run.document.purge
     end
 
-    # A retry that finds its run gone purges what an earlier attempt left
-    # (#986). Active Storage commits the attachment and blob rows before it
+    # A retry that finds its run (or its whole tenant schema) gone purges
+    # what an earlier attempt left (#986). Active Storage commits the attachment and blob rows before it
     # uploads (in after_commit), so an upload that fails with a retryable
     # error leaves committed rows behind. A Move/tenant deletion that captured
     # the run's attachment ids before those rows committed won't purge them,

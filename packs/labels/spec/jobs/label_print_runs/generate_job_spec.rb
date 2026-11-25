@@ -172,6 +172,16 @@ RSpec.describe LabelPrintRuns::GenerateJob do
         end
       end
 
+      # Every tenant switch raises once the block answers true, as it would
+      # after account deletion dropped the schema.
+      def drop_tenant_when(&)
+        allow(Apartment::Tenant).to receive(:switch).and_wrap_original do |original, *args, &block|
+          raise Apartment::TenantNotFound, "schema dropped" if yield
+
+          original.call(*args, &block)
+        end
+      end
+
       it "purges the earlier attempt's attachment, blob and object when the run is deleted before the retry" do
         run = run_for(1, 3)
         render_with(run, ["%PDF-1.4 fake", "%PDF-1.4 fake"])
@@ -188,6 +198,27 @@ RSpec.describe LabelPrintRuns::GenerateJob do
 
         expect(captured_ids).to be_empty
         expect(pdf).to have_received(:render).once
+        expect(documents_of(run)).to be_empty
+        expect(ActiveStorage::Blob.where(key: uploaded_keys)).to be_empty
+        expect(service.exist?(uploaded_keys.first)).to be(false)
+      end
+
+      it "purges the earlier attempt's attachment when the tenant schema is dropped before the retry" do
+        run = run_for(1, 3)
+        render_with(run, ["%PDF-1.4 fake"])
+        uploaded_keys = []
+        dropped = false
+        fail_first_upload do |key|
+          uploaded_keys << key
+          LabelPrintRun.where(id: run.id).delete_all
+          dropped = true
+        end
+        drop_tenant_when { dropped }
+
+        expect { enqueue_and_drain(run) }.to raise_error(Apartment::TenantNotFound)
+        allow(Apartment::Tenant).to receive(:switch).and_call_original
+        perform_enqueued_jobs while enqueued_jobs.any? # the queued blob purge
+
         expect(documents_of(run)).to be_empty
         expect(ActiveStorage::Blob.where(key: uploaded_keys)).to be_empty
         expect(service.exist?(uploaded_keys.first)).to be(false)
