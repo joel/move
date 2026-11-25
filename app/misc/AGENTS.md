@@ -99,7 +99,12 @@ and raises when the route re-loads it a different way. Several things load it
 `RodauthApp` (gotcha 1), the `Current.user` before_action (`rails_account` —
 rodauth-rails runs controller callbacks *inside* the route), and remember-me's
 `load_memory` (deadline extension while signed in; auto-login from the cookie).
-We leave `already_logged_in` unset, so signed-in users can reach those routes.
+`already_logged_in` is configured as a deliberate **no-op** (#822 — Rodauth
+2.47+ warns at boot while it is unset, Rodauth 3 will refuse to boot), so
+signed-in users can reach those routes. Halting or redirecting there would
+break the D14 invite carry, the invited-signup self-heal in `after_login`, and
+the apex handoff broker. While it stays a no-op, `account_reload` below is
+what keeps those requests from a 500.
 
 **Fix (in place).** `account_reload` in `RodauthMain` lets a session-loaded
 account be re-resolved by the route (the pre-2.47 behaviour); every other
