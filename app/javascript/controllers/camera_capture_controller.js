@@ -67,6 +67,8 @@ export default class extends Controller {
     this.retried = false
     this.resumeOnVisible = false
     this.resumeAfterCache = false
+    // Set by #settle when the focused pending status hides mid-request (#995).
+    this.focusOnStarted = false
     this.settleTimer = null
     // The getUserMedia lifecycle (generation guard, track-ended hook, release)
     // is the shared camera/stream module (#618); this controller owns only
@@ -141,8 +143,11 @@ export default class extends Controller {
     const fromStart = this.startTarget.contains(document.activeElement)
     this.#setState("requesting")
     const outcome = await this.camera.start()
+    // A stale request leaves the handoff to the request that replaces it.
     if (outcome === "stale") return
-    const refocus = fromStart && this.#focusLeftWithStart()
+    const handoff = this.focusOnStarted
+    this.focusOnStarted = false
+    const refocus = (fromStart || handoff) && this.#focusLeftWithStart()
     if (outcome !== "live") {
       this.#setState("unavailable")
       if (refocus) this.#focusStart()
@@ -153,11 +158,13 @@ export default class extends Controller {
     if (refocus) this.#focusLive()
   }
 
-  // Focus is still where the hidden start control left it: on the control
-  // itself, or dropped to the body when it hid.
+  // Focus is still where a hidden control left it: on the start control or
+  // the settled pending status (#995) — Chrome can keep a just-hidden element
+  // active until its next focus fixup — or dropped to the body.
   #focusLeftWithStart() {
     const active = document.activeElement
-    return !active || active === document.body || this.startTarget.contains(active)
+    return !active || active === document.body || this.startTarget.contains(active) ||
+      (this.hasPendingTarget && this.pendingTarget.contains(active))
   }
 
   // The shutter, unless an upload in flight keeps it disabled — then the
@@ -293,12 +300,32 @@ export default class extends Controller {
   // the input also makes any zombie submit() bail on its own staleness
   // guards. The event bubbles from the input to the form, where
   // capture-upload listens.
+  //
+  // When the page stays mounted (a failed response rendered in place, or a
+  // recovery), the "Replacing photo…" status hides here; if it held focus,
+  // the keyboard user must not drop to the body (#995).
   #settle() {
+    const stranded = this.hasPendingTarget && this.pendingTarget.contains(document.activeElement)
     this.liveSubmission = null
     this.#clearSettleTimer()
     this.uploadPending = false
     this.inputTarget.dispatchEvent(new CustomEvent("camera-capture:settle", { bubbles: true }))
     this.#setState(this.state)
+    if (stranded) this.#focusAfterSettle()
+  }
+
+  // The next live control: the re-armed shutter while streaming, else the
+  // start control (idle, or the retry after a failure), else the chooser.
+  // Mid-request (an automatic re-acquire) none is on show yet: start() hands
+  // focus over when the request resolves.
+  #focusAfterSettle() {
+    if (this.state === "requesting") {
+      this.focusOnStarted = true
+      return
+    }
+    if (this.state === "streaming") return this.shutterTarget.focus()
+    if (this.#offerStart(this.state)) return this.#focusStart()
+    if (!this.fallbackTarget.classList.contains("hidden")) this.inputTarget.focus()
   }
 
   // "Choose from library" — the same input the tile wraps; the existing
