@@ -22,7 +22,7 @@ module Components
     #
     # Overlay children are absolutely positioned by the caller (`absolute
     # inset-0 …`); the frame is `relative overflow-hidden`, so they clip to the
-    # rounded corners. Used by B2 capture and E2 scan.
+    # rounded corners. Used by B2 capture, C2 review Retake (#619) and E2 scan.
     class CameraViewfinder < Components::Base
       # The bespoke round shutter overlaid bottom-centre (native-camera
       # convention): a 64px warm-off-white disc in a 4px sage ring, press =

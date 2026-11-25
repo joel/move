@@ -166,7 +166,15 @@ module Views
             list
             add_form if can_add_item?
             move_photo_control if can_move_photo?
-            retake_control if @editable
+            # Retake through the in-app viewfinder (#619). Re-scan adds items, so
+            # it's offered only while the box can capture (packing) — the action
+            # rejects it otherwise; a plain image swap stays available in any phase.
+            if @editable
+              render Components::Reviews::RetakeControl.new(
+                url: move_box_review_retake_photo_path(@move, @box, @media, **queue_params),
+                rescan: @box.capturable?
+              )
+            end
             delete_photo_control if @editable && @box.packing?
             footer
           end
@@ -292,40 +300,6 @@ module Views
         unpacked.each do |box|
           option(value: box.id, disabled: true) do
             I18n.t("reviews.photo.move_to_box_unpacked", number: box.number)
-          end
-        end
-      end
-
-      # Replace this photo's image in place (Captures::Retake) — recover a corrupt
-      # master or swap a bad shot. Any phase. The tappable button is a label around a
-      # hidden file input (camera on mobile); picking a photo auto-downscales
-      # (capture-upload) and submits. The auto-submit action is on the FILE input, not
-      # the form, so toggling the re-scan checkbox doesn't submit an empty upload.
-
-      #: () -> untyped
-      def retake_control
-        div(class: "mt-stack-gap border-t border-card-border pt-stack-gap") do
-          span(class: "text-label-caps uppercase text-muted") { I18n.t("reviews.photo.retake_heading") }
-          form_with(url: move_box_review_retake_photo_path(@move, @box, @media, **queue_params), method: :post,
-                    data: { controller: "capture-upload" }, class: "mt-2 flex flex-col gap-3") do |form|
-            # Re-scan adds items, so it's only offered while the box can capture
-            # (packing) — the action rejects it otherwise. A plain image swap stays
-            # available in any phase.
-            if @box.capturable?
-              label(class: "flex items-center gap-2 text-body-md text-muted") do
-                input(type: "checkbox", name: "rerun_recognition", value: "1",
-                      class: "h-4 w-4 rounded border-card-border text-accent-sage focus:ring-accent-sage")
-                plain I18n.t("reviews.photo.retake_rescan")
-              end
-            end
-            label(class: "inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full " \
-                         "border border-card-border bg-card px-5 py-2 text-sm font-bold text-text-warm " \
-                         "transition hover:border-accent-sage hover:text-accent-sage active:scale-[0.98]") do
-              render Components::Icons::Camera.new(css: "h-5 w-5")
-              plain I18n.t("reviews.photo.retake_submit")
-              form.file_field :file, accept: "image/*", capture: "environment", required: true, class: "sr-only",
-                                     data: { "capture-upload-target": "file", action: "change->capture-upload#submit" }
-            end
           end
         end
       end
