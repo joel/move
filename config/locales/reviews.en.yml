@@ -47,6 +47,8 @@ en:
       retake_camera: "Take a new photo"
       retake_choose: "Choose a photo"
       retake_cancel: "Cancel"
+      # Shown instead of Cancel while the retake upload is in flight (#991).
+      retake_pending: "Replacing photo…"
       retake_allow: "Allow camera access to retake this photo"
       retake_unavailable: "Camera unavailable — choose a photo instead."
       retake_rescan: "Also re-scan for items"

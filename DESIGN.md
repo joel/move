@@ -232,8 +232,15 @@ disc in a 4px `accent-sage` ring overlaid bottom-centre, `active:scale-90`,
 (`max-w-md`, status + flash + shutter overlays), C2 review Retake (#619 —
 `Reviews::RetakeControl`, `max-w-sm`, same overlays; `camera-capture` with
 `autostart: false` so the camera opens only on "Take a new photo", plus a
-"Cancel" `close` target) and E2 scan (`max-w-sm`, aim hint
-+ reticle).
+"Cancel" `close` target that hides while the upload lock is held, replaced by
+a `role="status"` "Replacing photo…" `pending` target, #991) and E2 scan
+(`max-w-sm`, aim hint + reticle).
+Turbo-cache lifecycle (#987): every consumer wires
+`Ui::CameraViewfinder.cache_actions("<controller>")` (from `CACHE_EVENTS`) on
+its controller root — `turbo:before-cache` → `#teardown` releases the camera
+before the snapshot; `turbo:load` / `turbo:render` / `popstate` → `#resume`
+restarts it when the page outlived the cache (still connected). Camera startup
+moves focus only if it is still where the start control left it (#992).
 
 ### `Ui::BlurUpImage` — LQIP blur-up under every photo (#681)
 Zero-JS loading placeholder: a ~24px stripped-JPEG preview (base64 in

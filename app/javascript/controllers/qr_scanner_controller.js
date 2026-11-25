@@ -21,21 +21,43 @@ export default class extends Controller {
 
   connect() {
     this.scanning = false
+    this.resumeAfterCache = false
     this.camera = new CameraStream(this.videoTarget, { onEnded: () => this.#unavailable() })
     this.#startCamera()
   }
 
   disconnect() {
+    this.resumeAfterCache = false
     this.#stopCamera()
   }
 
   // turbo:before-cache — release the camera as soon as a navigation starts and
   // snapshot a pristine scanner (no revealed fallback), so a cache restore
-  // reconnects into the same state a fresh visit would.
+  // reconnects into the same state a fresh visit would. Turbo can also cache
+  // WITHOUT replacing the page (#987: a history entry Turbo didn't create, or
+  // a morphing refresh) — then no disconnect/connect follows, so remember to
+  // restart the camera if this controller is still connected afterwards.
   teardown() {
     this.#stopCamera()
+    this.resumeAfterCache = true
     this.element.classList.remove("camera-unavailable")
     if (this.hasFallbackTarget) this.fallbackTarget.classList.add("hidden")
+  }
+
+  // turbo:load / turbo:render / popstate after a teardown: the page was not
+  // replaced (this element is still mounted), so the camera comes back (or
+  // the fallback is revealed) instead of a silent black viewfinder. popstate
+  // covers Turbo's empty-state history pop, which caches the page but fires
+  // neither turbo:load nor turbo:render. Deferred one tick: Turbo clones the
+  // snapshot on the next event-loop tick after turbo:before-cache, and the
+  // restart must not leak into it.
+  resume() {
+    if (!this.resumeAfterCache) return
+    setTimeout(() => {
+      if (!this.resumeAfterCache || !this.element.isConnected) return
+      this.resumeAfterCache = false
+      this.#startCamera()
+    }, 0)
   }
 
   // Manual code entry (camera-independent fallback).

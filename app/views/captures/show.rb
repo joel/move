@@ -85,7 +85,8 @@ module Views
               data: { controller: "camera-capture",
                       action: "change->camera-capture#uploadStarted " \
                               "turbo:submit-start->camera-capture#uploadInFlight " \
-                              "turbo:submit-end->camera-capture#uploadSettled" }) do
+                              "turbo:submit-end->camera-capture#uploadSettled " +
+                              Components::Ui::CameraViewfinder.cache_actions("camera-capture") }) do
             viewfinder
             capture_form
             camera_controls

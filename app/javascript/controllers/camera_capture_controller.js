@@ -55,7 +55,7 @@ const INFLIGHT_RECOVERY_MS = 120000
 // and re-acquired on return.
 export default class extends Controller {
   static targets = ["viewfinder", "video", "shutter", "status", "flash",
-    "fallback", "start", "library", "input", "note", "close"]
+    "fallback", "start", "library", "input", "note", "close", "pending"]
 
   // autostart: false on surfaces where capture is a secondary action (the
   // review screen's Retake, #619) — the camera then starts only from the
@@ -66,6 +66,7 @@ export default class extends Controller {
   connect() {
     this.retried = false
     this.resumeOnVisible = false
+    this.resumeAfterCache = false
     this.settleTimer = null
     // The getUserMedia lifecycle (generation guard, track-ended hook, release)
     // is the shared camera/stream module (#618); this controller owns only
@@ -91,7 +92,39 @@ export default class extends Controller {
   disconnect() {
     document.removeEventListener("visibilitychange", this.onVisibility)
     this.#clearSettleTimer()
+    this.resumeAfterCache = false
     this.camera.stop()
+  }
+
+  // turbo:before-cache — release the camera as soon as a navigation caches
+  // this page and snapshot it with the viewfinder folded away. The upload
+  // lock is untouched (closing never unlocks a busy pipeline). Turbo can also
+  // cache WITHOUT replacing the page (#987: a history entry Turbo didn't
+  // create, or a morphing refresh), so a camera that was live is remembered
+  // and resumed if this controller is still connected afterwards.
+  teardown() {
+    const live = this.state === "requesting" || this.state === "streaming" || this.state === "capturing"
+    if (!live) return
+    this.camera.stop()
+    this.resumeAfterCache = true
+    this.#setState("idle")
+  }
+
+  // turbo:load / turbo:render / popstate after a teardown: if the page was
+  // not replaced (this element is still mounted), turn the camera back on.
+  // popstate covers Turbo's empty-state history pop, which caches the page
+  // but fires neither turbo:load nor turbo:render. Deferred one tick: Turbo
+  // clones the snapshot on the next event-loop tick after
+  // turbo:before-cache, and the restarted "requesting" DOM must not leak
+  // into it.
+  resume() {
+    if (!this.resumeAfterCache) return
+    setTimeout(() => {
+      if (!this.resumeAfterCache || !this.element.isConnected) return
+      this.resumeAfterCache = false
+      this.retried = false
+      this.start()
+    }, 0)
   }
 
   // Auto-start (coarse pointer), the "Use camera" button, or a retry. The
@@ -101,33 +134,48 @@ export default class extends Controller {
     if (!this.supported) return
     if (this.state !== "idle" && this.state !== "unavailable") return
     // The start control hides while the camera is requested; a keyboard user
-    // who pressed it must not be left focused on a hidden control.
+    // who pressed it must not be left focused on a hidden control. But the
+    // permission prompt can stay open a while: if the user has moved focus
+    // elsewhere by the time it resolves, the late resolve must not steal it
+    // back (#992).
     const fromStart = this.startTarget.contains(document.activeElement)
     this.#setState("requesting")
     const outcome = await this.camera.start()
     if (outcome === "stale") return
+    const refocus = fromStart && this.#focusLeftWithStart()
     if (outcome !== "live") {
       this.#setState("unavailable")
-      if (fromStart) this.#focusStart()
+      if (refocus) this.#focusStart()
       return
     }
     this.retried = false
     this.#setState("streaming")
-    if (fromStart) this.#focusLive()
+    if (refocus) this.#focusLive()
   }
 
-  // The shutter, unless an upload in flight keeps it disabled — then Cancel.
+  // Focus is still where the hidden start control left it: on the control
+  // itself, or dropped to the body when it hid.
+  #focusLeftWithStart() {
+    const active = document.activeElement
+    return !active || active === document.body || this.startTarget.contains(active)
+  }
+
+  // The shutter, unless an upload in flight keeps it disabled — then the
+  // "Replacing photo…" status (Cancel is hidden while the lock is held, #991).
   #focusLive() {
-    const target = this.shutterTarget.disabled && this.hasCloseTarget ? this.closeTarget : this.shutterTarget
+    const target = this.shutterTarget.disabled && this.hasPendingTarget ? this.pendingTarget : this.shutterTarget
     target.focus()
   }
 
   // "Cancel" (the close target, #619): release the camera and fold the
   // viewfinder away. stop() bumps the generation, so an in-flight start() or
-  // capture() tail goes stale. The upload lock is untouched — closing never
-  // unlocks a busy pipeline. Focus moves to the re-revealed start control
-  // (the Cancel button that held it is now hidden).
+  // capture() tail goes stale. Focus moves to the re-revealed start control
+  // (the Cancel button that held it is now hidden). While an upload is
+  // pending Cancel is hidden (#991): the in-flight POST would still replace
+  // the photo, so "Cancel" would be a lie — and a real abort is out of scope
+  // (#622 aborts only on recovery).
   close() {
+    if (this.uploadPending) return
     if (this.state === "idle" || this.state === "unavailable") return
     this.camera.stop()
     this.resumeOnVisible = false
@@ -172,9 +220,21 @@ export default class extends Controller {
   // the shutter would sit dead for the whole failsafe window.
   uploadStarted() {
     if (!this.inputTarget.files?.length) return
+    // The lock disables the shutter and hides Library/Cancel — a keyboard
+    // user on one of them would drop to the body (some browsers already blur
+    // the shutter while "capturing" disables it); move them to the pending
+    // status instead, where there is one.
+    const stranded = this.#lockHides(document.activeElement)
     this.uploadPending = true
     this.#armSettleTimer(SETTLE_FAILSAFE_MS)
     this.#setState(this.state)
+    if (stranded && this.hasPendingTarget) this.pendingTarget.focus()
+  }
+
+  #lockHides(element) {
+    if (!element || element === document.body) return true
+    return element === this.shutterTarget || element === this.libraryTarget ||
+      (this.hasCloseTarget && element === this.closeTarget)
   }
 
   // turbo:submit-start — the form is genuinely in flight: remember WHICH
@@ -357,7 +417,10 @@ export default class extends Controller {
     this.libraryTarget.classList.toggle("hidden", !streaming || this.uploadPending)
     this.noteTarget.classList.toggle("hidden", state !== "unavailable")
     this.startTarget.classList.toggle("hidden", !this.#offerStart(state))
-    if (this.hasCloseTarget) this.closeTarget.classList.toggle("hidden", !live)
+    // Cancel can't cancel an upload already handed to the pipeline (#991):
+    // hide it while the lock is held and say what is happening instead.
+    if (this.hasCloseTarget) this.closeTarget.classList.toggle("hidden", !live || this.uploadPending)
+    if (this.hasPendingTarget) this.pendingTarget.classList.toggle("hidden", !this.uploadPending)
     this.shutterTarget.disabled = state !== "streaming" || this.uploadPending
   }
 

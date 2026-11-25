@@ -40,7 +40,8 @@ module Components
         div(class: "mt-stack-gap flex flex-col gap-3 border-t border-card-border pt-stack-gap",
             data: { controller: "camera-capture", "camera-capture-autostart-value": "false",
                     action: "turbo:submit-start->camera-capture#uploadInFlight " \
-                            "turbo:submit-end->camera-capture#uploadSettled" }) do
+                            "turbo:submit-end->camera-capture#uploadSettled " +
+                            Components::Ui::CameraViewfinder.cache_actions("camera-capture") }) do
           span(class: "text-label-caps uppercase text-muted") { I18n.t("reviews.photo.retake_heading") }
           viewfinder
           retake_form
@@ -125,10 +126,18 @@ module Components
 
       # Revealed by the camera-capture state table: "Choose from library" and
       # "Cancel" while the camera is live, the unavailable note after a failure.
+      # While the upload lock is held Cancel hides and "Replacing photo…" shows
+      # instead (#991) — the POST in flight still replaces the photo, so a
+      # Cancel there would lie. The status takes focus (tabindex -1) when the
+      # control a keyboard user was on hides under them.
 
       #: () -> untyped
       def camera_controls
         div(class: "flex flex-col items-center gap-2") do
+          p(class: "hidden text-center text-body-md text-text-warm", role: "status", tabindex: "-1",
+            data: { "camera-capture-target": "pending" }) do
+            plain I18n.t("reviews.photo.retake_pending")
+          end
           button(type: "button", class: "hidden #{QUIET_LINK}",
                  data: { "camera-capture-target": "library", action: "camera-capture#openLibrary" }) do
             plain I18n.t("captures.viewfinder.library")

@@ -4,12 +4,9 @@ require "rails_helper"
 
 # #619 — the review screen's Retake runs through the in-app viewfinder (the
 # camera-capture controller with autostart off), not the native camera app.
-# These examples drive the real Stimulus controller against a fake camera:
-# `fake_camera_js` is injected over CDP BEFORE any page script runs (the
-# controller reads CameraStream.supported at connect, and the lvh.me test host
-# is an insecure context with no navigator.mediaDevices at all), and serves a
-# canvas captureStream() as the "rear camera". `window.__camera.deny = true`
-# makes the next getUserMedia reject like a permission denial.
+# These examples drive the real Stimulus controller against the fake camera in
+# spec/support/fake_camera_helpers.rb (injected over CDP before any page
+# script runs; `deny` / `hold` + `release()` steer getUserMedia).
 #
 # `:js` specs run in CI only (no chromedriver in the dev container). The
 # tenant/host setup and the cross-thread `eventually` read mirror
@@ -17,7 +14,6 @@ require "rails_helper"
 RSpec.describe "Review retake viewfinder (JS)", :js do
   let(:slug) { "jsretake" }
   let(:user) { create(:user) }
-  let(:fake_camera) { {} }
   let!(:seeded) do
     Apartment::Tenant.switch(slug) do
       move = create(:move, created_by: user)
@@ -26,39 +22,6 @@ RSpec.describe "Review retake viewfinder (JS)", :js do
       create(:item, move:, box:, source_media: media, name: "Coffee machine", review_state: "pending_review")
       { move:, box:, media:, blob_id: media.image.blob.id }
     end
-  end
-
-  def fake_camera_js
-    <<~JS
-      (() => {
-        const camera = window.__camera = { calls: 0, deny: false, streams: [] }
-        if (!navigator.mediaDevices) {
-          Object.defineProperty(navigator, "mediaDevices", { value: {}, configurable: true })
-        }
-        // The insecure origin answers the camera permission query "denied",
-        // which CameraStream treats as sticky — report a fresh "prompt" so
-        // every start() reaches getUserMedia (and the deny flag decides).
-        if (navigator.permissions) {
-          const query = navigator.permissions.query.bind(navigator.permissions)
-          navigator.permissions.query = (descriptor) =>
-            descriptor?.name === "camera" ? Promise.resolve({ state: "prompt" }) : query(descriptor)
-        }
-        navigator.mediaDevices.getUserMedia = async () => {
-          camera.calls++
-          if (camera.deny) throw new DOMException("Permission denied", "NotAllowedError")
-          const canvas = document.createElement("canvas")
-          canvas.width = 640
-          canvas.height = 480
-          const ctx = canvas.getContext("2d")
-          const paint = () => { ctx.fillStyle = "#6b8f71"; ctx.fillRect(0, 0, 640, 480) }
-          paint()
-          setInterval(paint, 100)
-          const stream = canvas.captureStream(10)
-          camera.streams.push(stream)
-          return stream
-        }
-      })()
-    JS
   end
 
   around do |example|
@@ -81,37 +44,19 @@ RSpec.describe "Review retake viewfinder (JS)", :js do
     Capybara.always_include_port = original_include_port
   end
 
-  # A `before`, not part of `around`: the :js `driven_by` switch to headless
-  # Chrome is itself a before hook, so inside `around` the session is still
-  # rack_test. The identifier is removed again in `after`, so the fake camera
-  # never leaks into another spec on the reused Chrome session.
-  before do
-    fake_camera[:script] = page.driver.browser.execute_cdp("Page.addScriptToEvaluateOnNewDocument", source: fake_camera_js)
-  end
-
-  after do
-    next unless fake_camera[:script]
-
-    page.driver.browser.execute_cdp("Page.removeScriptToEvaluateOnNewDocument", identifier: fake_camera[:script]["identifier"])
-  end
+  # FakeCameraHelpers (spec/support): installed from a `before`, removed in `after`.
+  before { install_fake_camera }
+  after { remove_fake_camera }
 
   def viewfinder = "[data-camera-capture-target='viewfinder']"
   def shutter = "button[data-camera-capture-target='shutter']"
+  def pending_status = "[data-camera-capture-target='pending']"
+  def rescan_box = "input[name='rerun_recognition']"
   def take_photo = I18n.t("reviews.photo.retake_camera")
-  def camera(expr) = page.evaluate_script("window.__camera.#{expr}")
+  def cancel = I18n.t("reviews.photo.retake_cancel")
   def focused_target = page.evaluate_script("document.activeElement?.dataset.cameraCaptureTarget")
   def focused_text = page.evaluate_script("document.activeElement?.textContent").to_s
-
-  # Retry a cross-thread read (see review_pending_edits_js_spec.rb).
-  def eventually(timeout: 10)
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
-    loop do
-      return true if yield
-      raise "condition not met within #{timeout}s" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
-
-      sleep 0.1
-    end
-  end
+  def focused_name = page.evaluate_script("document.activeElement?.name")
 
   def visit_photo
     login_as(user: user)
@@ -180,5 +125,150 @@ RSpec.describe "Review retake viewfinder (JS)", :js do
     expect(page).to have_text(I18n.t("reviews.photo.retake_choose"))
     # The start button stays as the retry affordance.
     expect(page).to have_button(take_photo)
+  end
+
+  # #991 — once the shutter hands a frame to the upload pipeline, the POST
+  # will replace the photo whatever the user does next: Cancel must not
+  # pretend otherwise.
+  describe "while the retake upload is pending" do
+    # Keep the frame in the pre-submit window: capture-upload's requestSubmit
+    # is stubbed, so the upload lock stays held until the spec settles it.
+    def hold_submission
+      page.execute_script(<<~JS)
+        const form = document.querySelector("form[data-controller~='capture-upload']")
+        window.__submits = 0
+        form.requestSubmit = () => { window.__submits++ }
+      JS
+    end
+
+    def settle_submission
+      page.execute_script(<<~JS)
+        const form = document.querySelector("form[data-controller~='capture-upload']")
+        form.dispatchEvent(new CustomEvent("turbo:submit-end", { bubbles: true, detail: {} }))
+      JS
+    end
+
+    def shoot_with_submission_held
+      visit_photo
+      open_viewfinder
+      hold_submission
+      expect(page).to have_no_css(pending_status, visible: :visible)
+      find(shutter).click
+    end
+
+    it "hides Cancel and shows the replacing status once the shutter hands off a frame" do
+      shoot_with_submission_held
+
+      expect(page).to have_css("#{pending_status}[role='status']", visible: :visible,
+                                                                   text: I18n.t("reviews.photo.retake_pending"))
+      expect(page).to have_no_button(cancel)
+      expect(page).to have_css("#{shutter}[disabled]")
+      # The keyboard user's shutter went inert; focus lands on the status.
+      expect(focused_target).to eq("pending")
+    end
+
+    it "brings Cancel back when the upload settles" do
+      shoot_with_submission_held
+      expect(page).to have_css(pending_status, visible: :visible)
+      eventually { page.evaluate_script("window.__submits").positive? }
+
+      settle_submission
+
+      expect(page).to have_button(cancel)
+      expect(page).to have_css(pending_status, visible: :hidden)
+      expect(page).to have_css("#{shutter}:not([disabled])")
+    end
+  end
+
+  # #992 — the permission prompt can stay open a while; a late resolve must not
+  # pull focus back from wherever the user has moved it since.
+  describe "focus when the camera resolves late" do
+    def start_by_keyboard_then_move_focus
+      visit_photo
+      page.execute_script("window.__camera.hold = true")
+      find_button(take_photo).send_keys(:enter)
+      eventually { camera("held.length") == 1 }
+      page.execute_script("document.querySelector(\"#{rescan_box}\").focus()")
+      expect(focused_name).to eq("rerun_recognition")
+    end
+
+    it "leaves focus alone when access is granted" do
+      start_by_keyboard_then_move_focus
+
+      page.execute_script("window.__camera.release()")
+
+      expect(page).to have_css("#{shutter}:not([disabled])", visible: :visible)
+      expect(focused_name).to eq("rerun_recognition")
+    end
+
+    it "leaves focus alone when access is denied" do
+      start_by_keyboard_then_move_focus
+      page.execute_script("window.__camera.deny = true")
+
+      page.execute_script("window.__camera.release()")
+
+      expect(page).to have_text(I18n.t("reviews.photo.retake_unavailable"))
+      expect(focused_name).to eq("rerun_recognition")
+    end
+
+    it "still moves focus to the shutter when the user left it alone" do
+      visit_photo
+      page.execute_script("window.__camera.hold = true")
+      find_button(take_photo).send_keys(:enter)
+      eventually { camera("held.length") == 1 }
+
+      page.execute_script("window.__camera.release()")
+
+      expect(page).to have_css("#{shutter}:not([disabled])", visible: :visible)
+      expect(focused_target).to eq("shutter")
+    end
+  end
+
+  # #987 — Turbo can cache the page (turbo:before-cache → teardown) without
+  # replacing it; the live camera must come back instead of going dark.
+  describe "Turbo caching the page" do
+    it "restarts the camera after a history pop Turbo didn't create" do
+      visit_photo
+      open_viewfinder
+
+      pop_history_outside_turbo
+
+      eventually { camera("calls") == 2 && camera("liveTrack(1)") }
+      expect(camera("liveTrack(0)")).to be(false)
+      expect(page).to have_css(viewfinder, visible: :visible)
+      expect(page).to have_css("#{shutter}:not([disabled])")
+    end
+
+    it "restarts the camera when Turbo renders without replacing the page" do
+      visit_photo
+      open_viewfinder
+
+      cache_then_render_in_place
+
+      eventually { camera("calls") == 2 && camera("liveTrack(1)") }
+      expect(camera("liveTrack(0)")).to be(false)
+      expect(page).to have_css(viewfinder, visible: :visible)
+    end
+
+    it "does not start a camera the user never opened" do
+      visit_photo
+
+      cache_then_render_in_place
+      pop_history_outside_turbo
+
+      expect(page).to have_css(viewfinder, visible: :hidden)
+      expect(camera("calls")).to eq(0)
+    end
+
+    it "releases the camera on a normal navigation away" do
+      visit_photo
+      open_viewfinder
+
+      page.execute_script("window.Turbo.visit('#{move_box_path(seeded[:move], seeded[:box])}')")
+
+      expect(page).to have_current_path(move_box_path(seeded[:move], seeded[:box]))
+      eventually { camera("liveTrack(0)") == false }
+      expect(camera("calls")).to eq(1)
+    end
   end
 end

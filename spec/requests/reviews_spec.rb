@@ -887,6 +887,20 @@ RSpec.describe "Per-photo review" do
         .and include("turbo:submit-end->camera-capture#uploadSettled")
       expect(form.at_css('input[name="rerun_recognition"]')).to be_present
     end
+
+    it "renders the hidden, focusable replacing-photo status for the upload lock (#991)" do
+      status = retake_section.at_css("[data-camera-capture-target='pending']")
+
+      expect(status["class"]).to include("hidden")
+      expect(status["role"]).to eq("status")
+      expect(status["tabindex"]).to eq("-1")
+      expect(status.text).to eq(I18n.t("reviews.photo.retake_pending"))
+    end
+
+    it "wires the Turbo-cache teardown and resume (#987)" do
+      expect(retake_section["data-action"])
+        .to include(Components::Ui::CameraViewfinder.cache_actions("camera-capture"))
+    end
   end
 
   describe "POST .../review/photo/:media_id/retake (retake photo)" do
