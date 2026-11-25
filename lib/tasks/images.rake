@@ -37,26 +37,24 @@ namespace :images do
     grand_total = 0
     # Media lives in each tenant schema; ActiveStorage::Blob is shared (public),
     # so switch per tenant to find the rows, then operate on their blobs.
-    Organization.pluck(:slug).each do |slug|
-      Apartment::Tenant.switch(slug) do
-        done = 0
-        reclaimed = 0
-        # with_discarded: soft-deleted photos still occupy storage, so optimise
-        # them too. optimized_at IS NULL is the idempotency guard — a re-run skips
-        # everything already processed (and freshly-captured media is pre-stamped).
-        Media.with_discarded.where(optimized_at: nil).find_each do |media|
-          saved = optimize.call(media)
-          next if saved.nil?
+    TenantSweep.in_each_tenant do |slug|
+      done = 0
+      reclaimed = 0
+      # with_discarded: soft-deleted photos still occupy storage, so optimise
+      # them too. optimized_at IS NULL is the idempotency guard — a re-run skips
+      # everything already processed (and freshly-captured media is pre-stamped).
+      Media.with_discarded.where(optimized_at: nil).find_each do |media|
+        saved = optimize.call(media)
+        next if saved.nil?
 
-          done += 1
-          reclaimed += saved
-        end
-        grand_total += reclaimed
-        line = "[images:optimize] #{slug}: #{done} optimised, " \
-               "#{ActiveSupport::NumberHelper.number_to_human_size(reclaimed)} reclaimed"
-        Rails.logger.info(line)
-        puts line
+        done += 1
+        reclaimed += saved
       end
+      grand_total += reclaimed
+      line = "[images:optimize] #{slug}: #{done} optimised, " \
+             "#{ActiveSupport::NumberHelper.number_to_human_size(reclaimed)} reclaimed"
+      Rails.logger.info(line)
+      puts line
     end
 
     puts "[images:optimize] total reclaimed: " \
@@ -73,22 +71,20 @@ namespace :images do
     # exact blobs this backfill exists for (#676 Codex). The flip side is that a
     # permanently unanalyzable image is re-attempted on every run — acceptable
     # for a manual, occasional task.
-    Organization.pluck(:slug).each do |slug|
-      Apartment::Tenant.switch(slug) do
-        done = 0
-        Media.with_discarded.joins(:image_attachment).find_each do |media|
-          blob = media.image.blob
-          next if blob.metadata["width"].to_i.positive? && blob.metadata["height"].to_i.positive?
+    TenantSweep.in_each_tenant do |slug|
+      done = 0
+      Media.with_discarded.joins(:image_attachment).find_each do |media|
+        blob = media.image.blob
+        next if blob.metadata["width"].to_i.positive? && blob.metadata["height"].to_i.positive?
 
-          blob.analyze
-          done += 1
-        rescue ActiveStorage::Error => e
-          # Missing/undownloadable objects must not strand the rest of the run.
-          warn "[images:analyze] skip media #{media.id} (storage): #{e.class} (#{e.message})"
-        end
-        total += done
-        puts "[images:analyze] #{slug}: #{done} analyzed"
+        blob.analyze
+        done += 1
+      rescue ActiveStorage::Error => e
+        # Missing/undownloadable objects must not strand the rest of the run.
+        warn "[images:analyze] skip media #{media.id} (storage): #{e.class} (#{e.message})"
       end
+      total += done
+      puts "[images:analyze] #{slug}: #{done} analyzed"
     end
     puts "[images:analyze] total: #{total}"
   end
@@ -99,27 +95,25 @@ namespace :images do
     # Presence of the lqip key is the idempotency guard (post-#681 uploads are
     # pre-stamped by ImageNormalizer). Downloads each remaining master once to
     # derive the ~24px preview; undecodable/unreadable masters warn and skip.
-    Organization.pluck(:slug).each do |slug|
-      Apartment::Tenant.switch(slug) do
-        done = 0
-        Media.with_discarded.joins(:image_attachment).find_each do |media|
-          blob = media.image.blob
-          next if blob.metadata["lqip"].present?
+    TenantSweep.in_each_tenant do |slug|
+      done = 0
+      Media.with_discarded.joins(:image_attachment).find_each do |media|
+        blob = media.image.blob
+        next if blob.metadata["lqip"].present?
 
-          lqip = ImageNormalizer.lqip_base64(blob.download)
-          if lqip.nil?
-            warn "[images:lqip] skip media #{media.id}: bytes did not decode"
-            next
-          end
-          blob.update!(metadata: blob.metadata.merge("lqip" => lqip))
-          done += 1
-        rescue ActiveStorage::Error => e
-          # Missing/undownloadable objects must not strand the rest of the run.
-          warn "[images:lqip] skip media #{media.id} (storage): #{e.class} (#{e.message})"
+        lqip = ImageNormalizer.lqip_base64(blob.download)
+        if lqip.nil?
+          warn "[images:lqip] skip media #{media.id}: bytes did not decode"
+          next
         end
-        total += done
-        puts "[images:lqip] #{slug}: #{done} previews stored"
+        blob.update!(metadata: blob.metadata.merge("lqip" => lqip))
+        done += 1
+      rescue ActiveStorage::Error => e
+        # Missing/undownloadable objects must not strand the rest of the run.
+        warn "[images:lqip] skip media #{media.id} (storage): #{e.class} (#{e.message})"
       end
+      total += done
+      puts "[images:lqip] #{slug}: #{done} previews stored"
     end
     puts "[images:lqip] total: #{total}"
   end
@@ -169,34 +163,32 @@ namespace :images do
     require "timeout"
     full = ENV["FULL"].present?
     grand = 0
-    Organization.pluck(:slug).each do |slug|
-      Apartment::Tenant.switch(slug) do
-        flagged = 0
-        Media.with_discarded.ready.where(image_unavailable: false).with_attached_image.find_each do |media|
-          blob = media.image.blob
-          readable = begin
-            if full
-              Timeout.timeout(60) { blob.download }
-            else
-              Timeout.timeout(5) { blob.service.download_chunk(blob.key, 0..64) }
-            end
-            true
-          rescue StandardError # rubocop:disable Move/BroadRescue -- any read error (corrupt/missing/timeout) means "can't display"
-            false
+    TenantSweep.in_each_tenant do |slug|
+      flagged = 0
+      Media.with_discarded.ready.where(image_unavailable: false).with_attached_image.find_each do |media|
+        blob = media.image.blob
+        readable = begin
+          if full
+            Timeout.timeout(60) { blob.download }
+          else
+            Timeout.timeout(5) { blob.service.download_chunk(blob.key, 0..64) }
           end
-          next if readable
-
-          # rubocop:disable Rails/SkipsModelValidations -- deliberate: flip one flag
-          # across many rows; re-running image validations here is needless overhead.
-          media.update_column(:image_unavailable, true)
-          # rubocop:enable Rails/SkipsModelValidations
-          flagged += 1
+          true
+        rescue StandardError # rubocop:disable Move/BroadRescue -- any read error (corrupt/missing/timeout) means "can't display"
+          false
         end
-        grand += flagged
-        line = "[images:flag_unavailable] #{slug}: #{flagged} flagged unavailable"
-        Rails.logger.info(line)
-        puts line
+        next if readable
+
+        # rubocop:disable Rails/SkipsModelValidations -- deliberate: flip one flag
+        # across many rows; re-running image validations here is needless overhead.
+        media.update_column(:image_unavailable, true)
+        # rubocop:enable Rails/SkipsModelValidations
+        flagged += 1
       end
+      grand += flagged
+      line = "[images:flag_unavailable] #{slug}: #{flagged} flagged unavailable"
+      Rails.logger.info(line)
+      puts line
     end
 
     puts "[images:flag_unavailable] total: #{grand} media flagged unavailable"

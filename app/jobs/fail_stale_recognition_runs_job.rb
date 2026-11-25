@@ -8,13 +8,8 @@
 class FailStaleRecognitionRunsJob < ApplicationJob
   #: () -> void
   def perform
-    Organization.pluck(:slug).each do |slug|
-      Apartment::Tenant.switch(slug) { RecognitionRuns::FailStale.new.call }
-    rescue Apartment::TenantNotFound
-      # Account-deletion race (the PurgeExpiredDiscardsJob precedent): the
-      # schema is dropped before the Organization row, so skip a schema-less
-      # slug rather than starve every tenant later in the list.
-      next
-    end
+    # TenantSweep skips a slug whose schema is already dropped (the
+    # account-deletion race) so one ghost tenant can't starve the rest.
+    TenantSweep.in_each_tenant { RecognitionRuns::FailStale.new.call }
   end
 end
