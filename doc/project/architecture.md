@@ -629,6 +629,13 @@ could not reach the database to mark its run failed still ends in "Try again" (#
 `GenerateJob#finalize_failed` also re-reads the run from the job arguments when the
 attempt died before loading it.
 
+The pending-job lookup of this sweep and of `RecognitionRuns::FailStale` is specced
+against real queue records (#990, the two `fail_stale_solid_queue_spec.rb` files).
+The `with a real Solid Queue` shared context (`spec/support/solid_queue_helpers.rb`)
+creates the tables from `db/queue_structure.sql` in the test database, inside each
+example's transaction. Production's separate queue database connection is not
+exercised.
+
 ### 4b. Bulk box lifecycle steps (Phase 44)
 
 `BoxStepsController` (editor-only, Menu-reached) advances **every** box in a source
