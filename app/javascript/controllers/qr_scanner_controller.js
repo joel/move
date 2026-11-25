@@ -1,22 +1,41 @@
 import { Controller } from "@hotwired/stimulus"
 import jsQR from "jsqr"
+import CameraStream from "camera/stream"
 
 // E2 — drives the live QR scanner. Opens the rear camera, decodes frames with
 // jsQR, and navigates to the resolved token. A printed label's QR encodes the
 // full resolve URL, so a camera hit navigates straight there; manual entry takes
-// just the token and is appended to resolveUrlValue. If the camera is denied or
-// unsupported, the manual-entry fallback is revealed instead.
+// just the token and is appended to resolveUrlValue. If the camera is denied,
+// unsupported, dies mid-scan, or the decode loop throws, the camera is released
+// and the manual-entry fallback is revealed instead.
+//
+// The stream lifecycle is the shared camera/stream module (#618): its
+// generation guard is what closes the permission-prompt race — a Turbo
+// navigation while the prompt is open (disconnect / turbo:before-cache →
+// teardown) makes the late getUserMedia resolve "stale" and stop its stream,
+// instead of leaving the camera lit and the decode loop running against a
+// detached element.
 export default class extends Controller {
   static values = { resolveUrl: String }
   static targets = ["video", "canvas", "manual", "fallback"]
 
   connect() {
     this.scanning = false
+    this.camera = new CameraStream(this.videoTarget, { onEnded: () => this.#unavailable() })
     this.#startCamera()
   }
 
   disconnect() {
     this.#stopCamera()
+  }
+
+  // turbo:before-cache — release the camera as soon as a navigation starts and
+  // snapshot a pristine scanner (no revealed fallback), so a cache restore
+  // reconnects into the same state a fresh visit would.
+  teardown() {
+    this.#stopCamera()
+    this.element.classList.remove("camera-unavailable")
+    if (this.hasFallbackTarget) this.fallbackTarget.classList.add("hidden")
   }
 
   // Manual code entry (camera-independent fallback).
@@ -27,41 +46,52 @@ export default class extends Controller {
   }
 
   async #startCamera() {
-    if (!navigator.mediaDevices?.getUserMedia) return this.#revealFallback()
-    try {
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }
-      })
-      this.videoTarget.srcObject = this.stream
-      this.videoTarget.setAttribute("playsinline", true)
-      await this.videoTarget.play()
-      this.scanning = true
-      this.#tick()
-    } catch (_error) {
-      this.#revealFallback()
-    }
+    if (!CameraStream.supported) return this.#revealFallback()
+    const outcome = await this.camera.start()
+    // Torn down while awaiting (navigated away mid-prompt) — the module has
+    // already stopped the late stream; nothing here may touch the DOM.
+    if (outcome === "stale") return
+    if (outcome !== "live") return this.#revealFallback()
+    this.scanning = true
+    this.#tick()
   }
 
   #stopCamera() {
     this.scanning = false
     if (this.rafId) cancelAnimationFrame(this.rafId)
-    this.stream?.getTracks().forEach((track) => track.stop())
+    this.rafId = null
+    this.camera.stop()
+  }
+
+  // The camera died mid-scan or the decode loop failed — never leave a lit
+  // camera behind a dead loop; hand over to manual entry.
+  #unavailable() {
+    this.#stopCamera()
+    this.#revealFallback()
   }
 
   #tick() {
     if (!this.scanning) return
-    const video = this.videoTarget
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      const canvas = this.canvasTarget
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-      const ctx = canvas.getContext("2d", { willReadFrequently: true })
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-      const image = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const code = jsQR(image.data, image.width, image.height)
-      if (code?.data) return this.#onDecode(code.data)
+    let code
+    try {
+      code = this.#decodeFrame()
+    } catch (_error) {
+      return this.#unavailable()
     }
+    if (code?.data) return this.#onDecode(code.data)
     this.rafId = requestAnimationFrame(() => this.#tick())
+  }
+
+  #decodeFrame() {
+    const video = this.videoTarget
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return null
+    const canvas = this.canvasTarget
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    const image = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    return jsQR(image.data, image.width, image.height)
   }
 
   #onDecode(data) {

@@ -16,7 +16,10 @@ module Views
       def view_template
         div(
           class: "flex flex-col items-center gap-6",
-          data: { controller: "qr-scanner", qr_scanner_resolve_url_value: move_scan_path(@move) }
+          data: { controller: "qr-scanner", qr_scanner_resolve_url_value: move_scan_path(@move),
+                  # Release the camera the moment a navigation starts, and keep
+                  # the Turbo snapshot pristine (#618).
+                  action: "turbo:before-cache@document->qr-scanner#teardown" }
         ) do
           viewfinder
           p(class: "max-w-sm text-center text-sm text-muted") { I18n.t("scans.show.hint") }
@@ -29,12 +32,7 @@ module Views
 
       #: () -> untyped
       def viewfinder
-        div(class: "relative aspect-[3/4] w-full max-w-sm overflow-hidden rounded-card " \
-                   "border border-card-border bg-black") do
-          video(
-            data: { qr_scanner_target: "video" }, muted: true, autoplay: true, playsinline: true,
-            class: "h-full w-full object-cover"
-          )
+        render Components::Ui::CameraViewfinder.new(controller: "qr-scanner", css: "max-w-sm") do
           canvas(data: { qr_scanner_target: "canvas" }, class: "hidden")
           overlay
         end
