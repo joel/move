@@ -211,6 +211,24 @@ RSpec.describe "Review retake viewfinder (JS)", :js do
       expect(page).to have_css(pending_status, visible: :hidden)
       expect(focused_text).to include(take_photo)
     end
+
+    it "hands focus to the shutter once a camera re-acquire still pending at settle resolves" do
+      shoot_with_submission_held
+      expect(page).to have_css(pending_status, visible: :visible)
+      # The camera dies mid-upload; its automatic re-acquire waits on a prompt.
+      page.execute_script(<<~JS)
+        window.__camera.hold = true
+        window.__camera.streams[0].getVideoTracks()[0].dispatchEvent(new Event("ended"))
+      JS
+      eventually { camera("held.length") == 1 }
+
+      settle_submission
+      expect(page).to have_css(pending_status, visible: :hidden)
+      page.execute_script("window.__camera.release()")
+
+      expect(page).to have_css("#{shutter}:not([disabled])", visible: :visible)
+      expect(focused_target).to eq("shutter")
+    end
   end
 
   # #992 — the permission prompt can stay open a while; a late resolve must not

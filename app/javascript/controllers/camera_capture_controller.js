@@ -67,6 +67,8 @@ export default class extends Controller {
     this.retried = false
     this.resumeOnVisible = false
     this.resumeAfterCache = false
+    // Set by #settle when the focused pending status hides mid-request (#995).
+    this.focusOnStarted = false
     this.settleTimer = null
     // The getUserMedia lifecycle (generation guard, track-ended hook, release)
     // is the shared camera/stream module (#618); this controller owns only
@@ -141,8 +143,10 @@ export default class extends Controller {
     const fromStart = this.startTarget.contains(document.activeElement)
     this.#setState("requesting")
     const outcome = await this.camera.start()
+    const handoff = this.focusOnStarted
+    this.focusOnStarted = false
     if (outcome === "stale") return
-    const refocus = fromStart && this.#focusLeftWithStart()
+    const refocus = (fromStart || handoff) && this.#focusLeftWithStart()
     if (outcome !== "live") {
       this.#setState("unavailable")
       if (refocus) this.#focusStart()
@@ -309,7 +313,13 @@ export default class extends Controller {
 
   // The next live control: the re-armed shutter while streaming, else the
   // start control (idle, or the retry after a failure), else the chooser.
+  // Mid-request (an automatic re-acquire) none is on show yet: start() hands
+  // focus over when the request resolves.
   #focusAfterSettle() {
+    if (this.state === "requesting") {
+      this.focusOnStarted = true
+      return
+    }
     if (this.state === "streaming") return this.shutterTarget.focus()
     if (this.#offerStart(this.state)) return this.#focusStart()
     if (!this.fallbackTarget.classList.contains("hidden")) this.inputTarget.focus()
