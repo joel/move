@@ -224,6 +224,74 @@ RSpec.describe LabelPrintRuns::GenerateJob do
         expect(service.exist?(uploaded_keys.first)).to be(false)
       end
 
+      # The first cleanup query after the drop raises once, as a database
+      # blip would (#1001). Returns a proc telling whether it fired.
+      def fail_cleanup_query_once(dropped)
+        injected = false
+        allow(ActiveStorage::Attachment).to receive(:where).and_wrap_original do |original, *args, **kwargs|
+          if dropped.call && !injected
+            injected = true
+            raise ActiveRecord::ConnectionNotEstablished, "db down"
+          end
+          original.call(*args, **kwargs)
+        end
+        -> { injected }
+      end
+
+      # Runs the queued cleanup once the database (and the stubbed switch) are back.
+      def drain_cleanup
+        allow(Apartment::Tenant).to receive(:switch).and_call_original
+        perform_enqueued_jobs while enqueued_jobs.any?
+      end
+
+      def expect_documents_gone(run, keys)
+        expect(documents_of(run)).to be_empty
+        expect(ActiveStorage::Blob.where(key: keys)).to be_empty
+        expect(service.exist?(keys.first)).to be(false)
+      end
+
+      it "keeps a retry's own error and still purges the orphan when the cleanup query fails once (#1001)" do
+        run = run_for(1, 3)
+        render_with(run, ["%PDF-1.4 fake"])
+        uploaded_keys = []
+        dropped = false
+        fail_first_upload do |key|
+          uploaded_keys << key
+          LabelPrintRun.where(id: run.id).delete_all
+          dropped = true
+        end
+        drop_tenant_when { dropped }
+        injected = fail_cleanup_query_once(-> { dropped })
+
+        expect { enqueue_and_drain(run) }.to raise_error(Apartment::TenantNotFound)
+        drain_cleanup
+
+        expect(injected.call).to be(true)
+        expect_documents_gone(run, uploaded_keys)
+      end
+
+      it "keeps the job's own error and still purges the loaded run's document when the cleanup query fails once (#1001)" do
+        run = run_for(1, 3)
+        render_with(run, ["%PDF-1.4 fake"])
+        uploaded_keys = []
+        dropped = false
+        allow(service).to receive(:upload).and_wrap_original do |original, *args, **kwargs|
+          original.call(*args, **kwargs)
+          uploaded_keys << args.first
+          LabelPrintRun.where(id: run.id).delete_all
+          dropped = true
+          raise ArgumentError, "upload rejected" # not transient: discarded at once
+        end
+        drop_tenant_when { dropped }
+        injected = fail_cleanup_query_once(-> { dropped })
+
+        expect { enqueue_and_drain(run) }.to raise_error(ArgumentError, "upload rejected")
+        drain_cleanup
+
+        expect(injected.call).to be(true)
+        expect_documents_gone(run, uploaded_keys)
+      end
+
       it "completes on the retry and leaves exactly one attachment when the run still exists" do
         run = run_for(1, 3)
         render_with(run, ["%PDF-1.4 fake", "%PDF-1.4 fake"])
