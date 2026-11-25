@@ -173,7 +173,9 @@ flowchart LR
 A slug with no schema is logged and skipped. That happens in the account-deletion
 race, because `Accounts::Delete` drops the schema before it deletes the Organization
 row, and aborting there would starve every later tenant. Any other error propagates,
-so a real bug in the block is never masked.
+so a real bug in the block is never masked. That includes a `TenantNotFound` raised
+*inside* the block (a nested switch): only a failure to enter the swept slug's own
+schema counts as a ghost tenant.
 
 ### Tenant teardown: deleting an account drops its solo-org schemas (#365)
 

@@ -11,14 +11,22 @@
 # Accounts::Delete drops the tenant schema before it deletes the Organization
 # row, so the registry can briefly list a schema-less slug. Aborting there
 # would starve every tenant later in the list of its sweep. Any other error
-# still propagates, so a genuine bug in the block is never masked.
+# still propagates, so a genuine bug in the block is never masked — including
+# a TenantNotFound raised by the block itself (say, a nested switch): only a
+# failure to enter the swept slug's own schema counts as a ghost tenant.
 module TenantSweep
   # Yields each tenant slug with that tenant's schema active.
   #: () { (String) -> void } -> void
   def self.in_each_tenant
     Organization.pluck(:slug).each do |slug|
-      Apartment::Tenant.switch(slug) { yield slug }
+      entered = false
+      Apartment::Tenant.switch(slug) do
+        entered = true
+        yield slug
+      end
     rescue Apartment::TenantNotFound
+      raise if entered
+
       Rails.logger.warn("[tenant_sweep] skipped #{slug}: tenant schema not found")
     end
   end

@@ -45,6 +45,21 @@ RSpec.describe TenantSweep do
     expect(calls).to eq(1)
   end
 
+  it "propagates a TenantNotFound raised inside the block instead of skipping" do
+    allow(Organization).to receive(:pluck).with(:slug).and_return([tenant, tenant])
+    allow(Rails.logger).to receive(:warn)
+    calls = 0
+
+    expect do
+      described_class.in_each_tenant do
+        calls += 1
+        Apartment::Tenant.switch("ghost-tenant") { nil }
+      end
+    end.to raise_error(Apartment::TenantNotFound)
+    expect(calls).to eq(1)
+    expect(Rails.logger).not_to have_received(:warn)
+  end
+
   it "restores the previous tenant after the sweep" do
     allow(Organization).to receive(:pluck).with(:slug).and_return(["ghost-tenant", tenant])
 
