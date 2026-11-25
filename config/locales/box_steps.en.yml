@@ -39,6 +39,7 @@ en:
           confirm: "Mark all boxes unpacked? This removes their remaining items from the boxes."
     skip_reason:
       room_required: "need a room first"
+      invalid_transition: "already moved on elsewhere"
       default: "couldn't be advanced"
     create:
       transitioned:

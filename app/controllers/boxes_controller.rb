@@ -158,8 +158,12 @@ class BoxesController < MoveScopedController
         [:notice, t(".transitioned", status: t("boxes.status.#{box.status}"))]
       end
     in Dry::Monads::Failure(reason)
-      respond_with_streams([], redirect: move_box_path(@move, @box),
-                               toast: true, status: :unprocessable_content) do
+      # A refusal usually means the page is stale (another member moved the box
+      # on, #971): re-stream the detail from the reloaded row (box_detail_stream
+      # reloads) so the status chip and action buttons snap to the real state
+      # instead of inviting the same refused tap again.
+      respond_with_streams(-> { [box_detail_stream] }, redirect: move_box_path(@move, @box),
+                                                       toast: true, status: :unprocessable_content) do
         [:alert, transition_error(reason)]
       end
     end

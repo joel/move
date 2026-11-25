@@ -4,8 +4,8 @@ require "rails_helper"
 
 # #820 — Rodauth 2.47+ raises "account retrieved multiple times during rodauth
 # route" when a route loads the account one way (by login, by key) after it was
-# already loaded by session in the same request. We do not configure
-# `already_logged_in`, so a signed-in user can still reach the login/token
+# already loaded by session in the same request. `already_logged_in` is a
+# deliberate no-op (#822), so a signed-in user can still reach the login/token
 # routes, and several things load the account by session first: the orphaned-
 # session guard (RodauthApp), the Current.user before_action (RodauthController,
 # via rails_account), and remember-me's load_memory (deadline extension while
@@ -36,6 +36,14 @@ RSpec.describe "Rodauth login/token routes for a signed-in user (#820)" do
   end
 
   shared_examples "a signed-in user on the login/token routes" do
+    # #822: already_logged_in is configured as a no-op, so the logged-out pages
+    # still render for a signed-in user instead of halting or redirecting.
+    it "renders the login page" do
+      get "/login"
+
+      expect(response).to have_http_status(:ok)
+    end
+
     it "requests a sign-in link by login without raising" do
       post "/email-auth-request", params: { email: user.email }
 

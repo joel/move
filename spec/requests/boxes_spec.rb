@@ -1202,7 +1202,7 @@ RSpec.describe "Boxes" do
           .and include(I18n.t("boxes.contents.empty_title"))
       end
 
-      it "streams an alert toast (no detail change) when a roomless seal is refused" do
+      it "streams an alert toast and the unchanged detail when a roomless seal is refused" do
         box = create(:box, move:, number: "1", status: "packing", room: nil)
 
         patch transition_move_box_path(move, box), params: { to: "sealed" }, as: :turbo_stream
@@ -1211,8 +1211,29 @@ RSpec.describe "Boxes" do
         expect(response.body)
           .to include(%(target="#{Components::FlashToasts::ID}"))
           .and include(I18n.t("boxes.transition.room_required"))
-        expect(response.body).not_to include(%(action="replace" target="#{Views::Boxes::Show::ID}"))
+          .and include(%(action="replace" target="#{Views::Boxes::Show::ID}"))
         expect(box.reload.status).to eq("packing")
+      end
+
+      it "re-streams the detail from the DB when the page was stale (#971)" do
+        box = create(:box, :with_room, move:, number: "1", status: "sealed")
+        # Another member unseals the box after this request loaded it as sealed.
+        allow(Boxes::TransitionStatus).to receive(:new).and_wrap_original do |original|
+          Box.where(id: box.id).update_all(status: "packing") # rubocop:disable Rails/SkipsModelValidations
+          original.call
+        end
+
+        patch transition_move_box_path(move, box), params: { to: "in_transit" }, as: :turbo_stream
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(box.reload.status).to eq("packing")
+        expect(response.body)
+          .to include(%(target="#{Components::FlashToasts::ID}"))
+          .and include(ERB::Util.h(I18n.t("boxes.transition.invalid")))
+          .and include(%(action="replace" target="#{Views::Boxes::Show::ID}"))
+          .and include(I18n.t("boxes.status.packing"))
+          .and include(I18n.t("boxes.actions.seal")) # the packing action set, not sealed's
+        expect(response.body).not_to include(I18n.t("boxes.actions.unseal"))
       end
     end
 

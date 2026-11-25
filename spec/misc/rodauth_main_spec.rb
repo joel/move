@@ -3,6 +3,27 @@
 require "rails_helper"
 
 RSpec.describe RodauthMain do
+  # #822 — Rodauth 2.47+ warns at boot (and Rodauth 3 will raise) unless
+  # `already_logged_in` is configured. The login feature's post_configure checks
+  # whether the method is still Rodauth::Base's default; we configure it as a
+  # deliberate no-op (signed-in users may reach the logged-out routes, #820).
+  describe "already_logged_in configuration (#822)" do
+    let(:auth_class) { RodauthApp.rodauth(nil) }
+
+    it "overrides Rodauth's unconfigured default" do
+      expect(auth_class.allocate.method(:already_logged_in).owner).not_to eq(Rodauth::Base)
+    end
+
+    it "emits no missing-configuration warning when the config is finalised" do
+      expect { auth_class.allocate.post_configure }
+        .not_to output(/already_logged_in/).to_stderr
+    end
+
+    it "is a no-op, so a signed-in user is neither halted nor redirected" do
+      expect(auth_class.allocate.already_logged_in).to be_nil
+    end
+  end
+
   # tenant_handoff_url is the apex's post-auth landing builder (#280): it mints a
   # single-use handoff token and, on success, clears the apex session (the apex is
   # a pure broker). Exercised on an allocated Rodauth instance with account_id
