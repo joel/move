@@ -53,16 +53,40 @@ module AppCLI
 
       # :missing, :foreign (not signed by our CA), :key_mismatch, :names_changed,
       # :expiring or :ok.
-      def leaf_state
-        cert = read_cert(cert_path)
+      def leaf_state(cert_file = cert_path, key_file = key_path, names = LEAF_NAMES)
+        cert = read_cert(cert_file)
         authority = ca
         return :missing if cert.nil? || authority.nil?
         return :foreign unless cert.verify(authority.public_key)
-        return :key_mismatch unless key_matches?(cert, key_path)
-        return :names_changed unless leaf_names(cert).sort == LEAF_NAMES.sort
+        return :key_mismatch unless key_matches?(cert, key_file)
+        return :names_changed unless leaf_names(cert).sort == names.sort
         return :expiring if cert.not_after - @clock.now < RENEW_WINDOW
 
         :ok
+      end
+
+      # A served worktree's zone (`<wt>.wt.move-easy.docker`) sits two labels
+      # below the zone, which the main leaf's one-label wildcard doesn't cover.
+      # Each gets its own leaf for `*.<zone>`, signed by the same CA: its name
+      # constraint permits every name under `.move-easy.docker`, so the browser
+      # needs no new trust. Traefik picks the leaf by SNI.
+      def zone_cert_path(zone) = File.join(leaf_dir, "wt-#{zone}.pem")
+      def zone_key_path(zone) = File.join(leaf_dir, "wt-#{zone}-key.pem")
+
+      # Idempotent; renews the zone leaf like the main one. The CA must exist
+      # (#ensure! first). Returns :generated or :present.
+      def ensure_zone_leaf!(zone)
+        raise ArgumentError, "#{zone} needs the #{DOMAIN} CA (run ensure! first)" unless zone.end_with?(".#{DOMAIN}") && ca_usable?
+
+        names = ["*.#{zone}"]
+        return :present if leaf_state(zone_cert_path(zone), zone_key_path(zone), names) == :ok
+
+        generate_leaf(names: names, cert_file: zone_cert_path(zone), key_file: zone_key_path(zone))
+        :generated
+      end
+
+      def remove_zone_leaf(zone)
+        FileUtils.rm_f([zone_cert_path(zone), zone_key_path(zone)])
       end
 
       def ca = read_cert(ca_cert_path)
@@ -95,20 +119,21 @@ module AppCLI
         persist(ca_cert_path => cert.to_pem, ca_key_path => key.to_pem)
       end
 
-      def generate_leaf
+      def generate_leaf(names: LEAF_NAMES, cert_file: cert_path, key_file: key_path)
         authority = ca
         key = OpenSSL::PKey::RSA.new(KEY_BITS)
-        cert = blank_cert(subject: OpenSSL::X509::Name.new([["CN", DOMAIN]]),
+        common_name = names.last.delete_prefix("*.")
+        cert = blank_cert(subject: OpenSSL::X509::Name.new([["CN", common_name]]),
                           issuer: authority.subject, key: key, validity: LEAF_VALIDITY)
         ext = factory(cert, authority)
         cert.add_extension(ext.create_extension("basicConstraints", "CA:FALSE"))
         cert.add_extension(ext.create_extension("keyUsage", "digitalSignature,keyEncipherment", true))
         cert.add_extension(ext.create_extension("extendedKeyUsage", "serverAuth"))
         cert.add_extension(ext.create_extension("subjectAltName",
-                                                LEAF_NAMES.map { |n| "DNS:#{n}" }.join(",")))
+                                                names.map { |n| "DNS:#{n}" }.join(",")))
         cert.add_extension(ext.create_extension("authorityKeyIdentifier", "keyid"))
         cert.sign(OpenSSL::PKey::RSA.new(File.read(ca_key_path)), OpenSSL::Digest.new("SHA256"))
-        persist(cert_path => cert.to_pem, key_path => key.to_pem)
+        persist(cert_file => cert.to_pem, key_file => key.to_pem)
       end
 
       def blank_cert(subject:, issuer:, key:, validity:)

@@ -30,6 +30,48 @@ RSpec.describe AppCLI::Services::CertificateStore do
     expect(File.stat(store.ca_key_path).mode & 0o777).to eq(0o600)
   end
 
+  describe "a worktree zone leaf" do
+    let(:zone) { "w1.wt.move-easy.docker" }
+    let(:zone_leaf) { OpenSSL::X509::Certificate.new(File.read(store.zone_cert_path(zone))) }
+
+    it "covers one label under the zone, signed by the same CA" do
+      store.ensure!
+      expect(store.ensure_zone_leaf!(zone)).to eq(:generated)
+      san = zone_leaf.extensions.find { |e| e.oid == "subjectAltName" }.value
+      expect(san).to eq("DNS:*.w1.wt.move-easy.docker")
+      expect(zone_leaf.verify(store.ca.public_key)).to be(true)
+      expect(store.leaf_state).to eq(:ok)
+    end
+
+    it "is idempotent and renews near expiry" do
+      store.ensure!
+      store.ensure_zone_leaf!(zone)
+      expect(store.ensure_zone_leaf!(zone)).to eq(:present)
+      later = Class.new { def self.now = Time.now.utc + (820 * 86_400) }
+      expect(described_class.new(dir: dir, clock: later).ensure_zone_leaf!(zone)).to eq(:generated)
+    end
+
+    it "verifies under the CA's name constraint, as a browser would" do
+      store.ensure!
+      store.ensure_zone_leaf!(zone)
+      x509 = OpenSSL::X509::Store.new.tap { |s| s.add_cert(store.ca) }
+      expect(x509.verify(zone_leaf)).to be(true)
+    end
+
+    it "refuses a name outside the CA's zone, or without a CA" do
+      expect { store.ensure_zone_leaf!(zone) }.to raise_error(ArgumentError)
+      store.ensure!
+      expect { store.ensure_zone_leaf!("evil.example") }.to raise_error(ArgumentError)
+    end
+
+    it "is removed without touching the main leaf" do
+      store.ensure!
+      store.ensure_zone_leaf!(zone)
+      store.remove_zone_leaf(zone)
+      expect(Dir.children(store.leaf_dir)).to contain_exactly("move-easy.docker.pem", "move-easy.docker-key.pem")
+    end
+  end
+
   it "is idempotent once everything is fresh" do
     store.ensure!
     expect(store.ensure!).to eq(:present)

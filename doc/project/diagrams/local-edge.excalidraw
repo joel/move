@@ -634,6 +634,126 @@
       "autoResize": true
     },
     {
+      "id": "wt-box",
+      "type": "rectangle",
+      "x": 560,
+      "y": 400,
+      "width": 250,
+      "height": 50,
+      "angle": 0,
+      "strokeColor": "#343a40",
+      "backgroundColor": "#ffe8cc",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "dashed",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "roundness": {
+        "type": 3
+      },
+      "seed": 40,
+      "version": 1,
+      "versionNonce": 40,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "wt-text"
+        }
+      ],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "frameId": null
+    },
+    {
+      "id": "wt-text",
+      "type": "text",
+      "x": 565,
+      "y": 405,
+      "width": 240,
+      "height": 40,
+      "angle": 0,
+      "strokeColor": "#212529",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "roundness": null,
+      "seed": 41,
+      "version": 1,
+      "versionNonce": 41,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "frameId": null,
+      "text": "move-app-wt-<wt> :9292 (0-3)\nmove. + <slug>. under <wt>.wt.",
+      "originalText": "move-app-wt-<wt> :9292 (0-3)\nmove. + <slug>. under <wt>.wt.",
+      "fontSize": 14,
+      "fontFamily": 2,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "wt-box",
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "id": "arrow-wt",
+      "type": "arrow",
+      "x": 460,
+      "y": 285,
+      "width": 100,
+      "height": 140,
+      "angle": 0,
+      "strokeColor": "#495057",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "dashed",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "roundness": null,
+      "seed": 42,
+      "version": 1,
+      "versionNonce": 42,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "frameId": null,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          100,
+          140
+        ]
+      ],
+      "startBinding": {
+        "elementId": "router-box",
+        "focus": 0,
+        "gap": 2
+      },
+      "endBinding": {
+        "elementId": "wt-box",
+        "focus": 0,
+        "gap": 2
+      },
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "lastCommittedPoint": null
+    },
+    {
       "id": "arrow-0",
       "type": "arrow",
       "x": 170,
