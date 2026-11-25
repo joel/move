@@ -185,6 +185,7 @@ RSpec.describe "Review retake viewfinder (JS)", :js do
     # to the next live control, not drop to the body.
     it "moves focus from the status to the re-armed shutter when the upload settles" do
       shoot_with_submission_held
+      expect(page).to have_css(pending_status, visible: :visible)
       expect(focused_target).to eq("pending")
 
       settle_submission
@@ -195,6 +196,7 @@ RSpec.describe "Review retake viewfinder (JS)", :js do
 
     it "moves focus from the status to the start control when the camera died meanwhile" do
       shoot_with_submission_held
+      expect(page).to have_css(pending_status, visible: :visible)
       expect(focused_target).to eq("pending")
       # The camera dies mid-upload and its one automatic retry is denied.
       page.execute_script(<<~JS)
