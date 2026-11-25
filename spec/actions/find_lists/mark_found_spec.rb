@@ -39,6 +39,36 @@ RSpec.describe FindLists::MarkFound do
     expect(Box.unscoped.find(box.id).status).to eq("sealed")
   end
 
+  # #1000: unlike the #980 case above, the box is deleted BEFORE its first
+  # load — item.with_lock reloads the item (clearing the box association) and
+  # Box's default_scope hides the discarded row, so item.box comes back nil.
+  it "keeps the committed find when the box is deleted before it is first loaded (#1000)" do
+    box = create(:box, move:, status: "sealed")
+    item = create(:item, move:, box:, name: "Face Cream")
+    create(:find_list_entry, move:, user:, item:)
+    allow(item).to receive(:with_lock).and_wrap_original do |original, *args, &block|
+      original.call(*args, &block).tap do
+        # Another member deletes the box once the OUTER item transaction has
+        # committed (depth 1 = only the fixture wrapper; skips the nested
+        # MarkRemoved lock).
+        next unless ActiveRecord::Base.connection.open_transactions == 1
+
+        Box.where(id: box.id).update_all(discarded_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+      end
+    end
+    allow(Rails.event).to receive(:notify)
+
+    result = described_class.new.call(move:, user:, item:)
+
+    aggregate_failures do
+      expect(result).to be_success
+      expect(result.value!).to include(opened_box: nil, completed_box: nil)
+      expect(item.reload.presence_state).to eq("removed")
+      expect(Box.unscoped.find(box.id).status).to eq("sealed")
+      expect(Rails.event).not_to have_received(:notify).with("box.status_changed", anything)
+    end
+  end
+
   it "opens an in-transit box for unpacking too" do
     box = create(:box, move:, status: "in_transit")
     item = create(:item, move:, box:, name: "Face Cream")
