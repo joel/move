@@ -17,6 +17,7 @@ require "rails_helper"
 RSpec.describe "Review retake viewfinder (JS)", :js do
   let(:slug) { "jsretake" }
   let(:user) { create(:user) }
+  let(:fake_camera) { {} }
   let!(:seeded) do
     Apartment::Tenant.switch(slug) do
       move = create(:move, created_by: user)
@@ -64,19 +65,26 @@ RSpec.describe "Review retake viewfinder (JS)", :js do
     Apartment::Tenant.drop(slug) if Apartment.tenant_names.include?(slug)
     Organizations::Create.new.call(name: "JS Retake Org", slug: slug, owner: user).value!
 
-    # Scoped to this example: the identifier is removed again in `ensure`, so
-    # the fake camera never leaks into another spec on the reused session.
-    script = page.driver.browser.execute_cdp("Page.addScriptToEvaluateOnNewDocument", source: fake_camera_js)
-    begin
-      example.run
-    ensure
-      page.driver.browser.execute_cdp("Page.removeScriptToEvaluateOnNewDocument", identifier: script["identifier"])
-    end
+    example.run
   ensure
     Apartment::Tenant.drop(slug) if Apartment.tenant_names.include?(slug)
     Rails.application.config.x.tenant_zone = original_zone
     Capybara.app_host = original_app_host
     Capybara.always_include_port = original_include_port
+  end
+
+  # A `before`, not part of `around`: the :js `driven_by` switch to headless
+  # Chrome is itself a before hook, so inside `around` the session is still
+  # rack_test. The identifier is removed again in `after`, so the fake camera
+  # never leaks into another spec on the reused Chrome session.
+  before do
+    fake_camera[:script] = page.driver.browser.execute_cdp("Page.addScriptToEvaluateOnNewDocument", source: fake_camera_js)
+  end
+
+  after do
+    next unless fake_camera[:script]
+
+    page.driver.browser.execute_cdp("Page.removeScriptToEvaluateOnNewDocument", identifier: fake_camera[:script]["identifier"])
   end
 
   def viewfinder = "[data-camera-capture-target='viewfinder']"
