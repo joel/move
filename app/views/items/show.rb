@@ -10,8 +10,8 @@ module Views
       def initialize(move:, item:, boxes:, editable: false, photo_siblings: 0, find_list_pinned: false,
                      origin: {})
         @move = move
-        # Where the back link returns to (#960): the raw `from`/`q` params,
-        # allow-listed by Components::Items::BackLink.
+        # The page the item was opened from (#960), as allow-listed params from
+        # Components::Items::BackLink.origin_params; the forms carry it on.
         @origin = origin
         @item = item
         @boxes = boxes
@@ -39,9 +39,7 @@ module Views
 
       #: () -> untyped
       def back_link
-        render Components::Items::BackLink.new(
-          move: @move, item: @item, from: @origin[:from], query: @origin[:query]
-        )
+        render Components::Items::BackLink.new(move: @move, item: @item, origin: @origin)
       end
 
       #: () -> untyped
@@ -158,9 +156,11 @@ module Views
 
       #: () -> untyped
       def editable_body
-        render Components::ItemForm.new(models: [@move, @item], item: @item, autosave: true)
+        render Components::ItemForm.new(
+          models: [@move, @item], item: @item, autosave: true, url: move_item_path(@move, @item, **@origin)
+        )
         render Components::Items::PresenceControls.new(
-          move: @move, item: @item, boxes: @boxes, editable: @editable
+          move: @move, item: @item, boxes: @boxes, editable: @editable, origin: @origin
         )
       end
 

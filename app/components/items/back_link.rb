@@ -5,13 +5,28 @@ module Components
     # C3's back link (#960, UX rule 4): returns the user to where they opened the
     # item from. The search results and find-list links tag the item URL with
     # `from=search` (plus the query) or `from=find_list`; any other or missing
-    # value falls back to the item's box. The destination is only ever built
-    # from route helpers chosen by that allow-list, never from a URL in params,
-    # so the link cannot become an open redirect. The fragment lands the user
-    # back on the card they opened.
+    # value falls back to the item's box. `origin_params` is the allow-list: it
+    # keeps only those known shapes, and the item page threads its result through
+    # its own forms and redirects so actions don't drop the context. The href is
+    # only ever built from route helpers, never from a URL in params, so the link
+    # cannot become an open redirect. The fragment lands the user back on the
+    # card they opened.
     class BackLink < Components::Base
       SEARCH = "search"
       FIND_LIST = "find_list"
+
+      # The allow-listed origin as URL params: `{ from: "search", q: }`,
+      # `{ from: "find_list" }`, or `{}` for anything else.
+
+      #: (untyped from, untyped query) -> Hash[Symbol, String]
+      def self.origin_params(from, query)
+        query = query.to_s.strip
+        case from.to_s
+        when SEARCH then query.empty? ? {} : { from: SEARCH, q: query }
+        when FIND_LIST then { from: FIND_LIST }
+        else {}
+        end
+      end
 
       # The anchor the origin page renders on the item's card or row.
 
@@ -21,12 +36,11 @@ module Components
       #: (untyped item) -> String
       def self.find_list_anchor(item) = "find-list-item-#{item.id}"
 
-      #: (move: untyped, item: untyped, ?from: untyped, ?query: untyped) -> void
-      def initialize(move:, item:, from: nil, query: nil)
+      #: (move: untyped, item: untyped, ?origin: Hash[Symbol, String]) -> void
+      def initialize(move:, item:, origin: {})
         @move = move
         @item = item
-        @from = from.to_s
-        @query = query.to_s.strip
+        @origin = self.class.origin_params(origin[:from], origin[:q])
       end
 
       #: () -> void
@@ -45,10 +59,11 @@ module Components
 
       #: () -> [String, String]
       def destination
-        if @from == SEARCH && @query.present?
-          [move_search_path(@move, q: @query, anchor: self.class.search_anchor(@item)),
+        case @origin[:from]
+        when SEARCH
+          [move_search_path(@move, q: @origin[:q], anchor: self.class.search_anchor(@item)),
            I18n.t("items.show.back_to_results")]
-        elsif @from == FIND_LIST
+        when FIND_LIST
           [move_find_list_path(@move, anchor: self.class.find_list_anchor(@item)),
            I18n.t("items.show.back_to_find_list")]
         else

@@ -74,6 +74,44 @@ RSpec.describe "Item back link" do
     end
   end
 
+  # Codex #977: an item-page action must not drop the origin on its way back.
+  describe "keeping the origin across item-page actions" do
+    let(:search_origin) { { from: "search", q: "skillet" } }
+
+    it "carries the allow-listed origin on the item page's forms" do
+      create(:box, move:, number: "5")
+
+      get move_item_path(move, item, **search_origin)
+
+      actions = response.parsed_body.css("form").pluck("action")
+      expect(actions).to include(move_item_path(move, item, **search_origin))
+        .and include(move_move_item_path(move, item, **search_origin))
+    end
+
+    it "redirects a move back to the item with the origin, so the back link survives" do
+      target = create(:box, move:, number: "5")
+
+      patch move_move_item_path(move, item, **search_origin), params: { target_box_id: target.id }
+
+      expect(response).to redirect_to(move_item_path(move, item, **search_origin))
+    end
+
+    it "keeps the origin on a no-JS update redirect" do
+      patch move_item_path(move, item, from: "find_list"), params: { item: { name: "Skillet" } }
+
+      expect(response).to redirect_to(move_item_path(move, item, from: "find_list"))
+    end
+
+    it "drops an unknown or URL-shaped origin from the redirect" do
+      target = create(:box, move:, number: "5")
+
+      patch move_move_item_path(move, item, from: "https://evil.example", q: "x"),
+            params: { target_box_id: target.id }
+
+      expect(response).to redirect_to(move_item_path(move, item))
+    end
+  end
+
   describe "origin links" do
     it "tags search result cards with the query and gives each card its anchor" do
       item

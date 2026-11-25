@@ -16,12 +16,9 @@ class ItemsController < MoveScopedController
 
   #: () -> untyped
   def show
-    # `origin` is the raw page-of-origin params (#960); Items::BackLink
-    # allow-lists them and builds the back href from route helpers only.
     render Views::Items::Show.new(
-      move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
-      editable: editable_move?, photo_siblings: photo_siblings(@item),
-      find_list_pinned: find_list_pinned?, origin: { from: params[:from].to_s, query: params[:q].to_s }
+      move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered, origin: back_origin,
+      editable: editable_move?, photo_siblings: photo_siblings(@item), find_list_pinned: find_list_pinned?
     )
   end
 
@@ -83,7 +80,7 @@ class ItemsController < MoveScopedController
         format.turbo_stream do
           render turbo_stream: [save_status_stream(:saved), state_badge_stream(item)]
         end
-        format.html { redirect_to move_item_path(@move, item), notice: t(".updated", name: item.name) }
+        format.html { redirect_to move_item_path(@move, item, **back_origin), notice: t(".updated", name: item.name) }
       end
     in Dry::Monads::Failure(Symbol)
       message = t("items.form.failed")
@@ -91,7 +88,7 @@ class ItemsController < MoveScopedController
         format.turbo_stream do
           render turbo_stream: save_status_stream(:error, message:), status: :unprocessable_content
         end
-        format.html { redirect_to move_item_path(@move, @item), alert: message }
+        format.html { redirect_to item_path, alert: message }
       end
     in Dry::Monads::Failure(errors)
       @item.assign_attributes(item_attributes)
@@ -109,7 +106,7 @@ class ItemsController < MoveScopedController
           render Views::Items::Show.new(
             move: @move, item: @item, boxes: @move.boxes.includes(:room).ordered,
             editable: true, photo_siblings: photo_siblings(@item),
-            find_list_pinned: find_list_pinned?
+            find_list_pinned: find_list_pinned?, origin: back_origin
           ), status: :unprocessable_content
         end
       end
@@ -129,9 +126,9 @@ class ItemsController < MoveScopedController
     in Dry::Monads::Success(item)
       redirect_to move_box_path(@move, item.box), notice: t(".deleted", name: item.name)
     in Dry::Monads::Failure(:wrong_phase)
-      redirect_to move_item_path(@move, @item), alert: t(".wrong_phase")
+      redirect_to item_path, alert: t(".wrong_phase")
     in Dry::Monads::Failure(_)
-      redirect_to move_item_path(@move, @item), alert: t(".delete_failed")
+      redirect_to item_path, alert: t(".delete_failed")
     end
   end
 
@@ -144,7 +141,7 @@ class ItemsController < MoveScopedController
     in Dry::Monads::Success({ item:, source_box:, source_completed: })
       moved_response(item, completed_source: source_completed ? source_box : nil)
     in Dry::Monads::Failure(reason)
-      redirect_to move_item_path(@move, @item), alert: move_error(reason, target)
+      redirect_to item_path, alert: move_error(reason, target)
     end
   end
 
@@ -252,8 +249,15 @@ class ItemsController < MoveScopedController
     )
   end
 
+  # The page the item was opened from (#960), allow-listed by Items::BackLink
+  # (never a URL). Threaded through the item page's forms and every redirect
+  # back to it, so an action doesn't reset the back link to the box.
+
+  #: () -> Hash[Symbol, String]
+  def back_origin = Components::Items::BackLink.origin_params(params[:from], params[:q])
+
   #: () -> String
-  def item_path = move_item_path(@move, @item)
+  def item_path = move_item_path(@move, @item, **back_origin)
 
   # The presence-flip alert (non-2xx toast; streams only when the DOM should
   # re-render reality — e.g. the stale-restore refusal swaps in the reopen link).
@@ -318,7 +322,7 @@ class ItemsController < MoveScopedController
       turbo_stream.replace(Components::Items::PresenceControls::ID,
                            view_context.render(Components::Items::PresenceControls.new(
                                                  move: @move, item: @item, boxes: presence_boxes,
-                                                 editable: editable_move?
+                                                 editable: editable_move?, origin: back_origin
                                                ))),
       # A presence flip changes the item's own searchability, so the "same
       # group" rail must follow (#642/#643): unpacking hides it, restoring
