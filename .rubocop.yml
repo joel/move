@@ -49,6 +49,7 @@ Style/FrozenStringLiteralComment:
   Exclude:
     - config/**/*
     - spec/**/*
+    - 'packs/*/spec/**/*'
     - Gemfile
     - Rakefile
     - Thorfile
@@ -67,17 +68,20 @@ Metrics/BlockLength:
   Exclude:
     - config/**/*
     - spec/**/*
+    - 'packs/*/spec/**/*'
     - lib/tasks/**/* # rake task definitions are inherently one long block
     - Steepfile # declarative check-line DSL, one line per checked file/dir
 
 Metrics/ClassLength:
   Exclude:
     - spec/**/*
+    - 'packs/*/spec/**/*'
 
 Metrics/MethodLength:
   Exclude:
     - db/migrate/*
     - spec/**/*
+    - 'packs/*/spec/**/*'
 
 Metrics/ModuleLength:
   Exclude:
@@ -98,11 +102,13 @@ Move/BroadRescue:
   Enabled: true
   Exclude:
     - 'spec/**/*'
+    - 'packs/*/spec/**/*'
 
 Move/DatabaseAggregation:
   Enabled: true
   Exclude:
     - 'spec/**/*'
+    - 'packs/*/spec/**/*'
 
 # Architecture fitness tests describe a layering concept, not a single class.
 # Merge (not replace) the cop's default Exclude, which already exempts
