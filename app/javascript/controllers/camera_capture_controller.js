@@ -143,9 +143,10 @@ export default class extends Controller {
     const fromStart = this.startTarget.contains(document.activeElement)
     this.#setState("requesting")
     const outcome = await this.camera.start()
+    // A stale request leaves the handoff to the request that replaces it.
+    if (outcome === "stale") return
     const handoff = this.focusOnStarted
     this.focusOnStarted = false
-    if (outcome === "stale") return
     const refocus = (fromStart || handoff) && this.#focusLeftWithStart()
     if (outcome !== "live") {
       this.#setState("unavailable")
