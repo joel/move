@@ -15,7 +15,9 @@ module LabelPrintRuns
   # page keeps showing progress. Rendering restarts from the first box. The run
   # turns `failed` (and the "Try again" button shows) in one place, after_discard,
   # which ActiveJob calls when a transient error has used up its attempts and
-  # immediately for any other error.
+  # immediately for any other error. Should that write itself fail (the
+  # database is down for the last attempt), LabelPrintRuns::FailStale fails the
+  # run on a later sweep (#985).
   class GenerateJob < ApplicationJob
     queue_as :default
 
@@ -81,19 +83,43 @@ module LabelPrintRuns
     # Marks the run failed and pushes the failed state (with "Try again") to the
     # status page. ActiveJob re-raises the error afterwards, so Solid Queue
     # records it, and a later run of this job no-ops because the run is no
-    # longer in progress. Nothing to do if the job died before it loaded an
-    # active run.
+    # longer in progress.
+    #
+    # Each retry is a fresh job instance, so when this attempt died before it
+    # loaded the run (a database error at the lookup) @run is unset and the run
+    # is looked up again from the job arguments (#985). If that lookup or the
+    # failed write cannot reach the database either, LabelPrintRuns::FailStale
+    # fails the run on a later sweep.
     def finalize_failed
-      return unless @run
+      Apartment::Tenant.switch(tenant_from_arguments) do
+        @run ||= active_run_from_arguments
+        next unless @run
 
-      Apartment::Tenant.switch(@tenant) do
         mark_failed(@run)
         reap_if_deleted(@run)
       end
     rescue Apartment::TenantNotFound
       # The tenant schema was dropped (account deletion): the run row went with
       # it, so purge the attachment this job may have written to public.
-      @run.document.purge
+      @run&.document&.purge
+    rescue ActiveRecord::ActiveRecordError => e
+      # The database is unreachable even for the tenant switch. Let ActiveJob
+      # re-raise the job's own error (not this one) so Solid Queue records the
+      # real cause; FailStale fails the run once the database is back.
+      Rails.logger.warn("[label_print] could not finalize run=#{arguments.first}: #{e.class}: #{e.message}")
+    end
+
+    def tenant_from_arguments
+      @tenant || arguments.last[:tenant]
+    end
+
+    def active_run_from_arguments
+      run = LabelPrintRun.find_by(id: arguments.first)
+      run if run&.in_progress?
+    rescue ActiveRecord::ActiveRecordError => e
+      # Still no database: leave the run to the FailStale sweep.
+      Rails.logger.warn("[label_print] run lookup failed for run=#{arguments.first}: #{e.class}: #{e.message}")
+      nil
     end
 
     def mark_failed(run)

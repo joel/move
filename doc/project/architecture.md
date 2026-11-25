@@ -154,6 +154,7 @@ New tenants created later via `Apartment::Tenant.create` clone the current full
 ### Cross-tenant sweeps: `TenantSweep.in_each_tenant` (#584)
 
 Recurring maintenance jobs (`PurgeExpiredDiscardsJob`, `FailStaleRecognitionRunsJob`,
+`FailStaleLabelPrintRunsJob`,
 the label-print and insurance-dossier purges) and the backfill rake tasks
 (`images:*`, `storage:backfill_to_r2`, `search:reindex`) all run the same body once per
 tenant. They go through one helper, `TenantSweep.in_each_tenant { |slug| … }`
@@ -617,10 +618,16 @@ stateDiagram-v2
   processing --> completed: PDF attached
   processing --> failed: transient error, attempts used up (after_discard)
   processing --> failed: any other error (after_discard)
+  processing --> failed: stranded 30 min, job gone (FailStale sweep, #985)
   failed --> [*]: "Try again" starts a new run
 ```
 
 `PurgeStaleLabelPrintRunsJob` reaps day-old run PDFs per tenant.
+`FailStaleLabelPrintRunsJob` (every 10 minutes) fails a run left `processing` for
+30 minutes whose `GenerateJob` is no longer in Solid Queue, so a final attempt that
+could not reach the database to mark its run failed still ends in "Try again" (#985).
+`GenerateJob#finalize_failed` also re-reads the run from the job arguments when the
+attempt died before loading it.
 
 ### 4b. Bulk box lifecycle steps (Phase 44)
 

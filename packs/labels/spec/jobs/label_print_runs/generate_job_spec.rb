@@ -149,6 +149,62 @@ RSpec.describe LabelPrintRuns::GenerateJob do
       expect(LabelPrintRuns::Broadcasting).to have_received(:broadcast_status)
         .with(having_attributes(status: "failed")).once
     end
+
+    describe "when the database fails on the last attempt (#985)" do
+      let(:stale_later) { LabelPrintRuns::FailStale::STALE_AFTER + 1.minute }
+
+      # Every attempt dies at the run lookup, so no attempt ever sets @run.
+      # The first `failing_lookups` calls to find_by raise; later ones succeed.
+      def break_run_lookup(failing_lookups)
+        calls = 0
+        allow(LabelPrintRun).to receive(:find_by).and_wrap_original do |original, *args, **kwargs|
+          calls += 1
+          raise ActiveRecord::ConnectionNotEstablished, "db down" if calls <= failing_lookups
+
+          original.call(*args, **kwargs)
+        end
+      end
+
+      it "fails the run from the job arguments once the database answers again" do
+        run = run_for(1, 3)
+        break_run_lookup(described_class::ATTEMPTS)
+
+        expect { enqueue_and_drain(run) }.to raise_error(ActiveRecord::ConnectionNotEstablished)
+
+        expect(BoxLabelsPdf).not_to have_received(:new)
+        expect(run.reload.status).to eq("failed")
+        expect(LabelPrintRuns::Broadcasting).to have_received(:broadcast_status)
+          .with(having_attributes(status: "failed")).once
+      end
+
+      it "leaves the run to the FailStale sweep when the database is still down, which fails it later" do
+        run = run_for(1, 3)
+        break_run_lookup(described_class::ATTEMPTS + 1)
+
+        expect { enqueue_and_drain(run) }.to raise_error(ActiveRecord::ConnectionNotEstablished)
+        expect(run.reload.status).to eq("processing")
+
+        travel(stale_later) { LabelPrintRuns::FailStale.new.call }
+
+        expect(run.reload.status).to eq("failed")
+      end
+
+      it "recovers a run whose failed write raises, on a later sweep" do
+        run = run_for(1, 3)
+        loaded = LabelPrintRun.find(run.id)
+        allow(loaded).to receive(:update!).and_raise(ActiveRecord::ConnectionNotEstablished, "db down")
+        allow(LabelPrintRun).to receive(:find_by).and_return(loaded)
+        render_with(run, [ArgumentError.new("bad layout")])
+
+        expect { enqueue_and_drain(run) }.to raise_error(ArgumentError, "bad layout")
+        expect(run.reload.status).to eq("processing")
+
+        allow(LabelPrintRun).to receive(:find_by).and_call_original
+        travel(stale_later) { LabelPrintRuns::FailStale.new.call }
+
+        expect(run.reload.status).to eq("failed")
+      end
+    end
   end
 
   it "marks the run failed (and re-raises) when rendering blows up" do

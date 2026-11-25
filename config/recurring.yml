@@ -34,3 +34,6 @@ production:
   fail_stale_recognition_runs:
     class: FailStaleRecognitionRunsJob
     schedule: every 10 minutes
+  fail_stale_label_print_runs:
+    class: FailStaleLabelPrintRunsJob
+    schedule: every 10 minutes
