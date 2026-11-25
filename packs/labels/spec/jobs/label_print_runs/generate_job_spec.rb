@@ -150,6 +150,63 @@ RSpec.describe LabelPrintRuns::GenerateJob do
         .with(having_attributes(status: "failed")).once
     end
 
+    describe "when the upload fails after the attachment commits (#986)" do
+      let(:service) { ActiveStorage::Blob.service }
+
+      def documents_of(run)
+        ActiveStorage::Attachment.where(record_type: "LabelPrintRun", record_id: run.id, name: "document")
+      end
+
+      # Active Storage commits the attachment and blob rows, then uploads in
+      # after_commit. The first upload stores the object, runs `before_raise`
+      # and then fails with a retryable error; later uploads succeed.
+      def fail_first_upload(&before_raise)
+        uploads = 0
+        allow(service).to receive(:upload).and_wrap_original do |original, *args, **kwargs|
+          original.call(*args, **kwargs)
+          uploads += 1
+          next unless uploads == 1
+
+          before_raise&.call(args.first)
+          raise Errno::ECONNRESET, "storage reset"
+        end
+      end
+
+      it "purges the earlier attempt's attachment, blob and object when the run is deleted before the retry" do
+        run = run_for(1, 3)
+        render_with(run, ["%PDF-1.4 fake", "%PDF-1.4 fake"])
+        # The deletion captured the run's attachment ids before the attach
+        # committed, so it holds none and purges nothing.
+        captured_ids = documents_of(run).ids
+        uploaded_keys = []
+        fail_first_upload do |key|
+          uploaded_keys << key
+          LabelPrintRun.where(id: run.id).delete_all
+        end
+
+        enqueue_and_drain(run)
+
+        expect(captured_ids).to be_empty
+        expect(pdf).to have_received(:render).once
+        expect(documents_of(run)).to be_empty
+        expect(ActiveStorage::Blob.where(key: uploaded_keys)).to be_empty
+        expect(service.exist?(uploaded_keys.first)).to be(false)
+      end
+
+      it "completes on the retry and leaves exactly one attachment when the run still exists" do
+        run = run_for(1, 3)
+        render_with(run, ["%PDF-1.4 fake", "%PDF-1.4 fake"])
+        fail_first_upload
+
+        enqueue_and_drain(run)
+
+        expect(pdf).to have_received(:render).twice
+        expect(run.reload.status).to eq("completed")
+        expect(documents_of(run).count).to eq(1)
+        expect(run.document.download).to eq("%PDF-1.4 fake")
+      end
+    end
+
     describe "when the database fails on the last attempt (#985)" do
       let(:stale_later) { LabelPrintRuns::FailStale::STALE_AFTER + 1.minute }
 
