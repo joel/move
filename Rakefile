@@ -12,11 +12,17 @@ Rake::Task[:default].prerequisites.clear if Rake::Task.task_defined?(:default)
 begin
   require "rspec/core/rake_task"
 
+  # Reason: rspec-rails already defines `spec` (with a `spec/**` pattern that
+  # misses packs/*/spec); a second RakeTask would only ADD an action, so `rake
+  # spec` ran the suite twice. Drop its action, keep its `spec:prepare` prereq.
+  Rake::Task[:spec].clear_actions if Rake::Task.task_defined?(:spec)
+
   desc "Run all examples"
   RSpec::Core::RakeTask.new(:spec) do |t|
-    # Reason: RSpec's own default pattern (relative to each run path), not the
-    # RakeTask's `spec/**…` one. packs-rails adds packs/*/spec to the run (#439), and
-    # a `spec/`-prefixed pattern joined onto those paths would match nothing.
+    # Reason: RSpec's own default pattern, which RSpec resolves under each run path:
+    # `spec/` plus the packs/*/spec dirs packs-rails adds (#439). It never globs the
+    # repo root (lib/templates is untouched). The RakeTask default `spec/**…` would
+    # become packs/<pack>/spec/spec/** for a pack and match nothing.
     t.pattern = "**{,/*/**}/*_spec.rb"
     t.ruby_opts = [
       "-w", # turn warnings on for your script
