@@ -42,9 +42,10 @@ Metrics/BlockLength:
 # Ceiling now tracks the largest class (app/views/boxes/show.rb, a Phlex view).
 # rodauth_main.rb was 239 during the #280/#346/#353 epic; #358 extracted its
 # auth_class_eval methods into RodauthMain::AuthMethods, dropping it to ~102 lines,
-# so the ceiling is back down from 239 to 233.
+# so the ceiling is back down from 239 to 233. #980 raised it to 235 for
+# UnpackingController's deleted-box redirect on complete/reopen.
 Metrics/ClassLength:
-  Max: 233
+  Max: 235
 
 # Offense count: 96
 # Configuration parameters: CountComments, CountAsOne, AllowedMethods, AllowedPatterns.

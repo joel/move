@@ -17,12 +17,18 @@ module Boxes
     # `description` is the optional contents summary captured by the seal modal
     # (B1) — persisted in the same transaction as the seal so the two never
     # diverge. nil leaves any existing description untouched.
+    #
+    # `from` is the optional state the caller expects the box to be in (#979).
+    # BulkTransition passes the source state it selected by, so a box another
+    # member moved on after the bulk loaded it is refused (:invalid_transition)
+    # even when its new state could still legally reach `to`. nil skips the
+    # check, so per-box callers keep validating the edge alone.
 
-    #: (box: untyped, to: untyped, actor: untyped, ?description: untyped) -> Dry::Monads::Result[untyped, untyped]
-    def call(box:, to:, actor:, description: nil)
+    #: (box: untyped, to: untyped, actor: untyped, ?description: untyped, ?from: untyped) -> Dry::Monads::Result[untyped, untyped]
+    def call(box:, to:, actor:, description: nil, from: nil)
       yield ensure_writable(box.move)
       to = to.to_s
-      yield transition_locked(box, to, description)
+      yield transition_locked(box, to, description, from&.to_s)
       yield emit_event(box, to, actor)
       Success(box)
     end
@@ -39,18 +45,24 @@ module Boxes
     # order of #757/#840 — the unpacked cascade writes items only after the box
     # is locked. The emit stays after the write, outside the lock block.
 
-    #: (untyped box, untyped to, untyped description) -> Dry::Monads::Result[untyped, untyped]
-    def transition_locked(box, to, description)
+    #: (untyped box, untyped to, untyped description, String? from) -> Dry::Monads::Result[untyped, untyped]
+    def transition_locked(box, to, description, from)
       box.with_lock(PARENT_ROW_LOCK) do
-        check = validate(box, to)
+        check = validate(box, to, from)
         check.success? ? persist(box, to, description) : check
       end
     rescue ActiveRecord::RecordInvalid => e
       Failure(e.record.errors)
     end
 
-    #: (untyped box, untyped to) -> Dry::Monads::Result[untyped, untyped]
-    def validate(box, to)
+    # The lock's re-read is unscoped, so it can return a box a concurrent
+    # Boxes::Delete discarded after the caller loaded it (#980): that box is
+    # no longer anyone's to transition (CompleteIfEmpty guards the same way).
+
+    #: (untyped box, untyped to, String? from) -> Dry::Monads::Result[untyped, untyped]
+    def validate(box, to, from)
+      return Failure(:not_found) if box.discarded?
+      return Failure(:invalid_transition) if from && box.status != from
       return Failure(:invalid_transition) unless box.can_transition_to?(to)
       return Failure(:room_required) if to == "sealed" && box.room_id.blank?
 

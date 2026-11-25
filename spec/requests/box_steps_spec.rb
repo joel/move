@@ -116,6 +116,23 @@ RSpec.describe "Bulk box steps" do
       )
     end
 
+    it "reports a box deleted after the bulk loaded it as skipped (#980)" do
+      create(:box, :with_room, move:, status: "packing", number: "1")
+      deleted = create(:box, :with_room, move:, status: "packing", number: "2")
+      allow(Boxes::TransitionStatus).to receive(:new).and_wrap_original do |original|
+        Boxes::Delete.new.call(box: Box.find(deleted.id), actor: user) if Box.exists?(deleted.id)
+        original.call
+      end
+
+      post move_box_steps_path(move), params: { to: "sealed" }
+
+      moved = I18n.t("box_steps.create.transitioned", count: 1, status: I18n.t("boxes.status.sealed"))
+      skipped = I18n.t("box_steps.create.skipped", count: 1, numbers: "2",
+                                                   reason: I18n.t("box_steps.skip_reason.not_found"))
+      expect(flash[:notice]).to eq("#{moved} #{skipped}")
+      expect(Box.unscoped.find(deleted.id).status).to eq("packing")
+    end
+
     it "caps the skipped box-number list so a large batch can't overflow the cookie" do
       26.times { |i| create(:box, move:, status: "packing", room: nil, number: (i + 1).to_s) }
 
