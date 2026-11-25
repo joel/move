@@ -20,6 +20,7 @@ en:
     not_available: "This box isn't being unpacked yet."
     flash:
       completed: "Box marked unpacked."
+      already_unpacked: "This box is already unpacked."
       failed: "Could not mark the box unpacked."
       remove_failed: "Couldn't unpack %{name}. The box is shown as it is now."
       photo_remove_failed: "Couldn't unpack this photo. The box is shown as it is now."
