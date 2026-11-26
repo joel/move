@@ -133,5 +133,79 @@ RSpec.describe "In-app camera across Turbo caching (JS)", :js do
       eventually { camera("liveTrack(0)") == false }
       expect(camera("calls")).to eq(1)
     end
+
+    # #994 — a Turbo cache that lands while the shutter is still encoding
+    # (state "capturing") stops the stream and bumps the camera generation.
+    # The grabbed frame must still reach the upload pipeline when the page
+    # stays mounted, instead of being dropped without a word.
+    describe "a Turbo cache during a shutter grab" do
+      # Holds every canvas.toBlob until `__grab.release()`, which restores the
+      # real toBlob first (the upload pipeline may encode again), and counts
+      # form submissions.
+      def hold_grab_js = <<~JS
+        (() => {
+          const original = HTMLCanvasElement.prototype.toBlob
+          const grab = window.__grab = { held: [], submits: 0 }
+          HTMLCanvasElement.prototype.toBlob = function (...args) { grab.held.push(() => original.apply(this, args)) }
+          grab.release = () => {
+            HTMLCanvasElement.prototype.toBlob = original
+            grab.held.splice(0).forEach((encode) => encode())
+          }
+          document.addEventListener("turbo:submit-start", () => grab.submits++)
+        })()
+      JS
+
+      def shutter = "[data-camera-capture-target='shutter']"
+
+      def media_count
+        Apartment::Tenant.switch(slug) { Media.where(box_id: seeded[:box].id).count }
+      end
+
+      def press_shutter_and_hold_grab
+        page.execute_script(hold_grab_js)
+        find(shutter).click
+        eventually { page.evaluate_script("window.__grab.held.length") == 1 }
+      end
+
+      it "still uploads the grabbed photo, exactly once, when the page stays mounted" do
+        open_capture_camera
+        press_shutter_and_hold_grab
+
+        cache_then_render_in_place
+        page.execute_script("window.__grab.release()")
+
+        eventually { media_count == 1 }
+        expect(page.evaluate_script("window.__grab.submits")).to eq(1)
+      end
+
+      # The encode can finish between turbo:before-cache and the render: on a
+      # real navigation, a submit then would hijack it, so nothing may upload
+      # until the page has proved it stayed mounted.
+      it "waits for the page to prove it stayed mounted when the encode finishes first" do
+        open_capture_camera
+        press_shutter_and_hold_grab
+
+        page.execute_script('document.dispatchEvent(new Event("turbo:before-cache"))')
+        page.execute_script("window.__grab.release()")
+        sleep 0.5
+        expect(page.evaluate_script("window.__grab.submits")).to eq(0)
+
+        page.execute_script('document.dispatchEvent(new Event("turbo:render"))')
+        eventually { media_count == 1 }
+        expect(page.evaluate_script("window.__grab.submits")).to eq(1)
+      end
+
+      it "drops the grab when a navigation replaces the page" do
+        open_capture_camera
+        press_shutter_and_hold_grab
+
+        navigate_away
+        page.execute_script("window.__grab.release()")
+
+        sleep 1 # nothing should arrive; give a stray submission time to land
+        expect(media_count).to eq(0)
+        expect(page.evaluate_script("window.__grab.submits")).to eq(0)
+      end
+    end
   end
 end
