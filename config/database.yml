@@ -27,7 +27,9 @@ default: &default
 
 development:
   <<: *default
-  database: move_development
+  # A worktree app (`bin/cli app serve`, #869) runs on its own
+  # move_development_wt_<wt>; config/dev_worktree.rb checks the pair.
+  database: <%= ENV["MOVE_DEV_DATABASE"].to_s.empty? ? "move_development" : ENV["MOVE_DEV_DATABASE"] %>
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.

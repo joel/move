@@ -1,6 +1,12 @@
 require "active_support/core_ext/integer/time"
+require_relative "../dev_worktree"
 
 Rails.application.configure do
+  # Main's hosts by default; a worktree app's own zone under `bin/cli app
+  # serve` (#869), which sets MOVE_TENANT_ZONE + MOVE_DEV_DATABASE.
+  dev_zone = DevWorktree.tenant_zone
+  dev_apex = DevWorktree.apex_host
+
   config.after_initialize do
     Bullet.enable        = true
     Bullet.alert         = true
@@ -54,13 +60,19 @@ Rails.application.configure do
   config.action_mailer.delivery_method = :smtp
   config.action_mailer.raise_delivery_errors = true
   config.action_mailer.smtp_settings = { address: "mail", port: 1025, domain: "move-easy.docker" }
-  config.action_mailer.default_url_options = { host: "move.move-easy.docker", protocol: "https" }
-  config.action_mailer.asset_host = "https://move.move-easy.docker"
+  config.action_mailer.default_url_options = { host: dev_apex, protocol: "https" }
+  config.action_mailer.asset_host = "https://#{dev_apex}"
 
   # Multi-tenancy: org subdomains are <slug>.move-easy.docker (the dev TLS
-  # cert only covers one label). Cookies are host-only (#280) — the apex session
-  # does not carry to subdomains; the post-login handoff token bridges it.
-  config.x.tenant_zone = "move-easy.docker"
+  # cert only covers one label), or <slug>.<wt>.wt.move-easy.docker for a
+  # served worktree. Cookies are host-only (#280) — the apex session does not
+  # carry to subdomains; the post-login handoff token bridges it.
+  config.x.tenant_zone = dev_zone
+
+  # A served worktree must never run on move_development (#869).
+  config.after_initialize do
+    DevWorktree.assert_database!(ActiveRecord::Base.configurations.configs_for(env_name: "development").first&.database)
+  end
 
   # Make template changes take effect immediately.
   config.action_mailer.perform_caching = false
@@ -97,8 +109,9 @@ Rails.application.configure do
   # (<slug>.move-easy.docker), so allow any subdomain of the dev zone, plus
   # localhost subdomains for the directly-exposed Puma. Without this, ActionCable
   # rejects the WS handshake as cross-origin and the progress bar never updates.
+  # A served worktree accepts only its own zone, so main's pages can't open it.
   config.action_cable.allowed_request_origins = [
-    %r{\Ahttps?://([a-z0-9-]+\.)*move-easy\.docker(:\d+)?\z},
+    %r{\Ahttps?://([a-z0-9-]+\.)*#{Regexp.escape(dev_zone)}(:\d+)?\z},
     %r{\Ahttps?://([a-z0-9-]+\.)*localhost(:\d+)?\z}
   ]
 

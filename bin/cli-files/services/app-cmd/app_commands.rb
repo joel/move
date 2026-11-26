@@ -5,12 +5,18 @@ require_relative "../helpers"
 require_relative "../../app-cmd/app_service"
 require_relative "../../app-cmd/checkout_resolver"
 require_relative "../../app-cmd/worktree_run"
+require_relative "../../app-cmd/worktree_serve"
 require_relative "../services_manager"
 
 module AppCLI
   module Services
     class AppCommands < Thor
       include Thor::Actions
+
+      REPO_OPTION_DESC = "Checkout to mount: a worktree branch or directory name, or a path " \
+                         "(starts with /, . or ~). Default: the main checkout".freeze
+      REPO_OPTION_DESC_SERVE = "Worktree to serve: a worktree branch or directory name, or a path " \
+                               "(starts with /, . or ~). Not the main checkout".freeze
 
       desc "start [ENV]", "Start the application (runs setup/build/start for all services)"
       def start(env = nil)
@@ -20,9 +26,27 @@ module AppCLI
         manager.start_all
       end
 
-      desc "stop [ENV]", "Stop the application container"
+      desc "stop [ENV] [--repo T | --name W] [--drop-db]",
+           "Stop the application container, or the worktree app `app serve` started (--repo / --name)"
+      method_option :repo, type: :string, desc: "Worktree whose served app to stop (see `app serve`)"
+      method_option :name, type: :string, desc: "Served worktree app to stop, by its name (move-app-wt-<name>)"
+      method_option :drop_db, type: :boolean, default: false,
+                              desc: "Also drop the worktree's own database (move_development_wt_<name>)"
       def stop(env = nil)
-        app_service(env).stop
+        return app_service(env).stop unless options[:repo] || options[:name]
+
+        refuse_non_dev!(env, "stop --repo/--name")
+        checkout = options[:repo] ? CheckoutResolver.new.resolve(options[:repo]) : nil
+        worktree_serve(checkout).stop(drop_db: options[:drop_db])
+      end
+
+      desc "serve --repo T [--name W]",
+           "Serve a worktree at https://move.<W>.wt.move-easy.docker, next to move-app-dev, on its own database"
+      method_option :repo, type: :string, required: true, desc: REPO_OPTION_DESC_SERVE
+      method_option :name, type: :string,
+                           desc: "Name W for the app, zone and database (default: the worktree directory name)"
+      def serve
+        worktree_serve(CheckoutResolver.new.resolve(options[:repo])).serve
       end
 
       desc "logs [ENV]", "View application logs"
@@ -70,9 +94,6 @@ module AppCLI
         env, command_parts = parse_env_and_command(args)
         app_service(env).exec(command_parts)
       end
-
-      REPO_OPTION_DESC = "Checkout to mount: a worktree branch or directory name, or a path " \
-                         "(starts with /, . or ~). Default: the main checkout".freeze
 
       desc "connect [ENV] [--repo T]", "Open a shell in the application container, or in a throwaway one for --repo"
       method_option :repo, type: :string, desc: REPO_OPTION_DESC
@@ -138,6 +159,18 @@ module AppCLI
 
         checkout = CheckoutResolver.new.resolve(options[:repo])
         exit(worktree_run(env, checkout).interactive(kind))
+      end
+
+      def worktree_serve(checkout)
+        app = WorktreeApp.for(checkout_path: checkout&.path, name: options[:name])
+        main_path = CheckoutResolver.new.main_checkout.path
+        WorktreeServe.new(shell: self, checkout: checkout, main_path: main_path, app: app)
+      end
+
+      def refuse_non_dev!(env, command)
+        return if Services.short_env(Services.normalize_env(env)) == "dev"
+
+        raise Thor::Error, "bin/cli app #{command} only supports the dev environment."
       end
 
       def worktree_run(env, checkout)
