@@ -24,13 +24,13 @@ RSpec.describe "Move-wide review queue flow" do
     pending_photo(box: office_box, name: "Desk lamp", captured_at: 1.hour.ago)
 
     visit move_review_path(move)
-    expect(page).to have_text("Box 1").and have_text("Kitchen")
-    expect(page).to have_text("Box 2").and have_text("Office")
+    expect(page).to have_text("Box 001").and have_text("Kitchen")
+    expect(page).to have_text("Box 002").and have_text("Office")
 
     # Newest first (#687): Review all enters the Office photo, located by its badge.
     click_link I18n.t("review_queues.show.review_all")
     expect(page).to have_field(with: "Desk lamp")
-    expect(page).to have_text(I18n.t("reviews.photo.queue_badge", number: "2"))
+    expect(page).to have_text(I18n.t("reviews.photo.queue_badge", number: "002"))
 
     # #660 — opening no longer confirms; the queue clears only via explicit marks.
     expect(move.items.find_by(name: "Desk lamp").review_state).to eq("pending_review")
@@ -47,7 +47,7 @@ RSpec.describe "Move-wide review queue flow" do
     # (top + bottom controls → match: :first picks the header one).
     click_button I18n.t("reviews.photo.mark_reviewed"), match: :first
     expect(page).to have_field(with: "Coffee machine")
-    expect(page).to have_text(I18n.t("reviews.photo.queue_badge", number: "1"))
+    expect(page).to have_text(I18n.t("reviews.photo.queue_badge", number: "001"))
 
     # Marking the last photo returns to the queue, now all caught up.
     click_button I18n.t("reviews.photo.mark_reviewed"), match: :first
@@ -68,7 +68,7 @@ RSpec.describe "Move-wide review queue flow" do
     # Ignoring the last photo exits to the queue — which still lists both photos.
     click_link I18n.t("reviews.photo.ignore"), match: :first
     expect(page).to have_current_path(move_review_path(move))
-    expect(page).to have_text("Box 1").and have_text("Box 2")
+    expect(page).to have_text("Box 001").and have_text("Box 002")
     expect(move.items.where(review_state: "pending_review").count).to eq(2)
   end
 

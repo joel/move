@@ -25,10 +25,10 @@ RSpec.describe "Gallery Groups" do
 
     expect(page).to have_text(I18n.t("galleries.groups.subtitle"))
     expect(page).to have_text("2 items").and have_text("2 boxes")
-    expect(page).to have_text("Box 2").and have_text("Box 10")
+    expect(page).to have_text("Box 002").and have_text("Box 010")
 
     click_on move.item_clusters.sole.label
-    expect(page).to have_text("AA batteries").and have_text("Box 2 · Kitchen")
+    expect(page).to have_text("AA batteries").and have_text("Box 002 · Kitchen")
 
     page.find("a[href='#{move_box_path(move, box_two)}']").click
     expect(page).to have_current_path(move_box_path(move, box_two))

@@ -78,7 +78,7 @@ module Components
 
       #: (untyped box) -> String
       def box_label(box)
-        parts = [I18n.t("find_lists.show.box_label", number: box.number)]
+        parts = [I18n.t("find_lists.show.box_label", number: box.padded_number)]
         parts << box.room.name if box.room
         parts.join(" · ")
       end

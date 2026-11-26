@@ -220,7 +220,7 @@ module Components
 
       #: (untyped media) -> untyped
       def caption(media)
-        parts = [I18n.t("galleries.index.box_label", number: media.box.number)]
+        parts = [I18n.t("galleries.index.box_label", number: media.box.padded_number)]
         parts << media.box.room.name if media.box.room
         parts.join(" · ")
       end

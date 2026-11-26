@@ -27,7 +27,7 @@ RSpec.describe "Find list flow" do
     visit move_search_path(move)
     expect(page).to have_text(I18n.t("find_lists.search_link", count: 1))
     click_link I18n.t("find_lists.search_link", count: 1)
-    expect(page).to have_text("#{I18n.t("find_lists.show.box_label", number: "3")} · Kitchen")
+    expect(page).to have_text("#{I18n.t("find_lists.show.box_label", number: "003")} · Kitchen")
 
     Items::MarkRemoved.new.call(item: item, actor: user)
     visit move_find_list_path(move)

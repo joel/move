@@ -605,7 +605,7 @@ RSpec.describe "Per-photo review" do
         expect(options.pluck("value")).to eq([open.id, unpacked.id])
         expect(options.first["disabled"]).to be_nil
         expect(options.last["disabled"]).not_to be_nil
-        expect(options.last.text).to eq(I18n.t("reviews.photo.move_to_box_unpacked", number: "7"))
+        expect(options.last.text).to eq(I18n.t("reviews.photo.move_to_box_unpacked", number: "007"))
       end
     end
 

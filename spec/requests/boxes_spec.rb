@@ -20,7 +20,7 @@ RSpec.describe "Boxes" do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("My Boxes").and include(move.name)
-      expect(response.body).to include("Kitchen").and include("Box 01")
+      expect(response.body).to include("Kitchen").and include("Box 001")
     end
 
     it "renders the empty state when the move has no boxes" do
@@ -53,7 +53,7 @@ RSpec.describe "Boxes" do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Kitchen")
-      expect(response.body).not_to include("Box 02")
+      expect(response.body).not_to include("Box 002")
     end
 
     it "treats a malformed room_id as a cleared filter (no error)" do
@@ -62,7 +62,7 @@ RSpec.describe "Boxes" do
       get move_boxes_path(move, room_id: "not-a-uuid")
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Box 01")
+      expect(response.body).to include("Box 001")
     end
 
     it "defaults to recency order so the newest box is first (#336)" do
@@ -72,7 +72,7 @@ RSpec.describe "Boxes" do
       get move_boxes_path(move)
 
       # The newer box (Box 01) sorts above the older one despite its lower number.
-      expect(response.body.index("Box 01")).to be < response.body.index("Box 05")
+      expect(response.body.index("Box 001")).to be < response.body.index("Box 005")
     end
 
     it "orders by box number ascending when ?sort=number" do
@@ -81,7 +81,7 @@ RSpec.describe "Boxes" do
 
       get move_boxes_path(move, sort: "number")
 
-      expect(response.body.index("Box 01")).to be < response.body.index("Box 02")
+      expect(response.body.index("Box 001")).to be < response.body.index("Box 002")
     end
 
     it "orders by weight (heaviest first, unweighed last) when ?sort=weight" do
@@ -92,8 +92,8 @@ RSpec.describe "Boxes" do
       get move_boxes_path(move, sort: "weight")
 
       body = response.body
-      expect(body.index("Box 02")).to be < body.index("Box 01")
-      expect(body.index("Box 01")).to be < body.index("Box 03")
+      expect(body.index("Box 002")).to be < body.index("Box 001")
+      expect(body.index("Box 001")).to be < body.index("Box 003")
     end
 
     it "orders by volume (largest first, dimensionless last) when ?sort=size" do
@@ -104,8 +104,8 @@ RSpec.describe "Boxes" do
       get move_boxes_path(move, sort: "size")
 
       body = response.body
-      expect(body.index("Box 02")).to be < body.index("Box 01")
-      expect(body.index("Box 01")).to be < body.index("Box 03")
+      expect(body.index("Box 002")).to be < body.index("Box 001")
+      expect(body.index("Box 001")).to be < body.index("Box 003")
     end
 
     it "falls back to the default order for an unknown ?sort=" do
@@ -114,7 +114,7 @@ RSpec.describe "Boxes" do
       get move_boxes_path(move, sort: "nonsense")
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Box 01")
+      expect(response.body).to include("Box 001")
     end
 
     it "keeps the active sort when switching room filters" do
