@@ -70,6 +70,8 @@ export default class extends Controller {
     // Set by #settle when the focused pending status hides mid-request (#995).
     this.focusOnStarted = false
     this.settleTimer = null
+    // The camera generation of a grab a Turbo cache interrupted (#994).
+    this.keptGrab = null
     // The getUserMedia lifecycle (generation guard, track-ended hook, release)
     // is the shared camera/stream module (#618); this controller owns only
     // the capture state machine around it.
@@ -95,6 +97,7 @@ export default class extends Controller {
     document.removeEventListener("visibilitychange", this.onVisibility)
     this.#clearSettleTimer()
     this.resumeAfterCache = false
+    this.keptGrab = null
     this.camera.stop()
   }
 
@@ -104,9 +107,14 @@ export default class extends Controller {
   // cache WITHOUT replacing the page (#987: a history entry Turbo didn't
   // create, or a morphing refresh), so a camera that was live is remembered
   // and resumed if this controller is still connected afterwards.
+  //
+  // A grab still encoding (state "capturing") is not thrown away with the
+  // stream (#994): its frame was taken before the cache, so capture() hands
+  // it over once the page has proved to stay mounted.
   teardown() {
     const live = this.state === "requesting" || this.state === "streaming" || this.state === "capturing"
     if (!live) return
+    if (this.state === "capturing") this.keptGrab = this.camera.generation
     this.camera.stop()
     this.resumeAfterCache = true
     this.#setState("idle")
@@ -211,6 +219,7 @@ export default class extends Controller {
     } catch (_error) {
       // Fall through: no frame, no flash — the shutter re-arms below.
     }
+    if (this.keptGrab === generation) return this.#deliverKept(blob)
     if (!this.camera.isCurrent(generation) || this.state !== "capturing") return
     if (blob) {
       // Feedback only when a frame actually enters the pipeline — a flash on a
@@ -219,6 +228,22 @@ export default class extends Controller {
       this.#deliver(blob)
     }
     this.#setState("streaming")
+  }
+
+  // A turbo:before-cache interrupted this grab (#994). Deferred one tick, like
+  // resume(): by then Turbo has cloned its snapshot and, on a real navigation,
+  // replaced the page (the controller disconnected, and the user chose to
+  // leave). The state is left to teardown/resume, which own it now. An upload
+  // that started meanwhile keeps the single-slot input: overwriting it would
+  // abort that photo instead.
+  #deliverKept(blob) {
+    this.keptGrab = null
+    if (!blob) return
+    setTimeout(() => {
+      if (!this.element.isConnected || this.uploadPending) return
+      this.#flash()
+      this.#deliver(blob)
+    }, 0)
   }
 
   // Any `change` on the file input carrying a real selection (our own #deliver
