@@ -5,7 +5,7 @@
 
 module Clusters
   # A cluster and its member items for the group-detail page (#633). Members
-  # are filtered LIVE through Item.searchable — an item removed or discarded
+  # are filtered LIVE through Item.confirmed_in_box — an item removed or discarded
   # since the last recompute drops out immediately even while the denormalized
   # counts are ~a-debounce stale — and ordered by box number then name: the
   # detail page is an unpacking checklist, so you sweep one box at a time.
@@ -22,7 +22,7 @@ module Clusters
       # page's thumb calls image_displayable? and TransformUrl per member, which
       # touch both — without the nested preload the page degrades linearly with
       # member count.
-      items = cluster.items.merge(Item.searchable)
+      items = cluster.items.merge(Item.confirmed_in_box)
                      .includes(box: :room, source_media: { image_attachment: :blob })
                      .joins(:box)
                      .order(Arel.sql("boxes.number::bigint"), :name)

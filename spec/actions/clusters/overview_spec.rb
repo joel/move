@@ -56,7 +56,7 @@ RSpec.describe Clusters::Overview do
     leaving.update!(presence_state: "removed") # unpacked, not discarded
 
     # The chip must not send the user to box 10 — no searchable member is there,
-    # matching the detail page's live Item.searchable filter.
+    # matching the detail page's live Item.confirmed_in_box filter.
     expect(overview.box_numbers.fetch(battery.id)).to eq(%w[2])
   end
 

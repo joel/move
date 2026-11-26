@@ -146,6 +146,21 @@ RSpec.describe "Searches" do
       expect(response.body).not_to include("Hidden lamp")
     end
 
+    # #1006 — a fresh capture is findable before review, marked as unreviewed.
+    it "includes pending_review items, marked Unreviewed; confirmed items carry no mark" do
+      box = create(:box, move:, number: "5")
+      create(:item, move:, box:, name: "Electric kettle", review_state: "pending_review")
+      create(:item, :confirmed, move:, box:, name: "Kettle descaler")
+      index_all
+
+      get move_search_path(move, q: "kettle")
+
+      page = response.parsed_body
+      card = ->(name) { page.css("h3").find { |h| h.text.strip == name }.ancestors("a").first }
+      expect(card.call("Electric kettle").text).to include(I18n.t("searches.unreviewed"))
+      expect(card.call("Kettle descaler").text).not_to include(I18n.t("searches.unreviewed"))
+    end
+
     it "surfaces recent successful searches on the empty state, replacing examples" do
       room = create(:room, move:, name: "Kitchen")
       box = create(:box, move:, number: "1", room:)

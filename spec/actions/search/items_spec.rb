@@ -117,6 +117,16 @@ RSpec.describe Search::Items do
       all = described_class.new.call(move:, query: "lamp", include_hidden: true).value!.map(&:item)
       expect(all).to include(visible, needs, removed)
     end
+
+    # #1006 — §7.4 excludes only needs_correction, false positives and removed
+    # items. A freshly captured (pending_review) item that is still in its box
+    # must be findable before anyone reviews it.
+    it "includes in-box pending_review items by default" do
+      pending = index(create(:item, move:, box:, name: "Electric kettle", review_state: "pending_review"))
+
+      default = described_class.new.call(move:, query: "kettle").value!.map(&:item)
+      expect(default).to include(pending)
+    end
   end
 
   describe "denormalized propagation (Domain §7.3)" do
