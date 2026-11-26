@@ -6,8 +6,8 @@
 
 module Clusters
   # Recomputes a Move's item clusters (#629, PR 2 of #625): groups the
-  # searchable items into families ("AA batteries — 9 items · 4 boxes") over
-  # name embeddings. Full recompute per Move on purpose — at a few hundred
+  # confirmed in-box items (Item.confirmed_in_box) into families
+  # ("AA batteries — 9 items · 4 boxes") over name embeddings. Full recompute per Move on purpose — at a few hundred
   # distinct names it is seconds of work, and re-deriving globally each run
   # keeps the result deterministic and drift-free (no incremental staleness
   # classes). Two stages:
@@ -83,14 +83,14 @@ module Clusters
 
     private
 
-    # Stage 1: one bounded SELECT of the searchable set, grouped by normalized
+    # Stage 1: one bounded SELECT of the clustering set, grouped by normalized
     # name in memory (a clustering working set — the sanctioned in-memory
     # group_by, not a DB-derivable aggregate). Blank normalizations are dropped
     # (a name of pure punctuation cannot be clustered meaningfully).
 
     #: (untyped move) -> Hash[String, untyped]
     def stage_one(move)
-      rows = move.items.searchable.pluck(:id, :name, :box_id, :family)
+      rows = move.items.confirmed_in_box.pluck(:id, :name, :box_id, :family)
       rows.group_by { |(_, name, _, _)| normalize(name) }.except("").to_h do |key, members|
         items = members.map { |(id, name, box_id, family)| { id: id, name: name, box_id: box_id, family: family } }
         [key, { key: key, items: items, key_text: key_text(key, items) }]

@@ -35,6 +35,20 @@ RSpec.describe Item do
 
       expect(box.items.unreviewed).to contain_exactly(kept)
     end
+
+    # #1006 — searchable is the Domain §7.4 set (pending included); the
+    # clustering set stays confirmed-only.
+    it "splits searchable (pending + confirmed) from confirmed_in_box" do
+      box = create(:box)
+      pending = create(:item, move: box.move, box:, review_state: "pending_review")
+      confirmed = create(:item, :confirmed, move: box.move, box:)
+      auto = create(:item, :auto_confirmed, move: box.move, box:)
+      create(:item, move: box.move, box:, review_state: "needs_correction")
+      create(:item, :confirmed, move: box.move, box:, presence_state: "removed")
+
+      expect(box.items.searchable).to contain_exactly(pending, confirmed, auto)
+      expect(box.items.confirmed_in_box).to contain_exactly(confirmed, auto)
+    end
   end
 
   describe "image generation claim (#416)" do

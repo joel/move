@@ -25,7 +25,7 @@ RSpec.describe "GalleryGroups" do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(cluster.label)
-      expect(response.body).to include("Box 2 · Kitchen").and include("Box 10")
+      expect(response.body).to include("Box 002 · Kitchen").and include("Box 010")
       # Box 2's member listed before box 10's — the sweep order.
       expect(response.body.index("AA battery")).to be < response.body.index("AAA battery")
     end

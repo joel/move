@@ -142,13 +142,13 @@ module Components
       I18n.t("boxes.card.badge", number: padded_number)
     end
 
-    # The card's visible identity is the zero-padded badge ("Box 01"), so every
-    # label naming the box (badge, duplicate control) uses the same padding.
+    # The card's visible identity is the box's printed-label name ("Box 007",
+    # Box#padded_number), so every label naming the box (badge, duplicate
+    # control) matches the physical label (#1007).
 
     #: () -> String
     def padded_number
-      # Kernel.format (not bare `format`, which is a Phlex element helper).
-      Kernel.format("%02d", @box.number.to_i)
+      @box.padded_number
     end
 
     #: () -> String

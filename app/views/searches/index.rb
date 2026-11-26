@@ -165,6 +165,7 @@ module Views
               h3(class: "text-headline-md text-text-warm transition-colors group-hover:text-accent-sage") do
                 result.item.name
               end
+              unreviewed_badge(result.item)
               location(result)
             end
           end
@@ -246,6 +247,21 @@ module Views
         )
       end
 
+      # A pending_review item is searchable (#1006) but its name is still the
+      # AI's guess — say so, so a wrong name isn't read as confirmed.
+
+      #: (untyped item) -> untyped
+      def unreviewed_badge(item)
+        return unless item.review_state == "pending_review"
+
+        div do
+          render Components::Ui::Chip.new(
+            label: I18n.t("searches.unreviewed"), kind: :tag,
+            title: I18n.t("searches.unreviewed_hint")
+          )
+        end
+      end
+
       #: (untyped result) -> untyped
       def location(result)
         div(class: "mt-auto flex items-center gap-3 rounded-card border border-card-border bg-page p-3") do
@@ -263,7 +279,7 @@ module Views
 
       #: (untyped result) -> String
       def location_label(result)
-        box = I18n.t("searches.box", number: result.box_number)
+        box = I18n.t("searches.box", number: Box.pad_number(result.box_number))
         result.room_name.present? ? "#{box} · #{result.room_name}" : box
       end
 

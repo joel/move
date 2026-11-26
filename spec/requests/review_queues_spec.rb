@@ -27,7 +27,7 @@ RSpec.describe "ReviewQueues" do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(I18n.t("review_queues.show.subtitle"))
-      expect(response.body).to include("Box 3").and include("Kitchen")
+      expect(response.body).to include("Box 003").and include("Kitchen")
       expect(response.body).to include(I18n.t("review_queues.show.pending_badge", count: 2))
     end
 
@@ -37,7 +37,7 @@ RSpec.describe "ReviewQueues" do
 
       get move_review_path(move)
 
-      expect(response.body.index("Box 1")).to be < response.body.index("Box 2")
+      expect(response.body.index("Box 001")).to be < response.body.index("Box 002")
     end
 
     it "links Review all and every tile into the queue-mode walk" do
@@ -122,8 +122,8 @@ RSpec.describe "ReviewQueues" do
 
       aggregate_failures do
         expect(response.body).to include(I18n.t("review_queues.show.capped", count: 1))
-        expect(response.body).to include("Box 2")
-        expect(response.body).not_to include("Box 1")
+        expect(response.body).to include("Box 002")
+        expect(response.body).not_to include("Box 001")
       end
     end
 

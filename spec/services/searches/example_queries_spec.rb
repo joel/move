@@ -27,6 +27,13 @@ RSpec.describe Searches::ExampleQueries do
     expect(described_class.new(move).list).to eq([])
   end
 
+  # #1006 — suggestions follow search's own set, so an unreviewed item counts.
+  it "counts pending_review items, which search now finds" do
+    add_items(office, "Lamp", review_state: "pending_review")
+
+    expect(described_class.new(move).list).to eq(%w[Office Lamp])
+  end
+
   it "skips items not yet indexed, which search could not match" do
     add_items(office, "Lamp", index: false)
 

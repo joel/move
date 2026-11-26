@@ -83,7 +83,7 @@ module Components
         div(class: "flex flex-wrap gap-2") do
           @box_numbers.first(CHIP_CAP).each do |number|
             render Components::Ui::Chip.new(
-              label: I18n.t("galleries.groups.card.box_chip", number: number), kind: :category
+              label: I18n.t("galleries.groups.card.box_chip", number: Box.pad_number(number)), kind: :category
             )
           end
           overflow_chip
