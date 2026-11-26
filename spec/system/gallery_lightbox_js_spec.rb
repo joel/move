@@ -63,7 +63,7 @@ RSpec.describe "Gallery lightbox (JS)", :js do
     first("button[data-lightbox-target='tile']").click
 
     expect(page).to have_css(".pswp--open")
-    expect(page).to have_css(".pswp__move-caption", text: /Box 2/i)
+    expect(page).to have_css(".pswp__move-caption", text: /Box 002/i)
     # The caption text is CSS-uppercased, so match the box link by href, not text.
     # Look the box up inside the tenant — the thread has left the schema by now.
     box_two = Apartment::Tenant.switch(slug) { move.boxes.find_by(number: "2") }
@@ -85,11 +85,11 @@ RSpec.describe "Gallery lightbox (JS)", :js do
 
     box_one = Apartment::Tenant.switch(slug) { move.boxes.find_by(number: "1") }
     click_button(I18n.t("galleries.index.lightbox.next"))
-    expect(page).to have_css(".pswp__move-caption", text: /Box 1/i)
+    expect(page).to have_css(".pswp__move-caption", text: /Box 001/i)
     expect(page).to have_css("a.pswp__button--move-view-box[href='#{move_box_path(move, box_one)}']")
 
     click_button(I18n.t("galleries.index.lightbox.prev"))
-    expect(page).to have_css(".pswp__move-caption", text: /Box 2/i)
+    expect(page).to have_css(".pswp__move-caption", text: /Box 002/i)
   end
 
   # The seeded-search chips (#724): rendered from data-items on the opened
@@ -131,7 +131,7 @@ RSpec.describe "Gallery lightbox (JS)", :js do
       # off), so count the main slides regardless of visibility.
       expect(page).to have_css(".move-gallery__slide", count: 2, visible: :all)
       expect(page).to have_css(".move-gallery__thumb", count: 2, visible: :all)
-      expect(page).to have_css(".move-gallery__caption", text: /Box 2/i)
+      expect(page).to have_css(".move-gallery__caption", text: /Box 002/i)
       # Counter text is CSS-uppercased ("1 OF 2"), so match case-insensitively.
       expect(page).to have_css(".move-gallery__counter", text: /1 of 2/i)
 
