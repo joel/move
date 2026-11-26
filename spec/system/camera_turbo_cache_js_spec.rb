@@ -178,6 +178,23 @@ RSpec.describe "In-app camera across Turbo caching (JS)", :js do
         expect(page.evaluate_script("window.__grab.submits")).to eq(1)
       end
 
+      # The encode can finish between turbo:before-cache and the render: on a
+      # real navigation, a submit then would hijack it, so nothing may upload
+      # until the page has proved it stayed mounted.
+      it "waits for the page to prove it stayed mounted when the encode finishes first" do
+        open_capture_camera
+        press_shutter_and_hold_grab
+
+        page.execute_script('document.dispatchEvent(new Event("turbo:before-cache"))')
+        page.execute_script("window.__grab.release()")
+        sleep 0.5
+        expect(page.evaluate_script("window.__grab.submits")).to eq(0)
+
+        page.execute_script('document.dispatchEvent(new Event("turbo:render"))')
+        eventually { media_count == 1 }
+        expect(page.evaluate_script("window.__grab.submits")).to eq(1)
+      end
+
       it "drops the grab when a navigation replaces the page" do
         open_capture_camera
         press_shutter_and_hold_grab
