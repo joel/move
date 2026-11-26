@@ -19,7 +19,7 @@ module Clusters
       item.created item.updated item.moved item.deleted
       item.removed item.restored item.undeleted item.family_backfilled
     ].freeze
-    # Box-level cascades change the searchable set WITHOUT item events (Codex
+    # Box-level cascades change the clustering set WITHOUT item events (Codex
     # P2 on #632): marking a box unpacked bulk-updates its items to removed via
     # update_all, and box delete/restore cascade discard/undiscard the children.
     # status_changed is subscribed for every transition rather than decoding

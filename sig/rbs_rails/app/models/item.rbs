@@ -844,6 +844,7 @@ class ::Item < ::ApplicationRecord
   def self.unreviewed: () -> ::Item::ActiveRecord_Relation
   def self.ordered: () -> ::Item::ActiveRecord_Relation
   def self.searchable: () -> ::Item::ActiveRecord_Relation
+  def self.confirmed_in_box: () -> ::Item::ActiveRecord_Relation
 
   module ::Item::GeneratedRelationMethods
     def in_box: () -> ::Item::ActiveRecord_Relation
@@ -855,6 +856,8 @@ class ::Item < ::ApplicationRecord
     def ordered: () -> ::Item::ActiveRecord_Relation
 
     def searchable: () -> ::Item::ActiveRecord_Relation
+
+    def confirmed_in_box: () -> ::Item::ActiveRecord_Relation
   end
 
   class ::Item::ActiveRecord_Relation < ::ActiveRecord::Relation

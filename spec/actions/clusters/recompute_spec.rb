@@ -91,7 +91,9 @@ RSpec.describe Clusters::Recompute do
     expect(move.item_clusters.sole.id).to eq(ids.fetch("aa battery"))
   end
 
-  it "clusters only the searchable set: pending, removed and discarded items don't count" do
+  # #1006 — clusters keep the confirmed-only set (Item.confirmed_in_box) even
+  # though search now includes pending_review items.
+  it "clusters only confirmed in-box items: pending, removed and discarded items don't count" do
     item!("AA battery")
     create(:item, move:, box: box_a, name: "AA battery", review_state: "pending_review")
     create(:item, :auto_confirmed, move:, box: box_a, name: "AA battery", presence_state: "removed")
@@ -99,7 +101,7 @@ RSpec.describe Clusters::Recompute do
 
     run
 
-    # Only one searchable member remains — below MIN_CLUSTER_ITEMS.
+    # Only one confirmed in-box member remains — below MIN_CLUSTER_ITEMS.
     expect(move.item_clusters).to be_empty
   end
 

@@ -124,6 +124,20 @@ RSpec.describe "MCP endpoint" do
     end
   end
 
+  describe "search_items" do
+    # #1006 — the same §7.4 set as the web UI: unreviewed items are findable and
+    # carry their review_state so the client knows the name is the AI's guess.
+    it "finds a pending_review item and reports its review_state" do
+      box = create(:box, move:, number: 4)
+      item = create(:item, move:, box:, name: "Electric kettle", review_state: "pending_review")
+      Search::RefreshDocument.new.call(item:)
+
+      results = structured(tool_call("search_items", { query: "kettle" }))["results"]
+
+      expect(results.pluck("name", "review_state")).to eq([["Electric kettle", "pending_review"]])
+    end
+  end
+
   describe "get_box_contents" do
     it "lists the in-box items of a box" do
       box = create(:box, move:, number: 2)

@@ -16,6 +16,8 @@ en:
     location: "Location"
     box: "Box %{number}"
     more_like_this: "More like “%{name}”"
+    unreviewed: "Unreviewed"
+    unreviewed_hint: "Name suggested by AI, not reviewed yet"
     match:
       exact: "Exact match"
       lexical: "Match"

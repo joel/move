@@ -17,7 +17,7 @@ module Clusters
     # that turned non-displayable and still fill the 2×2 quilt.
     MEMBER_WINDOW = 8
 
-    # status: :no_items (nothing searchable yet) · :organizing (never computed —
+    # status: :no_items (no confirmed in-box item yet) · :organizing (never computed —
     # caller should request a refresh) · :none (computed, no family qualified) ·
     # :ready. preview_media_ids/box_numbers are keyed by cluster id. Preview
     # ids (not Media) on purpose: Media is packs/captures' public model, so the
@@ -27,7 +27,7 @@ module Clusters
 
     #: (move: untyped) -> Dry::Monads::Result[untyped, untyped]
     def call(move:)
-      return Success(empty(:no_items)) unless move.items.searchable.exists?
+      return Success(empty(:no_items)) unless move.items.confirmed_in_box.exists?
       return Success(empty(:organizing)) unless computed?(move)
 
       rows = ItemCluster.where(move_id: move.id).by_spread.limit(CAP + 1).to_a
@@ -60,7 +60,7 @@ module Clusters
     # window ranks them, so the window counts distinct photos — a box whose one
     # photo recognized a dozen members can't starve the quilt of the other
     # boxes' photos. The window is wider than the 4 shown so the view can drop
-    # any that turned non-displayable and still fill the strip. The searchable
+    # any that turned non-displayable and still fill the strip. The clustering-set
     # guards are explicit because raw SQL bypasses the default_scope and the
     # scope. Returns ids, not Media (see Result) — the root gallery layer loads
     # the photos, keeping packs/search free of the packs/captures Media model.
@@ -97,7 +97,7 @@ module Clusters
     # The chip payload: every member box number per cluster, numerically
     # ordered in SQL (numbers are strings — a lexical sort puts "9" after
     # "10"). Bounded by the clusters on the page; the card truncates. The
-    # searchable predicates match the detail page's Item.searchable AND the
+    # confirmed_in_box predicates match the detail page AND the
     # preview query above: the chips ARE the retrieval answer, so a member
     # removed/unpacked since the recompute must not send the user to a box no
     # current member occupies (bounded staleness in the debounce window

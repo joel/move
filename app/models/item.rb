@@ -42,9 +42,15 @@ class Item < ApplicationRecord
   # by the box badge, the boxes-home summary, the move cards and the review queue.
   scope :unreviewed, -> { in_box.where(review_state: %w[pending_review needs_correction]) }
   scope :ordered, -> { order(created_at: :asc) }
-  # Confirmed/auto-confirmed items still in their box — the default searchable set
-  # (excludes needs_correction and removed; Domain §7.4).
-  scope :searchable, -> { in_box.where(review_state: %w[confirmed auto_confirmed]) }
+  # The default search set (Domain §7.4): items still in their box, leaving out
+  # only needs_correction and removed ones (a false positive is removed). A
+  # pending_review item is included — a fresh capture must be findable before
+  # anyone reviews it (#1006); results mark it as an unconfirmed AI name.
+  scope :searchable, -> { in_box.where(review_state: %w[pending_review confirmed auto_confirmed]) }
+  # Reviewed items still in their box — the clustering set (gallery families,
+  # group detail, same-group rail). Narrower than searchable on purpose: a
+  # family is built from trusted names, not the AI's first guess (#1006).
+  scope :confirmed_in_box, -> { in_box.where(review_state: %w[confirmed auto_confirmed]) }
 
   #: () -> bool
   def removed?
