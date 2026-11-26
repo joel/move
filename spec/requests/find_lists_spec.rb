@@ -26,9 +26,9 @@ RSpec.describe "FindLists" do
       aggregate_failures do
         expect(response).to have_http_status(:ok)
         expect(response.body).to include(I18n.t("find_lists.show.title"))
-        expect(response.body).to include("#{I18n.t("find_lists.show.box_label", number: "7")} · Bedroom")
+        expect(response.body).to include("#{I18n.t("find_lists.show.box_label", number: "007")} · Bedroom")
         expect(response.body).to include(move_box_path(move, early_box)).and include(move_box_path(move, late_box))
-        expect(response.body.index("Box 7")).to be < response.body.index("Box 11")
+        expect(response.body.index("Box 007")).to be < response.body.index("Box 011")
         expect(response.body).to include("line-through").and include(I18n.t("find_lists.show.found"))
         expect(response.body).to include(I18n.t("find_lists.show.found_count", found: 1, total: 2))
         expect(response.body).to include(move_find_list_clear_found_path(move))

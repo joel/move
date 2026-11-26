@@ -24,7 +24,7 @@ RSpec.describe "Boxes Home" do
     click_on I18n.t("boxes.form.submit")
 
     expect(page).to have_current_path(move_boxes_path(move), ignore_query: true)
-    expect(page).to have_text("Box 01").and have_text("Kitchen")
+    expect(page).to have_text("Box 001").and have_text("Kitchen")
     expect(move.boxes.reload.count).to eq(1)
   end
 
@@ -59,12 +59,12 @@ RSpec.describe "Boxes Home" do
 
     visit move_boxes_path(move)
     # Capybara matches the button by its title (aria-label matching is off).
-    click_on I18n.t("boxes.index.duplicate_box", number: "01")
+    click_on I18n.t("boxes.index.duplicate_box", number: "001")
 
     # The copy semantics live in the action/request specs; here we prove the
     # card's button wires click → new box visible on the index.
     expect(page).to have_current_path(move_boxes_path(move), ignore_query: true)
-    expect(page).to have_text("Box 02")
+    expect(page).to have_text("Box 002")
     expect(move.boxes.reload.count).to eq(2)
   end
 
@@ -76,6 +76,6 @@ RSpec.describe "Boxes Home" do
 
     expect(page).to have_text("My Boxes")
     expect(page).to have_no_link(I18n.t("boxes.index.add"))
-    expect(page).to have_no_button(I18n.t("boxes.index.duplicate_box", number: "01"))
+    expect(page).to have_no_button(I18n.t("boxes.index.duplicate_box", number: "001"))
   end
 end

@@ -33,7 +33,7 @@ RSpec.describe "Searches" do
       get move_search_path(move, q: "skillet")
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Cast iron skillet").and include("Box 1").and include("Kitchen")
+      expect(response.body).to include("Cast iron skillet").and include("Box 001").and include("Kitchen")
     end
 
     it "renders the item's photo thumbnail on the result card" do

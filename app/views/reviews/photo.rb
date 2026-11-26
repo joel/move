@@ -134,7 +134,7 @@ module Views
         attrs = if @queue
                   # Guarded like every navigation on this screen (#690/#699).
                   { href: move_box_path(@move, @box), class: "#{base} transition hover:text-text-warm",
-                    aria: { label: I18n.t("reviews.photo.view_box", number: @box.number) },
+                    aria: { label: I18n.t("reviews.photo.view_box", number: @box.padded_number) },
                     data: { action: "click->pending-add#guardVisit" } }
                 else
                   { class: base }
@@ -149,7 +149,7 @@ module Views
       #: () -> String
       def badge_text
         if @queue
-          [I18n.t("reviews.photo.queue_badge", number: @box.number), @box.room&.name].compact.join(" · ")
+          [I18n.t("reviews.photo.queue_badge", number: @box.padded_number), @box.room&.name].compact.join(" · ")
         else
           I18n.t("reviews.photo.badge", position: @position, total: @total)
         end
@@ -291,15 +291,20 @@ module Views
       end
 
       # Unpacked boxes stay listed (a picker is a selection surface) but are
-      # disabled and sorted last: Photos::Move refuses them (#839/#947).
+      # disabled and sorted last: Photos::Move refuses them (#839/#947). Labels
+      # are the padded box name (#1007); Box.distinct_padded_labels keeps
+      # "1"/"01" distinguishable so every option stays unique.
 
       #: () -> void
       def move_target_options
+        labels = Box.distinct_padded_labels(@move_boxes.map { |b| [b.id, b.number] })
         open, unpacked = @move_boxes.partition { |b| !b.unpacked? }
-        open.each { |box| option(value: box.id) { I18n.t("reviews.photo.move_to_box", number: box.number) } }
+        open.each do |box|
+          option(value: box.id) { I18n.t("reviews.photo.move_to_box", number: labels.fetch(box.id)) }
+        end
         unpacked.each do |box|
           option(value: box.id, disabled: true) do
-            I18n.t("reviews.photo.move_to_box_unpacked", number: box.number)
+            I18n.t("reviews.photo.move_to_box_unpacked", number: labels.fetch(box.id))
           end
         end
       end

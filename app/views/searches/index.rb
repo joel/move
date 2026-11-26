@@ -279,7 +279,7 @@ module Views
 
       #: (untyped result) -> String
       def location_label(result)
-        box = I18n.t("searches.box", number: result.box_number)
+        box = I18n.t("searches.box", number: Box.pad_number(result.box_number))
         result.room_name.present? ? "#{box} · #{result.room_name}" : box
       end
 

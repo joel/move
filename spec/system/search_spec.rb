@@ -28,7 +28,7 @@ RSpec.describe "Hybrid search" do
     visit move_search_path(move, q: "skillet")
 
     expect(page).to have_text("Cast iron skillet")
-    expect(page).to have_text("Box 1").and have_text("Kitchen")
+    expect(page).to have_text("Box 001").and have_text("Kitchen")
     expect(page).to have_text(I18n.t("searches.match.exact"))
     expect(page).to have_css('img[alt="Cast iron skillet"]')
   end

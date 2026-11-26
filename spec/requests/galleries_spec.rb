@@ -19,7 +19,7 @@ RSpec.describe "Galleries" do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(I18n.t("galleries.index.subtitle"))
-      expect(response.body).to include("Box 3").and include("Kitchen")
+      expect(response.body).to include("Box 003").and include("Kitchen")
     end
 
     it "orders photos most-recent first by default and reverses for sort=oldest" do
@@ -29,11 +29,11 @@ RSpec.describe "Galleries" do
       create(:media, move:, box: newer_box, captured_at: 1.hour.ago)
 
       get move_gallery_path(move)
-      expect(response.body.index("Box 2")).to be < response.body.index("Box 1")
+      expect(response.body.index("Box 002")).to be < response.body.index("Box 001")
 
       get move_gallery_path(move, sort: "oldest")
       expect(response).to have_http_status(:ok)
-      expect(response.body.index("Box 1")).to be < response.body.index("Box 2")
+      expect(response.body.index("Box 001")).to be < response.body.index("Box 002")
     end
 
     it "filters to a single room and keeps the sort bookmarkable" do
@@ -47,8 +47,8 @@ RSpec.describe "Galleries" do
       get move_gallery_path(move, room_id: kitchen.id)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Box 1")
-      expect(response.body).not_to include("Box 2")
+      expect(response.body).to include("Box 001")
+      expect(response.body).not_to include("Box 002")
     end
 
     it "emits real slide dimensions scaled into the detail box when edge transforms serve (#675)" do
@@ -250,7 +250,7 @@ RSpec.describe "Galleries" do
 
       get move_gallery_path(move)
 
-      expect(response.body).not_to include("Box 9")
+      expect(response.body).not_to include("Box 009")
     end
 
     it "windows the grid to one page and renders the pager cursored at the last tile (#718)" do
@@ -317,15 +317,15 @@ RSpec.describe "Galleries" do
 
       # Page one is the genuinely-oldest photo (Box 1), not the newest one
       # reversed into view; the cursor keeps the non-default sort.
-      expect(response.body).to include("Box 1")
-      expect(response.body).not_to include("Box 2")
+      expect(response.body).to include("Box 001")
+      expect(response.body).not_to include("Box 002")
       cursor = rendered_cursor(response.body)
       expect(cursor.fetch("sort")).to eq("oldest")
 
       get move_gallery_path(move, **cursor)
 
-      expect(response.body).to include("Box 2")
-      expect(response.body).not_to include("Box 1")
+      expect(response.body).to include("Box 002")
+      expect(response.body).not_to include("Box 001")
     end
 
     it "keeps the room filter on the pager and counts only filtered photos as remaining" do
@@ -349,18 +349,18 @@ RSpec.describe "Galleries" do
 
       get move_gallery_path(move, cursor: "not-a-time", cursor_id: "not-a-uuid")
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Box 1")
+      expect(response.body).to include("Box 001")
 
       # A well-formed uuid with a garbage timestamp is equally forgiven.
       get move_gallery_path(move, cursor: "garbage", cursor_id: media.id)
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Box 1")
+      expect(response.body).to include("Box 001")
 
       # A Ruby-parseable year that overflows Postgres's timestamp range must
       # not become a PG::DatetimeFieldOverflow 500 (security pass, #718).
       get move_gallery_path(move, cursor: "999999-01-01T00:00:00Z", cursor_id: media.id)
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Box 1")
+      expect(response.body).to include("Box 001")
     end
 
     it "renders no pager while the photos fit a single page" do
@@ -415,7 +415,7 @@ RSpec.describe "Galleries" do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(I18n.t("galleries.groups.subtitle"))
       expect(response.body).to include("2 items").and include("2 boxes")
-      expect(response.body).to include("Box 2").and include("Box 10")
+      expect(response.body).to include("Box 002").and include("Box 010")
       expect(response.body).to include(move_gallery_group_path(move, move.item_clusters.sole))
       # The member photo resolves through the root gallery layer into the quilt.
       expect(response.body).to include("<img")

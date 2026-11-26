@@ -93,7 +93,7 @@ module Views
 
       #: (untyped item) -> String
       def location(item)
-        parts = [I18n.t("gallery_groups.show.box_label", number: item.box.number)]
+        parts = [I18n.t("gallery_groups.show.box_label", number: item.box.padded_number)]
         parts << item.box.room.name if item.box.room
         parts.join(" · ")
       end
